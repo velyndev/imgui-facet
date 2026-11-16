@@ -30,17 +30,18 @@ namespace facet
 {
 namespace internal
 {
-// Frames between capture attempts after a failure.
-constexpr std::uint64_t kGlassRetryFrames = 120;
-
 namespace
 {
+
+// Seconds between capture attempts after a failure. Measured in time, not frames, so the
+// interval is the same at any frame rate.
+constexpr double kGlassRetrySeconds = 2.0;
 
 struct BlurState
 {
     BlurPass pass;
-    bool captureOk = true;          // result of the most recent capture
-    std::uint64_t failedFrame = 0;  // frame of the most recent failed capture
+    bool captureOk = true;    // result of the most recent capture
+    double failedTime = 0.0;  // ImGui time at which the failed capture was recorded
     bool shaderCompileFailed = false;
 };
 
@@ -55,6 +56,8 @@ struct GlassCallbackData
 {
     BlurRequest request;
     float fallback[4];  // opaque tint, used when the capture fails
+    double recordTime;  // ImGui::GetTime() when the panel was recorded; the callback runs
+                        // while rendering, where no ImGui context needs to be current
 };
 
 void GlassCallback(const ImDrawList*, const ImDrawCmd* command)
@@ -72,7 +75,7 @@ void GlassCallback(const ImDrawList*, const ImDrawCmd* command)
     state.captureOk = BlurSucceeded(status);
     if (!state.captureOk)
     {
-        state.failedFrame = FrameIndex();
+        state.failedTime = data.recordTime;
         state.pass.ClearOutput(context, data.fallback);
     }
 }
@@ -150,7 +153,10 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
     internal::BlurState& state = internal::State();
     // After a failed capture, try again now and then: the host may have changed its target.
     // A failing try looks like the fallback, because the callback fills the output with it.
-    const bool retry = !state.captureOk && internal::FrameIndex() >= state.failedFrame + internal::kGlassRetryFrames;
+    // A clock that went backwards (a new ImGui context) also allows a try.
+    const double now = ImGui::GetTime();
+    const bool retry = !state.captureOk &&
+                       (now < state.failedTime || now - state.failedTime >= internal::kGlassRetrySeconds);
     if (!state.pass.Ready() || (!state.captureOk && !retry) || internal::DeviceContext() == nullptr)
     {
         DrawGlassFallback(drawList, pMin, pMax, radius, spec);
@@ -181,6 +187,7 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
     data.fallback[1] = glass.tint.y;
     data.fallback[2] = glass.tint.z;
     data.fallback[3] = 1.0f;
+    data.recordTime = now;
     drawList->AddCallback(&internal::GlassCallback, &data, sizeof(data));
     if (ImDrawCallback reset = ImGui::GetPlatformIO().DrawCallback_ResetRenderState)
         drawList->AddCallback(reset, nullptr);

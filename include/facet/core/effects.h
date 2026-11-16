@@ -81,7 +81,7 @@ void DrawGlassFallback(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float rad
 
 // True when DrawGlass can blur on the current device and render target. It turns false
 // when a capture fails while rendering (no render target, a format that cannot be sampled,
-// a texture that cannot be created); DrawGlass then tries again every few seconds.
+// a texture that cannot be created); DrawGlass then tries again every 2 seconds.
 bool GlassAvailable();
 
 } // namespace facet
