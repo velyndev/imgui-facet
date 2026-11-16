@@ -14,6 +14,10 @@
 // is written into its style: FontScaleDpi = Scale() / UiScale() and FontScaleMain = UiScale(),
 // so text pushed at a design size (facet::PushTextStyle) grows with the same factor as every
 // Px() length.
+//
+// Pixel snapping: at fractional scales a Px() length falls between pixels, which blurs thin
+// lines and the edges of filled shapes. The Snap helpers round to the pixel grid; positions
+// are assumed to be in pixels with the grid at whole numbers (Dear ImGui's convention).
 
 #include <imgui.h>
 
@@ -45,5 +49,21 @@ float DpiScale();
 
 void SetScaleMode(ScaleMode mode);
 ScaleMode GetScaleMode();  // default FollowDpi
+
+// Rounds a pixel coordinate or length to the nearest whole pixel.
+float Snap(float pixels);
+ImVec2 Snap(ImVec2 pixels);
+
+// Px(units) rounded to whole pixels, at least 1 when units > 0. For borders, gaps and
+// insets that must stay crisp.
+float PxSnapped(float units);
+
+// The center line for a stroke of `thickness` whole pixels that starts at the pixel
+// containing `pixels`: lines with an odd thickness sit on a pixel center (x.5), even ones
+// on a pixel edge, so the stroke covers whole pixels and is not smeared over two.
+float SnapStroke(float pixels, float thickness);
+
+// The rectangle with its edges rounded to whole pixels (min and max separately).
+void SnapRect(ImVec2& pMin, ImVec2& pMax);
 
 } // namespace facet

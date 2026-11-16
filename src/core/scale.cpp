@@ -1,4 +1,5 @@
-// UI scale: DPI scale times user scale, or a scale fitted to the display size.
+// UI scale: DPI scale times user scale, or a scale fitted to the display size, plus the
+// pixel snapping helpers.
 
 #include "facet/core/scale.h"
 
@@ -128,6 +129,35 @@ void SetScaleMode(ScaleMode mode)
 ScaleMode GetScaleMode()
 {
     return State().mode;
+}
+
+float Snap(float pixels)
+{
+    return std::round(pixels);
+}
+
+ImVec2 Snap(ImVec2 pixels)
+{
+    return ImVec2(std::round(pixels.x), std::round(pixels.y));
+}
+
+float PxSnapped(float units)
+{
+    if (units <= 0.0f)
+        return std::round(Px(units));
+    return std::max(1.0f, std::round(Px(units)));
+}
+
+float SnapStroke(float pixels, float thickness)
+{
+    const int whole = std::max(1, static_cast<int>(std::lround(thickness)));
+    return std::floor(pixels) + ((whole % 2) == 1 ? 0.5f : 0.0f);
+}
+
+void SnapRect(ImVec2& pMin, ImVec2& pMax)
+{
+    pMin = Snap(pMin);
+    pMax = Snap(pMax);
 }
 
 namespace internal

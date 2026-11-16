@@ -1,4 +1,4 @@
-// UI scale modes and the font scale factors.
+// UI scale modes and the pixel snapping helpers.
 
 #include <cmath>
 
@@ -22,6 +22,11 @@ struct ScaleGuard
         facet::SetUiScale(ui);
     }
 };
+
+bool IsWhole(float value)
+{
+    return value == std::floor(value);
+}
 
 } // namespace
 
@@ -62,4 +67,74 @@ TEST_CASE("The scale is written into the Dear ImGui font scale factors")
     CHECK(style.FontScaleDpi == doctest::Approx(1.0f));
     CHECK(style.FontScaleMain * style.FontScaleDpi == doctest::Approx(facet::Scale()));
     ImGui::DestroyContext(context);
+}
+
+TEST_CASE("Snap rounds to whole pixels")
+{
+    CHECK(facet::Snap(10.4f) == 10.0f);
+    CHECK(facet::Snap(10.6f) == 11.0f);
+    CHECK(facet::Snap(-2.6f) == -3.0f);
+    const ImVec2 p = facet::Snap(ImVec2(1.49f, 7.51f));
+    CHECK(p.x == 1.0f);
+    CHECK(p.y == 8.0f);
+
+    ImVec2 a(0.4f, 3.6f);
+    ImVec2 b(10.5f, 20.2f);
+    facet::SnapRect(a, b);
+    CHECK(a.x == 0.0f);
+    CHECK(a.y == 4.0f);
+    CHECK(b.x == 11.0f);
+    CHECK(b.y == 20.0f);
+}
+
+TEST_CASE("PxSnapped gives whole pixels and never rounds a positive length away")
+{
+    ScaleGuard guard;
+    facet::SetScaleMode(facet::ScaleMode::Manual);
+    for (const float scale : {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f})
+    {
+        CAPTURE(scale);
+        facet::SetUiScale(scale);
+        for (const float units : {0.25f, 1.0f, 3.0f, 8.0f, 13.0f})
+        {
+            CAPTURE(units);
+            const float snapped = facet::PxSnapped(units);
+            CHECK(IsWhole(snapped));
+            CHECK(snapped >= 1.0f);
+            CHECK(std::fabs(snapped - facet::Px(units)) <= 0.5f + (facet::Px(units) < 1.0f ? 1.0f : 0.0f));
+        }
+        CHECK(facet::PxSnapped(0.0f) == 0.0f);
+    }
+}
+
+TEST_CASE("Hairlines are whole pixels at fractional scales")
+{
+    ScaleGuard guard;
+    facet::SetScaleMode(facet::ScaleMode::Manual);
+    for (const float scale : {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 3.0f})
+    {
+        CAPTURE(scale);
+        facet::SetUiScale(scale);
+        const float thickness = facet::HairlineThickness();
+        CHECK(IsWhole(thickness));
+        CHECK(thickness >= 1.0f);
+        CHECK(thickness <= std::max(1.0f, std::round(scale)));
+    }
+}
+
+TEST_CASE("SnapStroke centers odd strokes on pixel centers and even ones on pixel edges")
+{
+    CHECK(facet::SnapStroke(10.0f, 1.0f) == 10.5f);
+    CHECK(facet::SnapStroke(10.7f, 1.0f) == 10.5f);
+    CHECK(facet::SnapStroke(10.7f, 3.0f) == 10.5f);
+    CHECK(facet::SnapStroke(10.7f, 2.0f) == 10.0f);
+    CHECK(facet::SnapStroke(-0.2f, 1.0f) == -0.5f);
+    // A stroke of the snapped thickness around the center covers whole pixels.
+    for (const float thickness : {1.0f, 2.0f, 3.0f, 4.0f})
+    {
+        CAPTURE(thickness);
+        const float center = facet::SnapStroke(5.3f, thickness);
+        CHECK(IsWhole(center - thickness * 0.5f));
+        CHECK(IsWhole(center + thickness * 0.5f));
+    }
 }
