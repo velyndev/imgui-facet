@@ -77,7 +77,12 @@ target_link_libraries(facet
 facet_apply_warnings(facet)
 source_group(TREE "${PROJECT_SOURCE_DIR}" FILES ${FACET_LIB_SOURCES} ${FACET_LIB_HEADERS})
 
-# --- Demo --------------------------------------------------------------------
+# --- Demo and tests ----------------------------------------------------------
 if(FACET_BUILD_DEMO)
     add_subdirectory(demo)
+endif()
+
+if(FACET_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
