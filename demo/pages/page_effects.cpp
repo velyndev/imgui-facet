@@ -241,16 +241,16 @@ void DrawGlassSection()
     facet::GlassSpec spec;
     spec.blurRadius = facet::Px(BlurRadius());
     effects.drawnBlurPixels = spec.blurRadius;
+    // Glass panels are floating layers: they get the popover elevation as well. It goes
+    // through the spec so the shadow is not blurred into the panel's own backdrop.
+    spec.shadow = ScaledShadow(2);
 
-    // Glass panels are floating layers: they get the popover elevation as well.
-    facet::DrawShadow(drawList, glassMin, glassMax, radius, ScaledShadow(2));
     facet::DrawGlass(drawList, glassMin, glassMax, radius, spec);
     char detail[96];
     std::snprintf(detail, sizeof(detail), "Blur %.0f, tint %.0f%%", static_cast<double>(BlurRadius()),
                   static_cast<double>(theme.glass.tintOpacity * 100.0f));
     DrawPanelText(drawList, glassMin, glassMax, facet::GlassAvailable() ? "Glass" : "Glass (fallback active)", detail);
 
-    facet::DrawShadow(drawList, fallbackMin, fallbackMax, radius, ScaledShadow(2));
     facet::DrawGlassFallback(drawList, fallbackMin, fallbackMax, radius, spec);
     DrawPanelText(drawList, fallbackMin, fallbackMax, "Opaque fallback", "Used when the target cannot be read");
 }

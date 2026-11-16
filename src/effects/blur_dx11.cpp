@@ -4,7 +4,8 @@
 //   1. a draw callback that runs BlurPass::Run on the render target the renderer draws into,
 //      at most once per frame and render target; later panels reuse that blur,
 //   2. the renderer's reset-render-state callback, so it rebinds its own pipeline,
-//   3. the panel: the blurred output drawn in the panel's shape with UVs that map the
+//   3. the panel's shadow, after the capture so it stays out of the blurred backdrop,
+//   4. the panel: the blurred output drawn in the panel's shape with UVs that map the
 //      viewport onto the output, the glass tint on top, and a hairline border.
 // When blurring is not possible the panel is an opaque tint (DrawGlassFallback). A failure
 // found only while rendering fills the output with the opaque tint for that frame, so the
@@ -137,6 +138,7 @@ void DrawGlassFallback(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float rad
     if (drawList == nullptr)
         return;
     const internal::ResolvedGlass glass = internal::Resolve(spec);
+    DrawShadow(drawList, pMin, pMax, radius, spec.shadow);
     FillRect(drawList, pMin, pMax, ToU32(WithAlpha(glass.tint, 1.0f)), radius);
     internal::DrawGlassBorder(drawList, pMin, pMax, radius, spec);
 }
@@ -182,6 +184,10 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
     drawList->AddCallback(&internal::GlassCallback, &data, sizeof(data));
     if (ImDrawCallback reset = ImGui::GetPlatformIO().DrawCallback_ResetRenderState)
         drawList->AddCallback(reset, nullptr);
+
+    // The shadow comes after the capture, so it never darkens the blurred backdrop. The
+    // blurred output is opaque and hides the part of the shadow under the panel.
+    DrawShadow(drawList, pMin, pMax, radius, spec.shadow);
 
     // The panel shape in white with the blurred output, UVs mapping the viewport onto 0..1.
     drawList->PushTexture(ImTextureRef(static_cast<ImTextureID>(reinterpret_cast<std::uintptr_t>(output))));

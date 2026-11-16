@@ -12,6 +12,7 @@
 #include <d3dcompiler.h>
 #include <doctest/doctest.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <wrl/client.h>
 
 #include <facet/facet.h>
@@ -826,6 +827,56 @@ TEST_CASE("Glass follows device invalidation and recreation")
     CHECK(facet::GlassAvailable());
     facet::Shutdown();
     CHECK_FALSE(facet::GlassAvailable());
+    ImGui::DestroyContext();
+}
+
+TEST_CASE("Glass records its shadow after the backdrop capture")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    ImGui::CreateContext();
+    facet::InitDesc desc;
+    desc.device = warp.device.Get();
+    desc.context = warp.context.Get();
+    REQUIRE(facet::Init(desc));
+    REQUIRE(facet::GlassAvailable());
+    // The output is sized from the main viewport, which only a frame would set.
+    ImGui::GetMainViewport()->Size = ImVec2(64.0f, 64.0f);
+    // Rounded shapes need the tessellation tables, which a frame start would also set up.
+    ImGui::GetDrawListSharedData()->SetCircleTessellationMaxError(ImGui::GetStyle().CircleTessellationMaxError);
+
+    // Draw lists live in this block, so they are gone before the context is destroyed.
+    {
+        ImDrawList drawList(ImGui::GetDrawListSharedData());
+        drawList._ResetForNewFrame();
+        drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+        facet::GlassSpec spec;
+        spec.shadow = facet::ElevationShadow(2);
+        REQUIRE((spec.shadow.color & IM_COL32_A_MASK) != 0);
+        facet::DrawGlass(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 4.0f, spec);
+
+        // Nothing is drawn before the capture callback, so the capture cannot hold the shadow.
+        int firstCallback = -1;
+        unsigned int elementsBefore = 0;
+        for (int i = 0; i < drawList.CmdBuffer.Size && firstCallback < 0; ++i)
+        {
+            if (drawList.CmdBuffer[i].UserCallback != nullptr)
+                firstCallback = i;
+            else
+                elementsBefore += drawList.CmdBuffer[i].ElemCount;
+        }
+        CHECK(firstCallback >= 0);
+        CHECK(elementsBefore == 0);
+
+        // The shadow adds geometry after the capture: more than the same panel without it.
+        ImDrawList plain(ImGui::GetDrawListSharedData());
+        plain._ResetForNewFrame();
+        plain.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+        facet::DrawGlass(&plain, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 4.0f);
+        CHECK(drawList.VtxBuffer.Size > plain.VtxBuffer.Size);
+    }
+
+    facet::Shutdown();
     ImGui::DestroyContext();
 }
 

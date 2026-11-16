@@ -34,7 +34,9 @@ struct ShadowSpec
 ShadowSpec ElevationShadow(int level);
 
 // Draws the shadow of the rect pMin..pMax with corner `radius`. Draw it before the shape;
-// the shadow also covers the area under the shape, so the shape should be opaque.
+// the shadow also covers the area under the shape, so the shape should be opaque. A glass
+// panel is not opaque: pass its shadow in GlassSpec::shadow instead, because a shadow drawn
+// before DrawGlass is blurred into the panel's backdrop and darkens it.
 // Blur is limited to 128 pixels and the radius to 128 pixels; the shape's radius and the
 // blur are rounded to whole and half pixels so similar shadows share one baked tile.
 void DrawShadow(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const ShadowSpec& spec);
@@ -55,6 +57,10 @@ struct GlassSpec
     float saturation = -1.0f;
     ImVec4 tint = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     bool hairline = true;  // draws a separator-colored hairline border
+    // The panel's shadow, for example ElevationShadow(2) for a popover; a zero color draws
+    // none. It is drawn after the backdrop is captured, so it shows around the panel but is
+    // never part of the blurred backdrop behind it.
+    ShadowSpec shadow = {};
 };
 
 // Draws a panel that blurs the content rendered behind it, tinted and with corner
@@ -69,7 +75,8 @@ struct GlassSpec
 // formats. Must be drawn into a draw list of the main viewport.
 void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const GlassSpec& spec = {});
 
-// The panel DrawGlass draws when it cannot blur: the tint at full opacity and the hairline.
+// The panel DrawGlass draws when it cannot blur: spec.shadow, the tint at full opacity and
+// the hairline.
 void DrawGlassFallback(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const GlassSpec& spec = {});
 
 // True when DrawGlass can blur on the current device and render target. It turns false
