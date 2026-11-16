@@ -36,6 +36,11 @@ ctest --preset msvc-x64-release
 Other build presets: `msvc-x64-debug`, `msvc-x86-release`, `msvc-x86-debug` (configure
 preset `msvc-x86`). Build output goes to `build/<preset>/`, programs to
 `build/<preset>/bin/<Debug|Release>/`.
+
+The configure preset `msvc-ninja-x64` (build and test presets `msvc-ninja-x64-debug` and
+`msvc-ninja-x64-release`) uses Ninja Multi-Config with `cl`. It has to be run from an x64
+developer command prompt, because Ninja does not locate the compiler by itself.
+
 CMake options:
 
 | Option | Default | Meaning |
