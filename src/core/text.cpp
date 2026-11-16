@@ -1,16 +1,324 @@
-// Fonts and text styles.
-//
-// Font loading does not exist yet: WeightFont returns nullptr, so every text style draws
-// with the current ImGui font at the style's size, and SetFontSet keeps nothing.
+// Fonts and text styles: loads one font per weight (and display faces) into the Dear ImGui
+// font atlas and maps every TextStyle to a font and a size token.
 
 #include "facet/core/text.h"
 
+#include <windows.h>
+
+#include <cfloat>
+#include <climits>
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "core/core_internal.h"
 #include "internal/subsystem.h"
 
 namespace facet
 {
 namespace
 {
+
+// Named instances of Segoe UI Variable in the font's instance order: the Small, Text and
+// Display optical sizes, each in Light, Semilight, Regular, Semibold and Bold.
+constexpr int kInstanceTextRegular = 7;
+constexpr int kInstanceTextSemibold = 8;
+constexpr int kInstanceTextBold = 9;
+constexpr int kInstanceDisplaySemibold = 13;
+constexpr int kInstanceDisplayBold = 14;
+
+// FreeType reads the named instance from the upper 16 bits of the face index, counting from 1.
+constexpr int InstanceFaceIndex(int instance)
+{
+    return (instance + 1) << 16;
+}
+
+// Text measured to check that the instances of the variable font really differ.
+constexpr const char* kProbeText = "Hamburgefonstiv 0123456789";
+constexpr float kProbeSize = 20.0f;
+// The bold face must measure at least this much wider than the regular one.
+constexpr float kMinBoldWidening = 1.02f;
+
+enum Slot
+{
+    kRegular,
+    kSemibold,
+    kBold,
+    kDisplayRegular,
+    kDisplaySemibold,
+    kDisplayBold,
+    kSlotCount,
+};
+
+struct FontState
+{
+    // The custom set passed to SetFontSet, with its paths copied.
+    FontSet custom;
+    std::string customPaths[kSlotCount];
+    bool hasCustom = false;
+    bool reloadPending = false;
+
+    ImFont* fonts[kSlotCount] = {};
+    std::vector<std::unique_ptr<std::vector<char>>> fileData;  // font files read by Facet
+    FontOrigin origin = FontOrigin::None;
+    ImFont* previousDefault = nullptr;
+    bool setDefault = false;
+    bool initialized = false;
+};
+
+FontState& State()
+{
+    static FontState state;
+    return state;
+}
+
+FontSource& SlotSource(FontSet& set, int slot)
+{
+    FontSource* sources[kSlotCount] = {&set.regular,        &set.semibold,        &set.bold,
+                                       &set.displayRegular, &set.displaySemibold, &set.displayBold};
+    return *sources[slot];
+}
+
+std::wstring Widen(const char* utf8)
+{
+    const int length = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+    if (length <= 1)
+        return {};
+    std::wstring out(static_cast<size_t>(length - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8, -1, out.data(), length);
+    return out;
+}
+
+std::wstring SystemFontPath(const wchar_t* file)
+{
+    wchar_t windows[MAX_PATH] = {};
+    const UINT length = GetWindowsDirectoryW(windows, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+        return {};
+    return std::wstring(windows) + L"\\Fonts\\" + file;
+}
+
+// Reads a whole file, or returns nullptr. Kept alive by FontState until the fonts are removed,
+// because the rasterizer reads glyphs from it on demand.
+const std::vector<char>* ReadWholeFile(const std::wstring& path)
+{
+    if (path.empty())
+        return nullptr;
+    FILE* file = nullptr;
+    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr)
+        return nullptr;
+    auto data = std::make_unique<std::vector<char>>();
+    char buffer[64 * 1024];
+    size_t read = 0;
+    while ((read = std::fread(buffer, 1, sizeof(buffer), file)) > 0)
+        data->insert(data->end(), buffer, buffer + read);
+    std::fclose(file);
+    if (data->empty())
+        return nullptr;
+    State().fileData.push_back(std::move(data));
+    return State().fileData.back().get();
+}
+
+ImFont* AddFont(ImFontAtlas* atlas, const void* data, size_t size, int faceIndex, const char* name)
+{
+    if (data == nullptr || size == 0 || size > static_cast<size_t>(INT_MAX))
+        return nullptr;
+    ImFontConfig config;
+    config.FontDataOwnedByAtlas = false;
+    config.FontNo = faceIndex;
+    std::snprintf(config.Name, sizeof(config.Name), "%s", name);
+    return atlas->AddFontFromMemoryTTF(const_cast<void*>(data), static_cast<int>(size), 0.0f, &config);
+}
+
+ImFont* AddSource(ImFontAtlas* atlas, const FontSource& source, const char* name)
+{
+    if (source.data != nullptr)
+        return AddFont(atlas, source.data, source.size, source.faceIndex, name);
+    if (source.path == nullptr)
+        return nullptr;
+    const std::vector<char>* data = ReadWholeFile(Widen(source.path));
+    return data != nullptr ? AddFont(atlas, data->data(), data->size(), source.faceIndex, name) : nullptr;
+}
+
+void RemoveFonts(ImFontAtlas* atlas)
+{
+    FontState& state = State();
+    for (ImFont*& font : state.fonts)
+    {
+        if (font != nullptr && atlas != nullptr && !atlas->Locked && atlas->Fonts.contains(font))
+            atlas->RemoveFont(font);
+        font = nullptr;
+    }
+    state.fileData.clear();
+    state.origin = FontOrigin::None;
+}
+
+bool HasRequiredFaces()
+{
+    const FontState& state = State();
+    return state.fonts[kRegular] != nullptr && state.fonts[kSemibold] != nullptr && state.fonts[kBold] != nullptr;
+}
+
+bool LoadCustom(ImFontAtlas* atlas)
+{
+    FontState& state = State();
+    static const char* const kNames[kSlotCount] = {"Regular",         "Semibold",         "Bold",
+                                                   "Display Regular", "Display Semibold", "Display Bold"};
+    for (int slot = 0; slot < kSlotCount; ++slot)
+    {
+        const FontSource& source = SlotSource(state.custom, slot);
+        if (source.IsSet())
+            state.fonts[slot] = AddSource(atlas, source, kNames[slot]);
+    }
+    if (HasRequiredFaces())
+        return true;
+    internal::LogWarning("the custom font set could not be loaded (regular, semibold and bold are required); "
+                         "using the system fonts");
+    RemoveFonts(atlas);
+    return false;
+}
+
+float MeasureProbe(ImFont* font)
+{
+    return font->CalcTextSizeA(kProbeSize, FLT_MAX, 0.0f, kProbeText).x;
+}
+
+bool LoadVariable(ImFontAtlas* atlas)
+{
+#ifdef IMGUI_ENABLE_FREETYPE
+    FontState& state = State();
+    const std::vector<char>* data = ReadWholeFile(SystemFontPath(L"SegUIVar.ttf"));
+    if (data == nullptr)
+        return false;
+    const struct
+    {
+        int slot;
+        int instance;
+        const char* name;
+    } faces[] = {
+        {kRegular, kInstanceTextRegular, "Segoe UI Variable Text"},
+        {kSemibold, kInstanceTextSemibold, "Segoe UI Variable Text Semibold"},
+        {kBold, kInstanceTextBold, "Segoe UI Variable Text Bold"},
+        {kDisplaySemibold, kInstanceDisplaySemibold, "Segoe UI Variable Display Semibold"},
+        {kDisplayBold, kInstanceDisplayBold, "Segoe UI Variable Display Bold"},
+    };
+    for (const auto& face : faces)
+        state.fonts[face.slot] = AddFont(atlas, data->data(), data->size(), InstanceFaceIndex(face.instance), face.name);
+
+    if (HasRequiredFaces())
+    {
+        // A rasterizer that ignores the instance bits draws every face with the default
+        // instance; then regular and bold measure the same.
+        const float regular = MeasureProbe(state.fonts[kRegular]);
+        const float bold = MeasureProbe(state.fonts[kBold]);
+        if (regular > 0.0f && bold >= regular * kMinBoldWidening)
+            return true;
+        internal::LogWarning("Segoe UI Variable instances are not applied by the rasterizer; using static Segoe UI");
+    }
+    RemoveFonts(atlas);
+    return false;
+#else
+    (void)atlas;
+    return false;
+#endif
+}
+
+bool LoadStatic(ImFontAtlas* atlas)
+{
+    FontState& state = State();
+    const struct
+    {
+        int slot;
+        const wchar_t* file;
+        const char* name;
+    } faces[] = {
+        {kRegular, L"segoeui.ttf", "Segoe UI"},
+        {kSemibold, L"seguisb.ttf", "Segoe UI Semibold"},
+        {kBold, L"segoeuib.ttf", "Segoe UI Bold"},
+    };
+    for (const auto& face : faces)
+    {
+        const std::vector<char>* data = ReadWholeFile(SystemFontPath(face.file));
+        if (data != nullptr)
+            state.fonts[face.slot] = AddFont(atlas, data->data(), data->size(), 0, face.name);
+    }
+    if (HasRequiredFaces())
+        return true;
+    RemoveFonts(atlas);
+    return false;
+}
+
+void LoadFonts()
+{
+    FontState& state = State();
+    if (ImGui::GetCurrentContext() == nullptr)
+        return;
+    ImGuiIO& io = ImGui::GetIO();
+    ImFontAtlas* atlas = io.Fonts;
+    if (atlas == nullptr || atlas->Locked)
+    {
+        internal::LogWarning("the font atlas is locked; Facet text uses the default font");
+        return;
+    }
+
+    if (state.hasCustom && LoadCustom(atlas))
+        state.origin = FontOrigin::Custom;
+    else if (LoadVariable(atlas))
+        state.origin = FontOrigin::Variable;
+    else if (LoadStatic(atlas))
+        state.origin = FontOrigin::Static;
+    else
+        internal::LogWarning("no Segoe UI font was found; Facet text uses the default font");
+
+    if (state.origin != FontOrigin::None && (io.FontDefault == nullptr || state.setDefault))
+    {
+        if (!state.setDefault)
+            state.previousDefault = io.FontDefault;
+        io.FontDefault = state.fonts[kRegular];
+        state.setDefault = true;
+    }
+}
+
+void UnloadFonts()
+{
+    FontState& state = State();
+    ImFontAtlas* atlas = nullptr;
+    if (ImGui::GetCurrentContext() != nullptr)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        atlas = io.Fonts;
+        if (state.setDefault)
+            io.FontDefault = state.previousDefault;
+    }
+    state.setDefault = false;
+    state.previousDefault = nullptr;
+    RemoveFonts(atlas);
+}
+
+bool FontInit()
+{
+    State().initialized = true;
+    State().reloadPending = false;
+    LoadFonts();
+    return true;  // missing fonts fall back to the default font
+}
+
+void FontShutdown()
+{
+    UnloadFonts();
+    State().initialized = false;
+}
+
+void FontNewFrame()
+{
+    FontState& state = State();
+    if (!state.reloadPending)
+        return;
+    state.reloadPending = false;
+    UnloadFonts();
+    LoadFonts();
+}
 
 // The display faces are meant for the two largest styles.
 bool UsesDisplayFace(TextStyle style)
@@ -20,13 +328,51 @@ bool UsesDisplayFace(TextStyle style)
 
 } // namespace
 
-void SetFontSet(const FontSet&)
+void SetFontSet(const FontSet& fonts)
 {
+    FontState& state = State();
+    state.custom = fonts;
+    state.hasCustom = false;
+    for (int slot = 0; slot < kSlotCount; ++slot)
+    {
+        FontSource& source = SlotSource(state.custom, slot);
+        state.customPaths[slot] = source.path != nullptr ? source.path : "";
+        if (source.path != nullptr)
+            source.path = state.customPaths[slot].c_str();
+        state.hasCustom = state.hasCustom || source.IsSet();
+    }
+    if (state.initialized)
+        state.reloadPending = true;
 }
 
-ImFont* WeightFont(FontWeight, bool)
+ImFont* WeightFont(FontWeight weight, bool display)
 {
-    return nullptr;
+    const FontState& state = State();
+    const int text = static_cast<int>(weight);
+    if (display && state.fonts[kDisplayRegular + text] != nullptr)
+        return state.fonts[kDisplayRegular + text];
+    return state.fonts[text];
+}
+
+FontOrigin ActiveFontOrigin()
+{
+    return State().origin;
+}
+
+const char* FontOriginName(FontOrigin origin)
+{
+    switch (origin)
+    {
+    case FontOrigin::None:
+        return "default font";
+    case FontOrigin::Custom:
+        return "custom font set";
+    case FontOrigin::Variable:
+        return "Segoe UI Variable";
+    case FontOrigin::Static:
+        return "Segoe UI";
+    }
+    return "unknown";
 }
 
 void PushTextStyle(TextStyle style)
@@ -66,11 +412,15 @@ ImVec2 MeasureText(TextStyle style, const char* text, const char* textEnd, float
 namespace internal
 {
 
-// No hooks yet: no fonts are loaded.
+// Loads the fonts at Init and removes them at Shutdown; a SetFontSet after Init reloads them
+// at the start of the next frame.
 Subsystem FontSubsystem()
 {
     Subsystem subsystem;
     subsystem.name = "font";
+    subsystem.init = &FontInit;
+    subsystem.shutdown = &FontShutdown;
+    subsystem.newFrame = &FontNewFrame;
     return subsystem;
 }
 
