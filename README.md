@@ -10,14 +10,20 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 - The library lifetime: `facet::Init`, `NewFrame`, `EndFrame`, `Shutdown`,
   `InvalidateDeviceObjects`, `CreateDeviceObjects`, `Version`, and the embedding of
   `assets/icons/*.svg` into the library at build time.
-- The public core headers in `include/facet/core/`. Working today: the theme tokens with a
-  light and a dark preset and runtime accent colors (`theme.h`), the UI scale (`scale.h`), color
-  conversions with OKLab, OKLCH and WCAG contrast (`color.h`), and the rectangle, hairline and
-  `DrawGroup` helpers (`draw.h`). Declared and callable, but not implemented yet: animations
-  return their target value, text styles draw with the current Dear ImGui font at the style's
-  size, continuous corners and rounded gradients fall back to plain shapes, shadows and glow
-  draw nothing, glass panels draw an opaque tinted fill, image loaders return invalid handles,
-  and icons are not drawn.
+- The public core headers in `include/facet/core/`. Every declared function links; the state
+  of each area:
+  - Core, theme and scale: the theme tokens with a light and a dark preset and runtime accent
+    colors (`theme.h`) and the UI scale (`scale.h`) work.
+  - Core, color: conversions with OKLab, OKLCH and WCAG contrast (`color.h`) work.
+  - Core, drawing: the rectangle, hairline and `DrawGroup` helpers (`draw.h`) work;
+    continuous corners and rounded gradients fall back to plain shapes.
+  - Core, text: text styles draw with the current Dear ImGui font at the style's size; no
+    fonts are loaded yet (`text.h`).
+  - Core, motion: animations return their target value (`anim.h`).
+  - Effects: shadows and glow draw nothing, glass panels draw an opaque tinted fill
+    (`effects.h`).
+  - Images: image loaders return invalid handles (`image.h`).
+  - Icons: icons are not drawn (`icons.h`).
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
   window, a light and a dark theme and a UI scale setting. It currently has one page
   (Foundation) that shows the text styles, a few stock Dear ImGui widgets, the theme surfaces with
