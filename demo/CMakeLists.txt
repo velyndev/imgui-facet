@@ -22,6 +22,8 @@ target_include_directories(facet_demo PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/src")
 target_compile_definitions(facet_demo PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
     UNICODE
     _UNICODE
     _WIN32_WINNT=0x0A00

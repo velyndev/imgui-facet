@@ -58,11 +58,12 @@ target_include_directories(facet
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     PRIVATE
         "${PROJECT_SOURCE_DIR}/src")
+# The Windows macros stay PRIVATE: no public header includes windows.h, and consumers
+# must remain free to include the full windows.h (shellapi.h, mmsystem.h, winsock).
 target_compile_definitions(facet
-    PUBLIC
+    PRIVATE
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-    PRIVATE
         FACET_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(facet
     PUBLIC
