@@ -39,7 +39,9 @@ FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
     for (const float size : kTextSizes)
     {
         ImGui::PushFont(nullptr, size);
-        ImGui::Text("%.0f px  The quick brown fox jumps over the lazy dog", static_cast<double>(size));
+        // Wrapped, so the large samples stay readable on narrow targets and at scale 2.
+        ImGui::TextWrapped("%.0f px  The quick brown fox jumps over the lazy dog",
+                           static_cast<double>(size));
         ImGui::PopFont();
     }
 
@@ -61,7 +63,10 @@ FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
     if (assets.empty())
         ImGui::TextDisabled("No embedded assets.");
     for (const auto& asset : assets)
-        ImGui::BulletText("%s  (%zu bytes)", asset.name, asset.size);
+    {
+        ImGui::Bullet();
+        ImGui::TextWrapped("%s  (%zu bytes)", asset.name, asset.size);
+    }
 
     ImGui::SeparatorText("Display");
     const ImGuiIO& io = ImGui::GetIO();
@@ -80,6 +85,8 @@ FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
         ImGui::Text("Facet frames: %llu", static_cast<unsigned long long>(facet::FrameIndex()));
         ImGui::Text("Pages registered: %zu", facet::demo::Pages().size());
         ImGui::TreePop();
+        // The section is the last thing on the page; keep it in view on small targets.
+        ctx.RevealInCapture(1.0f);
     }
 }
 

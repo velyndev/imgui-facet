@@ -13,6 +13,8 @@
 // the navigation, group heading, order inside the group, then the optional capture state
 // names. Without state names the page has the single state "default". Capture mode renders
 // every page once per state with ctx.captureState set to the index of that state.
+// When a state changes something below the first screen, call ctx.RevealInCapture() right
+// after that content so the change is scrolled into the captured image.
 
 #include <initializer_list>
 #include <span>
@@ -36,6 +38,12 @@ struct PageCtx
     // Records the rect and id of the last submitted item under this name so that
     // selftest steps can click it or check its focus. Does nothing outside selftest runs.
     void Probe(std::string_view name) const;
+
+    // In capture runs, scrolls the page so the current cursor line sits at this fraction
+    // of the visible height (0 top, 0.5 center, 1 bottom). Call it right after the content
+    // a capture state changes, so the change is visible even when the page is taller than
+    // the capture size. Does nothing outside capture runs.
+    void RevealInCapture(float ratio = 0.5f) const;
 };
 
 using PageFn = void (*)(PageCtx& ctx);

@@ -5,6 +5,8 @@
 #include <map>
 #include <utility>
 
+#include <imgui.h>
+
 namespace facet::demo
 {
 namespace
@@ -56,6 +58,12 @@ void PageCtx::Probe(std::string_view name) const
 {
     if (probes != nullptr)
         probes->RecordLastItem(name);
+}
+
+void PageCtx::RevealInCapture(float ratio) const
+{
+    if (capture)
+        ImGui::SetScrollHereY(ratio);
 }
 
 std::span<const PageInfo> Pages()
