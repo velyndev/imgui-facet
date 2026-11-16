@@ -7,8 +7,17 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 **Status: early development.** No Facet widgets exist yet. What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86.
-- The library skeleton: `facet::Init`, `NewFrame`, `EndFrame`, `Shutdown`, `Version` and the
-  embedding of `assets/icons/*.svg` into the library at build time.
+- The library lifetime: `facet::Init`, `NewFrame`, `EndFrame`, `Shutdown`,
+  `InvalidateDeviceObjects`, `CreateDeviceObjects`, `Version`, and the embedding of
+  `assets/icons/*.svg` into the library at build time.
+- The public core headers in `include/facet/core/`. Working today: the theme tokens with a
+  light and a dark preset and runtime accent colors (`theme.h`), the UI scale (`scale.h`), color
+  conversions with OKLab, OKLCH and WCAG contrast (`color.h`), and the rectangle, hairline and
+  `DrawGroup` helpers (`draw.h`). Declared and callable, but not implemented yet: animations
+  return their target value, text styles draw with the current Dear ImGui font at the style's
+  size, continuous corners and rounded gradients fall back to plain shapes, shadows and glow
+  draw nothing, glass panels draw an opaque tinted fill, image loaders return invalid handles,
+  and icons are not drawn.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
   window, a light and a dark theme and a UI scale setting. It currently has one page
   (Foundation) that shows text sizes, a few stock Dear ImGui widgets, the theme surfaces with
