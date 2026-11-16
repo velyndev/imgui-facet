@@ -111,7 +111,20 @@ Contrast rules, checked by the unit tests:
 Rules for where effects may appear: backdrop blur only on the menu shell and popovers;
 shadows only on floating layers; glow only as the focus ring plus one opt-in accent glow.
 
-No further choices recorded yet.
+| Choice | Reason |
+|---|---|
+| A shadow's blur is two standard deviations of the Gaussian | The token then says how far beyond the shape the shadow visibly ends |
+| Shadows are baked once per corner radius (whole pixels) and blur (half pixels) and drawn as 9-slices | One small tile serves every size of a shape; the quads batch with the rest of the drawing |
+| Tiles are white with the shadow in alpha | The vertex color sets the shadow color and strength without a new tile |
+| Tiles are baked in physical pixels and rebuilt after a scale change | Soft edges stay as smooth at 200 % as at 100 % |
+| Glow is cut out inside its shape | It can sit on top of translucent fills without tinting them |
+| The shadow strength comes from the theme, stronger in dark | Black shadows on near-black surfaces need more opacity to be seen |
+| Glass copies the render target instead of reading it | Host swap chains rarely allow reading, and multisampled targets need a resolve anyway |
+| The blur halves and doubles the image a few times (dual filter) | A wide, smooth blur at a small, fixed cost per pixel |
+| The blur works in 16-bit float | Wide gradients show no banding, and sRGB targets are blurred in linear light |
+| Saturation is raised in the last blur pass | The tint washes colors out; a little extra saturation keeps the backdrop recognisable |
+| One blur per frame and render target | Several panels cost one blur; draw every backdrop before the first panel |
+| The fallback is the tint at full opacity | Text on the panel stays readable when nothing can be blurred, and a failure mid-frame looks the same |
 
 ## Images
 

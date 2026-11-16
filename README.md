@@ -24,8 +24,9 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
     fallback), text styles and text measuring (`text.h`) work.
   - Core, motion: smoothing, springs and tweens keyed by ImGui id, and reduced motion that
     follows the Windows setting (`anim.h`) work.
-  - Effects: shadows and glow draw nothing, glass panels draw an opaque tinted fill
-    (`effects.h`).
+  - Effects: soft shadows and glow drawn from a baked atlas, and glass panels that blur what
+    was drawn behind them, with an opaque tinted fallback where the render target cannot be
+    read (`effects.h`). The demo page Effects shows each of them.
   - Images: image loaders return invalid handles (`image.h`).
   - Icons: icons are not drawn (`icons.h`).
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
