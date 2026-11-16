@@ -22,6 +22,40 @@ constexpr ImVec4 kDarkAccent = Rgb(0x1F6FEB);
 constexpr float kHoverLightnessStep = 0.04f;
 constexpr float kPressedLightnessStep = 0.08f;
 
+// WCAG AA contrast for normal text, the target of accentText.
+constexpr float kTextContrast = 4.5f;
+// Lightness step (OKLCH L) of the accentText search.
+constexpr float kTextLightnessStep = 0.01f;
+
+// The lowest contrast of `text` on the four surfaces.
+float MinSurfaceContrast(const Colors& c, const ImVec4& text)
+{
+    const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary, c.bgElevated};
+    float lowest = ContrastRatio(text, surfaces[0]);
+    for (const ImVec4& surface : surfaces)
+        lowest = std::min(lowest, ContrastRatio(text, surface));
+    return lowest;
+}
+
+// The accent with its lightness moved away from the surfaces (darker on light surfaces,
+// lighter on dark ones) in small steps until it is readable on all of them. Black and white
+// end the search, and one of them always reaches 4.5:1 on the preset surfaces.
+ImVec4 DeriveAccentText(const Colors& c, bool dark)
+{
+    const Oklch lch = ToOklch(c.accent);
+    const float direction = dark ? 1.0f : -1.0f;
+    for (int step = 0;; ++step)
+    {
+        const float L = lch.L + direction * kTextLightnessStep * static_cast<float>(step);
+        if (L < 0.0f || L > 1.0f)
+            break;
+        const ImVec4 candidate = FromOklch({L, lch.C, lch.h});
+        if (MinSurfaceContrast(c, candidate) >= kTextContrast)
+            return candidate;
+    }
+    return dark ? Rgb(0xFFFFFF) : Rgb(0x000000);
+}
+
 Theme& Current()
 {
     static Theme theme = Theme::Light();
@@ -113,6 +147,7 @@ void Theme::ApplyAccent(const ImVec4& accent)
     c.accentHover = shifted(kHoverLightnessStep);
     c.accentPressed = shifted(kPressedLightnessStep);
 
+    c.accentText = DeriveAccentText(c, dark);
     c.accentSubtle = WithAlpha(c.accent, dark ? 0.24f : 0.14f);
     c.focusRing = WithAlpha(c.accent, dark ? 0.80f : 0.70f);
 }

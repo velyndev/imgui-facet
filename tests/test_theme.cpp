@@ -53,6 +53,16 @@ void CheckAccentStates(const facet::Colors& c)
     CHECK(facet::ContrastRatio(c.onAccent, c.accentPressed) >= kTextContrast);
 }
 
+void CheckAccentText(const facet::Theme& theme)
+{
+    for (const Surface& surface : Surfaces(theme))
+    {
+        CAPTURE(surface.name);
+        CHECK(facet::ContrastRatio(theme.colors.accentText, surface.color) >= kTextContrast);
+    }
+    CHECK(theme.colors.accentText.w == doctest::Approx(1.0f));
+}
+
 } // namespace
 
 TEST_CASE("Text tokens reach 4.5:1 on every surface of the light theme")
@@ -75,6 +85,18 @@ TEST_CASE("onAccent reaches 4.5:1 on the default accent states of both themes")
     CheckAccentStates(facet::Theme::Dark().colors);
 }
 
+TEST_CASE("accentText reaches 4.5:1 on every surface and keeps the accent hue")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        CheckAccentText(theme);
+        const facet::Oklch accent = facet::ToOklch(theme.colors.accent);
+        const facet::Oklch text = facet::ToOklch(theme.colors.accentText);
+        CHECK(text.h == doctest::Approx(accent.h).epsilon(0.02));
+    }
+}
+
 TEST_CASE("onAccent stays readable for accents across hues and lightness")
 {
     for (const bool dark : {false, true})
@@ -89,6 +111,7 @@ TEST_CASE("onAccent stays readable for accents across hues and lightness")
                 CAPTURE(lightness);
                 theme.ApplyAccent(facet::FromOklch({lightness, 0.15f, static_cast<float>(hue)}));
                 CheckAccentStates(theme.colors);
+                CheckAccentText(theme);
                 CHECK(theme.colors.accent.w == doctest::Approx(1.0f));
             }
         }

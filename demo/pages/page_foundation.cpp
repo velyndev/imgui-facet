@@ -54,6 +54,7 @@ void DrawSwatches(const facet::Theme& theme)
         {"bgElevated", c.bgElevated, "label", c.label, "labelSecondary", c.labelSecondary},
         {"accent", c.accent, "onAccent", c.onAccent, nullptr, c.onAccent},
         {"accentPressed", c.accentPressed, "onAccent", c.onAccent, nullptr, c.onAccent},
+        {"bgTertiary", c.bgTertiary, "accentText", c.accentText, nullptr, c.accentText},
         {"bg", c.bg, "destructive", c.destructive, "success", c.success},
         {"bg", c.bg, "warning", c.warning, nullptr, c.warning},
     };

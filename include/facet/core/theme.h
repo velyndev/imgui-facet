@@ -51,9 +51,10 @@ struct Colors
     // the faintest wash.
     ImVec4 fill[4];
 
-    // Text and glyphs, most to least prominent. label and labelSecondary are for text that
-    // must be read; labelTertiary for placeholders and disabled text; labelQuaternary for
-    // decoration only.
+    // Text and glyphs, most to least prominent. label and labelSecondary reach 4.5:1 on
+    // every surface and are the only ones for text that must be read, placeholders
+    // included (placeholders use labelSecondary). labelTertiary is below 4.5:1 and is for
+    // disabled text and decorative glyphs; labelQuaternary for decoration only.
     ImVec4 label;
     ImVec4 labelSecondary;
     ImVec4 labelTertiary;
@@ -69,6 +70,9 @@ struct Colors
     ImVec4 accentPressed;
     ImVec4 accentSubtle;  // translucent selection background
     ImVec4 onAccent;      // text and glyphs drawn on accent fills
+    // Accent-colored text and links on the surfaces: the accent hue with its lightness
+    // moved until it reaches 4.5:1 on bg, bgSecondary, bgTertiary and bgElevated.
+    ImVec4 accentText;
 
     // Status colors, readable as text on bg, bgSecondary and bgTertiary.
     ImVec4 destructive;
@@ -215,10 +219,11 @@ struct Theme
     static Theme Light();
     static Theme Dark();
 
-    // Sets colors.accent and derives accentHover, accentPressed, accentSubtle, onAccent and
-    // focusRing from it in OKLCH. onAccent is white or black, whichever is more readable,
-    // and hover and pressed move the lightness away from it, so text on every accent state
-    // reaches at least 4.5:1. The accent alpha is ignored.
+    // Sets colors.accent and derives accentHover, accentPressed, accentSubtle, onAccent,
+    // accentText and focusRing from it in OKLCH. onAccent is white or black, whichever is
+    // more readable, and hover and pressed move the lightness away from it, so text on
+    // every accent state reaches at least 4.5:1. accentText depends on the surface colors,
+    // so call this after changing them. The accent alpha is ignored.
     void ApplyAccent(const ImVec4& accent);
 };
 

@@ -286,7 +286,7 @@ void ApplyThemeToImGuiStyle(const facet::Theme& theme)
     colors[ImGuiCol_TableRowBg] = clear;
     colors[ImGuiCol_TableRowBgAlt] = c.fill[3];
 
-    colors[ImGuiCol_TextLink] = c.accent;
+    colors[ImGuiCol_TextLink] = c.accentText;
     colors[ImGuiCol_TextSelectedBg] = c.accentSubtle;
     colors[ImGuiCol_TreeLines] = c.separator;
     colors[ImGuiCol_DragDropTarget] = c.accent;
