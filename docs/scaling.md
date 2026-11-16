@@ -36,6 +36,11 @@ equal to the scale: `style.FontScaleDpi = Scale() / UiScale()` and
 every `facet::NewFrame`, so text and every `Px()` length always grow by the same factor.
 `facet::ApplyImGuiStyle()` also scales the stock widget sizes (see `docs/theming.md`).
 
+A host that sets the font scale itself, such as an overlay inside another application, calls
+`facet::SetManageFontScale(false)`. Facet then leaves both factors alone, also in
+`ApplyImGuiStyle`, and Facet text grows with whatever font scale the host sets. For text to
+line up with `Px()` lengths, that font scale should equal `facet::Scale()`.
+
 ## Pixel snapping
 
 At fractional scales such as 1.25 or 1.5, a `Px()` length rarely lands on a whole pixel. Thin

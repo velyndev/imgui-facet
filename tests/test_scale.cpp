@@ -69,6 +69,28 @@ TEST_CASE("The scale is written into the Dear ImGui font scale factors")
     ImGui::DestroyContext(context);
 }
 
+TEST_CASE("A host that manages the font scale keeps its own factors")
+{
+    ScaleGuard guard;
+    ImGuiContext* context = ImGui::CreateContext();
+    REQUIRE(facet::ManagesFontScale());
+    facet::SetManageFontScale(false);
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.FontScaleMain = 0.9f;
+    style.FontScaleDpi = 1.1f;
+    facet::SetUiScale(2.0f);
+    ImGuiStyle applied = style;
+    facet::ApplyImGuiStyle(&applied);
+    CHECK(style.FontScaleMain == doctest::Approx(0.9f));
+    CHECK(style.FontScaleDpi == doctest::Approx(1.1f));
+    CHECK(applied.FontScaleMain == doctest::Approx(0.9f));
+    CHECK(applied.FontScaleDpi == doctest::Approx(1.1f));
+    // Turning it back on writes the scale at once.
+    facet::SetManageFontScale(true);
+    CHECK(style.FontScaleMain * style.FontScaleDpi == doctest::Approx(facet::Scale()));
+    ImGui::DestroyContext(context);
+}
+
 TEST_CASE("Snap rounds to whole pixels")
 {
     CHECK(facet::Snap(10.4f) == 10.0f);

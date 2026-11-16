@@ -25,6 +25,7 @@ struct ScaleState
     float fit = 1.0f;
     ScaleMode mode = ScaleMode::FollowDpi;
     float effective = 1.0f;
+    bool manageFontScale = true;
     std::uint64_t revision = 1;
 };
 
@@ -131,6 +132,18 @@ ScaleMode GetScaleMode()
     return State().mode;
 }
 
+void SetManageFontScale(bool enabled)
+{
+    State().manageFontScale = enabled;
+    if (enabled)
+        internal::ApplyFontScale();
+}
+
+bool ManagesFontScale()
+{
+    return State().manageFontScale;
+}
+
 float Snap(float pixels)
 {
     return std::round(pixels);
@@ -170,9 +183,9 @@ std::uint64_t ScaleRevision()
 
 void ApplyFontScale()
 {
-    if (ImGui::GetCurrentContext() == nullptr)
-        return;
     const ScaleState& state = State();
+    if (!state.manageFontScale || ImGui::GetCurrentContext() == nullptr)
+        return;
     ImGuiStyle& style = ImGui::GetStyle();
     style.FontScaleMain = state.ui;
     style.FontScaleDpi = state.effective / state.ui;

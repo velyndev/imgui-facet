@@ -194,9 +194,18 @@ void ApplyImGuiStyle(ImGuiStyle* target)
     // Text: the Body size, scaled by ImGui through the font scale factors.
     style.FontSizeBase = theme.type[TextStyle::Body].size;
     style._NextFrameFontSizeBase = style.FontSizeBase;
-    const float ui = UiScale();
-    style.FontScaleMain = ui;
-    style.FontScaleDpi = ui > 0.0f ? Scale() / ui : Scale();
+    if (ManagesFontScale())
+    {
+        const float ui = UiScale();
+        style.FontScaleMain = ui;
+        style.FontScaleDpi = ui > 0.0f ? Scale() / ui : Scale();
+    }
+    else
+    {
+        // The host owns the font scale (SetManageFontScale(false)): keep its factors.
+        style.FontScaleMain = target->FontScaleMain;
+        style.FontScaleDpi = target->FontScaleDpi;
+    }
 
     ApplyColors(style, theme);
     *target = style;

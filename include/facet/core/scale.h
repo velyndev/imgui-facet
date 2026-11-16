@@ -10,8 +10,8 @@
 //               read from ImGui's DisplaySize in facet::NewFrame: menus that grow and shrink
 //               with the host's render resolution
 // All values are valid before Init. A change of Scale() notifies the library modules
-// (shadow and icon atlases are rasterized per scale) and, while a Dear ImGui context exists,
-// is written into its style: FontScaleDpi = Scale() / UiScale() and FontScaleMain = UiScale(),
+// (shadow and icon atlases are rasterized per scale) and, while a Dear ImGui context exists
+// and SetManageFontScale is on, is written into its style: FontScaleDpi = Scale() / UiScale() and FontScaleMain = UiScale(),
 // so text pushed at a design size (facet::PushTextStyle) grows with the same factor as every
 // Px() length.
 //
@@ -49,6 +49,14 @@ float DpiScale();
 
 void SetScaleMode(ScaleMode mode);
 ScaleMode GetScaleMode();  // default FollowDpi
+
+// Whether Facet writes style.FontScaleDpi and style.FontScaleMain (see above). On by default:
+// Facet then writes them on every scale change and in every facet::NewFrame, replacing any
+// value the host set. A host that manages the font scale itself, for example an overlay
+// inside another application, turns this off; Facet text then grows with the host's font
+// scale, which should equal Scale() for text to match the Px() lengths.
+void SetManageFontScale(bool enabled);
+bool ManagesFontScale();
 
 // Rounds a pixel coordinate or length to the nearest whole pixel.
 float Snap(float pixels);
