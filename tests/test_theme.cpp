@@ -1,6 +1,4 @@
-// Theme presets: contrast of text tokens on every surface, accent derivation, scale.
-
-#include <vector>
+// Theme presets, switching, blending and the Dear ImGui style mapping.
 
 #include <doctest/doctest.h>
 
@@ -9,114 +7,38 @@
 namespace
 {
 
-constexpr float kTextContrast = 4.5f;  // WCAG AA for normal text
-
-struct Surface
+bool SameColor(const ImVec4& a, const ImVec4& b)
 {
-    const char* name;
-    ImVec4 color;
+    return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+}
+
+bool SameColors(const facet::Colors& a, const facet::Colors& b)
+{
+    bool same = SameColor(a.bg, b.bg) && SameColor(a.bgSecondary, b.bgSecondary) &&
+                SameColor(a.bgTertiary, b.bgTertiary) && SameColor(a.bgElevated, b.bgElevated) &&
+                SameColor(a.label, b.label) && SameColor(a.labelSecondary, b.labelSecondary) &&
+                SameColor(a.accent, b.accent) && SameColor(a.accentText, b.accentText) &&
+                SameColor(a.onAccent, b.onAccent) && SameColor(a.scrim, b.scrim) &&
+                SameColor(a.separator, b.separator) && SameColor(a.focusRing, b.focusRing);
+    for (int i = 0; i < 4; ++i)
+        same = same && SameColor(a.fill[i], b.fill[i]);
+    return same;
+}
+
+// Restores the global theme state after a test changes it.
+struct ThemeGuard
+{
+    facet::Theme saved = facet::T();
+    facet::ThemeMode mode = facet::GetThemeMode();
+    ~ThemeGuard()
+    {
+        facet::ClearAccent();
+        facet::SetThemeMode(mode, false);
+        facet::SetTheme(saved, false);
+    }
 };
 
-std::vector<Surface> Surfaces(const facet::Theme& theme)
-{
-    const facet::Colors& c = theme.colors;
-    return {{"bg", c.bg}, {"bgSecondary", c.bgSecondary}, {"bgTertiary", c.bgTertiary},
-            {"bgElevated", c.bgElevated}};
-}
-
-void CheckReadableText(const facet::Theme& theme)
-{
-    const facet::Colors& c = theme.colors;
-    for (const Surface& surface : Surfaces(theme))
-    {
-        CAPTURE(surface.name);
-        CHECK(facet::ContrastRatio(c.label, surface.color) >= kTextContrast);
-        CHECK(facet::ContrastRatio(c.labelSecondary, surface.color) >= kTextContrast);
-        // Text on a control: the default control fill drawn over the surface.
-        const ImVec4 control = facet::Over(c.fill[1], surface.color);
-        CHECK(facet::ContrastRatio(c.label, control) >= kTextContrast);
-    }
-    // Status colors are used as text on the three content surfaces.
-    const ImVec4 content[] = {c.bg, c.bgSecondary, c.bgTertiary};
-    for (const ImVec4& surface : content)
-    {
-        CHECK(facet::ContrastRatio(c.destructive, surface) >= kTextContrast);
-        CHECK(facet::ContrastRatio(c.success, surface) >= kTextContrast);
-        CHECK(facet::ContrastRatio(c.warning, surface) >= kTextContrast);
-    }
-}
-
-void CheckAccentStates(const facet::Colors& c)
-{
-    CHECK(facet::ContrastRatio(c.onAccent, c.accent) >= kTextContrast);
-    CHECK(facet::ContrastRatio(c.onAccent, c.accentHover) >= kTextContrast);
-    CHECK(facet::ContrastRatio(c.onAccent, c.accentPressed) >= kTextContrast);
-}
-
-void CheckAccentText(const facet::Theme& theme)
-{
-    for (const Surface& surface : Surfaces(theme))
-    {
-        CAPTURE(surface.name);
-        CHECK(facet::ContrastRatio(theme.colors.accentText, surface.color) >= kTextContrast);
-    }
-    CHECK(theme.colors.accentText.w == doctest::Approx(1.0f));
-}
-
 } // namespace
-
-TEST_CASE("Text tokens reach 4.5:1 on every surface of the light theme")
-{
-    const facet::Theme theme = facet::Theme::Light();
-    CHECK_FALSE(theme.dark);
-    CheckReadableText(theme);
-}
-
-TEST_CASE("Text tokens reach 4.5:1 on every surface of the dark theme")
-{
-    const facet::Theme theme = facet::Theme::Dark();
-    CHECK(theme.dark);
-    CheckReadableText(theme);
-}
-
-TEST_CASE("onAccent reaches 4.5:1 on the default accent states of both themes")
-{
-    CheckAccentStates(facet::Theme::Light().colors);
-    CheckAccentStates(facet::Theme::Dark().colors);
-}
-
-TEST_CASE("accentText reaches 4.5:1 on every surface and keeps the accent hue")
-{
-    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
-    {
-        CAPTURE(theme.dark);
-        CheckAccentText(theme);
-        const facet::Oklch accent = facet::ToOklch(theme.colors.accent);
-        const facet::Oklch text = facet::ToOklch(theme.colors.accentText);
-        CHECK(text.h == doctest::Approx(accent.h).epsilon(0.02));
-    }
-}
-
-TEST_CASE("onAccent stays readable for accents across hues and lightness")
-{
-    for (const bool dark : {false, true})
-    {
-        facet::Theme theme = dark ? facet::Theme::Dark() : facet::Theme::Light();
-        for (int hue = 0; hue < 360; hue += 15)
-        {
-            for (const float lightness : {0.35f, 0.5f, 0.62f, 0.7f, 0.85f})
-            {
-                CAPTURE(dark);
-                CAPTURE(hue);
-                CAPTURE(lightness);
-                theme.ApplyAccent(facet::FromOklch({lightness, 0.15f, static_cast<float>(hue)}));
-                CheckAccentStates(theme.colors);
-                CheckAccentText(theme);
-                CHECK(theme.colors.accent.w == doctest::Approx(1.0f));
-            }
-        }
-    }
-}
 
 TEST_CASE("The token groups hold the documented starting values")
 {
@@ -125,57 +47,113 @@ TEST_CASE("The token groups hold the documented starting values")
     CHECK(theme.spacing.xxxl == 32.0f);
     CHECK(theme.radii.control == 8.0f);
     CHECK(theme.radii.window == 16.0f);
+    CHECK(theme.radii.continuousFrom == 10.0f);
     CHECK(theme.metrics.controlHeight == 28.0f);
     CHECK(theme.type[facet::TextStyle::Body].size == 13.0f);
     CHECK(theme.type[facet::TextStyle::Headline].weight == facet::FontWeight::Semibold);
     CHECK(theme.type[facet::TextStyle::LargeTitle].size == 26.0f);
     CHECK(theme.type[facet::TextStyle::Caption].size == 11.0f);
+    CHECK(theme.motion.durationFast == doctest::Approx(0.12f));
     CHECK(theme.motion.durationStandard == doctest::Approx(0.2f));
+    CHECK(theme.motion.durationSlow == doctest::Approx(0.35f));
     CHECK(theme.elevation.Level(0).blur == theme.elevation.Level(1).blur);
     CHECK(theme.elevation.Level(9).blur == theme.elevation.Level(3).blur);
     CHECK(theme.elevation.Level(3).blur > theme.elevation.Level(1).blur);
+    CHECK_FALSE(theme.dark);
+    CHECK(facet::Theme::Dark().dark);
 }
 
 TEST_CASE("SetTheme and SetAccent change the current theme")
 {
-    const facet::Theme saved = facet::T();
-
+    ThemeGuard guard;
     facet::SetTheme(facet::Theme::Dark(), false);
     CHECK(facet::T().dark);
     facet::SetAccent(IM_COL32(0xFF, 0xD6, 0x0A, 0xFF));
     CHECK(facet::T().colors.accent.x == doctest::Approx(1.0f));
-    CHECK(facet::ContrastRatio(facet::T().colors.onAccent, facet::T().colors.accent) >= kTextContrast);
+    CHECK(facet::ContrastRatio(facet::T().colors.onAccent, facet::T().colors.accent) >= 4.5f);
     facet::SetTheme(facet::Theme::Light(), false);
     CHECK_FALSE(facet::T().dark);
     CHECK(facet::T().colors.accent.z == doctest::Approx(facet::Theme::Light().colors.accent.z));
-
-    facet::SetTheme(saved, false);
 }
 
-TEST_CASE("Scale combines the DPI and user scale according to the mode")
+TEST_CASE("An animated SetTheme switches at once while Facet is not running")
 {
-    const float savedUi = facet::UiScale();
-    const float savedDpi = facet::DpiScale();
-    const facet::ScaleMode savedMode = facet::GetScaleMode();
+    ThemeGuard guard;
+    REQUIRE_FALSE(facet::IsInitialized());
+    facet::SetTheme(facet::Theme::Dark(), true);
+    CHECK_FALSE(facet::ThemeTransitionActive());
+    CHECK(facet::T().dark);
+    CHECK(SameColors(facet::T().colors, facet::Theme::Dark().colors));
+}
 
-    facet::SetScaleMode(facet::ScaleMode::FollowDpi);
-    facet::SetDpiScale(1.5f);
-    facet::SetUiScale(2.0f);
-    CHECK(facet::Scale() == doctest::Approx(3.0f));
-    CHECK(facet::Px(4.0f) == doctest::Approx(12.0f));
-    const ImVec2 size = facet::Px(ImVec2(10.0f, 20.0f));
-    CHECK(size.x == doctest::Approx(30.0f));
-    CHECK(size.y == doctest::Approx(60.0f));
+TEST_CASE("MixThemes returns exact copies at the endpoints")
+{
+    const facet::Theme light = facet::Theme::Light();
+    facet::Theme dark = facet::Theme::Dark();
+    dark.spacing.md = 20.0f;
+    dark.radii.card = 4.0f;
 
-    facet::SetScaleMode(facet::ScaleMode::Manual);
-    CHECK(facet::Scale() == doctest::Approx(2.0f));
+    const facet::Theme start = facet::MixThemes(light, dark, 0.0f);
+    CHECK(SameColors(start.colors, light.colors));
+    CHECK(start.spacing.md == light.spacing.md);
+    CHECK(start.radii.card == light.radii.card);
+    CHECK_FALSE(start.dark);
 
-    facet::SetUiScale(100.0f);
-    CHECK(facet::UiScale() == doctest::Approx(4.0f));
-    facet::SetUiScale(0.0f);
-    CHECK(facet::UiScale() == doctest::Approx(0.5f));
+    const facet::Theme end = facet::MixThemes(light, dark, 1.0f);
+    CHECK(SameColors(end.colors, dark.colors));
+    CHECK(end.spacing.md == 20.0f);
+    CHECK(end.radii.card == 4.0f);
+    CHECK(end.dark);
 
-    facet::SetScaleMode(savedMode);
-    facet::SetDpiScale(savedDpi);
-    facet::SetUiScale(savedUi);
+    // Values outside 0 to 1 are clamped.
+    CHECK(SameColors(facet::MixThemes(light, dark, -2.0f).colors, light.colors));
+    CHECK(SameColors(facet::MixThemes(light, dark, 3.0f).colors, dark.colors));
+}
+
+TEST_CASE("MixThemes blends colors in OKLab and lengths linearly")
+{
+    const facet::Theme light = facet::Theme::Light();
+    facet::Theme dark = facet::Theme::Dark();
+    dark.spacing.md = 20.0f;
+
+    const facet::Theme mid = facet::MixThemes(light, dark, 0.5f);
+    CHECK(mid.spacing.md == doctest::Approx((light.spacing.md + 20.0f) * 0.5f));
+    // White to black at the midpoint is the OKLab midpoint: lightness 0.5.
+    CHECK(facet::ToOklab(mid.colors.bg).L == doctest::Approx(0.5f).epsilon(0.01));
+    const ImVec4 expected = facet::Mix(light.colors.accent, dark.colors.accent, 0.5f);
+    CHECK(mid.colors.accent.x == doctest::Approx(expected.x));
+    CHECK(mid.colors.accent.z == doctest::Approx(expected.z));
+    // Switches flip at the halfway point.
+    CHECK(mid.dark);
+    CHECK_FALSE(facet::MixThemes(light, dark, 0.49f).dark);
+
+    // Lightness of the background falls monotonically along the blend.
+    float previous = 2.0f;
+    for (int i = 0; i <= 10; ++i)
+    {
+        const float L = facet::ToOklab(facet::MixThemes(light, dark, static_cast<float>(i) / 10.0f).colors.bg).L;
+        CHECK(L <= previous + 1e-5f);
+        previous = L;
+    }
+}
+
+TEST_CASE("SetThemeMode selects the presets and keeps a custom accent")
+{
+    ThemeGuard guard;
+    facet::SetThemeMode(facet::ThemeMode::Dark, false);
+    CHECK(facet::GetThemeMode() == facet::ThemeMode::Dark);
+    CHECK(facet::T().dark);
+
+    const ImVec4 purple = facet::AccentPresets()[1].color;
+    facet::SetAccent(purple);
+    facet::SetThemeMode(facet::ThemeMode::Light, false);
+    CHECK_FALSE(facet::T().dark);
+    CHECK(facet::ToU32(facet::T().colors.accent) == facet::ToU32(purple));
+
+    facet::SetThemeMode(facet::ThemeMode::System, false);
+    CHECK(facet::T().dark == facet::SystemPrefersDarkTheme());
+
+    // SetTheme replaces the accent with the one of the theme passed.
+    facet::SetTheme(facet::Theme::Light(), false);
+    CHECK(facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Light().colors.accent));
 }

@@ -7,6 +7,8 @@
 // never use literals. Lengths here are in design units: pixels at scale 1.
 // Colors are ImVec4 in sRGB with straight alpha (see color.h).
 
+#include <span>
+
 #include <imgui.h>
 
 #include "facet/core/anim.h"
@@ -171,6 +173,10 @@ struct Motion
 
     float scale = 1.0f;         // multiplies every duration and spring response
     bool reduceMotion = false;  // skip animations; values jump to their targets
+
+    // Periods of the looping loading indicators (also multiplied by `scale`).
+    float shimmerPeriod = 1.4f;  // one sweep of the skeleton highlight
+    float spinnerPeriod = 1.0f;  // one turn of the spinner arc
 };
 
 // One soft shadow; lengths in design units.
@@ -228,15 +234,67 @@ struct Theme
 };
 
 // The current theme. Valid at any time, also before Init; Theme::Light() until SetTheme.
+// During an animated switch it is the blend of the previous and the new theme.
 const Theme& T();
 
-// Makes `theme` current. With `animate`, a running app may cross-fade the colors over
-// motion.durationStandard; other tokens switch at once.
+// Makes `theme` current. With `animate`, while Facet is initialized and motion is not
+// reduced, the switch is spread over motion.durationStandard (times motion.scale) of the
+// new theme: colors blend in OKLab and lengths linearly, one blend step per facet::NewFrame;
+// switches (dark, weights, flags) change at the halfway point. Without `animate` the theme
+// changes at once. Either way the library modules are notified of every change.
 void SetTheme(const Theme& theme, bool animate = true);
 
-// Applies a new accent to the current theme (see Theme::ApplyAccent). The next SetTheme
-// replaces it with the accent of the theme passed there.
+// Applies a new accent to the current theme (see Theme::ApplyAccent). A running transition
+// finishes at once first. SetTheme shows the accent of the theme passed there; SetThemeMode
+// applies the accent of the last SetAccent to its preset until ClearAccent.
 void SetAccent(const ImVec4& accent);
 void SetAccent(ImU32 accent);
+// Forgets the accent of the last SetAccent, so SetThemeMode shows the presets' own accents
+// again. The current theme keeps its colors until the next switch.
+void ClearAccent();
+bool HasCustomAccent();
+
+// `a` blended toward `b`: colors in OKLab (alpha linearly), lengths, durations and springs
+// linearly, switches and enums taken from `b` from t = 0.5 on. t is clamped to 0 to 1, and
+// t = 0 and t = 1 return exact copies of `a` and `b`.
+Theme MixThemes(const Theme& a, const Theme& b, float t);
+
+// True while an animated SetTheme is still blending.
+bool ThemeTransitionActive();
+
+// Which preset the app shows. System follows the Windows "app mode" (light or dark); while
+// Facet is initialized, a change of that setting is picked up in facet::NewFrame and switched
+// to with an animation.
+enum class ThemeMode
+{
+    Light,
+    Dark,
+    System,
+};
+
+// Shows Theme::Light() or Theme::Dark(), chosen by `mode`, with the accent last passed to
+// SetAccent if there was one (see ClearAccent). SetTheme leaves the mode at the value it has.
+void SetThemeMode(ThemeMode mode, bool animate = true);
+ThemeMode GetThemeMode();  // default Light
+
+// The Windows app mode: true when apps should use a dark theme. Read from the registry; false
+// when the value does not exist (older Windows versions have no dark app mode).
+bool SystemPrefersDarkTheme();
+
+// A named accent color for theme pickers.
+struct AccentPreset
+{
+    const char* name;
+    ImVec4 color;
+};
+
+// The accent choices offered by the demo and available to apps. The first one is the default
+// accent of the light preset.
+std::span<const AccentPreset> AccentPresets();
+
+// The color for the outline of a stock control (a checkbox, a text field): separatorOpaque
+// mixed toward label until it reaches the 3:1 non-text contrast on bg, bgSecondary and
+// bgTertiary. Translucent fills alone stay far below that.
+ImVec4 ControlBoundaryColor(const Colors& colors);
 
 } // namespace facet
