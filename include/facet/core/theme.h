@@ -292,7 +292,9 @@ struct AccentPreset
 };
 
 // The accent choices offered by the demo and available to apps. The first one is the default
-// accent of the light preset.
+// accent of the light preset; the dark preset uses a lighter blue. A picker that offers the
+// first entry as "theme default" calls ClearAccent (and SetThemeMode) for it instead of
+// SetAccent, so each theme shows its own blue.
 std::span<const AccentPreset> AccentPresets();
 
 // The color for the outline of a stock control (a checkbox, a text field): separatorOpaque

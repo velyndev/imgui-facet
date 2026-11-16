@@ -203,7 +203,10 @@ void DrawFills()
     ImGui::Dummy(ImVec2(0.0f, facet::Px(theme.spacing.md)));
 }
 
-// The accent presets as round swatches; each is a button (Tab, Space) that applies it.
+// The accent presets as round swatches; each is a button (Tab, Space) that applies it. The
+// first swatch stands for the theme's own accent, which differs between light and dark:
+// it clears the custom accent instead of applying the preset color, and it is drawn in the
+// accent of the current theme while no custom accent is set.
 void DrawAccentPicker(facet::demo::PageCtx& ctx)
 {
     const facet::Theme& theme = facet::T();
@@ -212,43 +215,47 @@ void DrawAccentPicker(facet::demo::PageCtx& ctx)
     const float size = facet::Px(theme.metrics.controlHeight);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float right = facet::demo::ContentRight();
+    const bool custom = facet::HasCustomAccent();
     char probe[32];
     for (int i = 0; i < static_cast<int>(presets.size()); ++i)
     {
         const facet::AccentPreset& preset = presets[static_cast<size_t>(i)];
+        const bool themeDefault = i == 0;
         ImGui::PushID(i);
         if (ImGui::InvisibleButton(preset.name, ImVec2(size, size), ImGuiButtonFlags_EnableNav))
         {
-            facet::SetAccent(preset.color);
-            tokens.lastPreset = i;
+            if (themeDefault)
+            {
+                facet::ClearAccent();
+                facet::SetThemeMode(facet::GetThemeMode(), true);
+            }
+            else
+            {
+                facet::SetAccent(preset.color);
+            }
+            tokens.lastPreset = themeDefault ? -1 : i;
         }
         facet::ItemCursor();
         std::snprintf(probe, sizeof(probe), "tokens.accent.%d", i);
         ctx.Probe(probe);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", preset.name);
+            ImGui::SetTooltip(themeDefault ? "%s (theme default)" : "%s", preset.name);
         const ImVec2 center((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                             (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
-        const bool current = facet::ToU32(preset.color) == facet::ToU32(c.accent);
+        const bool current = themeDefault ? !custom : custom && facet::ToU32(preset.color) == facet::ToU32(c.accent);
+        const ImVec4 swatch = themeDefault && !custom ? c.accent : preset.color;
         const float ring = facet::Px(theme.metrics.focusRingWidth);
-        drawList->AddCircleFilled(center, size * 0.5f - ring, U32(preset.color));
+        drawList->AddCircleFilled(center, size * 0.5f - ring, U32(swatch));
         if (current)
             facet::StrokeArc(drawList, center, size * 0.5f - ring * 0.5f, 0.0f, kFullTurn, U32(c.label),
                              facet::HairlineThickness() * 2.0f, false);
         ImGui::PopID();
-        const bool last = i + 1 == static_cast<int>(presets.size());
-        facet::demo::SameLineIfFits(right, last ? facet::demo::ButtonWidth("Reset accent") : size);
+        if (i + 1 < static_cast<int>(presets.size()))
+            facet::demo::SameLineIfFits(right, size);
     }
-    if (ImGui::Button("Reset accent"))
-    {
-        facet::ClearAccent();
-        facet::SetThemeMode(facet::GetThemeMode(), true);
-        tokens.lastPreset = -1;
-    }
-    facet::ItemCursor();
-    ctx.Probe("tokens.reset");
-    Note("Accent: %s. Hover, pressed, subtle, focus ring, on-accent text and accent text are derived from it.",
-         tokens.lastPreset >= 0 ? presets[static_cast<size_t>(tokens.lastPreset)].name : "theme default");
+    const bool named = custom && tokens.lastPreset > 0;
+    Note("Accent: %s%s. Hover, pressed, subtle, focus ring, on-accent text and accent text are derived from it.",
+         presets[named ? static_cast<size_t>(tokens.lastPreset) : 0].name, named ? "" : ", the theme default");
 }
 
 void DrawSpacing()
@@ -436,9 +443,9 @@ FACET_DEMO_SELFTEST("tokens")
     });
     test.Expect("the derived on-accent text stays readable",
                 [] { return facet::ContrastRatio(facet::T().colors.onAccent, facet::T().colors.accent) >= 4.5f; });
-    test.Click("tokens.reset");
+    test.Click("tokens.accent.0");
     test.Wait(30);
-    test.Expect("Reset accent returns to the theme default", [] {
+    test.Expect("the first swatch returns to the theme default", [] {
         const facet::Theme preset = facet::T().dark ? facet::Theme::Dark() : facet::Theme::Light();
         return !facet::HasCustomAccent() && facet::ToU32(facet::T().colors.accent) == facet::ToU32(preset.colors.accent);
     });
@@ -487,8 +494,14 @@ FACET_DEMO_SELFTEST("tokens")
     test.KeyPress(ImGuiKey_UpArrow);
     test.ExpectFocused("nav.tokens");
     test.KeyPress(ImGuiKey_Space);
-    test.Click("tokens.accent.0");
+    test.Click("tokens.accent.1");
     test.Expect("the Tokens page is shown again", [] {
-        return facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::AccentPresets()[0].color);
+        return facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::AccentPresets()[1].color);
+    });
+    test.Click("tokens.accent.0");
+    test.Wait(30);
+    test.Expect("in the dark theme the first swatch gives the dark theme's own accent", [] {
+        return facet::T().dark && !facet::HasCustomAccent() &&
+               facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Dark().colors.accent);
     });
 }
