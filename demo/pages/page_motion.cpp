@@ -333,6 +333,17 @@ FACET_DEMO_SELFTEST("motion")
 
     test.Click("motion.slow");
     test.Expect("Slow down sets the motion scale to 4", [] { return facet::T().motion.scale == 4.0f; });
+    // A light or dark switch changes the colors and keeps the motion settings.
+    static facet::ThemeMode savedMode = facet::ThemeMode::Light;
+    static bool savedDark = false;
+    test.Do([] {
+        savedMode = facet::GetThemeMode();
+        savedDark = facet::T().dark;
+        facet::SetThemeMode(savedDark ? facet::ThemeMode::Light : facet::ThemeMode::Dark, false);
+    });
+    test.Expect("a theme switch keeps the slowed motion",
+                [] { return facet::T().dark != savedDark && facet::T().motion.scale == 4.0f; });
+    test.Do([] { facet::SetThemeMode(savedMode, false); });
     test.Click("motion.replay");
     test.Wait(30);
     test.Expect("at scale 4 the tween is still moving after 0.5 s",

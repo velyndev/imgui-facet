@@ -158,6 +158,31 @@ TEST_CASE("SetThemeMode selects the presets and keeps a custom accent")
     CHECK(facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Light().colors.accent));
 }
 
+TEST_CASE("SetThemeMode swaps the colors and keeps the other groups of the current theme")
+{
+    ThemeGuard guard;
+    facet::Theme custom = facet::Theme::Light();
+    custom.motion.scale = 4.0f;
+    custom.motion.reduceMotion = true;
+    custom.radii.continuousCorners = false;
+    custom.spacing.md = 14.0f;
+    facet::SetTheme(custom, false);
+
+    facet::SetThemeMode(facet::ThemeMode::Dark, false);
+    CHECK(facet::T().dark);
+    CHECK(SameColors(facet::T().colors, facet::Theme::Dark().colors));
+    CHECK(facet::T().elevation.Level(2).opacity == facet::Theme::Dark().elevation.Level(2).opacity);
+    CHECK(facet::T().motion.scale == 4.0f);
+    CHECK(facet::T().motion.reduceMotion);
+    CHECK_FALSE(facet::T().radii.continuousCorners);
+    CHECK(facet::T().spacing.md == 14.0f);
+
+    facet::SetThemeMode(facet::ThemeMode::Light, false);
+    CHECK_FALSE(facet::T().dark);
+    CHECK(SameColors(facet::T().colors, facet::Theme::Light().colors));
+    CHECK(facet::T().motion.scale == 4.0f);
+}
+
 TEST_CASE("ApplyImGuiStyle maps tokens and scale onto a Dear ImGui style")
 {
     ThemeGuard guard;

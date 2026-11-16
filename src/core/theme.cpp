@@ -188,13 +188,21 @@ bool ReadSystemDark()
     return status == ERROR_SUCCESS && value == 0;
 }
 
+// The theme a mode switch moves to: the colors and elevation of the light or dark preset on
+// top of the app's current theme, so spacing, radii, metrics, type, motion and glass settings
+// made with SetTheme survive the switch. During a running transition the theme it moves to
+// counts as the current one.
 Theme PresetFor(ThemeMode mode)
 {
     ThemeState& state = State();
     bool dark = mode == ThemeMode::Dark;
     if (mode == ThemeMode::System)
         dark = state.systemDark;
-    Theme theme = dark ? Theme::Dark() : Theme::Light();
+    const Theme preset = dark ? Theme::Dark() : Theme::Light();
+    Theme theme = state.blending ? state.to : state.current;
+    theme.dark = preset.dark;
+    theme.colors = preset.colors;
+    theme.elevation = preset.elevation;
     if (state.hasUserAccent)
         theme.ApplyAccent(state.userAccent);
     return theme;

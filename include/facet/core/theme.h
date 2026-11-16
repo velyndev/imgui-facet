@@ -272,8 +272,11 @@ enum class ThemeMode
     System,
 };
 
-// Shows Theme::Light() or Theme::Dark(), chosen by `mode`, with the accent last passed to
-// SetAccent if there was one (see ClearAccent). SetTheme leaves the mode at the value it has.
+// Switches to the colors (dark, colors, elevation) of Theme::Light() or Theme::Dark(), chosen
+// by `mode`, with the accent last passed to SetAccent if there was one (see ClearAccent).
+// Every other group of the current theme (spacing, radii, metrics, type, motion, glass) is
+// kept, so settings made with SetTheme, such as motion.reduceMotion, survive a mode switch,
+// including the automatic one in System mode. SetTheme leaves the mode at the value it has.
 void SetThemeMode(ThemeMode mode, bool animate = true);
 ThemeMode GetThemeMode();  // default Light
 

@@ -77,8 +77,10 @@ void ApplyGalleryLook(GalleryState& state, const PageCtx& ctx)
     bool changed = false;
     if (state.appliedMode < 0)
     {
-        // A fresh gallery starts from the preset accents, whatever an earlier run chose.
+        // A fresh gallery starts from the presets, whatever an earlier run chose: a mode switch
+        // alone keeps the motion, radius and spacing settings of the current theme.
         facet::ClearAccent();
+        facet::SetTheme(facet::Theme::Light(), false);
         facet::SetThemeMode(mode, false);
         changed = true;
     }

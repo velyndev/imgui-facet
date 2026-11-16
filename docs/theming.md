@@ -59,6 +59,11 @@ it watches that value: when the user changes the Windows setting, the theme foll
 animated switch at the next `facet::NewFrame`. `facet::SystemPrefersDarkTheme()` reads the
 setting.
 
+A mode switch replaces only `dark`, `colors` and `elevation` with those of the preset. The other
+groups of the current theme (spacing, radii, metrics, type, motion, glass) stay as the app set
+them with `SetTheme`, so a reduced-motion or motion-scale setting survives a switch, including
+one that follows the Windows setting.
+
 ## Accent
 
 ```cpp
