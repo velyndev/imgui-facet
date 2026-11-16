@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Embedded assets keep the same bytes on every platform
+*.svg text eol=lf

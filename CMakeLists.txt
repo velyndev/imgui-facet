@@ -22,11 +22,22 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(FacetWarnings)
 include(FacetDeps)
+include(FacetEmbed)
 
 # Shared output folder so the demo, the tests and their DLL-free dependencies sit together.
 if(FACET_IS_TOP_LEVEL)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 endif()
+
+# --- Embedded assets ---------------------------------------------------------
+# Every SVG under assets/icons is compiled into the library. New files are picked up
+# at build time without editing this file.
+file(GLOB_RECURSE FACET_ICON_FILES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/assets/icons/*.svg")
+facet_embed_assets(
+    OUTPUT "${PROJECT_BINARY_DIR}/generated/facet_embedded_assets.cpp"
+    BASE_DIR "${PROJECT_SOURCE_DIR}/assets"
+    FILES ${FACET_ICON_FILES})
 
 # --- Library -----------------------------------------------------------------
 file(GLOB_RECURSE FACET_LIB_SOURCES CONFIGURE_DEPENDS
@@ -37,7 +48,8 @@ file(GLOB_RECURSE FACET_LIB_HEADERS CONFIGURE_DEPENDS
 
 add_library(facet STATIC
     ${FACET_LIB_SOURCES}
-    ${FACET_LIB_HEADERS})
+    ${FACET_LIB_HEADERS}
+    "${PROJECT_BINARY_DIR}/generated/facet_embedded_assets.cpp")
 add_library(facet::facet ALIAS facet)
 
 target_compile_features(facet PUBLIC cxx_std_20)
