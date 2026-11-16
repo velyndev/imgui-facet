@@ -27,6 +27,29 @@ static_assert(std::size(kUiScales) == std::size(kUiScaleLabels));
 constexpr const char* kDarkLabel = "Dark theme";
 constexpr const char* kScaleLabel = "UI scale";
 
+// WCAG 2 non-text contrast that the boundary of a control needs against its surroundings.
+constexpr float kBoundaryContrast = 3.0f;
+// Mix step of the boundary color search.
+constexpr float kBoundaryMixStep = 0.05f;
+
+// Frame border color for stock widgets: separatorOpaque mixed toward label until it reaches
+// 3:1 on bg, bgSecondary and bgTertiary, so an unchecked checkbox or an empty text field is
+// visible on every content surface. Translucent fills alone stay far below that.
+ImVec4 ControlBoundary(const facet::Colors& c)
+{
+    const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary};
+    for (int step = 0; static_cast<float>(step) * kBoundaryMixStep <= 1.0f; ++step)
+    {
+        const ImVec4 candidate = facet::Mix(c.separatorOpaque, c.label, static_cast<float>(step) * kBoundaryMixStep);
+        bool readable = true;
+        for (const ImVec4& surface : surfaces)
+            readable = readable && facet::ContrastRatio(candidate, surface) >= kBoundaryContrast;
+        if (readable)
+            return candidate;
+    }
+    return c.label;
+}
+
 int NearestScaleIndex(float scale)
 {
     int best = 0;
@@ -228,8 +251,11 @@ void ApplyThemeToImGuiStyle(const facet::Theme& theme)
     colors[ImGuiCol_WindowBg] = c.bg;
     colors[ImGuiCol_ChildBg] = c.bgSecondary;
     colors[ImGuiCol_PopupBg] = c.bgElevated;
-    colors[ImGuiCol_Border] = c.separator;
+    // Window and frame borders share this color in Dear ImGui. Frames get a hairline border
+    // so controls keep a visible boundary; windows keep their default border sizes.
+    colors[ImGuiCol_Border] = ControlBoundary(c);
     colors[ImGuiCol_BorderShadow] = clear;
+    style.FrameBorderSize = facet::HairlineThickness();
 
     colors[ImGuiCol_FrameBg] = c.fill[1];
     colors[ImGuiCol_FrameBgHovered] = c.fill[0];
