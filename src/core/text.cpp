@@ -7,6 +7,7 @@
 
 #include <cfloat>
 #include <climits>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -473,11 +474,31 @@ ImVec2 MeasureText(TextStyle style, const char* text, const char* textEnd, float
     return size;
 }
 
+float CenteredTextY(float top, float height)
+{
+    const float size = ImGui::GetFontSize();
+    float inkTop = 0.0f;
+    float inkBottom = size;
+    ImFontBaked* baked = ImGui::GetFontBaked();
+    if (baked != nullptr && baked->Size > 0.0f)
+    {
+        // Glyph extents are relative to the top of the line, in units of the baked size.
+        const ImFontGlyph* glyph = baked->FindGlyphNoFallback('H');
+        if (glyph != nullptr && glyph->Y1 > glyph->Y0)
+        {
+            const float toPixels = size / baked->Size;
+            inkTop = glyph->Y0 * toPixels;
+            inkBottom = glyph->Y1 * toPixels;
+        }
+    }
+    return std::round(top + height * 0.5f - (inkTop + inkBottom) * 0.5f);
+}
+
 namespace internal
 {
 
-// Loads the fonts at Init and removes them at Shutdown; a SetFontSet after Init reloads them
-// at the start of the next frame.
+// Loads the fonts at Init and removes them at Shutdown; a SetFontSet reloads them between
+// frames or at the start of the next frame.
 Subsystem FontSubsystem()
 {
     Subsystem subsystem;

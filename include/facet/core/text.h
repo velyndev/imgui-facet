@@ -93,4 +93,10 @@ void TextV(TextStyle style, const char* fmt, va_list args) IM_FMTLIST(2);
 // zero terminated; wrapWidth <= 0 means no wrapping.
 ImVec2 MeasureText(TextStyle style, const char* text, const char* textEnd = nullptr, float wrapWidth = 0.0f);
 
+// The y at which to draw a line of text in the current font so that its capital letters sit
+// centered in the box from `top` to `top + height`. Centering the line height instead leaves
+// the letters low, because the line also holds the space for descenders. The result is
+// rounded to whole pixels. Call inside a frame, with the font of the text pushed.
+float CenteredTextY(float top, float height);
+
 } // namespace facet
