@@ -1,5 +1,5 @@
 // Drawing helpers that work without a frame: continuous corners, gradients, checkerboards,
-// arcs, DrawGroup vertex and clip transforms.
+// arcs, DrawGroup vertex and clip transforms, and the text helpers.
 
 #include <cfloat>
 #include <cmath>
@@ -12,6 +12,7 @@
 #include <facet/facet.h>
 
 #include "core/shape_path.h"
+#include "internal/text_util.h"
 
 namespace
 {
@@ -296,4 +297,122 @@ TEST_CASE("DrawGroup moves the clip rects of its commands and keeps the others")
     CHECK(last.ClipRect.x == 0.0f);
     CHECK(last.ClipRect.z == 1000.0f);
     CHECK(last.ElemCount > 0);
+}
+
+namespace
+{
+
+// A Dear ImGui context with the default font, for the text helpers.
+struct FontContext
+{
+    FontContext()
+    {
+        context = ImGui::CreateContext();
+        font = ImGui::GetIO().Fonts->AddFontDefault();
+    }
+    ~FontContext() { ImGui::DestroyContext(context); }
+    FontContext(const FontContext&) = delete;
+    FontContext& operator=(const FontContext&) = delete;
+
+    ImGuiContext* context = nullptr;
+    ImFont* font = nullptr;
+};
+
+constexpr float kFontSize = 13.0f;
+
+} // namespace
+
+TEST_CASE("TruncateText shortens at the end or in the middle to fit the width")
+{
+    FontContext fonts;
+    REQUIRE(fonts.font != nullptr);
+    using facet::internal::TruncateMode;
+    const char* text = "C:/projects/facet/demo/pages/page_motion.cpp";
+    const float full = fonts.font->CalcTextSizeA(kFontSize, FLT_MAX, 0.0f, text).x;
+    char out[128];
+
+    auto fits = facet::internal::TruncateText(fonts.font, kFontSize, text, nullptr, full + 1.0f, TruncateMode::End,
+                                              out, sizeof(out));
+    CHECK_FALSE(fits.truncated);
+    CHECK(std::strcmp(out, text) == 0);
+
+    for (const TruncateMode mode : {TruncateMode::End, TruncateMode::Middle})
+    {
+        CAPTURE(static_cast<int>(mode));
+        for (const float fraction : {0.3f, 0.5f, 0.8f})
+        {
+            CAPTURE(fraction);
+            const float width = full * fraction;
+            const auto result = facet::internal::TruncateText(fonts.font, kFontSize, text, nullptr, width, mode, out,
+                                                              sizeof(out));
+            CHECK(result.truncated);
+            CHECK(result.width <= width + 0.01f);
+            CHECK(result.length == static_cast<int>(std::strlen(out)));
+            CHECK(result.length < static_cast<int>(std::strlen(text)));
+            if (mode == TruncateMode::End)
+                CHECK(std::strncmp(out, text, 4) == 0);
+            else
+                CHECK(std::strcmp(out + result.length - 3, "cpp") == 0);
+        }
+    }
+
+    const auto none = facet::internal::TruncateText(fonts.font, kFontSize, text, nullptr, 0.5f, TruncateMode::End, out,
+                                                    sizeof(out));
+    CHECK(none.truncated);
+    CHECK(out[0] == '\0');
+
+    // UTF-8: never cut inside a character.
+    const char* accented = "\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9";
+    const float accentedWidth = fonts.font->CalcTextSizeA(kFontSize, FLT_MAX, 0.0f, accented).x;
+    const auto cut = facet::internal::TruncateText(fonts.font, kFontSize, accented, nullptr, accentedWidth * 0.6f,
+                                                   TruncateMode::End, out, sizeof(out));
+    CHECK(cut.truncated);
+    for (int i = 0; i < cut.length; ++i)
+    {
+        const unsigned char c = static_cast<unsigned char>(out[i]);
+        if (c == 0xC3u)
+            CHECK(static_cast<unsigned char>(out[i + 1]) == 0xA9u);
+        if (c == 0xA9u)
+            CHECK((i > 0 && static_cast<unsigned char>(out[i - 1]) == 0xC3u));
+    }
+}
+
+TEST_CASE("WrapText breaks at spaces and honours line breaks")
+{
+    FontContext fonts;
+    const char* text = "one two three four five\nsix";
+    const float word = fonts.font->CalcTextSizeA(kFontSize, FLT_MAX, 0.0f, "three ").x;
+    facet::internal::WrapLine lines[16];
+    const int count = facet::internal::WrapText(fonts.font, kFontSize, text, nullptr, word * 2.2f, lines);
+    REQUIRE(count >= 3);
+    REQUIRE(count <= 16);
+    for (int i = 0; i < count; ++i)
+    {
+        CHECK(lines[i].width <= word * 2.2f + 0.01f);
+        CHECK((lines[i].end == lines[i].begin || lines[i].end[-1] != ' '));
+    }
+    CHECK(std::strncmp(lines[count - 1].begin, "six", 3) == 0);
+    // Asking with less room still reports the total.
+    CHECK(facet::internal::WrapText(fonts.font, kFontSize, text, nullptr, word * 2.2f, {}) == count);
+    // No wrap width: one line per paragraph.
+    CHECK(facet::internal::WrapText(fonts.font, kFontSize, text, nullptr, 0.0f, lines) == 2);
+}
+
+TEST_CASE("FindMatches and DrawHighlightedText mark every occurrence")
+{
+    FontContext fonts;
+    facet::internal::TextRange ranges[4];
+    const char* text = "Motion, MOTION and motion";
+    const int count = facet::internal::FindMatches(text, nullptr, "motion", ranges);
+    CHECK(count == 3);
+    CHECK(ranges[0].begin == 0);
+    CHECK(ranges[1].begin == 8);
+    CHECK(ranges[2].end == static_cast<int>(std::strlen(text)));
+    CHECK(facet::internal::FindMatches(text, nullptr, "", ranges) == 0);
+
+    const float plain = fonts.font->CalcTextSizeA(kFontSize, FLT_MAX, 0.0f, text).x;
+    facet::internal::HighlightStyle style;
+    const float width = facet::internal::DrawHighlightedText(nullptr, fonts.font, kFontSize, ImVec2(0.0f, 0.0f), text,
+                                                             nullptr, std::span(ranges, 3), style);
+    CHECK(width == doctest::Approx(plain).epsilon(0.01));
 }
