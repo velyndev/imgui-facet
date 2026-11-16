@@ -1,4 +1,4 @@
-# facet_demo: gallery application.
+# facet_demo: gallery and capture application.
 # Every .cpp and .h under demo/ is part of the program, so new pages need no edit here.
 # Pages register themselves through static objects; they must stay in this executable
 # (a static library would let the linker drop them).
@@ -29,6 +29,7 @@ target_compile_definitions(facet_demo PRIVATE
 target_link_libraries(facet_demo PRIVATE
     facet::facet
     facet::imgui_backends
+    facet_stb
     d3d11
     dxgi
     dwmapi)
