@@ -1,6 +1,7 @@
 #include "pages/pages.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <utility>
 
@@ -12,6 +13,7 @@ namespace
 struct Registry
 {
     std::vector<PageInfo> pages;
+    std::vector<std::string> duplicateIds;  // ids registered more than once
     bool sorted = true;
 };
 
@@ -93,8 +95,41 @@ PageRegistrar::PageRegistrar(const char* id, const char* title, const char* grou
         info.states.emplace_back("default");
 
     Registry& registry = GetRegistry();
+    const bool duplicate = std::any_of(registry.pages.begin(), registry.pages.end(),
+                                       [&](const PageInfo& page) { return page.id == info.id; });
+    if (duplicate)
+    {
+        // Keep the first registration; ValidateRegistry reports the clash.
+        registry.duplicateIds.push_back(info.id);
+        return;
+    }
     registry.pages.push_back(std::move(info));
     registry.sorted = false;
+}
+
+bool ValidateRegistry()
+{
+    bool valid = true;
+    for (const std::string& id : GetRegistry().duplicateIds)
+    {
+        std::fprintf(stderr, "error: page id '%s' is registered more than once\n", id.c_str());
+        valid = false;
+    }
+    for (const std::string& id : DuplicateSelftestIds())
+    {
+        std::fprintf(stderr, "error: page '%s' registers more than one selftest script\n",
+                     id.c_str());
+        valid = false;
+    }
+    for (const std::string& id : SelftestPageIds())
+    {
+        if (FindPage(id) < 0)
+        {
+            std::fprintf(stderr, "error: selftest script for unknown page id '%s'\n", id.c_str());
+            valid = false;
+        }
+    }
+    return valid;
 }
 
 } // namespace facet::demo

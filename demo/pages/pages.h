@@ -57,6 +57,12 @@ std::span<const PageInfo> Pages();
 // Index into Pages() of the page with this id, or -1.
 int FindPage(std::string_view id);
 
+// Checks the page and selftest registrations: every page id must be unique, every page may
+// register at most one selftest script, and every script must belong to a registered page.
+// Prints one error line per problem to stderr and returns false when any was found.
+// Duplicate ids would otherwise overwrite each other's capture files silently.
+bool ValidateRegistry();
+
 struct PageRegistrar
 {
     PageRegistrar(const char* id, const char* title, const char* group, int order, PageFn draw,

@@ -104,6 +104,11 @@ struct SelftestRegistrar
 // Script builder registered for this page id, or nullptr.
 SelftestFn FindSelftest(std::string_view pageId);
 
+// Page ids that have a selftest script, sorted.
+std::vector<std::string> SelftestPageIds();
+// Page ids that registered a second script; the later registration was ignored.
+const std::vector<std::string>& DuplicateSelftestIds();
+
 struct SelftestOptions
 {
     std::string page;  // empty: every page that registered a script

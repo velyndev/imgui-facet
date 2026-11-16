@@ -36,7 +36,6 @@ ctest --preset msvc-x64-release
 Other build presets: `msvc-x64-debug`, `msvc-x86-release`, `msvc-x86-debug` (configure
 preset `msvc-x86`). Build output goes to `build/<preset>/`, programs to
 `build/<preset>/bin/<Debug|Release>/`.
-
 CMake options:
 
 | Option | Default | Meaning |
@@ -100,7 +99,8 @@ third_party/stb/ vendored stb headers
 Source files are collected with globs, so a new file under `src/`, `demo/`, `tests/` or
 `assets/icons/` is picked up without editing a CMake file. Demo pages and their selftest
 scripts register themselves (`FACET_DEMO_PAGE`, `FACET_DEMO_SELFTEST` in
-`demo/pages/pages.h` and `demo/selftest.h`).
+`demo/pages/pages.h` and `demo/selftest.h`). Page ids must be unique: `facet_demo` exits
+with an error naming the id when two pages, or two selftest scripts, use the same one.
 
 ## License
 

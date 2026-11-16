@@ -25,6 +25,12 @@ std::map<std::string, SelftestFn, std::less<>>& SelftestRegistry()
     return registry;
 }
 
+std::vector<std::string>& DuplicateSelftestStorage()
+{
+    static std::vector<std::string> duplicates;
+    return duplicates;
+}
+
 ImGuiKeyChord ModifierKeys(ImGuiKeyChord chord)
 {
     return chord & ImGuiMod_Mask_;
@@ -254,7 +260,21 @@ void SelftestScript::ExpectFocused(std::string_view probe)
 
 SelftestRegistrar::SelftestRegistrar(const char* pageId, SelftestFn build)
 {
-    SelftestRegistry()[pageId] = build;
+    if (!SelftestRegistry().emplace(pageId, build).second)
+        DuplicateSelftestStorage().emplace_back(pageId);
+}
+
+std::vector<std::string> SelftestPageIds()
+{
+    std::vector<std::string> ids;
+    for (const auto& entry : SelftestRegistry())
+        ids.push_back(entry.first);
+    return ids;
+}
+
+const std::vector<std::string>& DuplicateSelftestIds()
+{
+    return DuplicateSelftestStorage();
 }
 
 SelftestFn FindSelftest(std::string_view pageId)

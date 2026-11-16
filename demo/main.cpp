@@ -321,6 +321,9 @@ int wmain(int argc, wchar_t** argv)
         PrintUsage();
         return 0;
     }
+    // Clashing page ids would silently overwrite capture files and selftest scripts.
+    if (!ValidateRegistry())
+        return 1;
     if (listPages)
     {
         for (const PageInfo& page : Pages())
