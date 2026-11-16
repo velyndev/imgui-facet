@@ -12,14 +12,18 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
   `assets/icons/*.svg` into the library at build time.
 - The public core headers in `include/facet/core/`. Every declared function links; the state
   of each area:
-  - Core, theme and scale: the theme tokens with a light and a dark preset and runtime accent
-    colors (`theme.h`) and the UI scale (`scale.h`) work.
+  - Core, theme and scale: light and dark presets, a runtime accent with derived readable
+    states, animated theme switches, a mode that follows the Windows app theme and
+    `ApplyImGuiStyle` for stock Dear ImGui widgets (`theme.h`); the UI scale with three modes
+    and pixel snapping helpers (`scale.h`). See `docs/theming.md` and `docs/scaling.md`.
   - Core, color: conversions with OKLab, OKLCH and WCAG contrast (`color.h`) work.
-  - Core, drawing: the rectangle, hairline and `DrawGroup` helpers (`draw.h`) work;
-    continuous corners and rounded gradients fall back to plain shapes.
-  - Core, text: text styles draw with the current Dear ImGui font at the style's size; no
-    fonts are loaded yet (`text.h`).
-  - Core, motion: animations return their target value (`anim.h`).
+  - Core, drawing: rectangles with circular or continuous corners, hairlines, rounded
+    gradients, checkerboards, arcs with round caps, `DrawGroup` and pointer cursor helpers
+    (`draw.h`) work.
+  - Core, text: Segoe UI Variable weights loaded from the system (static Segoe UI as
+    fallback), text styles and text measuring (`text.h`) work.
+  - Core, motion: smoothing, springs and tweens keyed by ImGui id, and reduced motion that
+    follows the Windows setting (`anim.h`) work.
   - Effects: shadows and glow draw nothing, glass panels draw an opaque tinted fill
     (`effects.h`).
   - Images: image loaders return invalid handles (`image.h`).

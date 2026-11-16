@@ -4,8 +4,34 @@ Every visual choice in Facet with a one-line reason. Values are the starting tok
 `include/facet/core/theme.h` and `src/core/theme.cpp`, in design units (pixels at scale 1).
 Widgets read them from `facet::T()` and pass lengths through `facet::Px()`.
 
-The direction is a restrained desktop look for tools and in-game overlay menus: low visual
-energy, an even rhythm, and motion only where a state changes.
+## Direction
+
+Facet is a component framework and gallery for C++ developers who build desktop tools and
+in-game overlay menus. The look is restrained and quiet: it should feel at home next to the
+system's own windows and step back behind the content.
+
+Three dials set the character, each from 0 (none) to 3 (a lot):
+
+| Dial | Setting | Meaning |
+|---|---|---|
+| ENERGY | 1 | Low contrast between surfaces, one accent, no decoration that does not carry information |
+| RHYTHM | 2 | An even 4 px grid with clear grouping; dense enough for tools, never cramped |
+| MOTION | 2 | Short, soft motion that only marks a change of state; nothing loops for attention |
+
+**Identity motif: the sliding selection pill.** One soft accent-tinted highlight sits behind
+the selected entry and springs to the next one when the selection changes (standard spring).
+Tabs, the sidebar, segmented controls and lists share this one gesture, so it is recognisably
+Facet without any ornament. The demo navigation uses it today.
+
+**Dose caps.** Effects are allowed only where they carry meaning:
+
+- Backdrop blur: only on the floating menu shell and on popovers.
+- Shadows: only on floating layers (popovers, menus, dialogs, the shell).
+- Glow: only as the focus ring, plus one opt-in accent glow per screen.
+- Accent: only on the selection, the primary action and keyboard focus.
+
+Reduced motion follows the Windows "Animation effects" setting. Interactive items show the hand
+cursor, disabled ones the not-allowed cursor.
 
 ## Tokens
 
@@ -20,7 +46,9 @@ energy, an even rhythm, and motion only where a state changes.
 | Hairline | 1, at least one physical pixel | Separators stay crisp at every scale |
 | Minimum hit target | 24 | Small visuals stay easy to click |
 | Type | caption 11, footnote 12, callout 12, body 13, headline 13 semibold, title3 15 semibold, title2 17 semibold, title1 22 bold, large title 26 bold | Compact desktop scale with weight carrying the hierarchy |
-| Motion | springs quick (0.25 s, damping 1), standard (0.35 s, 0.85), gentle (0.5 s, 1); durations 120 / 200 / 350 ms | Motion only signals a state change; the standard spring overshoots slightly for the selection highlight |
+| Motion springs | quick (0.25 s, damping 1), standard (0.35 s, 0.85), gentle (0.5 s, 1) | The standard spring overshoots slightly, which reads as a physical selection highlight |
+| Motion durations | 120 / 200 / 350 ms | Motion only signals a state change, so it is over before the eye leaves the control |
+| Loading periods | shimmer sweep 1.4 s, spinner turn 1 s | Slow enough to read as waiting, fast enough to show that something runs |
 | Elevation | three shadow levels: offset 1 / 4 / 12, blur 3 / 16 / 40 | Shadows separate floating layers by height |
 | Glass | blur radius 20, tint opacity 0.72, saturation 1.5 | Enough tint to keep text on the panel readable over any backdrop |
 
@@ -32,24 +60,51 @@ energy, an even rhythm, and motion only where a state changes.
 | label, labelSecondary, labelTertiary, labelQuaternary | black at 100 / 60 / 30 / 16 % | white at 100 / 60 / 30 / 16 % | One text color in four strengths keeps every surface consistent |
 | fill[0] to fill[3] | #787880 at 20 / 16 / 12 / 8 % | #787880 at 36 / 32 / 24 / 18 % | Translucent control fills work on every surface |
 | Accent | #0066CC | #1F6FEB | One blue, dark enough in each theme for white text on it |
+| Accent presets | blue, purple, pink, red, orange, yellow, green, graphite | the same | A short list of distinct hues; any of them derives readable states |
 | Status: destructive, success, warning | #C4000F, #146C2E, #8A5300 | #FF6B5F, #32D74B, #FFD60A | Readable as text on the content surfaces |
 | Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Shadows need more strength to show on dark surfaces |
 | Scrim | black at 20 % | black at 48 % | Dims the content behind a modal layer without hiding it |
 
 Contrast rules, checked by the unit tests:
 
-- label and labelSecondary reach 4.5:1 on every surface; they are the only label tokens for
-  text that must be read, placeholders included.
+- label and labelSecondary reach 4.5:1 on every surface and on every fill over a surface; they
+  are the only label tokens for text that must be read, placeholders included.
 - labelTertiary is below 4.5:1 and is used only for disabled text and decorative glyphs.
 - The accent is set at runtime. `Theme::ApplyAccent` derives the other accent colors in OKLCH:
   onAccent is white or black, whichever is more readable; hover and pressed move the lightness
   away from onAccent so text on them stays at 4.5:1 or more; accentText keeps the hue and moves
-  the lightness until it reaches 4.5:1 on all four surfaces, for links and accent text.
-- The accent is used only on selection, the primary action and focus.
+  the lightness until it reaches 4.5:1 on all four surfaces, for links and accent text. The
+  tests check this for 24 hues at five lightness levels in both themes.
+- Outlines of controls reach 3:1 (non-text contrast) on the content surfaces.
 
 ## Core
 
-No further choices recorded yet.
+- **Continuous corners.** Each corner is a superellipse quadrant with exponent 3. Its curvature
+  is zero where it meets the straight edge, so the edge flows into the corner without the kink
+  a circular arc shows on large surfaces. It reaches 1.42 times the radius along each edge,
+  which puts its middle point exactly where a circular arc of the same radius has it, so both
+  look the same size. Corner points come from a unit table cached per segment count.
+- **Hairlines** are whole pixels and start on the pixel grid at every scale, so separators never
+  smear into two half-bright rows.
+- **Theme switches** blend over the standard duration (200 ms) with an ease-in-out curve:
+  colors in OKLab so the midpoint keeps an even lightness, lengths linearly; switches such as
+  `dark` flip at the halfway point. A switch the user did not start (the Windows app mode
+  changing) uses the same transition.
+- **Motion** is solved in closed form for the elapsed time: exponential smoothing, damped
+  springs and eased tweens. The same motion looks the same at 30 and at 240 frames per second,
+  and a long frame never makes a spring explode. Values snap onto their target once the rest
+  is too small to see, so screens come to rest.
+- **Reduced motion**: every animated value jumps to its target, skeletons stop sweeping, and the
+  spinner fades in and out in place instead of turning.
+- **Fonts.** Segoe UI Variable is loaded once per weight from its named instances (Text
+  Regular, Semibold, Bold; Display Semibold and Bold for the two largest styles, whose optical
+  size is drawn for large text). Where it is missing or its instances cannot be selected, the
+  static Segoe UI files are used. Nothing is bundled.
+- **Stock Dear ImGui widgets** follow the theme through `facet::ApplyImGuiStyle`: frame padding
+  makes a stock control exactly one control height, frames get a hairline outline of 3:1, and
+  the scrollbar is a pill.
+- **Loading states.** A skeleton is a fill[2] block with a fill[3] band sweeping left to right;
+  every skeleton on screen sweeps in step from one shared clock.
 
 ## Effects
 
@@ -64,7 +119,12 @@ No choices recorded yet.
 
 ## Demo
 
-- Until Facet widgets exist, the gallery maps the theme tokens onto the stock Dear ImGui
-  style colors. Stock frames get a hairline border whose color is derived to reach 3:1 on the
-  content surfaces, because translucent fills alone leave an unchecked checkbox nearly
-  invisible on light surfaces.
+- The gallery maps the theme tokens onto the stock Dear ImGui style with
+  `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme
+  and the scale.
+- Title strip: the window background with a hairline below it; the title in the headline
+  style, labels in labelSecondary in front of their controls.
+- Navigation: bgSecondary, group names in footnote labelSecondary, rows one control height
+  tall, and the selection pill in accentSubtle that springs between rows.
+- Content: the window background with 24 / 20 padding; every page starts with a Title1
+  heading and a one-paragraph summary, sections with a Title3 heading.
