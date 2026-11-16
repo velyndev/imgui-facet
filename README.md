@@ -27,8 +27,12 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
   - Effects: soft shadows and glow drawn from a baked atlas, and glass panels that blur what
     was drawn behind them, with an opaque tinted fallback where the render target cannot be
     read (`effects.h`). The demo page Effects shows each of them.
-  - Images: image loaders return invalid handles (`image.h`).
-  - Icons: icons are not drawn (`icons.h`).
+  - Images: PNG, JPEG, BMP, TGA and GIF loading (synchronous and on worker threads), RGBA
+    uploads, SVG rasterized per UI scale, and drawing with contain, cover and fill, rounded
+    corners, tint and loading and failed placeholders work (`image.h`, see
+    `docs/images-and-icons.md`).
+  - Icons: the built-in SVG icon set, icons registered at runtime, and drawing from a
+    per-scale atlas work (`icons.h`).
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
   window, a light and a dark theme and a UI scale setting. It currently has one page
   (Foundation) that shows the text styles, a few stock Dear ImGui widgets, the theme surfaces with

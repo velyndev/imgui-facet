@@ -128,7 +128,22 @@ shadows only on floating layers; glow only as the focus ring plus one opt-in acc
 
 ## Images
 
-No choices recorded yet.
+- Icons are drawn on a 16 unit grid with 1.5 unit strokes, round caps and joins, and a
+  1 unit margin. One stroke weight and one corner style make glyphs from different places
+  read as one set; the margin keeps them from touching the edges of buttons and fields.
+- Icons are rasterized at the whole pixel size they are drawn at and placed on whole
+  pixels, so a 16 unit icon is never a scaled copy of a 24 unit one and stays sharp at
+  every UI scale.
+- Icons default to the label color; a tint replaces it. Accent-colored icons use
+  accentText, which reaches 4.5:1 on every surface.
+- An image that is still loading shows a slow pulse between the two faintest fills
+  (fill[3] and fill[1], one cycle per four slow durations) with a faint picture glyph; with
+  reduced motion the fill stays still. A pulse says "waiting" without drawing attention.
+- A failed image shows the image-off glyph and a short label in labelSecondary on fill[3]
+  with a separator hairline, so the empty slot is explained instead of looking like a
+  layout gap.
+- Image corners follow FillRect, so images and cards with the same radius token have the
+  same corner shape.
 
 ## Demo
 
