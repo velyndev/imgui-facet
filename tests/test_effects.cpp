@@ -791,6 +791,7 @@ TEST_CASE("Backdrop blur and shadow atlas raise no debug layer messages")
     fi::ShadowAtlas atlas;
     atlas.SetDevice(device.Get(), context.Get());
     CHECK(atlas.Acquire(fi::MakeShadowKey(12.0f, 8.0f, false)) != nullptr);
+    atlas.FlushUploads();
     context->Flush();
 
     const UINT64 count = queue->GetNumStoredMessages();
@@ -878,6 +879,150 @@ TEST_CASE("Glass records its shadow after the backdrop capture")
 
     facet::Shutdown();
     ImGui::DestroyContext();
+}
+
+namespace
+{
+
+// Alpha of one texel of an RGBA8 texture, read back through a staging copy.
+int ReadAlpha(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, UINT x, UINT y)
+{
+    D3D11_TEXTURE2D_DESC desc = {};
+    texture->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> staging;
+    if (FAILED(device->CreateTexture2D(&desc, nullptr, staging.GetAddressOf())))
+        return -1;
+    context->CopyResource(staging.Get(), texture);
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        return -1;
+    const auto* row = static_cast<const std::uint8_t*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch;
+    const int alpha = row[static_cast<size_t>(x) * 4 + 3];
+    context->Unmap(staging.Get(), 0);
+    return alpha;
+}
+
+int CountCallbacks(const ImDrawList& drawList)
+{
+    int count = 0;
+    for (const ImDrawCmd& command : drawList.CmdBuffer)
+    {
+        if (command.UserCallback != nullptr)
+            ++count;
+    }
+    return count;
+}
+
+// Sets up an ImGui context and facet on a WARP device for draw list tests.
+struct EffectsContext
+{
+    explicit EffectsContext(const Warp& warp)
+    {
+        ImGui::CreateContext();
+        facet::InitDesc desc;
+        desc.device = warp.device.Get();
+        desc.context = warp.context.Get();
+        ready = facet::Init(desc);
+        ImGui::GetMainViewport()->Size = ImVec2(64.0f, 64.0f);
+        ImGui::GetDrawListSharedData()->SetCircleTessellationMaxError(ImGui::GetStyle().CircleTessellationMaxError);
+    }
+    ~EffectsContext()
+    {
+        facet::Shutdown();
+        ImGui::DestroyContext();
+    }
+    EffectsContext(const EffectsContext&) = delete;
+    EffectsContext& operator=(const EffectsContext&) = delete;
+
+    bool ready = false;
+};
+
+} // namespace
+
+TEST_CASE("Shadow tiles reach the page only when their upload runs")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    fi::ShadowAtlas atlas;
+    atlas.SetDevice(warp.device.Get(), warp.context.Get());
+    const fi::ShadowKey key = fi::MakeShadowKey(6.0f, 3.0f, false);
+    const fi::ShadowTile* tile = atlas.Acquire(key);
+    REQUIRE(tile != nullptr);
+    CHECK(atlas.PendingCount() == 1);
+
+    // The tile's inner corner lies inside the shape, so it is opaque once uploaded.
+    ComPtr<ID3D11Resource> resource;
+    reinterpret_cast<ID3D11ShaderResourceView*>(static_cast<std::uintptr_t>(tile->texture))->GetResource(resource.GetAddressOf());
+    ComPtr<ID3D11Texture2D> page;
+    REQUIRE(SUCCEEDED(resource.As(&page)));
+    const UINT x = static_cast<UINT>(std::lround(tile->uv.x / tile->texelUv.x)) + static_cast<UINT>(tile->layout.size) - 1;
+    const UINT y = static_cast<UINT>(std::lround(tile->uv.y / tile->texelUv.y)) + static_cast<UINT>(tile->layout.size) - 1;
+    CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
+
+    // One record per draw list and frame; another list or frame gets it again.
+    const int listA = 0;
+    const int listB = 0;
+    const std::span<const std::uint8_t> first = atlas.PendingUpload(key, &listA, 7);
+    REQUIRE(first.size() > sizeof(fi::ShadowUploadHeader));
+    const std::vector<std::uint8_t> record(first.begin(), first.end());
+    CHECK(atlas.PendingUpload(key, &listA, 7).empty());
+    CHECK_FALSE(atlas.PendingUpload(key, &listB, 7).empty());
+    CHECK_FALSE(atlas.PendingUpload(key, &listA, 8).empty());
+    // Recording alone has not touched the page.
+    CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
+
+    // A truncated record is ignored and does not count as done.
+    fi::ShadowAtlas::RunUpload(warp.context.Get(), record.data(), record.size() - 1);
+    CHECK(atlas.PendingCount() == 1);
+
+    fi::ShadowAtlas::RunUpload(warp.context.Get(), record.data(), record.size());
+    CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) > 200);
+    CHECK(atlas.PendingCount() == 0);
+    CHECK(atlas.PendingUpload(key, &listB, 9).empty());
+}
+
+TEST_CASE("A shadow queues its tile upload in front of its first draw")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    facet::ShadowSpec spec;
+    spec.offset = ImVec2(0.0f, 2.0f);
+    spec.blur = 9.0f;
+    spec.color = IM_COL32(0, 0, 0, 80);
+
+    {
+        ImDrawList drawList(ImGui::GetDrawListSharedData());
+        drawList._ResetForNewFrame();
+        drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+        facet::DrawShadow(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 5.0f, spec);
+        facet::DrawShadow(&drawList, ImVec2(20.0f, 20.0f), ImVec2(52.0f, 52.0f), 5.0f, spec);
+        // One upload for both shadows, recorded before any of their geometry.
+        CHECK(CountCallbacks(drawList) == 1);
+        REQUIRE(drawList.CmdBuffer.Size > 0);
+        ImDrawCmd& command = drawList.CmdBuffer[0];
+        REQUIRE(command.UserCallback != nullptr);
+        CHECK(command.ElemCount == 0);
+        CHECK(drawList.VtxBuffer.Size > 0);
+
+        // Run the callback the way the renderer would, with the copied record resolved.
+        REQUIRE(command.UserCallbackDataOffset >= 0);
+        command.UserCallbackData = drawList._CallbacksDataBuf.Data + command.UserCallbackDataOffset;
+        command.UserCallback(&drawList, &command);
+
+        // Once the upload ran, other draw lists use the tile without another upload.
+        ImDrawList later(ImGui::GetDrawListSharedData());
+        later._ResetForNewFrame();
+        later.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+        facet::DrawShadow(&later, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 5.0f, spec);
+        CHECK(CountCallbacks(later) == 0);
+        CHECK(later.VtxBuffer.Size > 0);
+    }
 }
 
 TEST_CASE("Blur output resize retires the old view for a few frames")

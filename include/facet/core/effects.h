@@ -39,6 +39,8 @@ ShadowSpec ElevationShadow(int level);
 // before DrawGlass is blurred into the panel's backdrop and darkens it.
 // Blur is limited to 128 pixels and the radius to 128 pixels; the shape's radius and the
 // blur are rounded to whole and half pixels so similar shadows share one baked tile.
+// A tile is baked on the CPU while recording; its texels are uploaded by a draw callback in
+// front of the shadow, so the device context is only used while the draw data is rendered.
 void DrawShadow(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const ShadowSpec& spec);
 
 // DrawShadow with ElevationShadow(level). Level 0 draws nothing.
