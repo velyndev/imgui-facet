@@ -116,11 +116,12 @@ TEST_CASE("Mix interpolates in OKLab and keeps the endpoints")
     CHECK(facet::Mix(a, b, 0.5f).w == doctest::Approx(0.5f));
 }
 
-TEST_CASE("WithAlpha replaces or scales alpha")
+TEST_CASE("WithAlpha replaces alpha and ScaleAlpha multiplies it")
 {
-    CHECK(facet::WithAlpha(facet::Rgb(0x112233), 0.25f).w == doctest::Approx(0.25f));
-    CHECK(facet::WithAlpha(IM_COL32(10, 20, 30, 200), 0.5f) == IM_COL32(10, 20, 30, 100));
-    CHECK(facet::WithAlpha(IM_COL32(10, 20, 30, 200), 2.0f) == IM_COL32(10, 20, 30, 255));
+    CHECK(facet::WithAlpha(facet::Rgb(0x112233, 0.5f), 0.25f).w == doctest::Approx(0.25f));
+    CHECK(facet::ScaleAlpha(IM_COL32(10, 20, 30, 200), 0.5f) == IM_COL32(10, 20, 30, 100));
+    CHECK(facet::ScaleAlpha(IM_COL32(10, 20, 30, 200), 2.0f) == IM_COL32(10, 20, 30, 255));
+    CHECK(facet::ScaleAlpha(IM_COL32(10, 20, 30, 200), -1.0f) == IM_COL32(10, 20, 30, 0));
 }
 
 TEST_CASE("Over blends a translucent color onto an opaque one")

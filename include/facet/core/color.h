@@ -67,8 +67,9 @@ ImVec4 Mix(const ImVec4& a, const ImVec4& b, float t);
 
 // The color with its alpha replaced.
 ImVec4 WithAlpha(const ImVec4& color, float alpha);
-// The color with its alpha multiplied by `factor`.
-ImU32 WithAlpha(ImU32 color, float factor);
+// The packed color with its alpha multiplied by `factor` (clamped to 0 to 255). The name
+// differs from WithAlpha on purpose: this one scales, it does not replace.
+ImU32 ScaleAlpha(ImU32 color, float factor);
 
 // `top` drawn over `bottom` with straight alpha blending in sRGB, the way Dear ImGui
 // renders it. The result has the combined coverage as alpha.

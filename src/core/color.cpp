@@ -155,7 +155,7 @@ ImVec4 WithAlpha(const ImVec4& color, float alpha)
     return ImVec4(color.x, color.y, color.z, alpha);
 }
 
-ImU32 WithAlpha(ImU32 color, float factor)
+ImU32 ScaleAlpha(ImU32 color, float factor)
 {
     const float alpha = static_cast<float>((color >> IM_COL32_A_SHIFT) & 0xFFu);
     const auto scaled = static_cast<ImU32>(std::lround(std::clamp(alpha * factor, 0.0f, 255.0f)));
