@@ -13,7 +13,9 @@ namespace facet
 struct InitDesc
 {
     ID3D11Device* device = nullptr;          // required; Facet keeps its own reference
-    ID3D11DeviceContext* context = nullptr;  // required; the immediate context used by the host
+    // Required: the immediate context that renders the Dear ImGui draw data (the one given
+    // to the DX11 renderer backend). Facet's draw callbacks issue their calls on it.
+    ID3D11DeviceContext* context = nullptr;
 };
 
 // Starts Facet. Requires a current Dear ImGui context and a valid device and context.
