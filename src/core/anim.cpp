@@ -22,8 +22,8 @@ namespace
 {
 
 constexpr float kTwoPi = 6.28318530718f;
-// Longest time step a slot advances in one go. Every motion here has long settled by then,
-// and it keeps float precision when a slot comes back after a pause.
+// Longest time step a slot advances in one go, for a single very long frame (a debugger
+// break, a stalled host). Every motion here has long settled by then.
 constexpr float kMaxStep = 10.0f;
 
 std::uint64_t Mix64(std::uint64_t x)
@@ -100,7 +100,8 @@ std::uint64_t AnimStore::MakeKey(ImGuiID id, int sub)
 
 void AnimStore::BeginFrame(float dt)
 {
-    clock += std::max(0.0f, dt);
+    frameDelta = std::max(0.0f, dt);
+    clock += frameDelta;
     ++frame;
 }
 
@@ -217,6 +218,14 @@ AnimStore::Slot& AnimStore::Acquire(std::uint64_t key, Kind kind, bool& created)
                 slot = Slot{};
                 slot.key = key;
                 slot.kind = kind;
+                slot.time = clock;
+            }
+            else if (slot.lastFrame + 1 < frame)
+            {
+                // The slot missed frames (its widget was not drawn). Motion time passes only
+                // while a slot is queried, so the gap counts as one frame: a widget that comes
+                // back with a new target starts its motion from the beginning.
+                slot.time = std::max(slot.time, clock - static_cast<double>(frameDelta));
             }
             slot.lastFrame = frame;
             return slot;

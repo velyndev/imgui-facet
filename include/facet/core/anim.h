@@ -8,8 +8,10 @@
 // in closed form for the elapsed time, so results do not depend on the frame rate and stay
 // stable at any frame time. Querying a key twice in one frame returns the same value.
 // The first query of a key returns the target at once (nothing animates in on the first
-// frame). Keys that were not queried for 30 frames are dropped in facet::EndFrame; a key
-// queried again after that starts at its target. Queries do not allocate memory; the store
+// frame). Time passes for a key only while it is queried: a widget that was not drawn for a
+// few frames and comes back with a new target animates from the start of the motion. Keys
+// that were not queried for 30 frames are dropped in facet::EndFrame; a key queried again
+// after that starts at its target. Queries do not allocate memory; the store
 // grows only when more keys are alive at once than ever before. A key keeps one kind: using
 // the same id and sub key for, say, Smooth and Spring restarts it each time.
 //

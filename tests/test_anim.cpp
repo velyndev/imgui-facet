@@ -233,6 +233,30 @@ TEST_CASE("Keys that are not queried are pruned after kPruneFrames frames")
     CHECK(store.Smooth(2, 0, 5.0f, 10.0f) == 5.0f);
 }
 
+TEST_CASE("Frames a key is not queried in do not count as motion time")
+{
+    AnimStore store;
+    const facet::SpringSpec spec{0.4f, 1.0f};
+    store.Tween(kId, 0, 0.0f, 0.2f, facet::Ease::Linear);
+    store.Spring(kId, 1, 0.0f, spec);
+    store.Smooth(kId, 2, 0.0f, 12.0f);
+    // The widget is hidden for 20 frames (fewer than kPruneFrames, so the keys survive).
+    for (int i = 0; i < 20; ++i)
+    {
+        store.BeginFrame(1.0f / 60.0f);
+        store.EndFrame();
+    }
+    // It comes back with a new target: the motions start, they do not jump to the end.
+    store.BeginFrame(1.0f / 60.0f);
+    const float tween = store.Tween(kId, 0, 1.0f, 0.2f, facet::Ease::Linear);
+    CHECK(tween == doctest::Approx(1.0f / 60.0f / 0.2f));
+    CHECK(store.Spring(kId, 1, 1.0f, spec) < 0.1f);
+    CHECK(store.Smooth(kId, 2, 1.0f, 12.0f) < 0.3f);
+    store.EndFrame();
+    store.BeginFrame(1.0f / 60.0f);
+    CHECK(store.Tween(kId, 0, 1.0f, 0.2f, facet::Ease::Linear) == doctest::Approx(2.0f / 60.0f / 0.2f));
+}
+
 TEST_CASE("Queries do not grow the store once its keys exist")
 {
     AnimStore store;

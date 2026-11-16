@@ -3,9 +3,11 @@
 // The motion store behind facet::Smooth, Spring, Tween and SmoothColor (anim.h).
 //
 // Slots live in an open-addressing hash table keyed by (ImGui id, sub key). A query finds or
-// creates its slot, advances it to the store's clock and returns the value. The table grows
-// by doubling, so queries allocate only when the number of live keys reaches a new maximum,
-// never per query. EndFrame drops slots that were not queried for kPruneFrames frames.
+// creates its slot, advances it to the store's clock and returns the value. Motion time passes
+// only while a key is queried: a key that skipped frames advances by one frame on its next
+// query. The table grows by doubling, so queries allocate only when the number of live keys
+// reaches a new maximum, never per query. EndFrame drops slots that were not queried for
+// kPruneFrames frames.
 //
 // The public functions use one global store, driven by the anim subsystem hooks. Tests and
 // tools create their own store and drive it with BeginFrame(dt) / EndFrame().
@@ -101,6 +103,7 @@ private:
     int live = 0;
     int used = 0;             // live plus tombstones
     double clock = 0.0;
+    float frameDelta = 0.0f;  // dt of the last BeginFrame
     std::uint32_t frame = 1;
     Settings config;
 };
