@@ -18,6 +18,8 @@ namespace
 
 // Frames rendered before the first step, so layout and fonts are settled.
 constexpr int kWarmupFrames = 10;
+// Frames rendered after asking for a scroll, so the scroll is applied and recorded again.
+constexpr int kRevealFrames = 3;
 
 std::map<std::string, SelftestFn, std::less<>>& SelftestRegistry()
 {
@@ -95,6 +97,14 @@ public:
             const ProbeRecord* probe = probes.Find(step.text);
             if (probe == nullptr)
                 return Report(false, "click '" + step.text + "': probe not found");
+            if (!probe->visible)
+            {
+                probes.RequestReveal(step.text);
+                Frames(kRevealFrames);
+                probe = probes.Find(step.text);
+                if (probe == nullptr || !probe->visible)
+                    return Report(false, "click '" + step.text + "': item cannot be scrolled into view");
+            }
             const ImVec2 center((probe->min.x + probe->max.x) * 0.5f, (probe->min.y + probe->max.y) * 0.5f);
             io.AddMousePosEvent(center.x, center.y);
             Frame();
@@ -175,10 +185,18 @@ void ProbeTable::Clear()
 
 void ProbeTable::RecordLastItem(std::string_view name)
 {
+    if (!pendingReveal.empty() && pendingReveal == name)
+    {
+        ImGui::ScrollToItem(ImGuiScrollFlags_AlwaysCenterY);
+        pendingReveal.clear();
+    }
+
     ProbeRecord record;
     record.id = ImGui::GetItemID();
     record.min = ImGui::GetItemRectMin();
     record.max = ImGui::GetItemRectMax();
+    const ImVec2 center((record.min.x + record.max.x) * 0.5f, (record.min.y + record.max.y) * 0.5f);
+    record.visible = ImGui::GetCurrentWindowRead()->InnerClipRect.Contains(center);
     for (auto& entry : entries)
     {
         if (entry.first == name)

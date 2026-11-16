@@ -97,7 +97,8 @@ facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|b
 
 Runs the input scripts that pages register: synthetic clicks and key presses, followed by
 checks, offscreen at the given size and scale (defaults `1280x800`, scale 1) in the given
-theme (default dark; `both` runs every script once per theme). It prints a `PASS` or `FAIL`
+theme (default dark; `both` runs every script once per theme). A scripted click on a control
+outside the visible part of its window scrolls it into view first. It prints a `PASS` or `FAIL`
 line per check, naming the page and theme, and exits with 1 when any check failed.
 
 `facet_demo --list-pages` prints the page ids with their capture states.

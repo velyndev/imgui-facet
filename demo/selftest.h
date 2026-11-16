@@ -38,6 +38,7 @@ struct ProbeRecord
     ImGuiID id = 0;
     ImVec2 min;
     ImVec2 max;
+    bool visible = false;  // the item's center lies inside its window's visible area
 };
 
 // Item rects recorded by PageCtx::Probe during the most recent frame.
@@ -49,9 +50,13 @@ public:
     const ProbeRecord* Find(std::string_view name) const;
     // Name of the probe recorded for this item id, or nullptr.
     const char* NameOf(ImGuiID id) const;
+    // Scrolls the item of this probe into the middle of its window when it is recorded
+    // next, the way a person scrolls to a control before clicking it.
+    void RequestReveal(std::string_view name) { pendingReveal = name; }
 
 private:
     std::vector<std::pair<std::string, ProbeRecord>> entries;
+    std::string pendingReveal;
 };
 
 class SelftestScript
@@ -80,6 +85,7 @@ public:
     // Runs arbitrary code between frames, typically to reset page state.
     void Do(std::function<void()> action);
     // Moves the mouse to the center of the probed item, presses and releases the left button.
+    // An item outside the visible area of its window is scrolled into view first.
     void Click(std::string_view probe);
     // Presses and releases a key, with modifiers when given (ImGuiKey_Tab | ImGuiMod_Shift).
     void KeyPress(ImGuiKeyChord chord);
