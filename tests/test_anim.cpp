@@ -257,6 +257,30 @@ TEST_CASE("Frames a key is not queried in do not count as motion time")
     CHECK(store.Tween(kId, 0, 1.0f, 0.2f, facet::Ease::Linear) == doctest::Approx(2.0f / 60.0f / 0.2f));
 }
 
+TEST_CASE("Pruning rebuilds keep the remaining keys")
+{
+    AnimStore store;
+    for (int i = 0; i < 40; ++i)
+        store.Smooth(static_cast<ImGuiID>(i + 1), 0, 1.0f, 10.0f);
+    const int capacity = store.Capacity();
+    // Only the first ten keys stay in use; the other thirty are pruned, which triggers a
+    // rebuild of the table.
+    for (std::uint32_t frame = 0; frame <= AnimStore::kPruneFrames; ++frame)
+    {
+        store.BeginFrame(1.0f / 60.0f);
+        for (int i = 0; i < 10; ++i)
+            store.Smooth(static_cast<ImGuiID>(i + 1), 0, 2.0f, 10.0f);
+        store.EndFrame();
+    }
+    CHECK(store.LiveSlots() == 10);
+    CHECK(store.Capacity() == capacity);
+    // The kept keys still hold their motion: a new target is approached, not jumped to, which
+    // is what a key that was lost and created again would do.
+    store.BeginFrame(1.0f / 60.0f);
+    for (int i = 0; i < 10; ++i)
+        CHECK(store.Smooth(static_cast<ImGuiID>(i + 1), 0, 50.0f, 10.0f) < 50.0f);
+}
+
 TEST_CASE("Queries do not grow the store once its keys exist")
 {
     AnimStore store;

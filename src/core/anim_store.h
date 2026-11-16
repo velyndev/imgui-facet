@@ -97,9 +97,12 @@ private:
     Slot& Acquire(std::uint64_t key, Kind kind, bool& created);
     const Slot* Find(std::uint64_t key) const;
     void Grow();
+    // Rebuilds the table at `capacity` (a power of two) without its tombstones.
+    void Rehash(size_t capacity);
     float Elapsed(Slot& slot);
 
     std::vector<Slot> slots;  // size is zero or a power of two
+    std::vector<Slot> spare;  // the previous table buffer, reused by the next Rehash
     int live = 0;
     int used = 0;             // live plus tombstones
     double clock = 0.0;

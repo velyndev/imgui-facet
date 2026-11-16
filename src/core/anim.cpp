@@ -121,56 +121,45 @@ void AnimStore::EndFrame()
             removed = true;
         }
     }
-    // Rebuild when tombstones pile up, so lookups stay short. Same capacity: no allocation.
+    // Rebuild when tombstones pile up, so lookups stay short.
     if (removed && used - live > static_cast<int>(slots.size()) / 4)
-    {
-        std::vector<Slot> old;
-        old.swap(slots);
-        slots.assign(old.size(), Slot{});
-        live = 0;
-        used = 0;
-        const size_t mask = slots.size() - 1;
-        for (const Slot& slot : old)
-        {
-            if (slot.kind == Kind::Empty || slot.kind == Kind::Tombstone)
-                continue;
-            size_t index = static_cast<size_t>(Mix64(slot.key)) & mask;
-            while (slots[index].kind != Kind::Empty)
-                index = (index + 1) & mask;
-            slots[index] = slot;
-            ++live;
-            ++used;
-        }
-    }
+        Rehash(slots.size());
 }
 
 void AnimStore::Clear()
 {
     slots.clear();
+    spare.clear();
     live = 0;
     used = 0;
 }
 
 void AnimStore::Grow()
 {
-    std::vector<Slot> old;
-    old.swap(slots);
-    const size_t capacity = old.empty() ? 64 : old.size() * 2;
-    slots.assign(capacity, Slot{});
+    Rehash(slots.empty() ? 64 : slots.size() * 2);
+}
+
+void AnimStore::Rehash(size_t capacity)
+{
+    // The live slots move into `spare`, which then becomes the table. The two buffers trade
+    // places, so a rebuild at the same capacity reuses the previous buffer and allocates
+    // nothing once both exist.
+    spare.assign(capacity, Slot{});
     live = 0;
     used = 0;
     const size_t mask = capacity - 1;
-    for (const Slot& slot : old)
+    for (const Slot& slot : slots)
     {
         if (slot.kind == Kind::Empty || slot.kind == Kind::Tombstone)
             continue;
         size_t index = static_cast<size_t>(Mix64(slot.key)) & mask;
-        while (slots[index].kind != Kind::Empty)
+        while (spare[index].kind != Kind::Empty)
             index = (index + 1) & mask;
-        slots[index] = slot;
+        spare[index] = slot;
         ++live;
         ++used;
     }
+    slots.swap(spare);
 }
 
 const AnimStore::Slot* AnimStore::Find(std::uint64_t key) const
