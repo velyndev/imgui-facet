@@ -75,6 +75,14 @@ void FillCheckerboard(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 colo
 void StrokeArc(ImDrawList* drawList, ImVec2 center, float radius, float aMin, float aMax, ImU32 color,
                float thickness, bool roundCaps = true);
 
+// Pointer feedback for the last submitted item: the hand cursor while it is hovered and
+// enabled, the not-allowed cursor while it is hovered and disabled (inside BeginDisabled).
+// Call right after the item.
+void ItemCursor();
+// The same for any custom hit test: call while the pointer is over an interactive area.
+void SetHandCursor();
+void SetNotAllowedCursor();
+
 // Transforms everything drawn into one draw list during its lifetime: when the scope ends,
 // the vertices added since construction are scaled by `scale` around `pivot`, moved by
 // `translate`, and their alpha is multiplied by `alpha`. Used for fade, zoom and slide

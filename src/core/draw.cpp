@@ -1,5 +1,5 @@
 // Drawing helpers: token-aware rectangles, circular-corner shapes, hairlines, gradients,
-// checkerboards, arcs and DrawGroup.
+// checkerboards, arcs, pointer feedback and DrawGroup.
 
 #include "facet/core/draw.h"
 
@@ -255,6 +255,26 @@ void StrokeArc(ImDrawList* drawList, ImVec2 center, float radius, float aMin, fl
     ArcPoints(drawList, startCenter, half, aMin + kPi, aMin + kTwoPi, capSegments, true);
     drawList->_Path.Size -= 1;
     drawList->PathFillConcave(color);
+}
+
+void ItemCursor()
+{
+    if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        return;
+    if ((ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0)
+        SetNotAllowedCursor();
+    else
+        SetHandCursor();
+}
+
+void SetHandCursor()
+{
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+}
+
+void SetNotAllowedCursor()
+{
+    ImGui::SetMouseCursor(ImGuiMouseCursor_NotAllowed);
 }
 
 DrawGroup::DrawGroup(ImDrawList* list, float groupAlpha, float groupScale, ImVec2 groupPivot,
