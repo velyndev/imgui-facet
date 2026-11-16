@@ -1,0 +1,32 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "msvc-base",
+      "hidden": true,
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolset": { "value": "v145,host=x64", "strategy": "set" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "msvc-x64",
+      "displayName": "MSVC x64",
+      "inherits": "msvc-base",
+      "architecture": { "value": "x64", "strategy": "set" }
+    },
+    {
+      "name": "msvc-x86",
+      "displayName": "MSVC x86",
+      "inherits": "msvc-base",
+      "architecture": { "value": "Win32", "strategy": "set" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "msvc-x64-debug", "configurePreset": "msvc-x64", "configuration": "Debug" },
+    { "name": "msvc-x64-release", "configurePreset": "msvc-x64", "configuration": "Release" },
+    { "name": "msvc-x86-debug", "configurePreset": "msvc-x86", "configuration": "Debug" },
+    { "name": "msvc-x86-release", "configurePreset": "msvc-x86", "configuration": "Release" }
+  ]
+}
