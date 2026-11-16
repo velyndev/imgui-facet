@@ -36,6 +36,15 @@ constexpr int kAsyncWidth = 1280;  // large enough that decoding takes a visible
 constexpr int kAsyncHeight = 720;
 constexpr int kNeutralSide = 128;
 constexpr int kCardGridCell = 20;
+// Opacity of the background color laid over the test card's grid lines.
+constexpr float kGridLineOpacity = 0.35f;
+// Grey levels of the neutral tint pattern, as fractions of white: the two check shades and
+// how much the soft spot brightens them. The pattern is fixed pixel data and deliberately
+// does not follow the theme, because a tint is only judged fairly against the same grey
+// in both themes.
+constexpr float kNeutralDark = 0.78f;
+constexpr float kNeutralLight = 0.9f;
+constexpr float kNeutralSpot = 0.25f;
 // Bytes of the encoded PNG kept for the damaged-data example: the signature and part of
 // the header, but no image data.
 constexpr std::size_t kTruncatedBytes = 64;
@@ -108,7 +117,7 @@ std::vector<unsigned char> MakeTestCard(const facet::Colors& c, int width, int h
         {
             ImVec4 color = column[static_cast<std::size_t>(x)];
             if (x % cell == 0 || y % cell == 0)
-                color = facet::Over(facet::WithAlpha(c.bg, 0.35f), color);
+                color = facet::Over(facet::WithAlpha(c.bg, kGridLineOpacity), color);
             const float distance = std::hypot(x + 0.5f - cx, y + 0.5f - cy);
             if (std::fabs(distance - ring) <= ringHalfWidth)
                 color = c.bg;
@@ -136,8 +145,8 @@ std::vector<unsigned char> MakeNeutral(int side)
             const float dx = (x + 0.5f) / side - 0.5f;
             const float dy = (y + 0.5f) / side - 0.5f;
             const float spot = std::max(0.0f, 1.0f - 2.0f * std::sqrt(dx * dx + dy * dy));
-            const float base = ((x / check + y / check) % 2 == 0) ? 0.78f : 0.9f;
-            const float value = std::min(1.0f, base + 0.25f * spot);
+            const float base = ((x / check + y / check) % 2 == 0) ? kNeutralDark : kNeutralLight;
+            const float value = std::min(1.0f, base + kNeutralSpot * spot);
             Put(pixels, side, x, y, ImVec4(value, value, value, 1.0f));
         }
     }
