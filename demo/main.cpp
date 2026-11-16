@@ -1,8 +1,13 @@
 // facet_demo: gallery application for Facet.
 //
-//   facet_demo                         interactive window
-//   facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N] [--warp]
-//   facet_demo --selftest [--page id] [--warp]
+//   facet_demo [--page id] [--theme light|dark] [--warp]      interactive window
+//   facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N]
+//              [--theme light|dark|both] [--warp]
+//   facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]
+//   facet_demo --list-pages
+//
+// An option that the chosen mode does not use is an error, so a typo in a script never
+// silently produces a run with other settings than intended.
 //
 // The program is built for the console subsystem. Started from a terminal or a script,
 // it behaves like any command line tool: the shell waits for it, stdout and stderr can be
@@ -15,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
+#include <filesystem>
 #include <string>
 
 #include <windows.h>
@@ -46,10 +52,23 @@ enum class Mode
 struct Options
 {
     Mode mode = Mode::Interactive;
-    CaptureOptions capture;
+    std::filesystem::path captureDirectory;
+    int width = 1280;
+    int height = 800;
+    float scale = 1.0f;
+    int warmupFrames = 60;
     std::string page;
+    ThemeSelection theme = ThemeSelection::Both;
     bool warp = false;
     bool help = false;
+    bool listPages = false;
+
+    // Which options were given, to reject the ones the mode does not use.
+    bool sawSize = false;
+    bool sawScale = false;
+    bool sawFrames = false;
+    bool sawPage = false;
+    bool sawTheme = false;
 };
 
 std::string ToUtf8(const wchar_t* text)
@@ -66,18 +85,23 @@ void PrintUsage()
 {
     std::printf(
         "usage:\n"
-        "  facet_demo\n"
-        "  facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N] [--warp]\n"
-        "  facet_demo --selftest [--page id] [--warp]\n"
+        "  facet_demo [--page id] [--theme light|dark] [--warp]\n"
+        "  facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N]\n"
+        "             [--theme light|dark|both] [--warp]\n"
+        "  facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]\n"
+        "  facet_demo --list-pages\n"
         "\n"
         "  --capture <dir>  render every page state offscreen and write PNG files and index.json\n"
-        "  --size WxH       offscreen size in pixels (default 1280x800)\n"
-        "  --scale S        UI scale (default 1)\n"
-        "  --page id        only this page\n"
-        "  --frames N       warm-up frames per page state before readback (default 60)\n"
-        "  --warp           render with the WARP software rasterizer\n"
         "  --selftest       run the scripted input tests of the pages\n"
-        "  --list-pages     print the registered page ids and capture states\n");
+        "  --size WxH       offscreen size in pixels (default 1280x800)\n"
+        "  --scale S        UI scale from 0.5 to 4 (default 1)\n"
+        "  --page id        only this page (interactive: the page shown first)\n"
+        "  --frames N       capture: warm-up frames per page state before readback (default 60)\n"
+        "  --theme T        light, dark or both (default: both for capture, dark otherwise)\n"
+        "  --warp           render with the WARP software rasterizer\n"
+        "  --list-pages     print the registered page ids and capture states\n"
+        "\n"
+        "An option that the chosen mode does not use is rejected.\n");
 }
 
 bool ParseSize(const std::wstring& text, int& width, int& height)
@@ -98,8 +122,73 @@ bool ParseSize(const std::wstring& text, int& width, int& height)
     return true;
 }
 
+bool ParseTheme(const std::wstring& text, ThemeSelection& theme)
+{
+    if (text == L"light")
+        theme = ThemeSelection::Light;
+    else if (text == L"dark")
+        theme = ThemeSelection::Dark;
+    else if (text == L"both")
+        theme = ThemeSelection::Both;
+    else
+        return false;
+    return true;
+}
+
+bool Reject(bool given, const char* option, const char* modeName)
+{
+    if (given)
+        std::fprintf(stderr, "error: %s is not used by %s\n", option, modeName);
+    return given;
+}
+
+// Checks that every given option is used by the chosen mode and fills in the per-mode
+// defaults. Returns false and prints the reason otherwise.
+bool ValidateForMode(Options& options)
+{
+    if (options.listPages)
+    {
+        const bool extra = options.mode != Mode::Interactive || options.sawSize || options.sawScale ||
+                           options.sawFrames || options.sawPage || options.sawTheme || options.warp;
+        if (extra)
+        {
+            std::fprintf(stderr, "error: --list-pages takes no other options\n");
+            return false;
+        }
+        return true;
+    }
+
+    switch (options.mode)
+    {
+    case Mode::Interactive:
+    {
+        const char* name = "the interactive window";
+        if (Reject(options.sawSize, "--size", name) || Reject(options.sawScale, "--scale", name) ||
+            Reject(options.sawFrames, "--frames", name))
+            return false;
+        if (!options.sawTheme)
+            options.theme = ThemeSelection::Dark;
+        if (options.theme == ThemeSelection::Both)
+        {
+            std::fprintf(stderr, "error: the interactive window shows one theme: use --theme light or dark\n");
+            return false;
+        }
+        return true;
+    }
+    case Mode::Capture:
+        return true;
+    case Mode::Selftest:
+        if (Reject(options.sawFrames, "--frames", "--selftest"))
+            return false;
+        if (!options.sawTheme)
+            options.theme = ThemeSelection::Dark;
+        return true;
+    }
+    return true;
+}
+
 // Returns false and prints the reason when the command line is invalid.
-bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
+bool ParseOptions(int argc, wchar_t** argv, Options& options)
 {
     bool sawCapture = false;
     bool sawSelftest = false;
@@ -120,7 +209,7 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
             const wchar_t* value = next("--capture");
             if (value == nullptr)
                 return false;
-            options.capture.directory = value;
+            options.captureDirectory = value;
             sawCapture = true;
         }
         else if (arg == L"--selftest")
@@ -132,11 +221,12 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
             const wchar_t* value = next("--size");
             if (value == nullptr)
                 return false;
-            if (!ParseSize(value, options.capture.width, options.capture.height))
+            if (!ParseSize(value, options.width, options.height))
             {
-                std::fprintf(stderr, "error: --size expects WxH, for example 1280x800\n");
+                std::fprintf(stderr, "error: --size expects WxH from 16x16 to 16384x16384, for example 1280x800\n");
                 return false;
             }
+            options.sawSize = true;
         }
         else if (arg == L"--scale")
         {
@@ -150,7 +240,8 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
                 std::fprintf(stderr, "error: --scale expects a number from 0.5 to 4\n");
                 return false;
             }
-            options.capture.scale = scale;
+            options.scale = scale;
+            options.sawScale = true;
         }
         else if (arg == L"--page")
         {
@@ -158,6 +249,7 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
             if (value == nullptr)
                 return false;
             options.page = ToUtf8(value);
+            options.sawPage = true;
         }
         else if (arg == L"--frames")
         {
@@ -171,7 +263,20 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
                 std::fprintf(stderr, "error: --frames expects a number from 1 to 10000\n");
                 return false;
             }
-            options.capture.warmupFrames = static_cast<int>(frames);
+            options.warmupFrames = static_cast<int>(frames);
+            options.sawFrames = true;
+        }
+        else if (arg == L"--theme")
+        {
+            const wchar_t* value = next("--theme");
+            if (value == nullptr)
+                return false;
+            if (!ParseTheme(value, options.theme))
+            {
+                std::fprintf(stderr, "error: --theme expects light, dark or both\n");
+                return false;
+            }
+            options.sawTheme = true;
         }
         else if (arg == L"--warp")
         {
@@ -179,7 +284,7 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
         }
         else if (arg == L"--list-pages")
         {
-            listPages = true;
+            options.listPages = true;
         }
         else if (arg == L"--help" || arg == L"-h" || arg == L"/?")
         {
@@ -201,8 +306,9 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
         options.mode = Mode::Capture;
     else if (sawSelftest)
         options.mode = Mode::Selftest;
-    options.capture.page = options.page;
-    return true;
+    if (options.help)
+        return true;
+    return ValidateForMode(options);
 }
 
 void ReleaseConsoleWhenLaunchedFromExplorer()
@@ -213,11 +319,23 @@ void ReleaseConsoleWhenLaunchedFromExplorer()
         FreeConsole();
 }
 
-int RunInteractive(bool warp)
+int RunInteractive(const Options& options)
 {
+    GalleryState gallery;
+    gallery.dark = options.theme == ThemeSelection::Dark;
+    if (!options.page.empty())
+    {
+        gallery.selectedPage = FindPage(options.page);
+        if (gallery.selectedPage < 0)
+        {
+            std::fprintf(stderr, "error: no page with id '%s'\n", options.page.c_str());
+            return 1;
+        }
+    }
+
     AppShell shell;
     ShellDesc desc;
-    desc.warp = warp;
+    desc.warp = options.warp;
     if (!shell.Create(desc))
         return 1;
 
@@ -235,10 +353,7 @@ int RunInteractive(bool warp)
     if (!facet::Init(init))
         std::fprintf(stderr, "error: facet::Init failed\n");
 
-    GalleryState gallery;
     auto frame = [&] {
-        if (shell.ConsumeDpiChange())
-            ApplyStyle(shell.DpiScale());
         float clear[4];
         ClearColor(clear);
         if (!shell.BeginFrame(clear))
@@ -248,8 +363,9 @@ int RunInteractive(bool warp)
         ImGui::NewFrame();
         facet::NewFrame();
 
+        // DrawGallery re-applies the style when the monitor DPI or the UI scale changed.
+        gallery.baseScale = shell.DpiScale();
         PageCtx ctx;
-        ctx.scale = shell.DpiScale();
         DrawGallery(gallery, ctx, &shell);
 
         facet::EndFrame();
@@ -290,12 +406,24 @@ int RunOffscreen(const Options& options)
     int result = 1;
     if (options.mode == Mode::Capture)
     {
-        result = RunCapture(shell, options.capture);
+        CaptureOptions capture;
+        capture.directory = options.captureDirectory;
+        capture.width = options.width;
+        capture.height = options.height;
+        capture.scale = options.scale;
+        capture.page = options.page;
+        capture.warmupFrames = options.warmupFrames;
+        capture.themes = options.theme;
+        result = RunCapture(shell, capture);
     }
     else
     {
         SelftestOptions selftest;
         selftest.page = options.page;
+        selftest.width = options.width;
+        selftest.height = options.height;
+        selftest.scale = options.scale;
+        selftest.themes = options.theme;
         result = RunSelftest(shell, selftest);
     }
     shell.Destroy();
@@ -310,8 +438,7 @@ int wmain(int argc, wchar_t** argv)
         ReleaseConsoleWhenLaunchedFromExplorer();
 
     Options options;
-    bool listPages = false;
-    if (!ParseOptions(argc, argv, options, listPages))
+    if (!ParseOptions(argc, argv, options))
     {
         PrintUsage();
         return 2;
@@ -324,7 +451,7 @@ int wmain(int argc, wchar_t** argv)
     // Clashing page ids would silently overwrite capture files and selftest scripts.
     if (!ValidateRegistry())
         return 1;
-    if (listPages)
+    if (options.listPages)
     {
         for (const PageInfo& page : Pages())
         {
@@ -337,6 +464,6 @@ int wmain(int argc, wchar_t** argv)
     }
 
     if (options.mode == Mode::Interactive)
-        return RunInteractive(options.warp);
+        return RunInteractive(options);
     return RunOffscreen(options);
 }

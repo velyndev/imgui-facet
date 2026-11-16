@@ -32,7 +32,9 @@ struct PageCtx
 {
     bool capture = false;     // true in --capture runs: the page should show captureState
     int captureState = 0;     // index into the page's state names; 0 outside capture runs
-    float scale = 1.0f;       // UI scale: monitor DPI / 96 in the window, --scale offscreen
+    bool dark = false;        // the dark theme is shown (facet::T() is Theme::Dark())
+    float scale = 1.0f;       // total UI scale: monitor DPI / 96 in the window or --scale
+                              // offscreen, times the UI scale chosen in the title strip
     ProbeTable* probes = nullptr;  // set during --selftest runs
 
     // Records the rect and id of the last submitted item under this name so that

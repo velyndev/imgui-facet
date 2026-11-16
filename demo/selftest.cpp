@@ -56,10 +56,12 @@ void QueueModifiers(ImGuiIO& io, ImGuiKeyChord mods, bool down)
 class PageRun
 {
 public:
-    PageRun(const PageInfo& pageInfo, int pageIndex, HeadlessSession& headless)
-        : page(pageInfo), session(headless)
+    PageRun(const PageInfo& pageInfo, int pageIndex, bool dark, float scale, HeadlessSession& headless)
+        : page(pageInfo), session(headless), label(pageInfo.id + " (" + ThemeName(dark) + ")")
     {
         gallery.selectedPage = pageIndex;
+        gallery.dark = dark;
+        gallery.baseScale = scale;
         ctx.probes = &probes;
     }
 
@@ -147,7 +149,7 @@ public:
 private:
     bool Report(bool ok, const std::string& description)
     {
-        std::printf("%s %s: %s\n", ok ? "PASS" : "FAIL", page.id.c_str(), description.c_str());
+        std::printf("%s %s: %s\n", ok ? "PASS" : "FAIL", label.c_str(), description.c_str());
         std::fflush(stdout);
         if (ok)
             ++passed;
@@ -158,6 +160,7 @@ private:
 
     const PageInfo& page;
     HeadlessSession& session;
+    std::string label;  // "<page> (<theme>)" for result lines
     GalleryState gallery;
     PageCtx ctx;
     ProbeTable probes;
@@ -311,23 +314,31 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options)
         SelftestScript script;
         build(script);
 
-        HeadlessSession session;
-        if (!session.Begin(shell, HeadlessOptions{}))
+        for (const bool dark : SelectedThemes(options.themes))
         {
-            std::printf("FAIL %s: offscreen session could not start\n", page.id.c_str());
-            ++totalFailed;
-            continue;
-        }
-        PageRun run(page, pageIndex, session);
-        run.Frames(kWarmupFrames);
-        for (const SelftestScript::Step& step : script.Steps())
-            run.Execute(step);
-        totalPassed += run.passed;
-        totalFailed += run.failed;
-        if (!session.Healthy())
-        {
-            std::printf("FAIL %s: a D3D call failed\n", page.id.c_str());
-            ++totalFailed;
+            HeadlessSession session;
+            HeadlessOptions headless;
+            headless.width = options.width;
+            headless.height = options.height;
+            headless.scale = options.scale;
+            if (!session.Begin(shell, headless))
+            {
+                std::printf("FAIL %s (%s): offscreen session could not start\n", page.id.c_str(),
+                            ThemeName(dark));
+                ++totalFailed;
+                continue;
+            }
+            PageRun run(page, pageIndex, dark, options.scale, session);
+            run.Frames(kWarmupFrames);
+            for (const SelftestScript::Step& step : script.Steps())
+                run.Execute(step);
+            totalPassed += run.passed;
+            totalFailed += run.failed;
+            if (!session.Healthy())
+            {
+                std::printf("FAIL %s (%s): a D3D call failed\n", page.id.c_str(), ThemeName(dark));
+                ++totalFailed;
+            }
         }
     }
 
@@ -342,7 +353,8 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options)
         ++totalFailed;
     }
 
-    std::printf("selftest: %d script(s), %d passed, %d failed\n", scripts, totalPassed, totalFailed);
+    std::printf("selftest: %d script(s) at %dx%d, scale %g, %d passed, %d failed\n", scripts, options.width,
+                options.height, static_cast<double>(options.scale), totalPassed, totalFailed);
     return totalFailed == 0 && totalPassed > 0 ? 0 : 1;
 }
 

@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <fstream>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 // The demo compiles its own PNG encoder with internal linkage; the library does not
@@ -33,6 +34,7 @@ struct CapturedFile
 {
     std::string page;
     std::string state;
+    std::string theme;
     std::string file;
 };
 
@@ -87,16 +89,63 @@ bool WriteIndex(const std::filesystem::path& path, const CaptureOptions& options
     out << "  \"width\": " << options.width << ",\n";
     out << "  \"height\": " << options.height << ",\n";
     out << "  \"scale\": " << FormatScale(options.scale) << ",\n";
+    out << "  \"themes\": [";
+    const std::vector<bool> themes = SelectedThemes(options.themes);
+    for (size_t i = 0; i < themes.size(); ++i)
+        out << (i == 0 ? "" : ", ") << JsonString(ThemeName(themes[i]));
+    out << "],\n";
     out << "  \"files\": [";
     for (size_t i = 0; i < files.size(); ++i)
     {
         out << (i == 0 ? "\n" : ",\n");
         out << "    {\"page\": " << JsonString(files[i].page) << ", \"state\": "
-            << JsonString(files[i].state) << ", \"file\": " << JsonString(files[i].file) << "}";
+            << JsonString(files[i].state) << ", \"theme\": " << JsonString(files[i].theme)
+            << ", \"file\": " << JsonString(files[i].file) << "}";
     }
     out << (files.empty() ? "]\n" : "\n  ]\n");
     out << "}\n";
     return static_cast<bool>(out);
+}
+
+// Renders one page state in one theme in a fresh offscreen session and writes the PNG.
+// Prints the reason and returns false on failure.
+bool CaptureOne(AppShell& shell, const CaptureOptions& options, int pageIndex, int stateIndex, bool dark,
+                const std::string& fileName, std::vector<unsigned char>& pixels)
+{
+    HeadlessSession session;
+    HeadlessOptions headless;
+    headless.width = options.width;
+    headless.height = options.height;
+    headless.scale = options.scale;
+    if (!session.Begin(shell, headless))
+        return false;
+
+    GalleryState gallery;
+    gallery.selectedPage = pageIndex;
+    gallery.dark = dark;
+    gallery.baseScale = options.scale;
+    PageCtx ctx;
+    ctx.capture = true;
+    ctx.captureState = stateIndex;
+    for (int frame = 0; frame < options.warmupFrames; ++frame)
+        session.Frame([&] { DrawGallery(gallery, ctx, nullptr); });
+
+    const std::filesystem::path filePath = options.directory / fileName;
+    const std::string pathText = reinterpret_cast<const char*>(filePath.u8string().c_str());
+    if (!session.Readback(pixels) || !session.Healthy())
+    {
+        std::fprintf(stderr, "error: readback failed for %s\n", fileName.c_str());
+        return false;
+    }
+    const int stride = options.width * 4;
+    if (stbi_write_png(pathText.c_str(), options.width, options.height, 4, pixels.data(), stride) == 0)
+    {
+        std::fprintf(stderr, "error: cannot write %s\n", pathText.c_str());
+        return false;
+    }
+    std::printf("wrote %s\n", pathText.c_str());
+    std::fflush(stdout);
+    return true;
 }
 
 } // namespace
@@ -137,48 +186,18 @@ int RunCapture(AppShell& shell, const CaptureOptions& options)
         const PageInfo& page = pages[static_cast<size_t>(pageIndex)];
         for (int stateIndex = 0; stateIndex < static_cast<int>(page.states.size()); ++stateIndex)
         {
-            const std::string& state = page.states[static_cast<size_t>(stateIndex)];
-            const std::string fileName = page.id + "__" + state + suffix + ".png";
-            const std::filesystem::path filePath = options.directory / fileName;
-
-            HeadlessSession session;
-            HeadlessOptions headless;
-            headless.width = options.width;
-            headless.height = options.height;
-            headless.scale = options.scale;
-            if (!session.Begin(shell, headless))
+            for (const bool dark : SelectedThemes(options.themes))
             {
-                ok = false;
-                continue;
+                CapturedFile file;
+                file.page = page.id;
+                file.state = page.states[static_cast<size_t>(stateIndex)];
+                file.theme = ThemeName(dark);
+                file.file = file.page + "__" + file.state + "__" + file.theme + suffix + ".png";
+                if (CaptureOne(shell, options, pageIndex, stateIndex, dark, file.file, pixels))
+                    written.push_back(std::move(file));
+                else
+                    ok = false;
             }
-
-            GalleryState gallery;
-            gallery.selectedPage = pageIndex;
-            PageCtx ctx;
-            ctx.capture = true;
-            ctx.captureState = stateIndex;
-            ctx.scale = options.scale;
-            for (int frame = 0; frame < options.warmupFrames; ++frame)
-                session.Frame([&] { DrawGallery(gallery, ctx, nullptr); });
-
-            const bool readOk = session.Readback(pixels);
-            const std::string pathText = reinterpret_cast<const char*>(filePath.u8string().c_str());
-            if (!readOk || !session.Healthy())
-            {
-                std::fprintf(stderr, "error: readback failed for %s\n", fileName.c_str());
-                ok = false;
-                continue;
-            }
-            const int stride = options.width * 4;
-            if (stbi_write_png(pathText.c_str(), options.width, options.height, 4, pixels.data(), stride) == 0)
-            {
-                std::fprintf(stderr, "error: cannot write %s\n", pathText.c_str());
-                ok = false;
-                continue;
-            }
-            std::printf("wrote %s\n", pathText.c_str());
-            std::fflush(stdout);
-            written.push_back({page.id, state, fileName});
         }
     }
 

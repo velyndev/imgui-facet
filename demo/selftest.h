@@ -23,6 +23,8 @@
 
 #include <imgui.h>
 
+#include "run_options.h"
+
 #define FACET_DEMO_CONCAT_INNER(a, b) a##b
 #define FACET_DEMO_CONCAT(a, b) FACET_DEMO_CONCAT_INNER(a, b)
 
@@ -112,10 +114,14 @@ const std::vector<std::string>& DuplicateSelftestIds();
 struct SelftestOptions
 {
     std::string page;  // empty: every page that registered a script
+    int width = 1280;  // offscreen size in pixels
+    int height = 800;
+    float scale = 1.0f;
+    ThemeSelection themes = ThemeSelection::Dark;  // Both runs every script once per theme
 };
 
-// Runs the scripts offscreen on the shell's device. Returns the process exit code:
-// 0 when every expectation passed, 1 otherwise.
+// Runs the scripts offscreen on the shell's device. Every result line names the page and
+// the theme. Returns the process exit code: 0 when every expectation passed, 1 otherwise.
 int RunSelftest(AppShell& shell, const SelftestOptions& options);
 
 } // namespace facet::demo

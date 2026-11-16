@@ -10,8 +10,9 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 - The library skeleton: `facet::Init`, `NewFrame`, `EndFrame`, `Shutdown`, `Version` and the
   embedding of `assets/icons/*.svg` into the library at build time.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
-  window. It currently has one page (Foundation) that shows text sizes, a few stock Dear ImGui
-  widgets, the embedded assets, the UI scale and the frame time.
+  window, a light and a dark theme and a UI scale setting. It currently has one page
+  (Foundation) that shows text sizes, a few stock Dear ImGui widgets, the theme surfaces with
+  the contrast ratios of their text colors, the embedded assets, the UI scale and the frame time.
 - A capture mode that renders pages offscreen into PNG files, and a selftest mode that operates
   pages with scripted mouse and keyboard input.
 - Unit tests with doctest.
@@ -58,34 +59,46 @@ as `facet::imgui_backends`. Using `FACET_IMGUI_TARGET` is not covered by a build
 ## Run the demo
 
 ```
-build\msvc-x64\bin\Release\facet_demo.exe
+build\msvc-x64\bin\Release\facet_demo.exe [--page id] [--theme light|dark] [--warp]
 ```
 
-The title strip at the top moves the window (double-click maximizes) and holds working
-Minimize, Maximize and Close buttons. The window edges resize it. In Debug builds the D3D11
-debug layer is used when the Windows "Graphics Tools" optional feature is installed.
+The title strip at the top moves the window (double-click maximizes) and holds a "Dark theme"
+switch, a "UI scale" list (75 to 200 %, multiplied with the monitor DPI scale) and working
+Minimize, Maximize and Close buttons; all of them work with the mouse and the keyboard. When
+the window is too narrow for one row, the theme and scale controls move to a second row. The
+window edges resize it. `--page` selects the page shown first, `--theme` the starting theme
+(default dark). In Debug builds the D3D11 debug layer is used when the Windows "Graphics
+Tools" optional feature is installed.
+
+Every mode rejects options it does not use (exit code 2), so a mistyped run never silently
+uses other settings.
 
 ### Capture mode
 
 ```
-facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N] [--warp]
+facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N]
+           [--theme light|dark|both] [--warp]
 ```
 
-Renders every page once per capture state into an offscreen 8-bit RGBA target, using a fixed
-time step of 1/60 s and no OS input, and writes `<page>__<state>__<W>x<H>@<scale>.png` plus
-`index.json` into `<dir>`. The window is never shown. Defaults: `1280x800`, scale 1, 60 warm-up
-frames per state. `--warp` renders with the WARP software rasterizer, so the output does not
-depend on the GPU; two WARP runs on the same machine produce identical files. The exit code is 0
-only when every file was written and no Direct3D call failed.
+Renders every page once per capture state and theme into an offscreen 8-bit RGBA target, using
+a fixed time step of 1/60 s and no OS input, and writes
+`<page>__<state>__<theme>__<W>x<H>@<scale>.png` plus `index.json` (size, scale, themes, and the
+page, state, theme and file name of every image) into `<dir>`. The window is never shown.
+Defaults: `1280x800`, scale 1, both themes, 60 warm-up frames per image. `--warp` renders with
+the WARP software rasterizer, so the output does not depend on the GPU; two WARP runs on the
+same machine produce identical files. The exit code is 0 only when every file was written and
+no Direct3D call failed.
 
 ### Selftest mode
 
 ```
-facet_demo --selftest [--page id] [--warp]
+facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]
 ```
 
 Runs the input scripts that pages register: synthetic clicks and key presses, followed by
-checks. It prints a `PASS` or `FAIL` line per check and exits with 1 when any check failed.
+checks, offscreen at the given size and scale (defaults `1280x800`, scale 1) in the given
+theme (default dark; `both` runs every script once per theme). It prints a `PASS` or `FAIL`
+line per check, naming the page and theme, and exits with 1 when any check failed.
 
 `facet_demo --list-pages` prints the page ids with their capture states.
 
