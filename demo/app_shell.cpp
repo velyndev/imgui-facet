@@ -465,7 +465,7 @@ LRESULT AppShell::HitTest(LPARAM lParam) const
         if (bottom)
             return HTBOTTOM;
     }
-    if (PtInRect(&captionRect, point))
+    if (!captionBlocked && PtInRect(&captionRect, point))
         return HTCAPTION;
     return HTCLIENT;
 }

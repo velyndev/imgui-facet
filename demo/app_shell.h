@@ -54,6 +54,11 @@ public:
     // window; double-clicks maximize. Set an empty rect to disable.
     void SetCaptionRect(float x0, float y0, float x1, float y1);
 
+    // While blocked, the drag region is ignored and every click inside it reaches the UI.
+    // The UI blocks it on frames where a popup is open or another window covers the strip
+    // under the mouse, so the strip never swallows a click meant for that window.
+    void SetCaptionBlocked(bool blocked) { captionBlocked = blocked; }
+
     // Forwards window messages to the Dear ImGui Win32 backend. Enable only after
     // ImGui_ImplWin32_Init and disable before ImGui_ImplWin32_Shutdown.
     void SetImGuiInputEnabled(bool enabled) { imguiInput = enabled; }
@@ -115,6 +120,7 @@ private:
     UINT pendingWidth = 0;
     UINT pendingHeight = 0;
     RECT captionRect = {};
+    bool captionBlocked = false;
     std::function<void()> liveResize;
 };
 

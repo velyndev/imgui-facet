@@ -45,12 +45,19 @@ void DrawTitleStrip(AppShell* shell)
     if (ImGui::Button(labels[2]) && shell != nullptr)
         shell->Close();
 
-    // Everything in the strip left of the buttons drags the window.
+    // Everything in the strip left of the buttons drags the window, unless a popup is open
+    // or another window (a combo list, a popup, a tooltip that takes input) lies over the
+    // strip under the mouse: then clicks there belong to the UI.
     if (shell != nullptr)
     {
         const ImVec2 stripMin = ImGui::GetWindowPos();
-        const float gap = style.ItemSpacing.x;
-        shell->SetCaptionRect(stripMin.x, stripMin.y, buttonsScreenX - gap, stripMin.y + stripHeight);
+        const ImVec2 captionMax(buttonsScreenX - style.ItemSpacing.x, stripMin.y + stripHeight);
+        shell->SetCaptionRect(stripMin.x, stripMin.y, captionMax.x, captionMax.y);
+        const bool popupOpen =
+            ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+        const bool coveredUnderMouse =
+            ImGui::IsMouseHoveringRect(stripMin, captionMax, false) && !ImGui::IsWindowHovered();
+        shell->SetCaptionBlocked(popupOpen || coveredUnderMouse);
     }
 
     ImGui::EndChild();
