@@ -454,4 +454,17 @@ FACET_DEMO_SELFTEST("tokens")
     test.KeyPress(ImGuiKey_UpArrow);
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Up and Enter in the UI scale list return to 100%", [] { return facet::UiScale() == 1.0f; });
+    // Navigation: a click opens a page (its controls can be clicked), the arrow keys and
+    // Space open the one above.
+    test.Click("nav.type");
+    test.ExpectFocused("nav.type");
+    test.Click("type.clear");
+    test.Click("nav.type");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectFocused("nav.tokens");
+    test.KeyPress(ImGuiKey_Space);
+    test.Click("tokens.accent.0");
+    test.Expect("the Tokens page is shown again", [] {
+        return facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::AccentPresets()[0].color);
+    });
 }
