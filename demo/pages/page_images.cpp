@@ -314,7 +314,13 @@ constexpr RadiusChoice kRadii[] = {
 
 } // namespace
 
-FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
+// Capture states, in the order passed to FACET_DEMO_PAGE below. "default" shows the top of
+// the page, "loading" scrolls to the asynchronous examples while they are pending, and
+// "results" scrolls to the end with the finished loads (ready and failed) and the SVGs.
+constexpr int kStateLoading = 1;
+constexpr int kStateResults = 2;
+
+FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results")
 {
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
@@ -322,7 +328,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
     if (ctx.capture)
     {
         ui = ImagesUi{};
-        if (ctx.captureState == 1)
+        if (ctx.captureState == kStateLoading)
             StartAsyncLoads();  // requested again every frame, so the capture shows them pending
         else
             for (facet::ImageHandle handle : {assets.async, assets.missing, assets.damaged})
@@ -448,7 +454,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
     if (ImGui::Button("Load again"))
         StartAsyncLoads();
     ctx.Probe("images.reload");
-    if (ctx.captureState == 1)
+    if (ctx.captureState == kStateLoading)
         ctx.RevealInCapture(0.7f);
 
     ImGui::SeparatorText("SVG");
@@ -468,6 +474,8 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
         Caption(caption);
         ImGui::EndGroup();
     }
+    if (ctx.captureState == kStateResults)
+        ctx.RevealInCapture(1.0f);
 }
 
 FACET_DEMO_SELFTEST("images")
