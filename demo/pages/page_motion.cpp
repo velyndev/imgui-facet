@@ -159,6 +159,33 @@ void DrawTracks(const float* values)
     }
 }
 
+// Sampled curves, recomputed only when the motion tokens they depend on change, so drawing the
+// page does not allocate the stores every frame.
+struct CurveCache
+{
+    bool valid = false;
+    float key[5] = {};
+    ImVec2 fine[kKinds][kFineSamples];
+    ImVec2 coarse[kKinds][kCoarseSamples];
+};
+
+CurveCache curves;
+
+void UpdateCurves()
+{
+    const facet::Motion& m = facet::T().motion;
+    const float key[5] = {m.scale, m.standard.response, m.standard.dampingRatio, m.durationStandard, m.durationSlow};
+    if (curves.valid && std::equal(std::begin(key), std::end(key), std::begin(curves.key)))
+        return;
+    std::copy(std::begin(key), std::end(key), std::begin(curves.key));
+    for (int kind = 0; kind < kKinds; ++kind)
+    {
+        SampleCurve(kind, kFineRate, curves.fine[kind], kFineSamples);
+        SampleCurve(kind, kCoarseRate, curves.coarse[kind], kCoarseSamples);
+    }
+    curves.valid = true;
+}
+
 // One plot per motion: the 240 fps curve as a line and the 30 fps samples as dots.
 void DrawCurves()
 {
@@ -172,13 +199,11 @@ void DrawCurves()
     const float height = facet::Px(theme.spacing.xxxl * 3.0f);
     const float inset = facet::Px(theme.spacing.md);
     const float dot = facet::Px(theme.spacing.xs) * 0.5f;
-    ImVec2 fine[kFineSamples];
-    ImVec2 coarse[kCoarseSamples];
+    UpdateCurves();
     for (int kind = 0; kind < kKinds; ++kind)
     {
-        SampleCurve(kind, kFineRate, fine, kFineSamples);
-        SampleCurve(kind, kCoarseRate, coarse, kCoarseSamples);
-
+        const ImVec2* fine = curves.fine[kind];
+        const ImVec2* coarse = curves.coarse[kind];
         ImGui::BeginGroup();
         facet::Text(facet::TextStyle::Headline, "%s", kKindNames[kind]);
         ImGui::Dummy(ImVec2(width, height));
