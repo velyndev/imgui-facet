@@ -282,8 +282,8 @@ void DrawShadow(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, co
 {
     const ImVec2 shapeMin(pMin.x + spec.offset.x - spec.spread, pMin.y + spec.offset.y - spec.spread);
     const ImVec2 shapeMax(pMax.x + spec.offset.x + spec.spread, pMax.y + spec.offset.y + spec.spread);
-    // Blur is a radius like the CSS blur radius: the visible falloff ends about `blur` pixels
-    // outside the shape, which is two standard deviations.
+    // Blur is a radius: the visible falloff ends about `blur` pixels outside the shape,
+    // which is two standard deviations.
     internal::DrawBlurredShape(drawList, shapeMin, shapeMax, std::max(0.0f, radius + spec.spread),
                                std::max(0.0f, spec.blur) * 0.5f, spec.color, false);
 }
