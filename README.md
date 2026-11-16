@@ -20,7 +20,7 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
   and icons are not drawn.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
   window, a light and a dark theme and a UI scale setting. It currently has one page
-  (Foundation) that shows text sizes, a few stock Dear ImGui widgets, the theme surfaces with
+  (Foundation) that shows the text styles, a few stock Dear ImGui widgets, the theme surfaces with
   the contrast ratios of their text colors, the embedded assets, the UI scale and the frame time.
 - A capture mode that renders pages offscreen into PNG files, and a selftest mode that operates
   pages with scripted mouse and keyboard input.

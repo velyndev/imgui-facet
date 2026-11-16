@@ -1,5 +1,5 @@
 // Foundation page: proves the demo harness works before any Facet widget exists.
-// It shows text at several sizes, a few stock ImGui widgets, the theme surfaces with the
+// It shows every text style, a few stock ImGui widgets, the theme surfaces with the
 // contrast of their text tokens, the embedded asset table, the UI scale and the frame time.
 
 #include <cstdio>
@@ -26,8 +26,24 @@ struct FoundationState
 FoundationState foundation;
 bool themeBeforeSwitch = false;  // selftest: theme before the switch was operated
 
-// Sample sizes in unscaled pixels; ImGui applies the UI scale on top.
-constexpr float kTextSizes[] = {11.0f, 13.0f, 15.0f, 17.0f, 22.0f, 26.0f};
+struct TextStyleSample
+{
+    facet::TextStyle style;
+    const char* name;
+};
+
+// Every text style, largest first. Sizes and weights come from the type tokens.
+constexpr TextStyleSample kTextStyles[] = {
+    {facet::TextStyle::LargeTitle, "LargeTitle"}, {facet::TextStyle::Title1, "Title1"},
+    {facet::TextStyle::Title2, "Title2"},         {facet::TextStyle::Title3, "Title3"},
+    {facet::TextStyle::Headline, "Headline"},     {facet::TextStyle::Body, "Body"},
+    {facet::TextStyle::Callout, "Callout"},       {facet::TextStyle::Footnote, "Footnote"},
+    {facet::TextStyle::Caption, "Caption"},
+};
+static_assert(std::size(kTextStyles) == facet::kTextStyleCount);
+
+constexpr const char* kWeightNames[] = {"regular", "semibold", "bold"};
+static_assert(std::size(kWeightNames) == facet::kFontWeightCount);
 
 // Width of a theme swatch in multiples of the font size.
 constexpr float kSwatchWidthEm = 13.0f;
@@ -101,20 +117,21 @@ void DrawSwatches(const facet::Theme& theme)
 
 FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
 {
-    ImGui::PushFont(nullptr, 22.0f);
-    ImGui::TextUnformatted("Foundation");
-    ImGui::PopFont();
-    ImGui::TextWrapped("Checks the demo harness: font sizes, stock widgets, theme surfaces, "
+    facet::Text(facet::TextStyle::Title1, "Foundation");
+    ImGui::TextWrapped("Checks the demo harness: text styles, stock widgets, theme surfaces, "
                        "embedded assets, UI scale and frame timing.");
 
-    ImGui::SeparatorText("Text sizes");
-    for (const float size : kTextSizes)
+    ImGui::SeparatorText("Text styles");
+    ImGui::TextWrapped("Sizes in design units. Until fonts are loaded, every weight draws with "
+                       "the default font.");
+    for (const TextStyleSample& sample : kTextStyles)
     {
-        ImGui::PushFont(nullptr, size);
+        const facet::TextStyleSpec& spec = facet::T().type[sample.style];
+        facet::PushTextStyle(sample.style);
         // Wrapped, so the large samples stay readable on narrow targets and at scale 2.
-        ImGui::TextWrapped("%.0f px  The quick brown fox jumps over the lazy dog",
-                           static_cast<double>(size));
-        ImGui::PopFont();
+        ImGui::TextWrapped("%s %.0f %s  The quick brown fox jumps over the lazy dog", sample.name,
+                           static_cast<double>(spec.size), kWeightNames[static_cast<int>(spec.weight)]);
+        facet::PopTextStyle();
     }
 
     ImGui::SeparatorText("Widgets");
