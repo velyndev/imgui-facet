@@ -7,6 +7,7 @@
 #include "facet/core/context.h"
 #include "facet/core/draw.h"
 #include "facet/core/effects.h"
+#include "facet/core/icons.h"
 #include "facet/core/image.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
