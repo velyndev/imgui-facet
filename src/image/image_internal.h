@@ -47,7 +47,7 @@ struct FitResult
 FitResult FitImage(ImVec2 boxMin, ImVec2 boxMax, ImVec2 imageSize, ImageFit fit);
 
 // Converts premultiplied pixels stored as 32-bit ARGB words in little-endian byte order
-// (bytes B, G, R, A, the lunasvg and Cairo layout) to straight RGBA. `srcStride` is the
+// (bytes B, G, R, A, the lunasvg bitmap layout) to straight RGBA. `srcStride` is the
 // source row size in bytes; `dst` receives width * height * 4 bytes. Fully transparent
 // pixels become 0, 0, 0, 0. With `mask`, the color is dropped and every pixel becomes white
 // with the source alpha, which is how single-color icons are stored for tinting.
