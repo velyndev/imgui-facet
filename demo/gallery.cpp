@@ -314,21 +314,26 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         facet::ItemCursor();
         std::snprintf(probeName, sizeof(probeName), "nav.%s", page.id.c_str());
         ctx.Probe(probeName);
+        // The item rectangle includes half the item spacing above and below, so rows can be
+        // hit without gaps. The visible row (hover fill, selection pill and title) is the
+        // rowHeight box centered in it.
         const ImVec2 itemMin = ImGui::GetItemRectMin();
         const ImVec2 itemMax = ImGui::GetItemRectMax();
         rowLeft = itemMin.x;
         rowRight = itemMax.x;
+        const float rowTop = facet::Snap(itemMin.y + (itemMax.y - itemMin.y - rowHeight) * 0.5f);
         if (ImGui::IsItemHovered() && !selected)
         {
             const ImU32 hover = Color(ImGui::IsItemActive() ? c.fill[1] : c.fill[2]);
-            facet::FillRect(drawList, itemMin, itemMax, hover, radius);
+            facet::FillRect(drawList, ImVec2(rowLeft, rowTop), ImVec2(rowRight, rowTop + rowHeight), hover, radius);
         }
         if (selected)
-            selectedY = itemMin.y - windowTop + ImGui::GetScrollY();
+            selectedY = rowTop - windowTop + ImGui::GetScrollY();
 
-        // Titles that do not fit the row end in an ellipsis.
+        // Titles that do not fit the row end in an ellipsis. Their capitals sit centered in
+        // the row box.
         facet::PushTextStyle(facet::TextStyle::Body);
-        const float textY = rowMin.y + (rowHeight - ImGui::GetFontSize()) * 0.5f;
+        const float textY = facet::CenteredTextY(rowTop, rowHeight);
         char title[128];
         facet::internal::TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr,
                                       itemMax.x - rowMin.x - rowInset * 2.0f, facet::internal::TruncateMode::End,
