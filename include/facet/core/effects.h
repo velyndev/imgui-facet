@@ -39,8 +39,9 @@ ShadowSpec ElevationShadow(int level);
 // before DrawGlass is blurred into the panel's backdrop and darkens it.
 // Blur is limited to 128 pixels and the radius to 128 pixels; the shape's radius and the
 // blur are rounded to whole and half pixels so similar shadows share one baked tile.
-// A tile is baked on the CPU while recording; its texels are uploaded by a draw callback in
-// front of the shadow, so the device context is only used while the draw data is rendered.
+// A shadow wholly outside the draw list's clip rect records nothing. A tile is baked on the
+// CPU while recording; its texels are uploaded by a draw callback in front of the shadow,
+// so the device context is only used while the draw data is rendered.
 void DrawShadow(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const ShadowSpec& spec);
 
 // DrawShadow with ElevationShadow(level). Level 0 draws nothing.
@@ -74,7 +75,9 @@ struct GlassSpec
 // (with the first panel's blur radius and saturation). Draw the backdrop of every glass
 // panel before the first one. The render target is copied, never bound as an input, so it
 // works in a swap chain owned by a host application, with multisampled, sRGB and typeless
-// formats. Must be drawn into a draw list of the main viewport.
+// formats. Must be drawn into a draw list of the main viewport. A panel wholly outside the
+// draw list's clip rect records no capture and no panel, only its shadow when that reaches
+// into view.
 void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const GlassSpec& spec = {});
 
 // The panel DrawGlass draws when it cannot blur: spec.shadow, the tint at full opacity and

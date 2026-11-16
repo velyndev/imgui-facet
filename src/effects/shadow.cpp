@@ -346,6 +346,13 @@ void DrawBlurredShape(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radi
     ShadowState& state = State();
     if (!state.deviceReady)
         return;
+    // Skip a shadow that lies wholly outside the clip rect: nothing to bake, upload or draw.
+    const float reach = std::ceil(std::max(0.0f, sigma) * 3.0f) + 1.0f;
+    const ImVec2 clipMin = drawList->GetClipRectMin();
+    const ImVec2 clipMax = drawList->GetClipRectMax();
+    if (pMax.x + reach <= clipMin.x || pMin.x - reach >= clipMax.x || pMax.y + reach <= clipMin.y ||
+        pMin.y - reach >= clipMax.y)
+        return;
     const float clampedRadius = std::clamp(radius, 0.0f, std::min(width, height) * 0.5f);
     const ShadowKey key = MakeShadowKey(clampedRadius, sigma, outsideOnly);
     const ShadowTile* tile = state.atlas.Acquire(key);

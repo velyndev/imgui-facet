@@ -150,6 +150,15 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
 {
     if (drawList == nullptr)
         return;
+    // A panel outside the clip rect (scrolled out of view) needs no capture and no blur. Its
+    // shadow may still reach into view; DrawShadow skips it when it does not.
+    const ImVec2 clipMin = drawList->GetClipRectMin();
+    const ImVec2 clipMax = drawList->GetClipRectMax();
+    if (pMax.x <= clipMin.x || pMin.x >= clipMax.x || pMax.y <= clipMin.y || pMin.y >= clipMax.y)
+    {
+        DrawShadow(drawList, pMin, pMax, radius, spec.shadow);
+        return;
+    }
     internal::BlurState& state = internal::State();
     // After a failed capture, try again now and then: the host may have changed its target.
     // A failing try looks like the fallback, because the callback fills the output with it.

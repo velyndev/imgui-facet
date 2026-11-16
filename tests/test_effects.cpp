@@ -1025,6 +1025,36 @@ TEST_CASE("A shadow queues its tile upload in front of its first draw")
     }
 }
 
+TEST_CASE("Effects outside the clip rect record nothing")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    REQUIRE(facet::GlassAvailable());
+
+    {
+        ImDrawList drawList(ImGui::GetDrawListSharedData());
+        drawList._ResetForNewFrame();
+        drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+        // A panel scrolled out of view adds no capture callback and no geometry.
+        facet::DrawGlass(&drawList, ImVec2(100.0f, 16.0f), ImVec2(140.0f, 48.0f), 4.0f);
+        // Neither does one with a shadow that stays out of view too.
+        facet::GlassSpec spec;
+        spec.shadow = facet::ElevationShadow(2);
+        facet::DrawGlass(&drawList, ImVec2(16.0f, 200.0f), ImVec2(48.0f, 240.0f), 4.0f, spec);
+        facet::DrawShadow(&drawList, ImVec2(-200.0f, 16.0f), ImVec2(-100.0f, 48.0f), 4.0f, spec.shadow);
+        facet::DrawGlow(&drawList, ImVec2(16.0f, -90.0f), ImVec2(48.0f, -60.0f), 4.0f, IM_COL32_WHITE, 8.0f);
+        CHECK(CountCallbacks(drawList) == 0);
+        CHECK(drawList.VtxBuffer.Size == 0);
+
+        // A visible panel still records its capture.
+        facet::DrawGlass(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 4.0f);
+        CHECK(CountCallbacks(drawList) >= 1);
+        CHECK(drawList.VtxBuffer.Size > 0);
+    }
+}
+
 TEST_CASE("Blur output resize retires the old view for a few frames")
 {
     Warp warp;
