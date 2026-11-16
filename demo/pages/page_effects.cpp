@@ -273,15 +273,18 @@ void DrawGlowSection()
     const ImVec2 area = ImGui::GetItemRectMin();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // Focus ring halo around a control-shaped sample.
+    // Focus ring halo around a control-shaped sample. The ring has the full token width and
+    // sits just outside the control; the halo glows outside the ring.
     const ImVec2 focusMin(area.x + room, area.y + room);
     const ImVec2 focusMax(focusMin.x + width, focusMin.y + height);
     const float controlRadius = facet::Px(theme.radii.control);
+    const float ringWidth = facet::Px(theme.metrics.focusRingWidth);
+    const ImVec2 ringMin(focusMin.x - ringWidth, focusMin.y - ringWidth);
+    const ImVec2 ringMax(focusMax.x + ringWidth, focusMax.y + ringWidth);
+    const float ringRadius = controlRadius + ringWidth;
     facet::FillRect(drawList, focusMin, focusMax, facet::ToU32(c.fill[1]), controlRadius);
-    facet::DrawGlow(drawList, focusMin, focusMax, controlRadius, facet::ToU32(c.focusRing),
-                    facet::Px(theme.spacing.sm));
-    facet::StrokeRect(drawList, focusMin, focusMax, facet::ToU32(c.focusRing), controlRadius,
-                      facet::Px(theme.metrics.focusRingWidth) * 0.5f);
+    facet::DrawGlow(drawList, ringMin, ringMax, ringRadius, facet::ToU32(c.focusRing), facet::Px(theme.spacing.sm));
+    facet::StrokeRect(drawList, ringMin, ringMax, facet::ToU32(c.focusRing), ringRadius, ringWidth);
     drawList->AddText(ImVec2(focusMin.x, focusMax.y + room * 0.5f), facet::ToU32(c.labelSecondary),
                       "Focus ring halo");
 
