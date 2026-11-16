@@ -4,12 +4,18 @@
 //
 // Every animated value lives in one store, keyed by an ImGui id plus a small sub key so a
 // widget can animate several values (hover, press, knob position) under its own id. The
-// store advances by facet::DeltaTime(), so results do not depend on the frame rate.
+// store advances by facet::DeltaTime() once per facet::NewFrame, and every motion is solved
+// in closed form for the elapsed time, so results do not depend on the frame rate and stay
+// stable at any frame time. Querying a key twice in one frame returns the same value.
 // The first query of a key returns the target at once (nothing animates in on the first
-// frame), and keys that were not queried during a frame are dropped at the end of it.
+// frame). Keys that were not queried for 30 frames are dropped in facet::EndFrame; a key
+// queried again after that starts at its target. Queries do not allocate memory; the store
+// grows only when more keys are alive at once than ever before. A key keeps one kind: using
+// the same id and sub key for, say, Smooth and Spring restarts it each time.
 //
 // Durations and spring responses are multiplied by T().motion.scale. While ReduceMotion()
-// is true every function returns its target immediately.
+// is true every function returns its target immediately. Values snap exactly onto their
+// target once the remaining distance is negligible.
 
 #include <imgui.h>
 
@@ -52,7 +58,17 @@ float Tween(ImGuiID id, int sub, float target, float duration, Ease ease = Ease:
 // Smooth for colors; interpolates in OKLab so hue shifts look even.
 ImVec4 SmoothColor(ImGuiID id, int sub, const ImVec4& target, float speed);
 
-// True when animations should be skipped (the theme's motion.reduceMotion token).
+// True when animations should be skipped: the theme's motion.reduceMotion token is on, or the
+// Windows setting "Animation effects" is off while Facet follows it.
 bool ReduceMotion();
+
+// The Windows "Animation effects" setting is off (SPI_GETCLIENTAREAANIMATION). Read at Init and
+// again about once per second of frame time, so a change applies without a restart.
+bool SystemReduceMotion();
+
+// Whether ReduceMotion() follows the Windows setting (default true). Tools that must render
+// the same frames on every machine, such as screenshot runs, turn it off.
+void SetFollowSystemMotion(bool follow);
+bool FollowsSystemMotion();
 
 } // namespace facet
