@@ -152,6 +152,15 @@ ImageHandle Allocate(Cache& cache, SourceKind kind)
 void Free(Cache& cache, std::uint32_t index)
 {
     Slot& slot = cache.slots[index];
+    if (slot.status == ImageStatus::Loading)
+    {
+        // A job still in the queue would only be decoded and then dropped; remove it. A
+        // decode already running finishes and its result is dropped in ProcessResults.
+        const std::uint32_t generation = slot.generation;
+        std::lock_guard lock(cache.mutex);
+        std::erase_if(cache.jobs,
+                      [&](const Job& job) { return job.index == index && job.generation == generation; });
+    }
     if (slot.view)
         cache.releaseQueue.push_back(std::move(slot.view));
     slot = Slot{};

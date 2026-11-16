@@ -31,8 +31,9 @@ Asynchronous loads always return a valid handle; a failure shows as `ImageStatus
 
 Two worker threads (one on single-core machines) start with the first asynchronous request.
 They read and decode; uploads happen on the frame thread in `facet::NewFrame` (or in
-`WaitForImage`), because the Direct3D upload uses the immediate context. A result whose
-handle was released in the meantime is dropped. `Shutdown` drops queued requests, waits for
+`WaitForImage`), because the Direct3D upload uses the immediate context. Releasing a handle
+whose request is still queued removes the request, so it is never decoded; a decode already
+running finishes and its result is dropped. `Shutdown` drops queued requests, waits for
 the decodes in progress and discards them.
 
 ### Deferred release
