@@ -118,6 +118,11 @@ line per check, naming the page and theme, and exits with 1 when any check faile
 
 `facet_demo --list-pages` prints the page ids with their capture states.
 
+## Design tokens
+
+`DESIGN.md` lists the starting value of every theme token and the reason for each visual
+choice.
+
 ## Layout
 
 ```
