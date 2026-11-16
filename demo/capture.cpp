@@ -5,7 +5,19 @@
 #include <system_error>
 #include <vector>
 
+// The demo compiles its own PNG encoder with internal linkage; the library does not
+// provide one. STBIW_WINDOWS_UTF8 lets stbi_write_png take UTF-8 paths.
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBIW_WINDOWS_UTF8
+#if defined(_MSC_VER)
+#pragma warning(push, 0)
+#pragma warning(disable : 4996)
+#endif
 #include <stb_image_write.h>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 #include "app_shell.h"
 #include "gallery.h"
