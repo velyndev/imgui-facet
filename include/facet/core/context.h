@@ -17,8 +17,8 @@ struct InitDesc
 };
 
 // Starts Facet. Requires a current Dear ImGui context and a valid device and context.
-// Returns false (and leaves Facet uninitialized) when a requirement is missing or when
-// Facet is already initialized.
+// Returns false (and leaves Facet uninitialized) when a requirement is missing, when a
+// module fails to start, or when Facet is already initialized.
 bool Init(const InitDesc& desc);
 
 // Call once per frame after ImGui::NewFrame(). Reads the frame's delta time from ImGui,
@@ -30,6 +30,18 @@ void EndFrame();
 
 // Releases every Direct3D reference Facet holds. Safe to call when not initialized.
 void Shutdown();
+
+// Releases every Direct3D object Facet created (textures, atlases, shaders, blur targets)
+// while keeping all other state. Call it before the host tears down device-dependent
+// resources it shares with Facet, then CreateDeviceObjects() to rebuild them on the same
+// device. For a new device, use Shutdown() and Init() instead. Does nothing when Facet is
+// not initialized or the objects are already released.
+void InvalidateDeviceObjects();
+
+// Recreates the objects released by InvalidateDeviceObjects(). Returns true when they
+// exist afterwards (also when they were never released), false when Facet is not
+// initialized or a module failed to create its objects.
+bool CreateDeviceObjects();
 
 bool IsInitialized();
 
