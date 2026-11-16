@@ -1,0 +1,237 @@
+#pragma once
+
+// Design tokens and the current theme.
+//
+// A Theme is a plain struct of token groups. Widgets read every color, spacing, radius,
+// size and duration from facet::T() and pass lengths through facet::Px() (scale.h); they
+// never use literals. Lengths here are in design units: pixels at scale 1.
+// Colors are ImVec4 in sRGB with straight alpha (see color.h).
+
+#include <imgui.h>
+
+#include "facet/core/anim.h"
+
+namespace facet
+{
+
+// Text styles from largest to smallest. Sizes and weights live in Theme::type.
+enum class TextStyle
+{
+    LargeTitle,
+    Title1,
+    Title2,
+    Title3,
+    Headline,
+    Body,
+    Callout,
+    Footnote,
+    Caption,
+};
+inline constexpr int kTextStyleCount = 9;
+
+enum class FontWeight
+{
+    Regular,
+    Semibold,
+    Bold,
+};
+inline constexpr int kFontWeightCount = 3;
+
+// Semantic colors. Each name says where the color is used, not what it looks like.
+struct Colors
+{
+    // Surfaces, from the window background up to floating layers.
+    ImVec4 bg;           // window and app background
+    ImVec4 bgSecondary;  // grouped content, sidebars, cards on bg
+    ImVec4 bgTertiary;   // content nested inside bgSecondary
+    ImVec4 bgElevated;   // popovers, menus, dialogs and other floating layers
+
+    // Translucent grey fills for control backgrounds, strongest first: fill[0] for pressed
+    // or large thumbs, fill[1] default control background, fill[2] hovered rows, fill[3]
+    // the faintest wash.
+    ImVec4 fill[4];
+
+    // Text and glyphs, most to least prominent. label and labelSecondary are for text that
+    // must be read; labelTertiary for placeholders and disabled text; labelQuaternary for
+    // decoration only.
+    ImVec4 label;
+    ImVec4 labelSecondary;
+    ImVec4 labelTertiary;
+    ImVec4 labelQuaternary;
+
+    ImVec4 separator;        // translucent hairlines over any surface
+    ImVec4 separatorOpaque;  // hairlines where translucency would double up
+
+    // The accent marks selection, the primary action and focus. Theme::ApplyAccent derives
+    // every color below from `accent`.
+    ImVec4 accent;
+    ImVec4 accentHover;
+    ImVec4 accentPressed;
+    ImVec4 accentSubtle;  // translucent selection background
+    ImVec4 onAccent;      // text and glyphs drawn on accent fills
+
+    // Status colors, readable as text on bg, bgSecondary and bgTertiary.
+    ImVec4 destructive;
+    ImVec4 success;
+    ImVec4 warning;
+
+    ImVec4 focusRing;
+
+    ImVec4 shadow;     // shadow color; its strength comes from the Elevation tokens
+    ImVec4 glassTint;  // tint of blurred panels; its strength comes from Glass::tintOpacity
+    ImVec4 scrim;      // dims the content behind modal layers
+};
+
+// The 4 px spacing grid.
+struct Spacing
+{
+    float xs = 4.0f;
+    float sm = 8.0f;
+    float md = 12.0f;
+    float lg = 16.0f;
+    float xl = 20.0f;
+    float xxl = 24.0f;
+    float xxxl = 32.0f;
+};
+
+// Corner radii by layer. A pill shape (radius = half the height) is used only by toggles
+// and chips and is not a token.
+struct Radii
+{
+    float element = 6.0f;  // small parts inside controls: checkboxes, tags, swatches
+    float control = 8.0f;
+    float card = 12.0f;
+    float popover = 14.0f;
+    float window = 16.0f;
+    // From this radius up, corners use the continuous (curvature-matched) path instead of
+    // a circular arc, when continuousCorners is on.
+    float continuousFrom = 10.0f;
+    bool continuousCorners = true;
+};
+
+// Sizes of controls.
+struct Metrics
+{
+    float controlHeightSmall = 22.0f;
+    float controlHeight = 28.0f;
+    float controlHeightLarge = 36.0f;
+
+    float toggleWidth = 38.0f;
+    float toggleHeight = 22.0f;
+    float toggleKnobInset = 2.0f;  // gap between the track edge and the knob
+
+    float checkboxSize = 16.0f;
+
+    float sliderTrackHeight = 4.0f;
+    float sliderKnobSize = 18.0f;
+
+    float focusRingWidth = 3.0f;
+    float hairline = 1.0f;       // rendered as at least one physical pixel
+    float minHitTarget = 24.0f;  // smallest clickable area, even for smaller visuals
+};
+
+struct TextStyleSpec
+{
+    float size = 13.0f;
+    FontWeight weight = FontWeight::Regular;
+};
+
+// Size and weight for every TextStyle.
+struct Type
+{
+    TextStyleSpec styles[kTextStyleCount] = {
+        {26.0f, FontWeight::Bold},      // LargeTitle
+        {22.0f, FontWeight::Bold},      // Title1
+        {17.0f, FontWeight::Semibold},  // Title2
+        {15.0f, FontWeight::Semibold},  // Title3
+        {13.0f, FontWeight::Semibold},  // Headline
+        {13.0f, FontWeight::Regular},   // Body
+        {12.0f, FontWeight::Regular},   // Callout
+        {12.0f, FontWeight::Regular},   // Footnote
+        {11.0f, FontWeight::Regular},   // Caption
+    };
+
+    const TextStyleSpec& operator[](TextStyle style) const { return styles[static_cast<int>(style)]; }
+    TextStyleSpec& operator[](TextStyle style) { return styles[static_cast<int>(style)]; }
+};
+
+struct Motion
+{
+    SpringSpec quick = {0.25f, 1.0f};      // small state changes: toggles, hover
+    SpringSpec standard = {0.35f, 0.85f};  // the selection pill, panels
+    SpringSpec gentle = {0.5f, 1.0f};      // large surfaces
+
+    float durationFast = 0.12f;
+    float durationStandard = 0.20f;
+    float durationSlow = 0.35f;
+
+    float scale = 1.0f;         // multiplies every duration and spring response
+    bool reduceMotion = false;  // skip animations; values jump to their targets
+};
+
+// One soft shadow; lengths in design units.
+struct ShadowLevel
+{
+    ImVec2 offset = {0.0f, 0.0f};
+    float blur = 0.0f;
+    float spread = 0.0f;
+    float opacity = 0.0f;  // alpha applied to Colors::shadow
+};
+
+// Shadows of floating layers: 1 small (raised controls), 2 medium (popovers, menus),
+// 3 large (dialogs, the floating menu shell).
+struct Elevation
+{
+    ShadowLevel levels[3];
+
+    // The shadow of level 1 to 3; the level is clamped into that range.
+    const ShadowLevel& Level(int level) const
+    {
+        const int index = level < 1 ? 0 : (level > 3 ? 2 : level - 1);
+        return levels[index];
+    }
+};
+
+// Blurred translucent panels (backdrop blur).
+struct Glass
+{
+    float blurRadius = 20.0f;   // design units
+    float tintOpacity = 0.72f;  // alpha applied to Colors::glassTint
+    float saturation = 1.5f;    // 1 keeps the backdrop saturation
+};
+
+struct Theme
+{
+    bool dark = false;
+    Colors colors;
+    Spacing spacing;
+    Radii radii;
+    Metrics metrics;
+    Type type;
+    Motion motion;
+    Elevation elevation;
+    Glass glass;
+
+    static Theme Light();
+    static Theme Dark();
+
+    // Sets colors.accent and derives accentHover, accentPressed, accentSubtle, onAccent and
+    // focusRing from it in OKLCH. onAccent is white or black, whichever is more readable,
+    // and hover and pressed move the lightness away from it, so text on every accent state
+    // reaches at least 4.5:1. The accent alpha is ignored.
+    void ApplyAccent(const ImVec4& accent);
+};
+
+// The current theme. Valid at any time, also before Init; Theme::Light() until SetTheme.
+const Theme& T();
+
+// Makes `theme` current. With `animate`, a running app may cross-fade the colors over
+// motion.durationStandard; other tokens switch at once.
+void SetTheme(const Theme& theme, bool animate = true);
+
+// Applies a new accent to the current theme (see Theme::ApplyAccent). The next SetTheme
+// replaces it with the accent of the theme passed there.
+void SetAccent(const ImVec4& accent);
+void SetAccent(ImU32 accent);
+
+} // namespace facet

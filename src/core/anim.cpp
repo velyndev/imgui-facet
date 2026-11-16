@@ -4,6 +4,7 @@
 // is what reduced motion produces as well, so callers already behave correctly.
 
 #include "facet/core/anim.h"
+#include "facet/core/theme.h"
 
 #include <algorithm>
 #include <cmath>
@@ -68,7 +69,7 @@ ImVec4 SmoothColor(ImGuiID, int, const ImVec4& target, float)
 
 bool ReduceMotion()
 {
-    return false;
+    return T().motion.reduceMotion;
 }
 
 namespace internal
