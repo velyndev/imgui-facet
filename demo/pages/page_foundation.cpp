@@ -45,12 +45,16 @@ FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
 
     ImGui::SeparatorText("Widgets");
     ImGui::Checkbox("Enable option", &foundation.checked);
+    ctx.Probe("checkbox");
     if (ImGui::Button("Increment"))
         ++foundation.counter;
+    ctx.Probe("increment");
     ImGui::SameLine();
     ImGui::Text("Count: %d", foundation.counter);
     ImGui::SliderFloat("Value", &foundation.value, 0.0f, 1.0f);
+    ctx.Probe("slider");
     ImGui::InputText("Name", foundation.name, sizeof(foundation.name));
+    ctx.Probe("name");
 
     ImGui::SeparatorText("Embedded assets");
     const auto assets = facet::internal::EmbeddedAssets();
@@ -77,4 +81,31 @@ FACET_DEMO_PAGE("foundation", "Foundation", "Harness", 0, "default", "details")
         ImGui::Text("Pages registered: %zu", facet::demo::Pages().size());
         ImGui::TreePop();
     }
+}
+
+FACET_DEMO_SELFTEST("foundation")
+{
+    test.Do([] { foundation = FoundationState{}; });
+
+    test.Click("checkbox");
+    test.Expect("clicking the checkbox turns it on", [] { return foundation.checked; });
+    test.Click("checkbox");
+    test.Expect("clicking the checkbox again turns it off", [] { return !foundation.checked; });
+    test.ExpectFocused("checkbox");
+
+    // After mouse input the keyboard cursor is hidden. The first Tab only shows it on the
+    // item that already has focus; the next Tab moves on.
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("checkbox");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("increment");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused button increments the counter",
+                [] { return foundation.counter == 1; });
+
+    test.Click("increment");
+    test.Expect("clicking the button increments the counter", [] { return foundation.counter == 2; });
+
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("checkbox");
 }

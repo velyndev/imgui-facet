@@ -50,6 +50,12 @@ void SortPages(std::vector<PageInfo>& pages)
 
 } // namespace
 
+void PageCtx::Probe(std::string_view name) const
+{
+    if (probes != nullptr)
+        probes->RecordLastItem(name);
+}
+
 std::span<const PageInfo> Pages()
 {
     Registry& registry = GetRegistry();

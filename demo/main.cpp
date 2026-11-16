@@ -2,10 +2,11 @@
 //
 //   facet_demo                         interactive window
 //   facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N] [--warp]
+//   facet_demo --selftest [--page id] [--warp]
 //
 // The program is built for the console subsystem. Started from a terminal or a script,
 // it behaves like any command line tool: the shell waits for it, stdout and stderr can be
-// redirected and the exit code is reliable, which capture runs depend on.
+// redirected and the exit code is reliable, which capture and selftest runs depend on.
 // Started without arguments from Explorer, Windows opens a console for it; the program
 // releases that console right away, so only the demo window stays (the console may show
 // for a moment). A GUI subsystem program attaching to its parent console was not used
@@ -28,6 +29,7 @@
 #include "capture.h"
 #include "gallery.h"
 #include "pages/pages.h"
+#include "selftest.h"
 
 namespace
 {
@@ -38,6 +40,7 @@ enum class Mode
 {
     Interactive,
     Capture,
+    Selftest,
 };
 
 struct Options
@@ -65,6 +68,7 @@ void PrintUsage()
         "usage:\n"
         "  facet_demo\n"
         "  facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N] [--warp]\n"
+        "  facet_demo --selftest [--page id] [--warp]\n"
         "\n"
         "  --capture <dir>  render every page state offscreen and write PNG files and index.json\n"
         "  --size WxH       offscreen size in pixels (default 1280x800)\n"
@@ -72,6 +76,7 @@ void PrintUsage()
         "  --page id        only this page\n"
         "  --frames N       warm-up frames per page state before readback (default 60)\n"
         "  --warp           render with the WARP software rasterizer\n"
+        "  --selftest       run the scripted input tests of the pages\n"
         "  --list-pages     print the registered page ids and capture states\n");
 }
 
@@ -97,6 +102,7 @@ bool ParseSize(const std::wstring& text, int& width, int& height)
 bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
 {
     bool sawCapture = false;
+    bool sawSelftest = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::wstring arg = argv[i];
@@ -116,6 +122,10 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
                 return false;
             options.capture.directory = value;
             sawCapture = true;
+        }
+        else if (arg == L"--selftest")
+        {
+            sawSelftest = true;
         }
         else if (arg == L"--size")
         {
@@ -182,8 +192,15 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options, bool& listPages)
         }
     }
 
+    if (sawCapture && sawSelftest)
+    {
+        std::fprintf(stderr, "error: --capture and --selftest cannot be combined\n");
+        return false;
+    }
     if (sawCapture)
         options.mode = Mode::Capture;
+    else if (sawSelftest)
+        options.mode = Mode::Selftest;
     options.capture.page = options.page;
     return true;
 }
@@ -270,7 +287,17 @@ int RunOffscreen(const Options& options)
     std::printf("device: %s%s\n", shell.UsesWarp() ? "WARP" : "hardware",
                 shell.DebugLayerActive() ? ", D3D11 debug layer" : "");
 
-    const int result = RunCapture(shell, options.capture);
+    int result = 1;
+    if (options.mode == Mode::Capture)
+    {
+        result = RunCapture(shell, options.capture);
+    }
+    else
+    {
+        SelftestOptions selftest;
+        selftest.page = options.page;
+        result = RunSelftest(shell, selftest);
+    }
     shell.Destroy();
     return result;
 }

@@ -20,8 +20,7 @@
 #include <string_view>
 #include <vector>
 
-#define FACET_DEMO_CONCAT_INNER(a, b) a##b
-#define FACET_DEMO_CONCAT(a, b) FACET_DEMO_CONCAT_INNER(a, b)
+#include "selftest.h"
 
 namespace facet::demo
 {
@@ -32,6 +31,11 @@ struct PageCtx
     bool capture = false;     // true in --capture runs: the page should show captureState
     int captureState = 0;     // index into the page's state names; 0 outside capture runs
     float scale = 1.0f;       // UI scale: monitor DPI / 96 in the window, --scale offscreen
+    ProbeTable* probes = nullptr;  // set during --selftest runs
+
+    // Records the rect and id of the last submitted item under this name so that
+    // selftest steps can click it or check its focus. Does nothing outside selftest runs.
+    void Probe(std::string_view name) const;
 };
 
 using PageFn = void (*)(PageCtx& ctx);
