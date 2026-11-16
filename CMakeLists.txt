@@ -76,3 +76,8 @@ target_link_libraries(facet
         dwmapi)
 facet_apply_warnings(facet)
 source_group(TREE "${PROJECT_SOURCE_DIR}" FILES ${FACET_LIB_SOURCES} ${FACET_LIB_HEADERS})
+
+# --- Demo --------------------------------------------------------------------
+if(FACET_BUILD_DEMO)
+    add_subdirectory(demo)
+endif()
