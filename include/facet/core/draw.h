@@ -34,7 +34,11 @@ void StrokeRoundRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color
 
 // Rectangles with continuous corners: the curvature grows smoothly from the straight edge
 // into the corner instead of jumping to a circle, which reads softer on large surfaces.
-// The corner extends somewhat further along the edges than a circular arc of the same radius.
+// Each corner is a superellipse quadrant (exponent 3) whose curvature is zero where it meets
+// the edges. It extends about 1.42 times the radius along each edge, so that its middle
+// point lies exactly where a circular arc of the same radius would put it; when the
+// rectangle is too small for that, the extent shrinks to half the shorter side. The corner
+// points come from a unit table cached per segment count, chosen from the radius in pixels.
 void FillContinuousRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius,
                         ImDrawFlags corners = 0);
 void StrokeContinuousRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius,
@@ -50,10 +54,26 @@ float HairlineThickness();
 void HairlineH(ImDrawList* drawList, float x0, float x1, float y, ImU32 color);
 void HairlineV(ImDrawList* drawList, float x, float y0, float y1, ImU32 color);
 
-// Linear two-color gradient. Corners follow FillRect.
+// Linear two-color gradient. Corners follow FillRect. The colors are interpolated per
+// channel in sRGB with straight alpha, across the whole rectangle (the rounded corners cut
+// the gradient, they do not compress it).
 void FillGradientRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 from, ImU32 to,
                       GradientDir direction = GradientDir::Vertical, float radius = 0.0f,
                       ImDrawFlags corners = 0);
+
+// A two-color checkerboard of square cells `cell` pixels wide (rounded to whole pixels, at
+// least 1), starting with `colorA` at the top-left cell. Drawn behind translucent colors so
+// their alpha shows. Corners follow FillRect; cells at a rounded corner are clipped to it.
+void FillCheckerboard(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 colorA, ImU32 colorB, float cell,
+                      float radius = 0.0f, ImDrawFlags corners = 0);
+
+// A circular arc stroke from angle aMin to aMax in radians (0 points right, angles grow
+// clockwise on screen because y points down). With `roundCaps`, each end gets a half-disc
+// cap of the stroke width, drawn as part of one outline so translucent colors do not
+// double up. A sweep of a full turn or more draws a closed ring without caps. For progress
+// rings, gauges and knobs.
+void StrokeArc(ImDrawList* drawList, ImVec2 center, float radius, float aMin, float aMax, ImU32 color,
+               float thickness, bool roundCaps = true);
 
 // Transforms everything drawn into one draw list during its lifetime: when the scope ends,
 // the vertices added since construction are scaled by `scale` around `pivot`, moved by
@@ -65,7 +85,14 @@ void FillGradientRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 from
 //         ... draw the popover ...
 //     }
 //
-// Clip rectangles are not transformed. Groups nest: the inner group applies first.
+// When the group moves or scales (decided by the values passed to the constructor), it
+// starts a new draw command, and at the end the clip rectangles of the commands it added are
+// transformed the same way and intersected with the clip rectangle that was current at
+// construction. So content clipped inside the group (a scrolled list in a popover) stays
+// clipped to its moved frame, and nothing is drawn outside the frame around the group.
+// Commands added after the group keep their own clip rectangle. Only the draw list passed in
+// is affected: child windows have draw lists of their own. Groups nest: the inner group
+// applies first.
 struct DrawGroup
 {
     DrawGroup(ImDrawList* drawList, float alpha = 1.0f, float scale = 1.0f, ImVec2 pivot = ImVec2(0.0f, 0.0f),
@@ -80,6 +107,9 @@ struct DrawGroup
     float scale = 1.0f;
     ImVec2 pivot;
     ImVec2 translate;
+    int commandStart = -1;  // first command of the group when it transforms clip rects, else -1
+    int indexStart = 0;     // IdxBuffer.Size at construction
+    ImVec4 outerClip;       // clip rect current at construction
 };
 
 } // namespace facet
