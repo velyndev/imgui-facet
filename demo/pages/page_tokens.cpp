@@ -182,6 +182,7 @@ void DrawFills()
     const float width = facet::Px(theme.spacing.xxxl * 3.0f);
     const float height = facet::Px(theme.metrics.controlHeight);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const float right = facet::demo::ContentRight();
     char text[48];
     for (int i = 0; i < 4; ++i)
     {
@@ -197,7 +198,7 @@ void DrawFills()
                           text);
         facet::PopTextStyle();
         if (i < 3)
-            ImGui::SameLine();
+            facet::demo::SameLineIfFits(right, width);
     }
     ImGui::Dummy(ImVec2(0.0f, facet::Px(theme.spacing.md)));
 }
@@ -210,6 +211,7 @@ void DrawAccentPicker(facet::demo::PageCtx& ctx)
     const auto presets = facet::AccentPresets();
     const float size = facet::Px(theme.metrics.controlHeight);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const float right = facet::demo::ContentRight();
     char probe[32];
     for (int i = 0; i < static_cast<int>(presets.size()); ++i)
     {
@@ -234,7 +236,8 @@ void DrawAccentPicker(facet::demo::PageCtx& ctx)
             facet::StrokeArc(drawList, center, size * 0.5f - ring * 0.5f, 0.0f, kFullTurn, U32(c.label),
                              facet::HairlineThickness() * 2.0f, false);
         ImGui::PopID();
-        ImGui::SameLine();
+        const bool last = i + 1 == static_cast<int>(presets.size());
+        facet::demo::SameLineIfFits(right, last ? facet::demo::ButtonWidth("Reset accent") : size);
     }
     if (ImGui::Button("Reset accent"))
     {
@@ -281,8 +284,10 @@ void DrawRadii()
     } steps[] = {{"element", r.element}, {"control", r.control}, {"card", r.card}, {"popover", r.popover}, {"window", r.window}};
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float size = facet::Px(theme.spacing.xxxl * 2.0f);
-    for (const auto& step : steps)
+    const float right = facet::demo::ContentRight();
+    for (size_t i = 0; i < std::size(steps); ++i)
     {
+        const auto& step = steps[i];
         ImGui::BeginGroup();
         ImGui::Dummy(ImVec2(size, size));
         const ImVec2 a = ImGui::GetItemRectMin();
@@ -292,9 +297,9 @@ void DrawRadii()
                           facet::HairlineThickness());
         facet::Text(facet::TextStyle::Footnote, "%s %.0f", step.name, static_cast<double>(step.value));
         ImGui::EndGroup();
-        ImGui::SameLine(0.0f, facet::Px(theme.spacing.lg));
+        if (i + 1 < std::size(steps))
+            facet::demo::SameLineIfFits(right, size, facet::Px(theme.spacing.lg));
     }
-    ImGui::NewLine();
     Note("From %.0f up, corners use the continuous path (%s).", static_cast<double>(r.continuousFrom),
          r.continuousCorners ? "on" : "off");
 }
@@ -310,8 +315,10 @@ void DrawControlHeights()
     } steps[] = {{"small", m.controlHeightSmall}, {"regular", m.controlHeight}, {"large", m.controlHeightLarge}};
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float width = facet::Px(theme.spacing.xxxl * 3.0f);
-    for (const auto& step : steps)
+    const float right = facet::demo::ContentRight();
+    for (size_t i = 0; i < std::size(steps); ++i)
     {
+        const auto& step = steps[i];
         ImGui::BeginGroup();
         ImGui::Dummy(ImVec2(width, facet::Px(step.value)));
         const ImVec2 a = ImGui::GetItemRectMin();
@@ -319,9 +326,9 @@ void DrawControlHeights()
         facet::FillRect(drawList, a, b, U32(theme.colors.fill[1]), facet::Px(theme.radii.control));
         facet::Text(facet::TextStyle::Footnote, "%s %.0f", step.name, static_cast<double>(step.value));
         ImGui::EndGroup();
-        ImGui::SameLine(0.0f, facet::Px(theme.spacing.lg));
+        if (i + 1 < std::size(steps))
+            facet::demo::SameLineIfFits(right, width, facet::Px(theme.spacing.lg));
     }
-    ImGui::NewLine();
 }
 
 void DrawElevationLevels()
@@ -330,6 +337,7 @@ void DrawElevationLevels()
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float width = facet::Px(theme.spacing.xxxl * 4.0f);
     const float height = facet::Px(theme.spacing.xxxl * 2.0f);
+    const float right = facet::demo::ContentRight();
     for (int level = 1; level <= 3; ++level)
     {
         const facet::ShadowLevel& shadow = theme.elevation.Level(level);
@@ -344,9 +352,9 @@ void DrawElevationLevels()
         Note("level %d: offset %.0f, blur %.0f, opacity %.2f", level, static_cast<double>(shadow.offset.y),
              static_cast<double>(shadow.blur), static_cast<double>(shadow.opacity));
         ImGui::EndGroup();
-        ImGui::SameLine(0.0f, facet::Px(theme.spacing.xxl));
+        if (level < 3)
+            facet::demo::SameLineIfFits(right, width, facet::Px(theme.spacing.xxl));
     }
-    ImGui::NewLine();
 }
 
 } // namespace

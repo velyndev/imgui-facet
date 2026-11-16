@@ -69,22 +69,15 @@ void DrawCorners(facet::demo::PageCtx& ctx)
         {"element", theme.radii.element}, {"control", theme.radii.control}, {"card", theme.radii.card},
         {"window", theme.radii.window},   {"window x 2", theme.radii.window * 2.0f},
     };
-    const float size = facet::Px(theme.spacing.xxxl * 2.5f);
+    // Four tiles per row; they shrink in narrow windows so the comparison stays side by side.
     const float gap = facet::Px(theme.spacing.lg);
+    const float size = std::min(facet::Px(theme.spacing.xxxl * 2.5f), (ImGui::GetContentRegionAvail().x - gap * 3.0f) / 4.0f);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const char* columns[] = {"Circular arc", "Continuous", "Both, arc outlined", "FillRect"};
-    for (const char* column : columns)
-    {
-        ImGui::BeginGroup();
-        Note("%s", column);
-        ImGui::Dummy(ImVec2(size, 0.0f));
-        ImGui::EndGroup();
-        ImGui::SameLine(0.0f, gap);
-    }
-    ImGui::NewLine();
+    Note("Columns: circular arc, continuous, both with the arc outlined, FillRect (follows the switch).");
     for (const auto& sample : samples)
     {
         const float radius = facet::Px(sample.radius);
+        Note("%s %.0f", sample.name, static_cast<double>(sample.radius));
         for (int column = 0; column < 4; ++column)
         {
             ImGui::Dummy(ImVec2(size, size));
@@ -106,9 +99,9 @@ void DrawCorners(facet::demo::PageCtx& ctx)
                 facet::FillRect(drawList, a, b, U32(c.fill[0]), radius);
                 break;
             }
-            ImGui::SameLine(0.0f, gap);
+            if (column < 3)
+                ImGui::SameLine(0.0f, gap);
         }
-        Note("%s %.0f", sample.name, static_cast<double>(sample.radius));
     }
     Paragraph("The continuous corner starts curving further along the edge and bends more gently, so its "
               "outline leaves the circular arc's outline near the edges.");
@@ -119,8 +112,9 @@ void DrawHairlines()
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const float width = facet::Px(theme.spacing.xxxl * 5.0f);
+    const float width = std::min(facet::Px(theme.spacing.xxxl * 5.0f), ImGui::GetContentRegionAvail().x);
     const float rowGap = facet::Px(theme.spacing.md);
+    const float right = facet::demo::ContentRight();
     const float height = rowGap * static_cast<float>(std::size(kHairlineOffsets) + 1);
     const char* titles[] = {"Unsnapped: Px(1) wide at the exact position", "Snapped: HairlineH"};
     for (int column = 0; column < 2; ++column)
@@ -141,9 +135,9 @@ void DrawHairlines()
                 facet::HairlineH(drawList, x0, x1, y, U32(c.label));
         }
         ImGui::EndGroup();
-        ImGui::SameLine(0.0f, facet::Px(theme.spacing.xl));
+        if (column == 0)
+            facet::demo::SameLineIfFits(right, width, facet::Px(theme.spacing.xl));
     }
-    ImGui::NewLine();
     Note("Rows sit 0, 0.25, 0.5 and 0.75 px off the pixel grid. Scale now %.2f: change it in the title strip.",
          static_cast<double>(facet::Scale()));
 }
@@ -153,7 +147,9 @@ void DrawGradients()
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const ImVec2 size = facet::Px(ImVec2(theme.spacing.xxxl * 5.0f, theme.spacing.xxxl * 2.0f));
+    const ImVec2 size(std::min(facet::Px(theme.spacing.xxxl * 5.0f), ImGui::GetContentRegionAvail().x),
+                      facet::Px(theme.spacing.xxxl * 2.0f));
+    const float right = facet::demo::ContentRight();
     const float radius = facet::Px(theme.radii.card);
     const float cell = facet::Px(theme.spacing.sm);
     const ImU32 checkA = U32(c.bg);
@@ -166,7 +162,7 @@ void DrawGradients()
     facet::FillGradientRect(drawList, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), U32(c.accent),
                             U32(facet::WithAlpha(c.accent, 0.0f)), facet::GradientDir::Horizontal, radius);
     ImGui::EndGroup();
-    ImGui::SameLine(0.0f, facet::Px(theme.spacing.xl));
+    facet::demo::SameLineIfFits(right, size.x, facet::Px(theme.spacing.xl));
     ImGui::BeginGroup();
     Note("Vertical: bgTertiary to bgSecondary");
     ImGui::Dummy(size);
@@ -178,17 +174,18 @@ void DrawGradients()
 
     Note("Alpha preview: the accent at 100, 75, 50 and 25 %%");
     const float chip = facet::Px(theme.metrics.controlHeightLarge);
-    for (const float alpha : kAlphaSteps)
+    for (size_t i = 0; i < std::size(kAlphaSteps); ++i)
     {
+        const float alpha = kAlphaSteps[i];
         ImGui::Dummy(ImVec2(chip, chip));
         const ImVec2 a = ImGui::GetItemRectMin();
         const ImVec2 b = ImGui::GetItemRectMax();
         const float r = facet::Px(theme.radii.element);
         facet::FillCheckerboard(drawList, a, b, checkA, checkB, facet::Px(theme.spacing.xs * 1.5f), r);
         facet::FillRect(drawList, a, b, U32(facet::WithAlpha(c.accent, alpha)), r);
-        ImGui::SameLine();
+        if (i + 1 < std::size(kAlphaSteps))
+            facet::demo::SameLineIfFits(right, chip);
     }
-    ImGui::NewLine();
 }
 
 void DrawArcsAndLoading()
@@ -198,6 +195,7 @@ void DrawArcsAndLoading()
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float size = facet::Px(theme.spacing.xxxl * 1.5f);
     const float thickness = facet::Px(theme.metrics.sliderTrackHeight);
+    const float right = facet::demo::ContentRight();
     char label[16];
     for (const float level : kRingLevels)
     {
@@ -213,7 +211,7 @@ void DrawArcsAndLoading()
         std::snprintf(label, sizeof(label), "%.0f%%", static_cast<double>(level * 100.0f));
         Note("%s", label);
         ImGui::EndGroup();
-        ImGui::SameLine(0.0f, facet::Px(theme.spacing.lg));
+        facet::demo::SameLineIfFits(right, size, facet::Px(theme.spacing.lg));
     }
     ImGui::BeginGroup();
     ImGui::Dummy(ImVec2(size, size));
@@ -222,7 +220,8 @@ void DrawArcsAndLoading()
     facet::internal::DrawSpinner(drawList, spinnerCenter, size * 0.5f - thickness, U32(c.accent), thickness);
     Note("Spinner");
     ImGui::EndGroup();
-    ImGui::SameLine(0.0f, facet::Px(theme.spacing.xl));
+    const float skeletonWidth = std::min(facet::Px(theme.spacing.xxxl * 6.0f), right - ImGui::GetCursorScreenPos().x);
+    facet::demo::SameLineIfFits(right, skeletonWidth, facet::Px(theme.spacing.xl));
 
     // Skeleton lines of a loading list row (placeholder content).
     ImGui::BeginGroup();
@@ -230,7 +229,7 @@ void DrawArcsAndLoading()
     const float widths[] = {theme.spacing.xxxl * 6.0f, theme.spacing.xxxl * 4.5f, theme.spacing.xxxl * 5.0f};
     for (const float width : widths)
     {
-        ImGui::Dummy(ImVec2(facet::Px(width), lineHeight));
+        ImGui::Dummy(ImVec2(std::min(facet::Px(width), skeletonWidth), lineHeight));
         facet::internal::DrawSkeleton(drawList, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
                                       facet::Px(theme.radii.element));
     }
@@ -242,7 +241,9 @@ void DrawGroupDemo(facet::demo::PageCtx& ctx)
 {
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
-    const float sliderWidth = facet::Px(theme.spacing.xxxl * 5.0f);
+    // Room for the label after each slider.
+    const float sliderWidth = std::min(facet::Px(theme.spacing.xxxl * 5.0f),
+                                       ImGui::GetContentRegionAvail().x - facet::Px(theme.spacing.xxxl * 2.0f));
 
     ImGui::SetNextItemWidth(sliderWidth);
     ImGui::SliderFloat("##alpha", &draw.alpha, 0.0f, 1.0f, "%.2f");
@@ -272,7 +273,9 @@ void DrawGroupDemo(facet::demo::PageCtx& ctx)
                                facet::Ease::OutCubic);
 
     // The card: a surface, a title, and a list clipped to an inner frame.
-    const ImVec2 cardSize = facet::Px(ImVec2(theme.spacing.xxxl * 8.0f, theme.spacing.xxxl * 4.0f));
+    const float margin = facet::Px(theme.spacing.xxxl);
+    const ImVec2 cardSize(std::min(facet::Px(theme.spacing.xxxl * 8.0f), ImGui::GetContentRegionAvail().x - margin * 2.0f),
+                          facet::Px(theme.spacing.xxxl * 4.0f));
     ImGui::Dummy(ImVec2(cardSize.x + facet::Px(theme.spacing.xxxl) * 2.0f, cardSize.y + facet::Px(theme.spacing.lg)));
     const ImVec2 area = ImGui::GetItemRectMin();
     const ImVec2 a(area.x + facet::Px(theme.spacing.xxxl), area.y + facet::Px(theme.spacing.sm));

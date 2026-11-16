@@ -1,5 +1,6 @@
 #include "gallery.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -11,6 +12,7 @@
 #include <facet/facet.h>
 
 #include "app_shell.h"
+#include "internal/text_util.h"
 
 namespace facet::demo
 {
@@ -31,6 +33,9 @@ constexpr const char* kScaleLabel = "UI scale";
 
 // Widths in multiples of spacing tokens, so they follow the theme and the scale.
 constexpr float kNavWidthInXxxl = 7.0f;     // navigation column
+constexpr float kNavMinWidthInXxxl = 4.0f;  // navigation column in narrow windows
+// Largest share of the window the navigation takes, so narrow windows keep room for the page.
+constexpr float kNavMaxShare = 0.3f;
 constexpr float kComboWidthInXxxl = 3.0f;   // theme and scale lists
 
 // Sub keys of the animated values of the navigation.
@@ -250,7 +255,9 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     const std::span<const PageInfo> pages = Pages();
-    const float width = facet::Px(theme.spacing.xxxl * kNavWidthInXxxl);
+    const float width = std::min(facet::Px(theme.spacing.xxxl * kNavWidthInXxxl),
+                                 std::max(facet::Px(theme.spacing.xxxl * kNavMinWidthInXxxl),
+                                          ImGui::GetContentRegionAvail().x * kNavMaxShare));
     const ImVec2 padding = facet::Px(ImVec2(theme.spacing.sm, theme.spacing.md));
     const float rowHeight = facet::Px(theme.metrics.controlHeight);
     const float rowInset = facet::Px(theme.spacing.md);
@@ -317,9 +324,14 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         if (selected)
             selectedY = itemMin.y - windowTop + ImGui::GetScrollY();
 
+        // Titles that do not fit the row end in an ellipsis.
         facet::PushTextStyle(facet::TextStyle::Body);
         const float textY = rowMin.y + (rowHeight - ImGui::GetFontSize()) * 0.5f;
-        drawList->AddText(ImVec2(rowMin.x + rowInset, textY), Color(c.label), page.title.c_str());
+        char title[128];
+        facet::internal::TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr,
+                                      itemMax.x - rowMin.x - rowInset * 2.0f, facet::internal::TruncateMode::End,
+                                      title, sizeof(title));
+        drawList->AddText(ImVec2(rowMin.x + rowInset, textY), Color(c.label), title);
         facet::PopTextStyle();
         ImGui::PopID();
     }
@@ -456,12 +468,39 @@ void Paragraph(const char* text)
     facet::PopTextStyle();
 }
 
+float ContentRight()
+{
+    return ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+}
+
+bool SameLineIfFits(float right, float nextWidth, float spacing)
+{
+    if (spacing < 0.0f)
+        spacing = ImGui::GetStyle().ItemSpacing.x;
+    if (ImGui::GetItemRectMax().x + spacing + nextWidth > right)
+        return false;
+    ImGui::SameLine(0.0f, spacing);
+    return true;
+}
+
+float ButtonWidth(const char* label)
+{
+    return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+float CheckboxWidth(const char* label)
+{
+    return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(label, nullptr, true).x;
+}
+
 void Note(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     ImGui::PushStyleColor(ImGuiCol_Text, facet::T().colors.labelSecondary);
-    facet::TextV(facet::TextStyle::Footnote, fmt, args);
+    facet::PushTextStyle(facet::TextStyle::Footnote);
+    ImGui::TextWrappedV(fmt, args);
+    facet::PopTextStyle();
     ImGui::PopStyleColor();
     va_end(args);
 }

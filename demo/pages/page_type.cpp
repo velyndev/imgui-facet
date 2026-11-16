@@ -1,6 +1,7 @@
 // Type page: every text style in every weight, plus the text helpers: truncation at the end
 // and in the middle, wrapping, and match highlighting.
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <iterator>
@@ -150,10 +151,11 @@ void DrawHighlight(facet::demo::PageCtx& ctx)
 {
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
-    ImGui::SetNextItemWidth(facet::Px(theme.spacing.xxxl * 6.0f));
+    const float right = facet::demo::ContentRight();
+    ImGui::SetNextItemWidth(std::min(facet::Px(theme.spacing.xxxl * 6.0f), ImGui::GetContentRegionAvail().x));
     ImGui::InputTextWithHint("##query", "Filter style names", type.query, sizeof(type.query));
     ctx.Probe("type.query");
-    ImGui::SameLine();
+    facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear"));
     if (ImGui::Button("Clear"))
         type.query[0] = '\0';
     facet::ItemCursor();
@@ -210,7 +212,7 @@ FACET_DEMO_PAGE("type", "Type", "Foundations", 1, "default", "narrow")
 
     SectionHeader("Truncation");
     Note("Column width");
-    ImGui::SetNextItemWidth(facet::Px(facet::T().spacing.xxxl * 6.0f));
+    ImGui::SetNextItemWidth(std::min(facet::Px(facet::T().spacing.xxxl * 6.0f), ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##width", &type.widthFraction, kMinWidthFraction, kMaxWidthFraction, "%.2f");
     facet::ItemCursor();
     ctx.Probe("type.width");

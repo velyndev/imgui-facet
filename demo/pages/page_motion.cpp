@@ -91,13 +91,15 @@ void SampleCurve(int kind, int rate, ImVec2* out, int count)
 
 void DrawControls(facet::demo::PageCtx& ctx)
 {
+    const float right = facet::demo::ContentRight();
+    const float gap = facet::Px(facet::T().spacing.xl);
     // A fixed id: the label changes, the item (and its keyboard focus) stays.
     if (ImGui::Button(motion.forward ? "Replay backward###replay" : "Replay forward###replay"))
         motion.forward = !motion.forward;
     facet::ItemCursor();
     ctx.Probe("motion.replay");
 
-    ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.xl));
+    facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth("Reduce motion"), gap);
     bool reduce = facet::T().motion.reduceMotion;
     if (ImGui::Checkbox("Reduce motion", &reduce))
     {
@@ -108,7 +110,7 @@ void DrawControls(facet::demo::PageCtx& ctx)
     facet::ItemCursor();
     ctx.Probe("motion.reduce");
 
-    ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.xl));
+    facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth("Slow down 4x"), gap);
     bool slow = facet::T().motion.scale > 1.0f;
     if (ImGui::Checkbox("Slow down 4x", &slow))
     {
@@ -194,12 +196,13 @@ void DrawCurves()
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImGuiStyle& style = ImGui::GetStyle();
     const float gap = style.ItemSpacing.x * 2.0f;
-    const float width = std::max(facet::Px(theme.spacing.xxxl * 3.0f),
-                                 (ImGui::GetContentRegionAvail().x - gap * (kKinds - 1)) / kKinds);
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const float width = std::min(avail, std::max(facet::Px(theme.spacing.xxxl * 3.0f), (avail - gap * (kKinds - 1)) / kKinds));
     const float height = facet::Px(theme.spacing.xxxl * 3.0f);
     const float inset = facet::Px(theme.spacing.md);
     const float dot = facet::Px(theme.spacing.xs) * 0.5f;
     UpdateCurves();
+    const float right = facet::demo::ContentRight();
     for (int kind = 0; kind < kKinds; ++kind)
     {
         const ImVec2* fine = curves.fine[kind];
@@ -231,7 +234,7 @@ void DrawCurves()
         Note("%.1f s; line 240 fps, dots 30 fps", static_cast<double>(kCurveSeconds));
         ImGui::EndGroup();
         if (kind + 1 < kKinds)
-            ImGui::SameLine(0.0f, gap);
+            facet::demo::SameLineIfFits(right, width, gap);
     }
 }
 

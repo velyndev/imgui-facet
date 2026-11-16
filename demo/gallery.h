@@ -55,7 +55,17 @@ void PageHeader(const char* title, const char* summary);
 void SectionHeader(const char* title);
 // Wrapped body text in labelSecondary.
 void Paragraph(const char* text);
-// One line of footnote text in labelSecondary, printf formatted.
+// Footnote text in labelSecondary, printf formatted, wrapped at the content width.
 void Note(const char* fmt, ...) IM_FMTARGS(1);
+
+// Row wrapping for narrow windows and large scales. ContentRight() is the right edge of the
+// content area at the cursor; take it at the start of a row. SameLineIfFits continues the
+// row after the last item when an item `nextWidth` wide still ends before `right`, and
+// otherwise lets the next item start a new row. Returns whether the row continues.
+float ContentRight();
+bool SameLineIfFits(float right, float nextWidth, float spacing = -1.0f);
+// Widths of stock controls for SameLineIfFits.
+float ButtonWidth(const char* label);
+float CheckboxWidth(const char* label);
 
 } // namespace facet::demo
