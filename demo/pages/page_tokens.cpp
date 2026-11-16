@@ -402,7 +402,23 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent")
 
 FACET_DEMO_SELFTEST("tokens")
 {
+    static bool startDark = false;
     test.Do([] { tokens = TokensState{}; });
+
+    // An animated theme switch blends over several frames and ends exactly on the new theme.
+    test.Do([] {
+        startDark = facet::T().dark;
+        facet::SetTheme(startDark ? facet::Theme::Light() : facet::Theme::Dark(), true);
+    });
+    test.Expect("an animated SetTheme is still blending one frame later",
+                [] { return facet::ThemeTransitionActive(); });
+    test.Wait(20);
+    test.Expect("after the standard duration the new theme is shown exactly", [] {
+        const facet::Theme target = startDark ? facet::Theme::Light() : facet::Theme::Dark();
+        return !facet::ThemeTransitionActive() && facet::T().dark != startDark &&
+               facet::ToU32(facet::T().colors.bg) == facet::ToU32(target.colors.bg);
+    });
+    test.Do([] { facet::SetTheme(startDark ? facet::Theme::Dark() : facet::Theme::Light(), false); });
 
     // Accent presets: by mouse, then the next one by keyboard.
     test.Click("tokens.accent.1");
