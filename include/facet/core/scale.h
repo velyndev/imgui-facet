@@ -10,7 +10,10 @@
 //               read from ImGui's DisplaySize in facet::NewFrame: menus that grow and shrink
 //               with the host's render resolution
 // All values are valid before Init. A change of Scale() notifies the library modules
-// (shadow and icon atlases are rasterized per scale).
+// (shadow and icon atlases are rasterized per scale) and, while a Dear ImGui context exists,
+// is written into its style: FontScaleDpi = Scale() / UiScale() and FontScaleMain = UiScale(),
+// so text pushed at a design size (facet::PushTextStyle) grows with the same factor as every
+// Px() length.
 
 #include <imgui.h>
 

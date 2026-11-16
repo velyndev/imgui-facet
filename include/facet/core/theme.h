@@ -297,4 +297,17 @@ std::span<const AccentPreset> AccentPresets();
 // bgTertiary. Translucent fills alone stay far below that.
 ImVec4 ControlBoundaryColor(const Colors& colors);
 
+// Writes the current theme and scale into a Dear ImGui style (the current context's style
+// when null): every color, and every size, padding, rounding and border from the tokens,
+// multiplied by Scale(); the font scale factors as in scale.h; the base font size from the
+// Body text style. Settings without a token (anti-aliasing, tessellation, global alpha,
+// hover delays) keep their values. Stock Dear ImGui widgets then follow the Facet theme.
+void ApplyImGuiStyle(ImGuiStyle* style = nullptr);
+
+// When on, facet::NewFrame calls ApplyImGuiStyle() whenever the theme or the scale changed
+// since the last call, including every step of a theme transition. Off by default, so a
+// host with its own Dear ImGui style keeps it.
+void SyncImGuiStyle(bool enabled);
+bool ImGuiStyleSynced();
+
 } // namespace facet

@@ -3,7 +3,9 @@
 #include "facet/core/scale.h"
 
 #include <algorithm>
+#include <cmath>
 
+#include "core/core_internal.h"
 #include "internal/subsystem.h"
 
 namespace facet
@@ -22,6 +24,7 @@ struct ScaleState
     float fit = 1.0f;
     ScaleMode mode = ScaleMode::FollowDpi;
     float effective = 1.0f;
+    std::uint64_t revision = 1;
 };
 
 ScaleState& State()
@@ -52,19 +55,28 @@ void Update()
     if (effective == state.effective)
         return;
     state.effective = effective;
+    ++state.revision;
+    internal::ApplyFontScale();
     internal::NotifyScaleChanged(effective);
 }
 
 void NewFrame()
 {
     ScaleState& state = State();
-    if (state.mode != ScaleMode::FitDisplay || ImGui::GetCurrentContext() == nullptr)
-        return;
-    const ImVec2 display = ImGui::GetIO().DisplaySize;
-    if (display.x <= 0.0f || display.y <= 0.0f)
-        return;
-    state.fit = std::max(0.25f, std::min(display.x / kFitReferenceWidth, display.y / kFitReferenceHeight));
-    Update();
+    if (state.mode == ScaleMode::FitDisplay && ImGui::GetCurrentContext() != nullptr)
+    {
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+        if (display.x > 0.0f && display.y > 0.0f)
+        {
+            state.fit = std::max(0.25f, std::min(display.x / kFitReferenceWidth, display.y / kFitReferenceHeight));
+            Update();
+        }
+    }
+    // The host may have reset its style; keep the font scale in step with Scale().
+    internal::ApplyFontScale();
+    // Runs after the theme hook, so a theme transition step and a scale change of this frame
+    // both reach the Dear ImGui style before the first window.
+    internal::SyncImGuiStyleIfNeeded();
 }
 
 } // namespace
@@ -120,6 +132,21 @@ ScaleMode GetScaleMode()
 
 namespace internal
 {
+
+std::uint64_t ScaleRevision()
+{
+    return State().revision;
+}
+
+void ApplyFontScale()
+{
+    if (ImGui::GetCurrentContext() == nullptr)
+        return;
+    const ScaleState& state = State();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.FontScaleMain = state.ui;
+    style.FontScaleDpi = state.effective / state.ui;
+}
 
 Subsystem ScaleSubsystem()
 {

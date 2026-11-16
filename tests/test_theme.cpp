@@ -157,3 +157,43 @@ TEST_CASE("SetThemeMode selects the presets and keeps a custom accent")
     facet::SetTheme(facet::Theme::Light(), false);
     CHECK(facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Light().colors.accent));
 }
+
+TEST_CASE("ApplyImGuiStyle maps tokens and scale onto a Dear ImGui style")
+{
+    ThemeGuard guard;
+    const float savedUi = facet::UiScale();
+    const float savedDpi = facet::DpiScale();
+    const facet::ScaleMode savedMode = facet::GetScaleMode();
+    facet::SetScaleMode(facet::ScaleMode::FollowDpi);
+    facet::SetDpiScale(1.5f);
+    facet::SetUiScale(2.0f);
+    facet::SetTheme(facet::Theme::Dark(), false);
+
+    ImGuiStyle style;
+    style.Alpha = 0.75f;
+    facet::ApplyImGuiStyle(&style);
+    const facet::Theme& theme = facet::T();
+    CHECK(style.Colors[ImGuiCol_WindowBg].x == theme.colors.bg.x);
+    CHECK(style.Colors[ImGuiCol_Text].x == theme.colors.label.x);
+    CHECK(style.Colors[ImGuiCol_TextLink].z == theme.colors.accentText.z);
+    CHECK(style.FrameRounding == doctest::Approx(theme.radii.control * 3.0f));
+    CHECK(style.ItemSpacing.x == doctest::Approx(theme.spacing.sm * 3.0f));
+    CHECK(style.FrameBorderSize == doctest::Approx(facet::HairlineThickness()));
+    CHECK(style.FontSizeBase == theme.type[facet::TextStyle::Body].size);
+    CHECK(style.FontScaleMain * style.FontScaleDpi == doctest::Approx(facet::Scale()));
+    CHECK(style.FontScaleDpi == doctest::Approx(1.5f));
+    // Settings without a token are kept.
+    CHECK(style.Alpha == 0.75f);
+    // The frame height of a stock control is the control height token.
+    const float frameHeight = theme.type[facet::TextStyle::Body].size * 3.0f + style.FramePadding.y * 2.0f;
+    CHECK(frameHeight == doctest::Approx(theme.metrics.controlHeight * 3.0f).epsilon(0.05));
+
+    // Applying twice gives the same sizes (no compounding).
+    const float rounding = style.FrameRounding;
+    facet::ApplyImGuiStyle(&style);
+    CHECK(style.FrameRounding == rounding);
+
+    facet::SetScaleMode(savedMode);
+    facet::SetDpiScale(savedDpi);
+    facet::SetUiScale(savedUi);
+}
