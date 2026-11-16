@@ -554,7 +554,9 @@ LRESULT AppShell::WndProc(UINT msg, WPARAM wParam, LPARAM lParam)
 
     case WM_SYSCOMMAND:
         // Alt alone would open the hidden window menu and freeze input until the next key.
-        if ((wParam & 0xFFF0) == SC_KEYMENU)
+        // Alt+Space still opens the system menu, so the window can be moved and sized from
+        // the keyboard.
+        if ((wParam & 0xFFF0) == SC_KEYMENU && lParam != VK_SPACE)
             return 0;
         break;
 
