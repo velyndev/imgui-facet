@@ -1,5 +1,6 @@
 #include "app_shell.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <iterator>
 #include <string_view>
@@ -86,15 +87,24 @@ bool AppShell::Create(const ShellDesc& desc)
         return true;
 
     // Size the window for the DPI of the monitor it landed on and center it in the work area.
+    // The size is clamped to the work area so the title strip (the only drag region and the
+    // home of the window buttons) is always on screen. When the requested size does not fit,
+    // the window starts maximized; restoring it gives the clamped size.
     dpi = GetDpiForWindow(hwnd);
-    const int width = ScaleForDpi(desc.width, dpi);
-    const int height = ScaleForDpi(desc.height, dpi);
     MONITORINFO monitor = {};
     monitor.cbSize = sizeof(monitor);
     GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitor);
-    const RECT& work = monitor.rcWork;
-    const int x = work.left + ((work.right - work.left) - width) / 2;
-    const int y = work.top + ((work.bottom - work.top) - height) / 2;
+    const int workLeft = static_cast<int>(monitor.rcWork.left);
+    const int workTop = static_cast<int>(monitor.rcWork.top);
+    const int workWidth = static_cast<int>(monitor.rcWork.right) - workLeft;
+    const int workHeight = static_cast<int>(monitor.rcWork.bottom) - workTop;
+    const int requestedWidth = ScaleForDpi(desc.width, dpi);
+    const int requestedHeight = ScaleForDpi(desc.height, dpi);
+    const int width = std::min(requestedWidth, workWidth);
+    const int height = std::min(requestedHeight, workHeight);
+    const bool startMaximized = width < requestedWidth || height < requestedHeight;
+    const int x = std::max(workLeft, workLeft + (workWidth - width) / 2);
+    const int y = std::max(workTop, workTop + (workHeight - height) / 2);
     // SWP_FRAMECHANGED makes Windows send WM_NCCALCSIZE, which removes the system frame.
     SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
@@ -105,7 +115,7 @@ bool AppShell::Create(const ShellDesc& desc)
     if (!CreateSwapChain())
         return false;
 
-    ShowWindow(hwnd, SW_SHOWNORMAL);
+    ShowWindow(hwnd, startMaximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
     UpdateWindow(hwnd);
     return true;
 }

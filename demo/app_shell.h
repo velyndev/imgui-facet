@@ -14,7 +14,8 @@ namespace facet::demo
 struct ShellDesc
 {
     const wchar_t* title = L"Facet demo";
-    int width = 1280;     // client size in 96 DPI units; scaled to the monitor DPI
+    int width = 1280;     // client size in 96 DPI units; scaled to the monitor DPI and
+                          // clamped to its work area
     int height = 800;
     bool hidden = false;  // offscreen runs: the window is never shown and has no swap chain
     bool warp = false;    // use the WARP software rasterizer instead of the GPU
