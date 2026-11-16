@@ -19,10 +19,12 @@ namespace
 // Layout in multiples of token values, so the page scales with the theme.
 constexpr float kCardHeightControls = 3.0f;       // card height in controlHeightLarge units
 constexpr float kBackdropHeightControls = 8.0f;   // glass backdrop height in controlHeightLarge
-constexpr float kStackedHeightControls = 13.0f;   // the same when the panels are stacked
+constexpr float kStackedHeightControls = 7.0f;    // the same when the panels are stacked; kept
+                                                  // low so the whole section fits a short view
 constexpr float kMinPanelWidthControls = 6.0f;    // narrower panels stack instead
 constexpr float kPanelTopFraction = 0.3f;         // backdrop shown above the panels, so shapes
                                                   // and text cross the glass edge
+constexpr float kStackedPanelTopFraction = 0.2f;  // the same for stacked panels
 constexpr float kSliderWidthEm = 16.0f;           // slider width in multiples of the font size
 constexpr float kGlowSampleWidthControls = 4.0f;  // glow samples: width in controlHeightLarge
 constexpr int kBackdropShapes = 16;
@@ -216,7 +218,7 @@ void DrawGlassSection()
     DrawBackdrop(drawList, min, max);
 
     const float radius = facet::Px(theme.radii.popover);
-    const float top = min.y + height * kPanelTopFraction;
+    const float top = min.y + height * (stacked ? kStackedPanelTopFraction : kPanelTopFraction);
     ImVec2 glassMin;
     ImVec2 glassMax;
     ImVec2 fallbackMin;
@@ -314,8 +316,10 @@ FACET_DEMO_PAGE("effects", "Effects", "Core", 20, "shadows", "glass", "glow")
 
     ImGui::SeparatorText("Glass");
     DrawGlassSection();
+    // The bottom of the glass section at the bottom of the view, so on short targets the
+    // whole backdrop with both panels is in the image.
     if (ctx.captureState == 1)
-        ctx.RevealInCapture(0.6f);
+        ctx.RevealInCapture(1.0f);
 
     ImGui::SeparatorText("Glow");
     DrawGlowSection();
