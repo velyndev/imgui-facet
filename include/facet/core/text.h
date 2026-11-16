@@ -56,9 +56,12 @@ struct FontSet
     FontSource displayBold;
 };
 
-// Replaces the system fonts. Call before Init; a call after Init reloads the fonts at the
-// next NewFrame. Passing an empty FontSet returns to the system fonts. File paths are
-// copied; memory data is not. A set whose regular, semibold or bold face cannot be loaded
+// Replaces the system fonts. A call before Init takes effect at Init. After Init, a call
+// between frames reloads the fonts at once and a call inside a frame in the next NewFrame.
+// With a renderer backend that does not update textures itself, the font atlas is locked for
+// the whole frame, so call it between frames there: until the atlas is unlocked the old
+// fonts stay and the reload waits. Passing an empty FontSet returns to the system fonts.
+// File paths are copied; memory data is not. A set whose regular, semibold or bold face cannot be loaded
 // is not used: the system fonts load instead, with a warning.
 void SetFontSet(const FontSet& fonts);
 

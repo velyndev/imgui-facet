@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include <imgui_internal.h>
+
 #include "core/core_internal.h"
 #include "internal/subsystem.h"
 
@@ -141,17 +143,37 @@ ImFont* AddSource(ImFontAtlas* atlas, const FontSource& source, const char* name
     return data != nullptr ? AddFont(atlas, data->data(), data->size(), source.faceIndex, name) : nullptr;
 }
 
-void RemoveFonts(ImFontAtlas* atlas)
+// Removes Facet's fonts from the atlas and frees the file buffers they read from. A locked
+// atlas cannot remove fonts; then nothing changes and false is returned, because freeing the
+// buffers would leave the fonts pointing into released memory.
+bool RemoveFonts(ImFontAtlas* atlas)
 {
     FontState& state = State();
+    if (atlas != nullptr && atlas->Locked)
+    {
+        for (ImFont* font : state.fonts)
+        {
+            if (font != nullptr && atlas->Fonts.contains(font))
+                return false;
+        }
+    }
     for (ImFont*& font : state.fonts)
     {
-        if (font != nullptr && atlas != nullptr && !atlas->Locked && atlas->Fonts.contains(font))
+        if (font != nullptr && atlas != nullptr && atlas->Fonts.contains(font))
             atlas->RemoveFont(font);
         font = nullptr;
     }
     state.fileData.clear();
     state.origin = FontOrigin::None;
+    return true;
+}
+
+bool AtlasLocked()
+{
+    if (ImGui::GetCurrentContext() == nullptr)
+        return false;
+    const ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    return atlas != nullptr && atlas->Locked;
 }
 
 bool HasRequiredFaces()
@@ -280,9 +302,23 @@ void LoadFonts()
     }
 }
 
-void UnloadFonts()
+bool HasLoadedFonts()
+{
+    for (const ImFont* font : State().fonts)
+    {
+        if (font != nullptr)
+            return true;
+    }
+    return false;
+}
+
+// Removes Facet's fonts and restores the app's default font. Returns false, with everything
+// left in place, while the atlas is locked.
+bool UnloadFonts()
 {
     FontState& state = State();
+    if (AtlasLocked() && HasLoadedFonts())
+        return false;
     ImFontAtlas* atlas = nullptr;
     if (ImGui::GetCurrentContext() != nullptr)
     {
@@ -293,31 +329,52 @@ void UnloadFonts()
     }
     state.setDefault = false;
     state.previousDefault = nullptr;
-    RemoveFonts(atlas);
+    return RemoveFonts(atlas);
+}
+
+// Replaces the loaded fonts with the current choice. A locked atlas (between ImGui::NewFrame
+// and ImGui::EndFrame with a renderer that does not update textures itself) keeps the old
+// fonts and leaves the reload pending.
+void Reload()
+{
+    FontState& state = State();
+    if (AtlasLocked())
+    {
+        if (!state.reloadPending)
+            internal::LogWarning("the font atlas is locked; the new font set loads at the next unlocked frame "
+                                 "(call SetFontSet before ImGui::NewFrame)");
+        state.reloadPending = true;
+        return;
+    }
+    state.reloadPending = false;
+    UnloadFonts();
+    LoadFonts();
 }
 
 bool FontInit()
 {
-    State().initialized = true;
-    State().reloadPending = false;
+    FontState& state = State();
+    state.initialized = true;
+    state.reloadPending = false;
+    // Fonts left over from a shutdown during a locked frame are replaced now.
+    UnloadFonts();
     LoadFonts();
     return true;  // missing fonts fall back to the default font
 }
 
 void FontShutdown()
 {
-    UnloadFonts();
-    State().initialized = false;
+    FontState& state = State();
+    if (!UnloadFonts())
+        internal::LogWarning("the font atlas is locked at shutdown; Facet's fonts stay in it");
+    state.initialized = false;
+    state.reloadPending = false;
 }
 
 void FontNewFrame()
 {
-    FontState& state = State();
-    if (!state.reloadPending)
-        return;
-    state.reloadPending = false;
-    UnloadFonts();
-    LoadFonts();
+    if (State().reloadPending)
+        Reload();
 }
 
 // The display faces are meant for the two largest styles.
@@ -341,7 +398,14 @@ void SetFontSet(const FontSet& fonts)
             source.path = state.customPaths[slot].c_str();
         state.hasCustom = state.hasCustom || source.IsSet();
     }
-    if (state.initialized)
+    // Between frames the fonts change at once. Inside a frame a font of the old set may still
+    // be pushed, so the reload waits for the next facet::NewFrame (see Reload).
+    if (!state.initialized)
+        return;
+    const ImGuiContext* context = ImGui::GetCurrentContext();
+    if (context != nullptr && !context->WithinFrameScope)
+        Reload();
+    else
         state.reloadPending = true;
 }
 

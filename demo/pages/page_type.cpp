@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iterator>
+#include <string>
 
 #include <imgui.h>
 
@@ -247,4 +249,43 @@ FACET_DEMO_SELFTEST("type")
     });
     test.Expect("the width stays inside its range",
                 [] { return type.widthFraction >= kMinWidthFraction && type.widthFraction <= kMaxWidthFraction; });
+
+    // An app font set loads while frames run, and an empty set returns to the system fonts.
+    // The static Segoe UI files serve as the app's set.
+    static facet::FontOrigin startOrigin = facet::FontOrigin::None;
+    static bool staticFilesFound = false;
+    static std::string fontPaths[3];
+    test.Do([] {
+        startOrigin = facet::ActiveFontOrigin();
+        char* windows = nullptr;
+        size_t length = 0;
+        const bool found = _dupenv_s(&windows, &length, "WINDIR") == 0 && windows != nullptr;
+        const char* const files[3] = {"segoeui.ttf", "seguisb.ttf", "segoeuib.ttf"};
+        staticFilesFound = found;
+        for (int i = 0; i < 3; ++i)
+        {
+            fontPaths[i] = std::string(found ? windows : "") + "\\Fonts\\" + files[i];
+            std::FILE* file = nullptr;
+            staticFilesFound = staticFilesFound && fopen_s(&file, fontPaths[i].c_str(), "rb") == 0 && file != nullptr;
+            if (file != nullptr)
+                std::fclose(file);
+        }
+        std::free(windows);
+        facet::FontSet set;
+        set.regular.path = fontPaths[0].c_str();
+        set.semibold.path = fontPaths[1].c_str();
+        set.bold.path = fontPaths[2].c_str();
+        facet::SetFontSet(set);
+    });
+    test.Wait(2);
+    test.Expect("a font set passed inside a frame is in use from the next frame", [] {
+        return staticFilesFound ? facet::ActiveFontOrigin() == facet::FontOrigin::Custom
+                                : facet::ActiveFontOrigin() != facet::FontOrigin::None;
+    });
+    test.Expect("the app's regular face draws the text styles",
+                [] { return facet::WeightFont(facet::FontWeight::Regular) != nullptr; });
+    test.Do([] { facet::SetFontSet(facet::FontSet{}); });
+    test.Wait(2);
+    test.Expect("an empty font set returns to the system fonts",
+                [] { return facet::ActiveFontOrigin() == startOrigin; });
 }
