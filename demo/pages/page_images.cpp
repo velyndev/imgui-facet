@@ -340,6 +340,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
     }
 
     ImGui::SeparatorText("Options");
+    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Fit");
     ImGui::SameLine();
     if (ImGui::RadioButton("Contain", ui.fit == facet::ImageFit::Contain))
@@ -354,6 +355,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
         ui.fit = facet::ImageFit::Fill;
     ctx.Probe("images.fit.fill");
 
+    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Radius");
     for (int i = 0; i < static_cast<int>(std::size(kRadii)); ++i)
     {
@@ -423,7 +425,8 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading")
         char caption[96];
         std::snprintf(caption, sizeof(caption), "Generated PNG, %d x %d: %s", kAsyncWidth, kAsyncHeight,
                       StatusName(facet::GetImageStatus(assets.async)));
-        Example(assets.async, ImVec2(tile * kWideAspect, tile), options, caption);
+        const float wide = std::min(ImGui::GetContentRegionAvail().x, tile * kWideAspect);
+        Example(assets.async, ImVec2(wide, tile), options, caption);
         Flow(tile);
         std::snprintf(caption, sizeof(caption), "Missing file: %s",
                       StatusName(facet::GetImageStatus(assets.missing)));
