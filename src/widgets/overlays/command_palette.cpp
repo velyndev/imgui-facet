@@ -14,6 +14,12 @@ bool CommandPalette(const char* label, bool* open, std::span<const ChoiceItem>, 
     return false;
 }
 
+bool CommandPalette(const char* label, bool* open, std::span<const char* const>, int*, const CommandPaletteOptions&)
+{
+    internal::StubLayer("CommandPalette", label, open != nullptr && *open);
+    return false;
+}
+
 bool CommandPalette(const char* label, bool* open, ShortcutId*, const CommandPaletteOptions&)
 {
     internal::StubLayer("CommandPalette", label, open != nullptr && *open);

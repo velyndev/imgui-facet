@@ -15,10 +15,21 @@
 //     by AdapterIndexToStorageId(index): the index itself unless the caller sets the adapter,
 //     for example to an item id that survives reordering.
 //   - Checked values (a set of options that are on) are a std::span<bool> with one entry per
-//     item, written like any other edited value.
+//     item, written like any other edited value. std::vector<bool> packs its bits and does not
+//     convert to a span; keep the flags in std::array<bool, N>, a bool array or
+//     std::unique_ptr<bool[]> instead.
 // Popup lists (Dropdown, MultiDropdown, BeginCombo) open on input only.
+//
+// Item sources: a span of ChoiceItem, a span of plain labels (const char* const) for items that
+// need only a label, or a count plus a ChoiceGetter for generated and long lists. A getter is
+// called during the widget call only, possibly many times. The strings it writes into the item
+// need to stay valid only until the next getter call: a widget copies what it keeps (a filtered
+// order keeps indices, not labels) or calls the getter again, so a getter may format its labels
+// into one static buffer.
 
 #include <algorithm>
+#include <iterator>
+#include <ranges>
 #include <span>
 
 #include <imgui.h>
@@ -190,6 +201,8 @@ struct SelectableListOptions
 // Enter is reported by SelectableListActivatedRow. Label, width and kept state as ListBox.
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const ChoiceItem> items,
                     const SelectableListOptions& options = {});
+bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const char* const> items,
+                    const SelectableListOptions& options = {});
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, int itemCount, ChoiceGetter getter,
                     void* user, const SelectableListOptions& options = {});
 
@@ -198,8 +211,10 @@ int SelectableListActivatedRow();
 
 // --- Reorderable list ----------------------------------------------------------------------------
 
-// One move in a reorderable list: the row at `from` now belongs at `to`, both indices into the
-// list as it was before the move. The caller moves its own data, for example with
+// One move in a reorderable list of n rows: the row at index `from` (in the list before the
+// move) ends up at index `to` (in the list after the move); the rows in between shift by one
+// toward the gap it left. Both are in 0 to n - 1. Moving row 1 of five rows to index 3 turns
+// {0, 1, 2, 3, 4} into {0, 2, 3, 1, 4}. The caller moves its own data, for example with
 // ApplyReorderMove.
 struct ReorderMove
 {
@@ -208,20 +223,23 @@ struct ReorderMove
     constexpr bool IsValid() const { return from >= 0 && to >= 0 && from != to; }
 };
 
-// Moves items[move.from] to position move.to and shifts the elements in between by one. Does
-// nothing for an invalid move or for indices outside the span.
-template <class T>
-void ApplyReorderMove(std::span<T> items, const ReorderMove& move)
+// Applies `move` to a random-access container of the caller's (std::vector, std::array, a C
+// array, a std::span): items[move.from] goes to index move.to and the elements in between shift
+// by one. Does nothing for an invalid move or for indices outside the container.
+template <class Range>
+    requires std::ranges::random_access_range<Range> && std::ranges::sized_range<Range>
+void ApplyReorderMove(Range&& items, const ReorderMove& move)
 {
-    const int count = static_cast<int>(items.size());
+    const auto count = static_cast<long long>(std::ranges::size(items));
     if (!move.IsValid() || move.from >= count || move.to >= count)
         return;
-    const auto from = items.begin() + move.from;
-    const auto to = items.begin() + move.to;
+    const auto first = std::ranges::begin(items);
+    const auto from = std::ranges::next(first, move.from);
+    const auto to = std::ranges::next(first, move.to);
     if (move.from < move.to)
-        std::rotate(from, from + 1, to + 1);
+        std::rotate(from, std::ranges::next(from), std::ranges::next(to));
     else
-        std::rotate(to, from, from + 1);
+        std::rotate(to, from, std::ranges::next(from));
 }
 
 struct ReorderableListOptions
@@ -236,8 +254,11 @@ struct ReorderableListOptions
 // rows move aside to show the gap. With the keyboard, Alt+Up and Alt+Down move the focused
 // row. Writes *move and returns true on the frame a row lands on a new place; *move is left
 // alone otherwise. A row keeps its animation state under ChoiceItem::id (the index when 0), so
-// give items stable ids when the caller moves its data. Default width: the available width.
+// give items stable ids when the caller moves its data; rows of the label overload are keyed
+// by index. Default width: the available width.
 bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove* move,
+                     const ReorderableListOptions& options = {});
+bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove* move,
                      const ReorderableListOptions& options = {});
 
 // --- Tree view -----------------------------------------------------------------------------------
@@ -364,6 +385,8 @@ struct TransferListOptions
 // selection and filter text of both lists are kept under the id.
 bool TransferList(const char* id, std::span<bool> inTarget, std::span<const ChoiceItem> items,
                   const TransferListOptions& options = {});
+bool TransferList(const char* id, std::span<bool> inTarget, std::span<const char* const> items,
+                  const TransferListOptions& options = {});
 
 struct SearchableChecklistOptions
 {
@@ -385,6 +408,8 @@ struct SearchableChecklistOptions
 // of `checked` and returns true on that frame; missing entries count as false and are never
 // written. Label above the list, as ListBox. The filter text is kept under the id.
 bool SearchableChecklist(const char* label, std::span<bool> checked, std::span<const ChoiceItem> items,
+                         const SearchableChecklistOptions& options = {});
+bool SearchableChecklist(const char* label, std::span<bool> checked, std::span<const char* const> items,
                          const SearchableChecklistOptions& options = {});
 bool SearchableChecklist(const char* label, std::span<bool> checked, int itemCount, ChoiceGetter getter,
                          void* user, const SearchableChecklistOptions& options = {});

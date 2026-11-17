@@ -4,6 +4,8 @@
 // placeholder of src/widgets/structure_stub.h sizes, truncates and closes as documented.
 
 #include <array>
+#include <span>
+#include <string>
 #include <vector>
 
 #include <doctest/doctest.h>
@@ -208,9 +210,11 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List labels", &v.index, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List getter", &v.index, 3, &Getter, nullptr)));
     CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable", &selection, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable labels", &selection, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable getter", &selection, 3, &Getter, nullptr)));
     CHECK_BALANCED(CHECK(facet::SelectableListActivatedRow() == -1));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", kItems, &v.move)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", kLabels, &v.move)));
     CHECK_BALANCED({
         const bool open = facet::BeginTreeView("Tree", &selection);
         CHECK(open);
@@ -228,7 +232,9 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::TreeViewSelectionChanged()));
     CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist", checked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist labels", checked, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist getter", checked, 3, &Getter, nullptr)));
     CHECK(selection.Size == 0);
 
@@ -442,12 +448,18 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK(facet::Breadcrumbs("Path labels", kLabels) == -1));
     CHECK_BALANCED(CHECK_FALSE(facet::Pagination("Pages", &v.page, 10)));
     CHECK_BALANCED(facet::StepIndicator("Steps", 1, kItems));
+    CHECK_BALANCED(facet::StepIndicator("Steps labels", 1, kLabels));
     CHECK_BALANCED(CHECK_FALSE(facet::StepIndicator("Steps edit", &v.step, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::StepIndicator("Steps edit labels", &v.step, kLabels)));
     CHECK_BALANCED({
         facet::BeginWizard("Wizard", &v.step, kItems);
         ImGui::TextUnformatted("step");
         CHECK(facet::WizardFooter() == facet::WizardAction::None);
         facet::EndWizard();
+    });
+    CHECK_BALANCED({
+        facet::WizardScope wizard("Wizard labels", &v.step, kLabels);
+        ImGui::TextUnformatted("step");
     });
     CHECK_BALANCED(facet::ShortcutSheet("Shortcuts", &v.open));
 
@@ -489,6 +501,7 @@ void CallEveryStub(Values& v)
         facet::EndLoadingOverlay();
     });
     CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Commands", &v.open, kItems, &v.picked)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Command labels", &v.open, kLabels, &v.picked)));
     CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Shortcuts palette", &v.open, &v.pickedShortcut)));
     CHECK_BALANCED(facet::WatermarkOverlay("Watermark", kFields));
     CHECK_BALANCED(CHECK(facet::UnsavedChangesBar("Changes", 2) == facet::UnsavedChangesAction::None));
@@ -902,15 +915,37 @@ TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both 
 
 TEST_CASE("ApplyReorderMove moves one element and shifts the others")
 {
+    // `to` is the moved element's index after the move.
     std::vector<int> data = {0, 1, 2, 3, 4};
-    facet::ApplyReorderMove(std::span<int>(data), {1, 3});
+    facet::ApplyReorderMove(data, {1, 3});
     CHECK(data == std::vector<int>{0, 2, 3, 1, 4});
-    facet::ApplyReorderMove(std::span<int>(data), {3, 0});
+    CHECK(data[3] == 1);
+    facet::ApplyReorderMove(data, {3, 0});
     CHECK(data == std::vector<int>{1, 0, 2, 3, 4});
-    facet::ApplyReorderMove(std::span<int>(data), {4, 4});
-    facet::ApplyReorderMove(std::span<int>(data), {-1, 2});
-    facet::ApplyReorderMove(std::span<int>(data), {2, 5});
+    facet::ApplyReorderMove(data, {4, 4});
+    facet::ApplyReorderMove(data, {-1, 2});
+    facet::ApplyReorderMove(data, {2, 5});
     CHECK(data == std::vector<int>{1, 0, 2, 3, 4});
     CHECK_FALSE(facet::ReorderMove{}.IsValid());
     CHECK(facet::ReorderMove{0, 1}.IsValid());
+}
+
+TEST_CASE("ApplyReorderMove takes the caller's containers as they are")
+{
+    // A C array, a std::array, a std::span and a std::vector<bool> without spelling a span.
+    int array[3] = {0, 1, 2};
+    facet::ApplyReorderMove(array, {0, 2});
+    CHECK(array[0] == 1);
+    CHECK(array[1] == 2);
+    CHECK(array[2] == 0);
+    std::array<facet::ChoiceItem, 3> items = {{{"Option 1"}, {"Option 2"}, {"Option 3"}}};
+    facet::ApplyReorderMove(items, {2, 0});
+    CHECK(std::string(items[0].label) == "Option 3");
+    CHECK(std::string(items[1].label) == "Option 1");
+    std::vector<int> data = {0, 1, 2};
+    facet::ApplyReorderMove(std::span<int>(data).subspan(1), {0, 1});
+    CHECK(data == std::vector<int>{0, 2, 1});
+    std::vector<bool> flags = {true, false, false};
+    facet::ApplyReorderMove(flags, {0, 2});
+    CHECK(flags == std::vector<bool>{false, false, true});
 }

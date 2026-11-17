@@ -26,6 +26,13 @@ bool SearchableChecklist(const char* label, std::span<bool>, std::span<const Cho
     return false;
 }
 
+bool SearchableChecklist(const char* label, std::span<bool>, std::span<const char* const>,
+                         const SearchableChecklistOptions& options)
+{
+    DrawSearchableChecklist(label, options);
+    return false;
+}
+
 bool SearchableChecklist(const char* label, std::span<bool>, int, ChoiceGetter, void*,
                          const SearchableChecklistOptions& options)
 {

@@ -25,6 +25,13 @@ bool SelectableList(const char* label, ImGuiSelectionBasicStorage*, std::span<co
     return false;
 }
 
+bool SelectableList(const char* label, ImGuiSelectionBasicStorage*, std::span<const char* const>,
+                    const SelectableListOptions& options)
+{
+    DrawSelectableList(label, options);
+    return false;
+}
+
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage*, int, ChoiceGetter, void*,
                     const SelectableListOptions& options)
 {

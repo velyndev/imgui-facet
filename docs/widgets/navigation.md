@@ -107,7 +107,11 @@ Status: planned
 ```cpp
 void StepIndicator(const char* id, int current, std::span<const ChoiceItem> steps,
                    const StepIndicatorOptions& options = {});
+void StepIndicator(const char* id, int current, std::span<const char* const> steps,
+                   const StepIndicatorOptions& options = {});
 bool StepIndicator(const char* id, int* current, std::span<const ChoiceItem> steps,
+                   const StepIndicatorOptions& options = {});
+bool StepIndicator(const char* id, int* current, std::span<const char* const> steps,
                    const StepIndicatorOptions& options = {});
 ```
 
@@ -119,6 +123,7 @@ Status: planned
 
 ```cpp
 void BeginWizard(const char* id, int* step, std::span<const ChoiceItem> steps, const WizardOptions& options = {});
+void BeginWizard(const char* id, int* step, std::span<const char* const> steps, const WizardOptions& options = {});
 void EndWizard();
 WizardAction WizardFooter(const WizardFooterOptions& options = {});
 class WizardScope;

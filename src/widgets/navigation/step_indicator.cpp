@@ -22,7 +22,18 @@ void StepIndicator(const char* id, int, std::span<const ChoiceItem>, const StepI
     DrawStepIndicator(id, options);
 }
 
+void StepIndicator(const char* id, int, std::span<const char* const>, const StepIndicatorOptions& options)
+{
+    DrawStepIndicator(id, options);
+}
+
 bool StepIndicator(const char* id, int*, std::span<const ChoiceItem>, const StepIndicatorOptions& options)
+{
+    DrawStepIndicator(id, options);
+    return false;
+}
+
+bool StepIndicator(const char* id, int*, std::span<const char* const>, const StepIndicatorOptions& options)
 {
     DrawStepIndicator(id, options);
     return false;

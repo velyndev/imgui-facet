@@ -134,6 +134,8 @@ Status: planned
 ```cpp
 bool CommandPalette(const char* label, bool* open, std::span<const ChoiceItem> commands, int* picked,
                     const CommandPaletteOptions& options = {});
+bool CommandPalette(const char* label, bool* open, std::span<const char* const> commands, int* picked,
+                    const CommandPaletteOptions& options = {});
 bool CommandPalette(const char* label, bool* open, ShortcutId* picked, const CommandPaletteOptions& options = {});
 ```
 

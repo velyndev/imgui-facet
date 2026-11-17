@@ -12,7 +12,14 @@ changes its status to ready.
 Two kinds of multiple choice use two kinds of storage. A selection (highlighted rows that the next
 command acts on) is a caller-owned `ImGuiSelectionBasicStorage` driven by
 `ImGui::BeginMultiSelect`. Checked values (options that are on) are a `std::span<bool>` with one
-entry per item.
+entry per item. `std::vector<bool>` packs its bits and does not convert to a span; keep such flags
+in a `std::array<bool, N>`, a `bool` array or a `std::unique_ptr<bool[]>`.
+
+Items come as a span of `ChoiceItem`, as a span of plain labels (`const char* const`) where a label
+is all an item needs, or as a count and a `ChoiceGetter` for generated and long lists. A getter is
+called during the widget call only, possibly many times, and the strings it writes need to stay
+valid only until its next call: widgets copy what they keep or ask again, so one static buffer is
+enough for a getter that formats its labels.
 
 ## Widgets
 
@@ -76,6 +83,8 @@ Status: planned
 ```cpp
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const ChoiceItem> items,
                     const SelectableListOptions& options = {});
+bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const char* const> items,
+                    const SelectableListOptions& options = {});
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, int itemCount, ChoiceGetter getter,
                     void* user, const SelectableListOptions& options = {});
 int SelectableListActivatedRow();
@@ -89,13 +98,19 @@ Status: planned
 
 ```cpp
 struct ReorderMove { int from = -1; int to = -1; constexpr bool IsValid() const; };
-template <class T> void ApplyReorderMove(std::span<T> items, const ReorderMove& move);
+template <class Range>
+    requires std::ranges::random_access_range<Range> && std::ranges::sized_range<Range>
+void ApplyReorderMove(Range&& items, const ReorderMove& move);
 bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove* move,
+                     const ReorderableListOptions& options = {});
+bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove* move,
                      const ReorderableListOptions& options = {});
 ```
 
 Rows dragged by a grip (or moved with Alt+Up and Alt+Down) to a new place; the move comes back as a
-result that the caller applies to its own data. `ApplyReorderMove` is implemented and tested.
+result that the caller applies to its own data. `from` is the row's index before the move and `to`
+its index after it. `ApplyReorderMove` is implemented and tested; it takes a `std::vector`, a
+`std::array`, a C array or a `std::span` as it is.
 
 ### BeginTreeView, BeginTreeNode, TreeLeaf
 
@@ -135,6 +150,8 @@ Status: planned
 ```cpp
 bool TransferList(const char* id, std::span<bool> inTarget, std::span<const ChoiceItem> items,
                   const TransferListOptions& options = {});
+bool TransferList(const char* id, std::span<bool> inTarget, std::span<const char* const> items,
+                  const TransferListOptions& options = {});
 ```
 
 Two filterable lists with move buttons and drag between them; they stack in a Compact width.
@@ -145,6 +162,8 @@ Status: planned
 
 ```cpp
 bool SearchableChecklist(const char* label, std::span<bool> checked, std::span<const ChoiceItem> items,
+                         const SearchableChecklistOptions& options = {});
+bool SearchableChecklist(const char* label, std::span<bool> checked, std::span<const char* const> items,
                          const SearchableChecklistOptions& options = {});
 bool SearchableChecklist(const char* label, std::span<bool> checked, int itemCount, ChoiceGetter getter,
                          void* user, const SearchableChecklistOptions& options = {});
@@ -205,7 +224,10 @@ animation state when the data moves:
 std::vector<facet::ChoiceItem> items = BuildItems(presets);   // label and id from each preset
 facet::ReorderMove move;
 if (facet::ReorderableList("presets", items, &move))
-    facet::ApplyReorderMove(std::span<Preset>(presets), move);
+{
+    facet::ApplyReorderMove(presets, move);   // the app's std::vector<Preset>
+    facet::ApplyReorderMove(items, move);     // keeps the shown rows in step until the next rebuild
+}
 ```
 
 A tree with lazily loaded children. `ImGui::IsItemToggledOpen` right after the node call says when to

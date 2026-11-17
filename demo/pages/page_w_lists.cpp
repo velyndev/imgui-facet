@@ -38,8 +38,8 @@ const facet::CheckTreeItem kCheckTree[] = {
 
 constexpr int kGeneratedCount = 1000;
 
-// Generated entries for the getter overloads: "Option <n>". The text lives in a static buffer;
-// widgets read an entry during the call only.
+// Generated entries for the getter overloads: "Option <n>". The text lives in one static buffer,
+// which lists.h allows: a getter's strings need to stay valid only until its next call.
 bool NumberedOption(void*, int index, facet::ChoiceItem* out)
 {
     static char text[32];
@@ -109,7 +109,7 @@ void SelectAndReorder(ListsState& s)
     facet::SelectableList("Selectable list", &s.selection, kOptions, {.visibleRows = 4});
     facet::ReorderMove move;
     if (facet::ReorderableList("reorder", s.reorder, &move))
-        facet::ApplyReorderMove(std::span<facet::ChoiceItem>(s.reorder), move);
+        facet::ApplyReorderMove(s.reorder, move);
 }
 
 void Hierarchies(ListsState& s)

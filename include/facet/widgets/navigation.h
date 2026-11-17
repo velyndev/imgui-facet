@@ -229,8 +229,12 @@ struct StepIndicatorOptions
 // rest are open. Not interactive.
 void StepIndicator(const char* id, int current, std::span<const ChoiceItem> steps,
                    const StepIndicatorOptions& options = {});
+void StepIndicator(const char* id, int current, std::span<const char* const> steps,
+                   const StepIndicatorOptions& options = {});
 // The same, and a done step can be activated: writes *current and returns true.
 bool StepIndicator(const char* id, int* current, std::span<const ChoiceItem> steps,
+                   const StepIndicatorOptions& options = {});
+bool StepIndicator(const char* id, int* current, std::span<const char* const> steps,
                    const StepIndicatorOptions& options = {});
 
 struct WizardOptions
@@ -243,6 +247,7 @@ struct WizardOptions
 // and which slides when the step changes, and a footer from WizardFooter. `step` is kept by
 // the caller and written by the footer and by the step indicator. EndWizard is always called.
 void BeginWizard(const char* id, int* step, std::span<const ChoiceItem> steps, const WizardOptions& options = {});
+void BeginWizard(const char* id, int* step, std::span<const char* const> steps, const WizardOptions& options = {});
 void EndWizard();
 
 // What the wizard footer did this frame.
@@ -270,6 +275,10 @@ class [[nodiscard]] WizardScope
 {
 public:
     WizardScope(const char* id, int* step, std::span<const ChoiceItem> steps, const WizardOptions& options = {})
+    {
+        BeginWizard(id, step, steps, options);
+    }
+    WizardScope(const char* id, int* step, std::span<const char* const> steps, const WizardOptions& options = {})
     {
         BeginWizard(id, step, steps, options);
     }

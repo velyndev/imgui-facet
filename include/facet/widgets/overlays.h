@@ -321,8 +321,10 @@ struct CommandPaletteOptions
 // fuzzy matched as one types; ChoiceItem::group groups them, detail shows a hint at the end.
 // Shown while *open is true; the visible label part is its accessible name. Up and Down move,
 // Enter picks, Escape closes. On a pick it writes *picked and *open = false and returns true.
-// Recent picks are kept under the id.
+// A null `open` shows nothing and returns false. Recent picks are kept under the id.
 bool CommandPalette(const char* label, bool* open, std::span<const ChoiceItem> commands, int* picked,
+                    const CommandPaletteOptions& options = {});
+bool CommandPalette(const char* label, bool* open, std::span<const char* const> commands, int* picked,
                     const CommandPaletteOptions& options = {});
 // The same over the enabled shortcuts of the registry (core/input.h), with their chords as key
 // caps. On a pick it writes *picked, calls TriggerShortcut for it and returns true.

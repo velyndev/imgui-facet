@@ -6,12 +6,27 @@
 
 namespace facet
 {
+namespace
+{
 
-bool TransferList(const char* id, std::span<bool>, std::span<const ChoiceItem>, const TransferListOptions& options)
+void DrawTransferList(const char* id, const TransferListOptions& options)
 {
     const int rows = options.visibleRows > 0 ? options.visibleRows : internal::kStubListRows;
     internal::StubItem("TransferList", id, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(ControlSize::Inherit));
+}
+
+} // namespace
+
+bool TransferList(const char* id, std::span<bool>, std::span<const ChoiceItem>, const TransferListOptions& options)
+{
+    DrawTransferList(id, options);
+    return false;
+}
+
+bool TransferList(const char* id, std::span<bool>, std::span<const char* const>, const TransferListOptions& options)
+{
+    DrawTransferList(id, options);
     return false;
 }
 

@@ -6,13 +6,29 @@
 
 namespace facet
 {
+namespace
+{
+
+void DrawReorderableList(const char* id, std::size_t count, const ReorderableListOptions& options)
+{
+    const int rows = count == 0 ? 1 : static_cast<int>(count);
+    internal::StubItem("ReorderableList", id, internal::StubWidth(options.width, true),
+                       static_cast<float>(rows) * ControlHeight(options.size));
+}
+
+} // namespace
 
 bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove*,
                      const ReorderableListOptions& options)
 {
-    const int rows = items.empty() ? 1 : static_cast<int>(items.size());
-    internal::StubItem("ReorderableList", id, internal::StubWidth(options.width, true),
-                       static_cast<float>(rows) * ControlHeight(options.size));
+    DrawReorderableList(id, items.size(), options);
+    return false;
+}
+
+bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove*,
+                     const ReorderableListOptions& options)
+{
+    DrawReorderableList(id, items.size(), options);
     return false;
 }
 

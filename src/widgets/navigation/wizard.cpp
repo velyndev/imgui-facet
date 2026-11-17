@@ -13,6 +13,11 @@ void BeginWizard(const char* id, int*, std::span<const ChoiceItem>, const Wizard
     internal::BeginStubFrame("BeginWizard", "Wizard", id, false);
 }
 
+void BeginWizard(const char* id, int*, std::span<const char* const>, const WizardOptions&)
+{
+    internal::BeginStubFrame("BeginWizard", "Wizard", id, false);
+}
+
 void EndWizard()
 {
     internal::EndStubFrame("BeginWizard");
