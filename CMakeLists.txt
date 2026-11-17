@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(Facet VERSION 0.1.0 LANGUAGES C CXX)
+# The version is written down once, in include/facet/core/version.h.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/facet/core/version.h" FACET_VERSION_LINES
+    REGEX "^#define FACET_VERSION_(MAJOR|MINOR|PATCH) [0-9]+$")
+foreach(part MAJOR MINOR PATCH)
+    if(NOT FACET_VERSION_LINES MATCHES "FACET_VERSION_${part} ([0-9]+)")
+        message(FATAL_ERROR "FACET_VERSION_${part} not found in include/facet/core/version.h")
+    endif()
+    set(FACET_VERSION_${part} ${CMAKE_MATCH_1})
+endforeach()
+
+project(Facet
+    VERSION ${FACET_VERSION_MAJOR}.${FACET_VERSION_MINOR}.${FACET_VERSION_PATCH}
+    LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(FACET_IS_TOP_LEVEL ON)
@@ -63,8 +75,7 @@ target_include_directories(facet
 target_compile_definitions(facet
     PRIVATE
         NOMINMAX
-        WIN32_LEAN_AND_MEAN
-        FACET_VERSION_STRING="${PROJECT_VERSION}")
+        WIN32_LEAN_AND_MEAN)
 target_link_libraries(facet
     PUBLIC
         ${FACET_IMGUI_LINK_TARGET}

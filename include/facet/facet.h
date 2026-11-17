@@ -12,3 +12,4 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
+#include "facet/core/version.h"

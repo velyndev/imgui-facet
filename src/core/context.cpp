@@ -4,14 +4,11 @@
 #include <imgui.h>
 #include <wrl/client.h>
 
+#include "facet/core/version.h"
 #include "internal/device.h"
 #include "internal/subsystem.h"
 
 static_assert(IMGUI_VERSION_NUM >= 19300, "Facet requires Dear ImGui 1.93.0 or newer");
-
-#ifndef FACET_VERSION_STRING
-#error "FACET_VERSION_STRING must be defined by the build"
-#endif
 
 namespace facet
 {
@@ -248,7 +245,7 @@ bool IsInitialized()
 
 const char* Version()
 {
-    return FACET_VERSION_STRING;
+    return FACET_VERSION;
 }
 
 std::uint64_t FrameIndex()

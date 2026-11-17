@@ -10,6 +10,8 @@ target_include_directories(facet_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(facet_tests PRIVATE facet::facet doctest::doctest)
+# The version CMake read from include/facet/core/version.h, compared with the header in a test.
+target_compile_definitions(facet_tests PRIVATE FACET_TEST_PROJECT_VERSION="${PROJECT_VERSION}")
 facet_apply_warnings(facet_tests)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${FACET_TEST_SOURCES})
 

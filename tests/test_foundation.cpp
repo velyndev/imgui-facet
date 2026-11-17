@@ -1,5 +1,6 @@
 // Library skeleton: version string, lifetime guards and the embedded asset table.
 
+#include <cstdio>
 #include <cstring>
 
 #include <doctest/doctest.h>
@@ -15,6 +16,19 @@ TEST_CASE("Version is a non-empty major.minor.patch string")
     REQUIRE(version != nullptr);
     CHECK(std::strlen(version) > 0);
     CHECK(std::strchr(version, '.') != nullptr);
+}
+
+TEST_CASE("The version comes from version.h alone")
+{
+    // The library returns the header's string, built from the three numbers.
+    CHECK(std::strcmp(facet::Version(), FACET_VERSION) == 0);
+    char expected[32];
+    std::snprintf(expected, sizeof(expected), "%d.%d.%d", FACET_VERSION_MAJOR, FACET_VERSION_MINOR,
+                  FACET_VERSION_PATCH);
+    CHECK(std::strcmp(FACET_VERSION, expected) == 0);
+    CHECK(FACET_VERSION_NUM == FACET_VERSION_MAJOR * 10000 + FACET_VERSION_MINOR * 100 + FACET_VERSION_PATCH);
+    // CMake read the same numbers for project(VERSION).
+    CHECK(std::strcmp(FACET_TEST_PROJECT_VERSION, FACET_VERSION) == 0);
 }
 
 TEST_CASE("Init rejects a missing device and context")

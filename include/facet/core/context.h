@@ -65,7 +65,8 @@ bool CreateDeviceObjects();
 
 bool IsInitialized();
 
-// Library version as "major.minor.patch". Never null.
+// Library version as "major.minor.patch": FACET_VERSION of the library build (version.h).
+// Never null.
 const char* Version();
 
 // Number of completed NewFrame() calls since Init().
