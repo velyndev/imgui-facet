@@ -333,7 +333,9 @@ bool CommandPalette(const char* label, bool* open, int* picked, std::span<const 
 bool CommandPalette(const char* label, bool* open, int* picked, std::span<const char* const> commands,
                     const CommandPaletteOptions& options = {});
 // The same over the enabled shortcuts of the registry (core/input.h), with their chords as key
-// caps. On a pick it writes *picked, calls TriggerShortcut for it and returns true.
+// caps. On a pick it writes *picked, calls TriggerShortcut for it and returns true. Run the
+// action in the ShortcutPressed handler only; the result reports the pick, for example to
+// close other UI.
 bool CommandPalette(const char* label, bool* open, ShortcutId* picked, const CommandPaletteOptions& options = {});
 
 // --- Watermark overlay ---------------------------------------------------------------------------
@@ -369,15 +371,16 @@ enum class UnsavedChangesAction
 
 struct UnsavedChangesBarOptions
 {
-    const char* message = nullptr;     // text before the buttons; null shows the number of changes
-    const char* applyLabel = nullptr;  // null: "Apply"
-    const char* revertLabel = nullptr; // null: "Revert"
+    const char* message = nullptr;     // text before the buttons; null formats Strings::unsavedChanges
+    const char* applyLabel = nullptr;  // null uses Strings::apply
+    const char* revertLabel = nullptr; // null uses Strings::revert
     bool applyShortcut = true;         // Ctrl+S applies while the window has focus
 };
 
 // A bar that slides in at the bottom of the current window while changeCount > 0, with Apply
 // and Revert buttons; Escape reverts while it has focus. Returns the action of this frame; the
-// caller applies or reverts its settings, which brings changeCount to 0.
+// caller applies or reverts its settings, which brings changeCount to 0. Strings::unsavedChanges
+// is a printf format that takes changeCount as its one %d.
 UnsavedChangesAction UnsavedChangesBar(const char* id, int changeCount, const UnsavedChangesBarOptions& options = {});
 
 } // namespace facet

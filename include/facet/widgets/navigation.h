@@ -163,7 +163,8 @@ struct MenuItemOptions
 
 // A menu row. Returns true when it is activated (click, Enter); the menu then closes. With
 // `command` set, activation also calls TriggerShortcut(command), so the shortcut's handler runs
-// the action in the next frame.
+// the action in the next frame. With a command, run the action in the ShortcutPressed handler
+// only; the result reports the activation, for example to close other UI.
 bool MenuItem(const char* label, const MenuItemOptions& options = {});
 // A row with a check mark; activation flips *checked and returns true.
 bool MenuItem(const char* label, bool* checked, const MenuItemOptions& options = {});
@@ -210,7 +211,7 @@ int Breadcrumbs(const char* id, std::span<const char* const> path, const Breadcr
 
 struct PaginationOptions
 {
-    bool compact = false;              // previous, "page of count" and next only
+    bool compact = false;              // previous, the page and count in Strings::pageOf, and next only
     ControlSize size = ControlSize::Inherit;
 };
 

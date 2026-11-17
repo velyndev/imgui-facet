@@ -199,7 +199,8 @@ struct TitleBarOptions
 // subtitle, then the caller's items, then the window buttons. Items submitted between
 // BeginTitleBar and EndTitleBar sit at the trailing end, right-aligned with their widths from
 // the last frame. The free area of the bar is the drag region (Caption in AppFrameHitTest).
-// EndTitleBar is always called. A window button press is read with TitleBarPressedButton.
+// EndTitleBar is always called. A window button press is read with TitleBarPressedButton. The
+// window buttons are named by Strings::minimize, maximize, restore and close.
 void BeginTitleBar(const char* label, const TitleBarOptions& options = {});
 void EndTitleBar();
 
@@ -280,10 +281,11 @@ struct MiniWindowOptions
 
 // A compact, auto-sized panel with a title and a pin button. It shows while the overlay menu is
 // visible, and while *pinned is true also when the menu is hidden, then without its title bar
-// and (with clickThrough) without taking input. The pin button writes *pinned; a null `pinned`
-// means never pinned and no pin button. Dragged by its title like a shell; position kept in
-// units. Returns false while hidden; call EndMiniWindow only after true. Call it outside any
-// window and outside BeginOverlay.
+// and (with clickThrough) without taking input. The pin button (named by Strings::pin, or
+// Strings::unpin while pinned) writes *pinned; a null `pinned` means never pinned and no pin
+// button. Dragged by its title like a shell; position kept in units. Returns false while
+// hidden; call EndMiniWindow only after true. Call it outside any window and outside
+// BeginOverlay.
 [[nodiscard]] bool BeginMiniWindow(const char* label, bool* pinned, const MiniWindowOptions& options = {});
 void EndMiniWindow();
 
