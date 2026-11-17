@@ -20,6 +20,7 @@ namespace
 
 using facet::demo::ForcedItemState;
 using facet::demo::Note;
+using facet::demo::NoteBeside;
 using facet::demo::SectionHeader;
 
 struct ItemPageState
@@ -81,8 +82,7 @@ void SmallItem(facet::demo::PageCtx& ctx)
     facet::FillRect(drawList, item.rect.Min, item.rect.Max, facet::ToU32(fill), radius);
     facet::internal::DrawItemFocusRing(item, radius);
     ImGui::SameLine(0.0f, (target - side) * 0.5f + facet::Px(t.spacing.md));
-    ImGui::AlignTextToFramePadding();
-    Note("Clicked %d times. The box is %.0f units, the area that takes the mouse %.0f units (the minHitTarget "
+    NoteBeside("Clicked %d times. The box is %.0f units, the area that takes the mouse %.0f units (the minHitTarget "
          "token, outlined).",
          page.smallPresses, t.spacing.md, t.metrics.minHitTarget);
 }
@@ -123,16 +123,14 @@ FACET_DEMO_PAGE("item", "Item behaviour", "Blocks", 10, "default", "hovered", "p
     if (facet::demo::ProtoButton(ctx, "Hold to count", "item.repeat", true))
         ++page.repeats;
     ImGui::SameLine(0.0f, gap);
-    ImGui::AlignTextToFramePadding();
-    Note("Count: %d. Presses on the click, then repeats at the key repeat rate while the mouse button, Space or "
+    NoteBeside("Count: %d. Presses on the click, then repeats at the key repeat rate while the mouse button, Space or "
          "Enter is held.",
          page.repeats);
 
     SectionHeader("Toggle look");
     facet::demo::ProtoToggle(ctx, "Prototype toggle", &page.toggle, "item.toggle");
     ImGui::SameLine(0.0f, gap);
-    ImGui::AlignTextToFramePadding();
-    Note("%s", page.toggle ? "On" : "Off");
+    NoteBeside("%s", page.toggle ? "On" : "Off");
 
     SectionHeader("Minimum hit target");
     SmallItem(ctx);

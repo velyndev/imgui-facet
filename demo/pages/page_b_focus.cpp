@@ -57,8 +57,10 @@ void SurfaceCard(facet::demo::PageCtx& ctx, int index, float width)
     const Surface& surface = kSurfaces[index];
     const float padding = facet::Px(t.spacing.lg);
     const float caption = facet::MeasureText(facet::TextStyle::Footnote, surface.name).y;
-    const float height =
-        facet::ControlHeight(facet::ControlSize::Regular) + padding * 2.0f + caption + facet::Px(t.spacing.xs);
+    // Between the caption and the button: room for the focus ring plus a small gap, so the ring
+    // never touches the caption's descenders.
+    const float captionGap = facet::internal::FocusRingOutset() + facet::Px(t.spacing.xs);
+    const float height = facet::ControlHeight(facet::ControlSize::Regular) + padding * 2.0f + caption + captionGap;
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const ImVec2 max(pos.x + width, pos.y + height);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -70,7 +72,7 @@ void SurfaceCard(facet::demo::PageCtx& ctx, int index, float width)
     facet::PushTextStyle(facet::TextStyle::Footnote);
     drawList->AddText(ImVec2(pos.x + padding, pos.y + padding), facet::ToU32(t.colors.labelSecondary), surface.name);
     facet::PopTextStyle();
-    ImGui::SetCursorScreenPos(ImVec2(pos.x + padding, pos.y + padding + caption + facet::Px(t.spacing.xs)));
+    ImGui::SetCursorScreenPos(ImVec2(pos.x + padding, pos.y + padding + caption + captionGap));
     if (ctx.capture && ctx.captureState == kFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused);
     char label[64];

@@ -135,6 +135,9 @@ FACET_DEMO_PAGE("overflow", "Overflow", "Blocks", 40, "default", "narrow", "open
     }
     Note("Current: %s. %d of %d items in the row%s.", kItems[page.current], kItemCount - fit.hiddenCount, kItemCount,
          fit.showButton ? ", the rest behind More" : "");
+    // The row is what the default and narrow states change: keep it in the image at any size.
+    if (!page.open)
+        ctx.RevealInCapture(0.6f);
 
     if (page.open)
     {

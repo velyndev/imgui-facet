@@ -110,6 +110,9 @@ void SliderRow(facet::demo::PageCtx& ctx, int index)
     facet::internal::EndRow();
     if (index == kDisabled)
         ImGui::EndDisabled();
+    // The capture states show on the linear slider: keep it in the image at any size.
+    if (index == kLinear)
+        ctx.RevealInCapture(0.5f);
 }
 
 } // namespace
@@ -132,7 +135,6 @@ FACET_DEMO_PAGE("value-drag", "Value drag", "Blocks", 50, "default", "hovered", 
     for (int i = kLinear; i <= kStop; ++i)
         SliderRow(ctx, i);
     facet::internal::EndRowGroup();
-    ctx.RevealInCapture(0.4f);
 
     SectionHeader("Vertical");
     SliderRow(ctx, kVertical);

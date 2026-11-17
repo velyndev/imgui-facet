@@ -64,6 +64,9 @@ void SectionHeader(const char* title);
 void Paragraph(const char* text);
 // Footnote text in labelSecondary, printf formatted, wrapped at the content width.
 void Note(const char* fmt, ...) IM_FMTARGS(1);
+// A Note on the line of the last item (call after ImGui::SameLine): its first line of text is
+// centered on the item's height, wherever the item's text sits.
+void NoteBeside(const char* fmt, ...) IM_FMTARGS(1);
 // Starts a settings row: `label` in Footnote labelSecondary in the label column of
 // facet::LayoutLabeledRow (the layout tokens), centered on the control height, with the cursor
 // placed after the column for the control (submit the control with a "##" label). When the

@@ -616,6 +616,21 @@ void Note(const char* fmt, ...)
     va_end(args);
 }
 
+void NoteBeside(const char* fmt, ...)
+{
+    const ImRect item(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    va_list args;
+    va_start(args, fmt);
+    ImGui::PushStyleColor(ImGuiCol_Text, facet::T().colors.labelSecondary);
+    facet::PushTextStyle(facet::TextStyle::Footnote);
+    const float y = facet::CenteredTextY(item.Min.y, item.GetHeight());
+    ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, y));
+    ImGui::TextWrappedV(fmt, args);
+    facet::PopTextStyle();
+    ImGui::PopStyleColor();
+    va_end(args);
+}
+
 // ---- Prototype controls ---------------------------------------------------------------------
 
 void ProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 max)
@@ -703,7 +718,8 @@ void DrawTrack(ImDrawList* drawList, const ImRect& track, facet::Orientation ori
     const float start = vertical ? track.Max.y : track.Min.x;
     const float end = vertical ? track.Min.y : track.Max.x;
     const ImRect whole = lineRect(start - (vertical ? -half : half), end + (vertical ? -half : half));
-    facet::FillRect(drawList, whole.Min, whole.Max, Color(disabled ? c.fill[3] : c.fill[0]), half);
+    // The unfilled line in the 3:1 boundary color, so the ends of the range stay visible.
+    facet::FillRect(drawList, whole.Min, whole.Max, Color(disabled ? c.fill[3] : facet::ControlBoundaryColor(c)), half);
     const float a = facet::internal::FractionToTrack(track, orientation, fillFrom);
     const float b = facet::internal::FractionToTrack(track, orientation, fillTo);
     if (a != b)
@@ -723,8 +739,12 @@ void DrawTrack(ImDrawList* drawList, const ImRect& track, facet::Orientation ori
     };
     if (m.step > 0.0 && m.max > m.min && (m.max - m.min) / m.step <= 20.0)
     {
-        for (double v = m.min; v <= m.max + m.step * 0.5; v += m.step)
-            drawTick(v);
+        const double count = std::floor((m.max - m.min) / m.step + 1e-9);
+        for (int i = 0; i <= static_cast<int>(count); ++i)
+            drawTick(m.min + i * m.step);
+        // A max off the grid is a stop too (End and drags reach it).
+        if (m.min + count * m.step < m.max - m.step * 1e-9)
+            drawTick(m.max);
     }
     for (const double stop : m.stops)
     {

@@ -147,6 +147,9 @@ void RangeRow(facet::demo::PageCtx& ctx, int index)
     facet::internal::EndRow();
     if (disabled)
         ImGui::EndDisabled();
+    // The capture states show on the first slider: keep it in the image at any size.
+    if (index == kClamp)
+        ctx.RevealInCapture(0.4f);
 }
 
 // Adds a handle in the middle of the widest gap.
@@ -214,7 +217,6 @@ FACET_DEMO_PAGE("multi-handle", "Multi-handle", "Blocks", 60, "default", "draggi
     for (int i = kClamp; i <= kMirror; ++i)
         RangeRow(ctx, i);
     facet::internal::EndRowGroup();
-    ctx.RevealInCapture(0.35f);
 
     SectionHeader("Vertical");
     RangeRow(ctx, kVertical);
