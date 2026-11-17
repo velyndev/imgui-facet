@@ -20,6 +20,9 @@ constexpr float kSamePosition = 0.5f;
 // Animation sub key of the hover amount of a handle (the track takes the pointer for all of
 // them, so the handle's own hover amount stays 0).
 constexpr int kHandleHoverSub = kItemAnimSubBase + 8;
+// Bisection steps for the furthest logarithmic span shift that keeps the minimum gap: halves
+// the fraction each step, far below a pixel after this many.
+constexpr int kGapBisections = 40;
 
 // The values a cancel restores, taken when an edit of a widget's part begins.
 struct EditSnapshot
@@ -635,13 +638,48 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
                 const double fraction = spanDrag.tracker.Fraction();
                 if (mapping.scale == ValueScale::Logarithmic)
                 {
-                    // Even on screen: every handle moves by the same fraction of the track.
+                    // Even on screen: every handle moves by the same fraction of the track. The
+                    // gaps in value units then shrink toward min, so the shift stops where the
+                    // smallest gap would fall below the minimum (found by bisection: the steps
+                    // of a stepped mapping make it uneven).
                     double f[kMaxHandles];
+                    double start[kMaxHandles];
                     for (int i = 0; i < n; ++i)
+                    {
+                        start[i] = moved[i];
                         f[i] = ValueToFraction(mapping, moved[i]);
+                    }
+                    const double gap = EffectiveGap(constraints, n);
+                    const double eps = ValueEpsilon(constraints);
+                    const auto place = [&](double shift) {
+                        for (int i = 0; i < n; ++i)
+                            moved[i] = shift == 0.0 ? start[i] : FractionToValue(mapping, f[i] + shift);
+                    };
+                    const auto keepsGap = [&]() {
+                        for (int i = 1; i < n; ++i)
+                        {
+                            if (moved[i] - moved[i - 1] < gap - eps)
+                                return false;
+                        }
+                        return true;
+                    };
                     const double d = std::clamp(fraction, -f[0], 1.0 - f[n - 1]);
-                    for (int i = 0; i < n; ++i)
-                        moved[i] = FractionToValue(mapping, f[i] + d);
+                    place(d);
+                    if (!keepsGap())
+                    {
+                        double good = 0.0;
+                        double bad = d;
+                        for (int k = 0; k < kGapBisections; ++k)
+                        {
+                            const double middle = (good + bad) * 0.5;
+                            place(middle);
+                            if (keepsGap())
+                                good = middle;
+                            else
+                                bad = middle;
+                        }
+                        place(good);
+                    }
                 }
                 else
                 {

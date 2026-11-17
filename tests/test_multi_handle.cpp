@@ -431,6 +431,39 @@ TEST_CASE("Multi-handle behaviour: dragging the span moves both and keeps the di
     CHECK(range.commits == 2);
 }
 
+TEST_CASE("Multi-handle behaviour: a span drag on a logarithmic track keeps the minimum gap")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.options.drag.mapping = {.min = 1.0, .max = 1000.0, .scale = facet::ValueScale::Logarithmic};
+    range.options.constraints.minGap = 150.0;
+    range.values[0] = 100.0;
+    range.values[1] = 300.0;
+    Install(session, range);
+    const ImRect r = session.ItemRect("range");
+    const auto at = [&](double value) {
+        const double t = std::log(value) / std::log(1000.0);
+        return ImVec2(r.Min.x + static_cast<float>(t) * r.GetWidth(), r.GetCenter().y);
+    };
+    // Grab the span between the handles and drag far toward min: the gap shrinks in value units
+    // as the span moves down, so the span stops where it reaches 150.
+    const ImVec2 middle = at(std::sqrt(100.0 * 300.0));
+    double smallestWritten = 1e9;  // the smallest gap the caller ever received with changed set
+    session.SetUi([&] {
+        range.Ui(session);
+        if (range.last.changed)
+            smallestWritten = std::min(smallestWritten, range.values[1] - range.values[0]);
+    });
+    session.Drag({middle, ImVec2(middle.x - 120.0f, middle.y)});
+    CHECK(smallestWritten >= 150.0 - 1e-6);
+    CHECK(range.values[1] - range.values[0] >= 150.0 - 1e-6);
+    CHECK(range.values[1] - range.values[0] == doctest::Approx(150.0).epsilon(0.01));
+    CHECK(range.values[0] < 100.0);
+    CHECK(range.values[1] / range.values[0] == doctest::Approx(3.0).epsilon(0.001));  // the same span on screen
+    CHECK(range.commits == 1);
+}
+
 TEST_CASE("Multi-handle behaviour: Escape restores every handle")
 {
     facet::test::Session session;
