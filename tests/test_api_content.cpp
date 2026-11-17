@@ -191,6 +191,21 @@ Stacks CurrentStacks()
             facet::internal::OpenScopeCount(), facet::internal::UsageErrorCount()};
 }
 
+// The bytes of an object or array before a call, to prove afterwards that the call wrote
+// nothing into it: no member, no element (padding is copied as well, and a widget that writes
+// one member leaves it as it was).
+template <class T>
+class Snapshot
+{
+public:
+    explicit Snapshot(const T& value) : source(&value) { std::memcpy(bytes, &value, sizeof(T)); }
+    bool Unchanged() const { return std::memcmp(bytes, source, sizeof(T)) == 0; }
+
+private:
+    const T* source;
+    unsigned char bytes[sizeof(T)];
+};
+
 // How a call is checked besides the stacks.
 enum class Expect
 {
@@ -374,9 +389,9 @@ void ChartCalls()
     Check("FrameTimeGraph, samples", Expect::Item, "frames 2", [] { FrameTimeGraph("frames 2", values, {.compact = true}); });
 
     LegendItem legend[] = {{"Series 1"}, {"Series 2", 0, true}};
+    const Snapshot legendBefore(legend);
     Check("Legend", Expect::Item, "legend", [&] { CHECK_FALSE(Legend("legend", legend)); });
-    CHECK_FALSE(legend[0].hidden);
-    CHECK(legend[1].hidden);
+    CHECK(legendBefore.Unchanged());
 
     double low = 1.0;
     double high = 2.0;
@@ -419,10 +434,9 @@ void MediaCalls()
     CHECK(selected == 1);
 
     ImageViewerState view{.zoom = 2.0f, .center = ImVec2(3.0f, 4.0f)};
+    const Snapshot viewBefore(view);
     Check("ImageViewer", Expect::Item, "Viewer", [&] { CHECK_FALSE(ImageViewer("Viewer", none, &view, {.height = 100.0f})); });
-    CHECK(view.zoom == 2.0f);
-    CHECK(view.center.x == 3.0f);
-    CHECK(view.center.y == 4.0f);
+    CHECK(viewBefore.Unchanged());
 
     float split = 0.25f;
     Check("ImageCompare", Expect::Item, "Compare", [&] { CHECK_FALSE(ImageCompare("Compare", &split, none, none)); });
@@ -442,34 +456,31 @@ void MediaCalls()
     Check("DropZonePayload", Expect::NoItem, nullptr, [] { CHECK(DropZonePayload() == nullptr); });
 }
 
-bool SameVec2(ImVec2 a, ImVec2 b)
-{
-    return a.x == b.x && a.y == b.y;
-}
-
 void EditorCalls()
 {
     using namespace facet;
     ImVec2 points[4] = {{0.0f, 0.0f}, {0.5f, 0.25f}, {1.0f, 1.0f}};
     int count = 3;
+    const Snapshot pointsBefore(points);
     Check("CurveEditor", Expect::Item, "Curve", [&] {
         CHECK_FALSE(CurveEditor("Curve", points, &count, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.marker = 0.5f}));
     });
     CHECK(count == 3);
-    CHECK(SameVec2(points[1], ImVec2(0.5f, 0.25f)));
+    CHECK(pointsBefore.Unchanged());
 
     CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
+    const Snapshot curveBefore(curve);
     Check("BezierEditor", Expect::Item, "Easing", [&] { CHECK_FALSE(BezierEditor("Easing", &curve)); });
-    CHECK(SameVec2(curve.p1, ImVec2(0.25f, 0.1f)));
-    CHECK(SameVec2(curve.p2, ImVec2(0.25f, 1.0f)));
+    CHECK(curveBefore.Unchanged());
 
     GradientStop stops[3] = {{0.0f}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
     int stopCount = 2;
+    const Snapshot stopsBefore(stops);
     Check("GradientEditor", Expect::Item, "Gradient", [&] {
         CHECK_FALSE(GradientEditor("Gradient", stops, &stopCount, {.alpha = true}));
     });
     CHECK(stopCount == 2);
-    CHECK(stops[1].position == 1.0f);
+    CHECK(stopsBefore.Unchanged());
 
     // Open categories and rows take content; the row pushes its label on the id stack.
     Check("PropertyGrid", Expect::NoItem, nullptr, [] {
@@ -526,6 +537,7 @@ void ToolCalls()
     CHECK(std::strcmp(buffer, "text") == 0);
 
     FilterChip filters[] = {{"Filter 1"}, {"Filter 2", {}, true}};
+    const Snapshot filtersBefore(filters);
     Check("SearchFilterBar", Expect::Item, "Search", [&] {
         CHECK_FALSE(SearchFilterBar("Search", &command, filters, {.resultCount = 3}));
     });
@@ -533,8 +545,7 @@ void ToolCalls()
           [&] { CHECK_FALSE(SearchFilterBar("Search 2", buffer, sizeof(buffer), filters)); });
     CHECK(command == "text");
     CHECK(std::strcmp(buffer, "text") == 0);
-    CHECK_FALSE(filters[0].active);
-    CHECK(filters[1].active);
+    CHECK(filtersBefore.Unchanged());
 
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
         BeginSettingsSearch("settings", {.filter = "query"});
@@ -547,9 +558,9 @@ void ToolCalls()
 
     Check("KeybindList, registry", Expect::Item, "binds", [] { CHECK_FALSE(KeybindList("binds", {.filter = "x"})); });
     KeybindListItem binds[] = {{"Action", "Group", {ImGuiKey_A}, {ImGuiKey_B}}};
+    const Snapshot bindsBefore(binds);
     Check("KeybindList, items", Expect::Item, "binds 2", [&] { CHECK_FALSE(KeybindList("binds 2", binds)); });
-    CHECK(binds[0].bind.primary == ImGuiKey_A);
-    CHECK(binds[0].defaultBind.primary == ImGuiKey_B);
+    CHECK(bindsBefore.Unchanged());
 
     static const PresetItem presets[] = {{"Preset 1"}, {"Preset 2", true}};
     int active = 1;
@@ -565,9 +576,9 @@ void ToolCalls()
     Check("ThemeModeControl", Expect::Item, "Theme", [&] { CHECK_FALSE(ThemeModeControl("Theme", &mode)); });
     CHECK(mode == ThemeMode::Dark);
     ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
+    const Snapshot accentBefore(accent);
     Check("AccentPicker", Expect::Item, "Accent", [&] { CHECK_FALSE(AccentPicker("Accent", &accent)); });
-    CHECK(accent.x == 0.1f);
-    CHECK(accent.z == 0.3f);
+    CHECK(accentBefore.Unchanged());
     float scale = 1.25f;
     Check("UiScaleControl", Expect::Item, "Scale",
           [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.keyboardZoom = true})); });
@@ -611,6 +622,7 @@ void CanvasCalls()
 {
     using namespace facet;
     CanvasElementState element{CanvasAnchor::Center, {10.0f, 20.0f}, {100.0f, 50.0f}};
+    const Snapshot elementBefore(element);
     Check("PreviewCanvas", Expect::NoItem, nullptr, [&] {
         BeginPreviewCanvas("canvas", ImVec2(1920.0f, 1080.0f), {.gridSpacing = 120.0f});
         CHECK_FALSE(CanvasElement("Element", &element, {.resizable = true}));
@@ -619,11 +631,10 @@ void CanvasCalls()
     Check("PreviewCanvasScope, empty size", Expect::NoItem, nullptr,
           [] { PreviewCanvasScope canvas("canvas 2", ImVec2(0.0f, 0.0f)); });
     Check("CanvasElement", Expect::Item, "Element 2", [&] { CHECK_FALSE(CanvasElement("Element 2", &element)); });
-    CHECK(element.anchor == CanvasAnchor::Center);
-    CHECK(SameVec2(element.offset, ImVec2(10.0f, 20.0f)));
-    CHECK(SameVec2(element.extent, ImVec2(100.0f, 50.0f)));
+    CHECK(elementBefore.Unchanged());
 
     LayerItem layers[] = {{"Layer 1"}, {"Layer 2", {}, 1, false, true}};
+    const Snapshot layersBefore(layers);
     int selected = 1;
     Check("LayerList", Expect::Item, "layers", [&] {
         const LayerListResult result = LayerList("layers", &selected, layers);
@@ -632,9 +643,7 @@ void CanvasCalls()
         CHECK(result.to == -1);
     });
     CHECK(selected == 1);
-    CHECK(layers[0].visible);
-    CHECK_FALSE(layers[1].visible);
-    CHECK(layers[1].locked);
+    CHECK(layersBefore.Unchanged());
 
     // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
     bool open = true;
@@ -812,11 +821,16 @@ TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack"
         facet::EndPropertyGrid();
         facet::EndDragSource();
         facet::EndDropTarget();
+        facet::EndDataTableCellEdit();
+        facet::EndPropertyCategory();
+        facet::EndSettingsSearch();
+        facet::EndPreviewCanvas();
+        facet::EndOnboarding();
         reported = facet::internal::UsageErrorCount() - errors;
         Stacks after = CurrentStacks();
         after.usageErrors = before.usageErrors;
         CHECK(after == before);
     });
     session.Frame();
-    CHECK(reported == 7);
+    CHECK(reported == 12);
 }
