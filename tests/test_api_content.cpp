@@ -70,6 +70,34 @@ static_assert(OptionsFollowConventions<facet::ImageCompareOptions>());
 static_assert(OptionsFollowConventions<facet::TimelineScrubberOptions>());
 static_assert(OptionsFollowConventions<facet::DropZoneOptions>());
 
+static_assert(OptionsFollowConventions<facet::CurveEditorOptions>());
+static_assert(OptionsFollowConventions<facet::BezierEditorOptions>());
+static_assert(OptionsFollowConventions<facet::GradientEditorOptions>());
+static_assert(OptionsFollowConventions<facet::PropertyGridOptions>());
+static_assert(OptionsFollowConventions<facet::PropertyCategoryOptions>());
+static_assert(OptionsFollowConventions<facet::PropertyRowOptions>());
+static_assert(OptionsFollowConventions<facet::ConsoleViewOptions>());
+static_assert(OptionsFollowConventions<facet::SearchFilterBarOptions>());
+static_assert(OptionsFollowConventions<facet::SettingsSearchMatchOptions>());
+static_assert(OptionsFollowConventions<facet::KeybindListOptions>());
+static_assert(OptionsFollowConventions<facet::PresetListOptions>());
+static_assert(OptionsFollowConventions<facet::InventoryGridOptions>());
+static_assert(OptionsFollowConventions<facet::ItemTileOptions>());
+static_assert(OptionsFollowConventions<facet::ItemSlotOptions>());
+static_assert(OptionsFollowConventions<facet::ItemDetailCardOptions>());
+static_assert(OptionsFollowConventions<facet::MediaCardOptions>());
+static_assert(OptionsFollowConventions<facet::UserChipOptions>());
+static_assert(OptionsFollowConventions<facet::ProfileSwitcherOptions>());
+static_assert(OptionsFollowConventions<facet::PreviewCanvasOptions>());
+static_assert(OptionsFollowConventions<facet::CanvasElementOptions>());
+static_assert(OptionsFollowConventions<facet::LayerListOptions>());
+static_assert(OptionsFollowConventions<facet::OnboardingOptions>());
+static_assert(OptionsFollowConventions<facet::ThemeModeControlOptions>());
+static_assert(OptionsFollowConventions<facet::AccentPickerOptions>());
+static_assert(OptionsFollowConventions<facet::UiScaleControlOptions>());
+static_assert(OptionsFollowConventions<facet::DragSourceOptions>());
+static_assert(OptionsFollowConventions<facet::AcceptDropOptions>());
+
 // The stacks a call must leave as it found them.
 struct Stacks
 {
@@ -320,6 +348,246 @@ void MediaCalls()
     Check("DropZonePayload", Expect::NoItem, nullptr, [] { CHECK(DropZonePayload() == nullptr); });
 }
 
+bool SameVec2(ImVec2 a, ImVec2 b)
+{
+    return a.x == b.x && a.y == b.y;
+}
+
+void EditorCalls()
+{
+    using namespace facet;
+    ImVec2 points[4] = {{0.0f, 0.0f}, {0.5f, 0.25f}, {1.0f, 1.0f}};
+    int count = 3;
+    Check("CurveEditor", Expect::Item, "Curve", [&] {
+        CHECK_FALSE(CurveEditor("Curve", points, &count, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.marker = 0.5f}));
+    });
+    CHECK(count == 3);
+    CHECK(SameVec2(points[1], ImVec2(0.5f, 0.25f)));
+
+    CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
+    Check("BezierEditor", Expect::Item, "Easing", [&] { CHECK_FALSE(BezierEditor("Easing", &curve)); });
+    CHECK(SameVec2(curve.p1, ImVec2(0.25f, 0.1f)));
+    CHECK(SameVec2(curve.p2, ImVec2(0.25f, 1.0f)));
+
+    GradientStop stops[3] = {{0.0f}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
+    int stopCount = 2;
+    Check("GradientEditor", Expect::Item, "Gradient", [&] {
+        CHECK_FALSE(GradientEditor("Gradient", stops, &stopCount, {.alpha = true}));
+    });
+    CHECK(stopCount == 2);
+    CHECK(stops[1].position == 1.0f);
+
+    // Open categories and rows take content; the row pushes its label on the id stack.
+    Check("PropertyGrid", Expect::NoItem, nullptr, [] {
+        BeginPropertyGrid("grid", {.filter = "prop"});
+        const bool category = BeginPropertyCategory("Category");
+        CHECK(category);
+        if (category)
+        {
+            const ImGuiID outside = ImGui::GetID("##value");
+            const bool row = BeginPropertyRow("Property", {.modified = true});
+            CHECK(row);
+            if (row)
+            {
+                CHECK(ImGui::GetID("##value") != outside);
+                ImGui::Button("##value");
+                EndPropertyRow();
+            }
+            CHECK(ImGui::GetID("##value") == outside);
+            EndPropertyCategory();
+        }
+        CHECK_FALSE(BeginPropertyCategory("Closed", {.defaultOpen = false}));
+        EndPropertyGrid();
+    });
+    Check("PropertyGridScope", Expect::NoItem, nullptr, [] {
+        PropertyGridScope grid("grid2");
+        if (PropertyCategoryScope category("Category"); category)
+            if (PropertyRowScope row("Property"); row)
+                ImGui::TextUnformatted("value");
+    });
+}
+
+void ToolCalls()
+{
+    using namespace facet;
+    static const LogEntry lines[] = {{"Line 1"}};
+    static const char* const commands[] = {"command"};
+    const LogGetter getter = [](void*, int index, LogEntry* out) {
+        *out = lines[index];
+        return true;
+    };
+    std::string command = "text";
+    char buffer[16] = "text";
+    Check("ConsoleView", Expect::Item, "console", [&] {
+        CHECK_FALSE(ConsoleView("console", &command, lines, {.commands = commands, .height = 80.0f}));
+    });
+    Check("ConsoleView, getter", Expect::Item, "console 2",
+          [&] { CHECK_FALSE(ConsoleView("console 2", &command, 1, getter, nullptr, {.height = 80.0f})); });
+    Check("ConsoleView, buffer", Expect::Item, "console 3",
+          [&] { CHECK_FALSE(ConsoleView("console 3", buffer, sizeof(buffer), lines, {.height = 80.0f})); });
+    Check("ConsoleView, buffer and getter", Expect::Item, "console 4", [&] {
+        CHECK_FALSE(ConsoleView("console 4", buffer, sizeof(buffer), 1, getter, nullptr, {.height = 80.0f}));
+    });
+    CHECK(command == "text");
+    CHECK(std::strcmp(buffer, "text") == 0);
+
+    FilterChip filters[] = {{"Filter 1"}, {"Filter 2", {}, true}};
+    Check("SearchFilterBar", Expect::Item, "Search", [&] {
+        CHECK_FALSE(SearchFilterBar("Search", &command, filters, {.resultCount = 3}));
+    });
+    Check("SearchFilterBar, buffer", Expect::Item, "Search 2",
+          [&] { CHECK_FALSE(SearchFilterBar("Search 2", buffer, sizeof(buffer), filters)); });
+    CHECK(command == "text");
+    CHECK(std::strcmp(buffer, "text") == 0);
+    CHECK_FALSE(filters[0].active);
+    CHECK(filters[1].active);
+
+    Check("SettingsSearch", Expect::NoItem, nullptr, [] {
+        BeginSettingsSearch("settings", "query");
+        CHECK(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));
+        EndSettingsSearch();
+    });
+    Check("SettingsSearchScope", Expect::NoItem, nullptr, [] { SettingsSearchScope search("settings 2", ""); });
+    Check("SettingsSearchHitCount", Expect::NoItem, nullptr,
+          [] { CHECK(SettingsSearchHitCount("settings", nullptr) == 0); });
+
+    Check("KeybindList, registry", Expect::Item, "binds", [] { CHECK_FALSE(KeybindList("binds", {.filter = "x"})); });
+    KeybindListItem binds[] = {{"Action", "Group", {ImGuiKey_A}, {ImGuiKey_B}}};
+    Check("KeybindList, items", Expect::Item, "binds 2", [&] { CHECK_FALSE(KeybindList("binds 2", binds)); });
+    CHECK(binds[0].bind.primary == ImGuiKey_A);
+    CHECK(binds[0].defaultBind.primary == ImGuiKey_B);
+
+    static const PresetItem presets[] = {{"Preset 1"}, {"Preset 2", true}};
+    int active = 1;
+    Check("PresetList", Expect::Item, "presets", [&] {
+        const PresetListResult result = PresetList("presets", &active, presets);
+        CHECK(result.action == PresetAction::None);
+        CHECK(result.index == -1);
+        CHECK(result.name == nullptr);
+    });
+    CHECK(active == 1);
+
+    ThemeMode mode = ThemeMode::Dark;
+    Check("ThemeModeControl", Expect::Item, "Theme", [&] { CHECK_FALSE(ThemeModeControl("Theme", &mode)); });
+    CHECK(mode == ThemeMode::Dark);
+    ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
+    Check("AccentPicker", Expect::Item, "Accent", [&] { CHECK_FALSE(AccentPicker("Accent", &accent)); });
+    CHECK(accent.x == 0.1f);
+    CHECK(accent.z == 0.3f);
+    float scale = 1.25f;
+    Check("UiScaleControl", Expect::Item, "Scale",
+          [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.keyboardZoom = true})); });
+    CHECK(scale == 1.25f);
+}
+
+void InventoryCalls()
+{
+    using namespace facet;
+    static const InventoryItem slots[] = {{"Item 1", {}, Icon("file"), 2}, {}, {"Item 2"}};
+    const auto neutral = [](const InventoryResult& result) {
+        return result.action == InventoryAction::None && result.source == 0 && result.from == -1 &&
+               result.to == -1 && result.count == 0;
+    };
+    int selected = 2;
+    Check("InventoryGrid", Expect::Item, "bag", [&] { CHECK(neutral(InventoryGrid("bag", &selected, slots))); });
+    Check("InventoryGrid, columns", Expect::Item, "bag 2",
+          [&] { CHECK(neutral(InventoryGrid("bag 2", &selected, slots, {.columns = 2, .slotSize = 40.0f}))); });
+    CHECK(selected == 2);
+    Check("ItemTile", Expect::Item, "tile", [] { CHECK_FALSE(ItemTile("tile", slots[0], {.selected = true})); });
+    Check("ItemSlot", Expect::Item, "Slot", [&] { CHECK(neutral(ItemSlot("Slot", slots[1]))); });
+
+    static const ItemStat stats[] = {{"Stat", 2.0, 1.0}};
+    static const char* const actions[] = {"Action"};
+    Check("ItemDetailCard", Expect::Item, "Item", [] {
+        CHECK(ItemDetailCard("Item", ImageHandle{}, {.stats = stats, .actions = actions}) == -1);
+    });
+    Check("MediaCard", Expect::Item, "Card", [] { CHECK_FALSE(MediaCard("Card", ImageHandle{}, {.selected = true})); });
+    Check("UserChip", Expect::Item, "Name", [] { CHECK_FALSE(UserChip("Name", ImageHandle{}, {.detail = "Detail"})); });
+    Check("UserChip, compact", Expect::Item, "Name 2", [] { CHECK_FALSE(UserChip("Name 2", ImageHandle{}, {.compact = true})); });
+
+    static const AvatarItem profiles[] = {{"Profile 1"}, {"Profile 2"}};
+    int current = 0;
+    Check("ProfileSwitcher", Expect::Item, "profiles", [&] {
+        CHECK(ProfileSwitcher("profiles", &current, profiles, {.addLabel = "Add"}) == ProfileSwitcherAction::None);
+    });
+    CHECK(current == 0);
+}
+
+void CanvasCalls()
+{
+    using namespace facet;
+    CanvasElementState element{CanvasAnchor::Center, {10.0f, 20.0f}, {100.0f, 50.0f}};
+    Check("PreviewCanvas", Expect::NoItem, nullptr, [&] {
+        BeginPreviewCanvas("canvas", ImVec2(1920.0f, 1080.0f), {.gridSpacing = 120.0f});
+        CHECK_FALSE(CanvasElement("Element", &element, {.resizable = true}));
+        EndPreviewCanvas();
+    });
+    Check("PreviewCanvasScope, empty size", Expect::NoItem, nullptr,
+          [] { PreviewCanvasScope canvas("canvas 2", ImVec2(0.0f, 0.0f)); });
+    Check("CanvasElement", Expect::Item, "Element 2", [&] { CHECK_FALSE(CanvasElement("Element 2", &element)); });
+    CHECK(element.anchor == CanvasAnchor::Center);
+    CHECK(SameVec2(element.offset, ImVec2(10.0f, 20.0f)));
+    CHECK(SameVec2(element.extent, ImVec2(100.0f, 50.0f)));
+
+    LayerItem layers[] = {{"Layer 1"}, {"Layer 2", {}, 1, false, true}};
+    int selected = 1;
+    Check("LayerList", Expect::Item, "layers", [&] {
+        const LayerListResult result = LayerList("layers", &selected, layers);
+        CHECK(result.action == LayerAction::None);
+        CHECK(result.index == -1);
+        CHECK(result.to == -1);
+    });
+    CHECK(selected == 1);
+    CHECK(layers[0].visible);
+    CHECK_FALSE(layers[1].visible);
+    CHECK(layers[1].locked);
+
+    // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
+    bool open = true;
+    int step = 1;
+    Check("BeginOnboarding, open", Expect::Item, "Welcome", [&] { CHECK_FALSE(BeginOnboarding("Welcome", &open, &step, 3)); });
+    CHECK(open);
+    CHECK(step == 1);
+    bool closed = false;
+    Check("BeginOnboarding, closed", Expect::NoItem, nullptr,
+          [&] { CHECK_FALSE(BeginOnboarding("Welcome 2", &closed, &step, 3)); });
+    CHECK_FALSE(closed);
+    Check("OnboardingScope", Expect::NoItem, nullptr, [&] {
+        OnboardingScope onboarding("Welcome 3", &closed, &step, 3);
+        CHECK_FALSE(static_cast<bool>(onboarding));
+    });
+}
+
+void DragDropCalls()
+{
+    using namespace facet;
+    const int payload = 7;
+    Check("BeginDragSource", Expect::NoItem, nullptr, [&] {
+        ImGui::Button("source");
+        if (BeginDragSource("test.item", &payload, sizeof(payload), {.previewText = "Item"}))
+            EndDragSource();
+        DragSourceScope scope("test.item", &payload, sizeof(payload));
+        CHECK_FALSE(static_cast<bool>(scope));
+    });
+    Check("BeginDropTarget", Expect::NoItem, nullptr, [] {
+        ImGui::Button("target");
+        if (BeginDropTarget())
+            EndDropTarget();
+        CHECK(AcceptDrop("test.item", {.indicator = DropIndicator::LineBefore, .peek = true}) == nullptr);
+        DropTargetScope scope;
+        CHECK_FALSE(static_cast<bool>(scope));
+    });
+}
+
+void CompositeCalls()
+{
+    EditorCalls();
+    ToolCalls();
+    InventoryCalls();
+    CanvasCalls();
+    DragDropCalls();
+}
+
 } // namespace
 
 TEST_CASE("The display stubs submit one item each, return the neutral result and keep every stack")
@@ -350,4 +618,38 @@ TEST_CASE("The media stubs submit one item each, return the neutral result and k
     RunFrame(session, &runs, &MediaCalls);
     CHECK(runs == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
+}
+
+TEST_CASE("The composite stubs submit one item each, return the neutral result and keep every stack")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int runs = 0;
+    RunFrame(session, &runs, &CompositeCalls);
+    CHECK(runs == 1);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+}
+
+TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int reported = 0;
+    session.SetUi([&] {
+        const Stacks before = CurrentStacks();
+        const int errors = facet::internal::UsageErrorCount();
+        facet::EndDataTable();
+        facet::EndDataStateView();
+        facet::EndKeyValueList();
+        facet::EndPropertyRow();
+        facet::EndPropertyGrid();
+        facet::EndDragSource();
+        facet::EndDropTarget();
+        reported = facet::internal::UsageErrorCount() - errors;
+        Stacks after = CurrentStacks();
+        after.usageErrors = before.usageErrors;
+        CHECK(after == before);
+    });
+    session.Frame();
+    CHECK(reported == 7);
 }
