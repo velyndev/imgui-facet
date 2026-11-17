@@ -340,8 +340,8 @@ struct XYPadOptions
     bool grid = false;                  // grid lines at every step (or at quarters without one)
     bool crosshair = true;              // guide lines through the point and axis readouts
     bool yDown = false;                 // min.y at the top; by default min.y is at the bottom
-    float width = 0.0f;                 // units; 0 for the default pad size, kFill fills
-    float height = 0.0f;                // units; 0 makes the pad square
+    float width = 0.0f;                 // units; 0: default side, at most the available width; kFill fills
+    float height = 0.0f;                // units; 0 makes the pad square (as high as it is wide)
     bool readOnly = false;
     bool mixed = false;                 // no point until the first edit
     const char* error = nullptr;
@@ -361,7 +361,7 @@ struct JoystickPadOptions
     bool springReturn = true;           // the stick returns to the center on release
     bool circular = true;               // the value stays inside the unit circle; otherwise inside the square
     bool showDeadzone = false;          // draws the deadzone ring
-    float diameter = 0.0f;              // units; 0 for the default pad size
+    float diameter = 0.0f;              // units; 0: default size, at most the available width
     bool readOnly = false;
     const char* error = nullptr;
     const char* helpText = nullptr;
@@ -412,8 +412,8 @@ struct BoxRangePadOptions
     HandleCollision collision = HandleCollision::Clamp;
     bool dragSpan = true;               // dragging the box body moves the whole box
     bool yDown = false;                 // min.y at the top; by default min.y is at the bottom
-    float width = 0.0f;                 // units; 0 for the default pad size, kFill fills
-    float height = 0.0f;                // units; 0 makes the pad square
+    float width = 0.0f;                 // units; 0: default side, at most the available width; kFill fills
+    float height = 0.0f;                // units; 0 makes the pad square (as high as it is wide)
     bool readOnly = false;
     bool mixed = false;                 // no box and no handles until the first edit writes both corners
     const char* error = nullptr;

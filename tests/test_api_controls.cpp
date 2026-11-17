@@ -698,6 +698,52 @@ TEST_CASE("Controls that narrow themselves never outgrow a short row")
     CHECK(session.ItemRect("asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
 }
 
+TEST_CASE("Pads keep their default size in a wide row and fit a short row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 point(0.5f, 0.5f);
+    ImVec2 low(0.25f, 0.25f);
+    ImVec2 high(0.75f, 0.75f);
+    float available = 0.0f;
+    session.SetUi([&] {
+        facet::XYPad("Pad##wide", &point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+        session.Track("xy wide");
+        facet::JoystickPad("Stick##wide", &point);
+        session.Track("stick wide");
+        // A row far narrower than the default pad sizes.
+        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(400.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::XYPad("Pad", &point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+        session.Track("xy");
+        facet::BoxRangePad("Box", &low, &high, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+        session.Track("box");
+        facet::JoystickPad("Stick", &point);
+        session.Track("stick");
+        // A size the caller asks for is kept.
+        facet::XYPad("Pad##asked", &point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f});
+        session.Track("xy asked");
+        facet::JoystickPad("Stick##asked", &point, {.diameter = 100.0f});
+        session.Track("stick asked");
+        ImGui::EndChild();
+    });
+    session.Frame();
+
+    REQUIRE(available > 1.0f);
+    CHECK(session.ItemRect("xy wide").GetWidth() > available);
+    CHECK(session.ItemRect("stick wide").GetWidth() > available);
+    for (const char* name : {"xy", "box", "stick"})
+    {
+        CAPTURE(name);
+        const ImRect rect = session.ItemRect(name);
+        CHECK(rect.GetWidth() == doctest::Approx(available));
+        // Square: as high as it is wide.
+        CHECK(rect.GetHeight() == doctest::Approx(available));
+    }
+    CHECK(session.ItemRect("xy asked").GetWidth() == doctest::Approx(facet::Px(100.0f)));
+    CHECK(session.ItemRect("stick asked").GetWidth() == doctest::Approx(facet::Px(100.0f)));
+}
+
 TEST_CASE("The placeholder text drops the label, then the name, and keeps the word planned")
 {
     facet::test::Session session;

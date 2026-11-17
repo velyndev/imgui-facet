@@ -19,7 +19,8 @@ constexpr float kJoystickInXxxl = 4.0f;
 
 bool JoystickPad(const char* label, ImVec2*, const JoystickPadOptions& options)
 {
-    const float diameter = options.diameter > 0.0f ? Px(options.diameter) : Px(T().spacing.xxxl) * kJoystickInXxxl;
+    const float diameter = options.diameter > 0.0f ? Px(options.diameter)
+                                                   : internal::StubFitAvailable(Px(T().spacing.xxxl) * kJoystickInXxxl);
     internal::ControlStub("JoystickPad", label, diameter,
                           diameter + internal::StubMessageHeight(options.error, options.helpText));
     return false;

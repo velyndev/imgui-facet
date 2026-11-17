@@ -74,15 +74,26 @@ inline float StubWidth(float optionWidth, float defaultWidth)
     return width < 1.0f ? 1.0f : width;
 }
 
-// StubWidth for a content-sized control that narrows itself when the row is short (labels
-// collapse to icons, buttons move into a menu): the family default is `content` (pixels), but
-// at most the available width. A width the caller asked for is kept as it is.
+// StubWidth for a control that narrows itself when the row is short (labels collapse to icons,
+// buttons move into a menu, cells and pads shrink): the family default is `content` (pixels),
+// but at most the available width. A width the caller asked for is kept as it is.
 inline float StubFittedWidth(float optionWidth, float content)
 {
     if (!StubCanDraw())
         return 0.0f;
     const float available = ImGui::GetContentRegionAvail().x;
     return StubWidth(optionWidth, content < available ? content : (available > 1.0f ? available : 1.0f));
+}
+
+// `length` (pixels), but at most the available width and at least one pixel: the default size
+// of a control without a width option that shrinks in a short row (JoystickPad, Rating).
+inline float StubFitAvailable(float length)
+{
+    if (!StubCanDraw())
+        return 0.0f;
+    const float available = ImGui::GetContentRegionAvail().x;
+    const float fitted = length < available ? length : available;
+    return fitted < 1.0f ? 1.0f : fitted;
 }
 
 // Height of the message line under a control (spacing.xs and one Footnote line) when the widget
@@ -160,11 +171,11 @@ inline float StubDial(float diameterUnits, ControlSize size)
     return diameterUnits > 0.0f ? Px(diameterUnits) : ControlHeight(size) * kStubDialInControls;
 }
 
-// Size of a two-dimensional pad: `widthUnits` by rule 6 with the default pad side, and
-// `heightUnits` or square.
+// Size of a two-dimensional pad: `widthUnits` by rule 6 with the default pad side (at most the
+// available width), and `heightUnits` or square.
 inline ImVec2 StubPadSize(float widthUnits, float heightUnits)
 {
-    const float width = StubWidth(widthUnits, Px(T().spacing.xxxl) * kStubPadInXxxl);
+    const float width = StubFittedWidth(widthUnits, Px(T().spacing.xxxl) * kStubPadInXxxl);
     return ImVec2(width, heightUnits > 0.0f ? Px(heightUnits) : width);
 }
 
