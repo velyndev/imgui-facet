@@ -108,9 +108,10 @@ bool RasterizeIcon(std::uint32_t iconId, int pixels, RgbaImage& out);
 // Pages the icon atlas holds now; at most four (icon_atlas.cpp).
 int IconAtlasPageCount();
 
-// Drops the icon registry, so the next use builds it again from the embedded icons. Icons
-// registered at runtime are gone afterwards. For tests that need the first build to happen
-// at a chosen moment; not for use while a frame is being recorded.
+// Drops the icon registry and empties the icon atlas, so the next use builds the registry
+// again from the embedded icons. Icons registered at runtime are gone afterwards. For tests
+// that need the first build to happen at a chosen moment or must see only the embedded
+// set; not for use while a frame is being recorded.
 void ResetIconRegistry();
 
 // Draws the loading placeholder or the failed marker of an image box. Used by DrawImage

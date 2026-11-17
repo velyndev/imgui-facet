@@ -824,6 +824,10 @@ TEST_CASE("Icon registration and drawing survive failed allocations")
     }
     CHECK(drawn);
     CHECK(failures > 0);
+
+    // Leave the registry as other test cases expect it.
+    facet::EndFrame();
+    facet::internal::ResetIconRegistry();
 }
 TEST_CASE("A glyph whose allocation fails takes no room in the icon atlas")
 {
@@ -927,4 +931,34 @@ TEST_CASE("Each allocation on the way to an icon glyph can fail without breaking
     }
     CHECK(through);
     CHECK(failures >= 5);
+}
+TEST_CASE("Resetting the icon registry also drops the glyphs of icons that are gone")
+{
+    Session session;
+    REQUIRE(session.ok);
+    facet::EndFrame();
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList._SetPixelDensity(1.0f);
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
+
+    const char* name = "facet-test-reset-icon";
+    const facet::Icon icon = facet::RegisterIcon(name, kSvg24);
+    REQUIRE(icon.IsValid());
+    facet::NewFrame();
+    facet::DrawIcon(&drawList, icon, ImVec2(0.0f, 0.0f), 16.0f, IM_COL32_WHITE);
+    CHECK(drawList.VtxBuffer.Size == 4);  // a textured quad
+    CHECK(facet::internal::IconAtlasPageCount() == 1);
+    facet::EndFrame();
+
+    facet::internal::ResetIconRegistry();
+    CHECK_FALSE(facet::FindIcon(name).IsValid());
+    CHECK(facet::internal::IconAtlasPageCount() == 0);
+
+    // The icon is unknown now, so it draws the placeholder and not its old raster.
+    facet::NewFrame();
+    const int vertices = drawList.VtxBuffer.Size;
+    facet::DrawIcon(&drawList, icon, ImVec2(0.0f, 0.0f), 16.0f, IM_COL32_WHITE);
+    CHECK(drawList.VtxBuffer.Size - vertices > 4);  // the crossed box
+    facet::EndFrame();
 }

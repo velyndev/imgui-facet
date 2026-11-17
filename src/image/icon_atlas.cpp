@@ -539,6 +539,9 @@ int IconAtlasPageCount()
 void ResetIconRegistry()
 {
     RegistryStorage().reset();
+    // Glyphs are keyed by icon id: without this an icon that is gone would keep drawing
+    // its old raster, and a new icon under the same name would reuse it.
+    Clear(State());
 }
 
 bool RasterizeIcon(std::uint32_t iconId, int pixels, RgbaImage& out)

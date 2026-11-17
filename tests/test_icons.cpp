@@ -91,6 +91,8 @@ TEST_CASE("Icon names are listed in byte order")
 
 TEST_CASE("Every built-in icon parses and rasterizes to a white mask inside its margin")
 {
+    // Only the embedded set: icons that other test cases registered do not follow its rules.
+    facet::internal::ResetIconRegistry();
     for (int i = 0; i < facet::IconCount(); ++i)
     {
         const char* name = facet::IconNameAt(i);
@@ -161,4 +163,8 @@ TEST_CASE("Icons registered at runtime join the registry")
     CHECK_FALSE(facet::RegisterIcon(nullptr, svg).IsValid());
     CHECK_FALSE(facet::FindIcon("test-runtime-bad").IsValid());
     CHECK(facet::IconCount() == before + 1);
+
+    // Leave the registry as other test cases expect it.
+    facet::internal::ResetIconRegistry();
+    CHECK_FALSE(facet::FindIcon("test-runtime-dot").IsValid());
 }
