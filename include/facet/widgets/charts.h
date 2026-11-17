@@ -4,7 +4,7 @@
 // legends and the range brush.
 //
 // One data form for every chart. A series is a ChartSeries: a span of float values (y), an
-// optional span of float x values of the same length, or, for large or generated data, a
+// optional span of double x values of the same length, or, for large or generated data, a
 // count plus a ChartGetter that fills one point at a time. The data stays the caller's: a
 // chart reads it during the call and keeps nothing but its hover and animation state. One
 // option pattern for axes: ChartAxis (range, scale, format, grid) on every chart with axes.
@@ -42,7 +42,8 @@ struct ChartSeries
 {
     const char* label = nullptr;           // legend and hover text; "##" hides it
     std::span<const float> values = {};    // y values
-    std::span<const float> x = {};         // x values, same length as values; empty: x is the index
+    std::span<const double> x = {};        // x values, same length as values; empty: x is the index.
+                                           // double, so time axes in seconds keep their precision
     int count = 0;                         // points of the getter
     ChartGetter getter = nullptr;
     void* user = nullptr;

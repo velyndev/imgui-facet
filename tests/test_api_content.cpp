@@ -110,6 +110,10 @@ static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
 static_assert(HasDataBlock<facet::LayerListOptions>());
 static_assert(!HasDataBlock<facet::SparklineOptions>());  // the check itself works
 
+// Chart x values are doubles like ChartPoint, ChartAxis and the range brush: a float near
+// 1.7e9 seconds steps by 128 s.
+static_assert(std::is_same_v<decltype(facet::ChartSeries::x), std::span<const double>>);
+
 // One alignment enum for styled text and table columns.
 static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);
 static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::ColumnAlign>);

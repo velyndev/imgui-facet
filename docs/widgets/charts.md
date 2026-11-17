@@ -14,7 +14,7 @@ result.
 ## One data form, one axis pattern
 
 - **Series** are `ChartSeries`: `values` (a span of float y values) with an optional `x` span of
-  the same length, or `count` plus a `ChartGetter` that fills one `ChartPoint` (double x and y)
+  doubles of the same length (double, so time axes in seconds keep their precision), or `count` plus a `ChartGetter` that fills one `ChartPoint` (double x and y)
   at a time and may return false for a gap. The data stays the caller's and is read during the
   call only.
 - **Axes** are `ChartAxis`: `min` and `max` (equal values follow the data), `ValueScale`,
