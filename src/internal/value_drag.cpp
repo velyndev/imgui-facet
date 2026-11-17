@@ -77,7 +77,6 @@ struct Session
     double anchorValue = 0.0;  // the value at the drag's start fraction (after a jump)
     DragTracker tracker;
     ImVec2 lastMouse;
-    double wheelRemainder = 0.0;
 };
 
 Session& CurrentSession()
@@ -85,6 +84,25 @@ Session& CurrentSession()
     static Session session;
     return session;
 }
+
+// Wheel movement below a whole notch (touchpads send fractions), kept for the item under the
+// pointer until it adds up to a notch. A wheel session ends on the frame after its step, so the
+// rest lives outside the session; it is dropped when the wheel turns another item, turns the
+// other way, or stops applying to this item (the pointer left it).
+struct WheelRest
+{
+    ImGuiID id = 0;
+    double rest = 0.0;
+};
+
+WheelRest& CurrentWheelRest()
+{
+    static WheelRest rest;
+    return rest;
+}
+
+// Sums of fractional notches such as ten times 0.1 land a hair below a whole notch.
+constexpr double kNotchEpsilon = 1e-9;
 
 struct CanceledRecord
 {
@@ -277,6 +295,7 @@ void MarkEditCanceled(ImGuiID id)
 void ResetValueDragState()
 {
     CurrentSession() = {};
+    CurrentWheelRest() = {};
     Canceled() = {};
 }
 
@@ -464,7 +483,9 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
 
     // The wheel, over the item, while it is focused or Alt is held.
     const bool wheelEnabled = options.wheel && !readOnly && item.hovered && (focused || io.KeyAlt);
-    double wheelRest = 0.0;
+    WheelRest& wheelRest = CurrentWheelRest();
+    if (!wheelEnabled && wheelRest.id == id)
+        wheelRest = {};
     if (wheelEnabled)
     {
         ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, id);
@@ -474,10 +495,12 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
             wheel += io.MouseWheel;
         if (ImGui::TestKeyOwner(ImGuiKey_MouseWheelX, id))
             wheel -= io.MouseWheelH;
-        // Fractional notches (touchpads) add up within one edit session.
-        const double total = wheel + (session.id == id ? session.wheelRemainder : 0.0);
-        const int notches = static_cast<int>(std::trunc(total));
-        wheelRest = total - notches;
+        // Fractional notches (touchpads) add up across frames until they make a whole one.
+        if (wheelRest.id != id || wheel * wheelRest.rest < 0.0)
+            wheelRest = {id, 0.0};
+        const double total = wheel + wheelRest.rest;
+        const int notches = static_cast<int>(std::trunc(total + std::copysign(kNotchEpsilon, total)));
+        wheelRest.rest = total - notches;
         if (notches != 0)
         {
             const StepSize size = io.KeyCtrl ? StepSize::Coarse : (io.KeyShift ? StepSize::Fine : StepSize::Normal);
@@ -509,7 +532,6 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
 
     if (session.id == id && session.keyboard)
     {
-        session.wheelRemainder = wheelRest;
         result.keyboard = true;
         ImGui::SetKeyOwner(ImGuiKey_Escape, id);
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, id))

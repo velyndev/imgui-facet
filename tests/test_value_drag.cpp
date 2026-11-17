@@ -460,6 +460,30 @@ TEST_CASE("Value drag: the wheel steps only when focused or with Alt")
     CHECK(slider.value == doctest::Approx(0.49));
 }
 
+TEST_CASE("Value drag: fractions of a wheel notch add up to steps")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    Install(session, slider);
+    const ImVec2 knob = TestSlider::At(session, 0.5);
+    session.Click(knob);
+    REQUIRE(slider.value == 0.5);
+    for (int i = 0; i < 8; ++i)
+        session.Wheel(knob, 0.25f);
+    CHECK(slider.value == doctest::Approx(0.52));
+    // Ten tenths make one notch as well.
+    for (int i = 0; i < 10; ++i)
+        session.Wheel(knob, 0.1f);
+    CHECK(slider.value == doctest::Approx(0.53));
+    // The other direction starts its own count.
+    session.Wheel(knob, 0.5f);
+    session.Wheel(knob, -0.75f);
+    CHECK(slider.value == doctest::Approx(0.53));
+    session.Wheel(knob, -0.25f);
+    CHECK(slider.value == doctest::Approx(0.52));
+}
+
 TEST_CASE("Value drag: the clamp limits stop an edit, and an edit that cannot move writes nothing")
 {
     facet::test::Session session;
