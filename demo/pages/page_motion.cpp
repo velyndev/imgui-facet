@@ -121,9 +121,8 @@ void DrawControls(facet::demo::PageCtx& ctx)
     facet::ItemCursor();
     ctx.Probe("motion.slow");
 
-    Note("Windows animation effects are %s; Facet %s that setting here.",
-         facet::SystemReduceMotion() ? "off" : "on",
-         facet::FollowsSystemMotion() ? "follows" : "ignores (capture and selftest runs)");
+    Note("System animation setting: %s. %s", facet::SystemReduceMotion() ? "off" : "on",
+         facet::FollowsSystemMotion() ? "Followed here." : "Not followed in capture and selftest runs.");
 }
 
 // The three tracks: a progress bar filled up to the current value, with a small marker at the
