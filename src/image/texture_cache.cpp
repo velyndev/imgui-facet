@@ -49,6 +49,7 @@
 #include "internal/alloc_guard.h"
 #include "internal/device.h"
 #include "internal/image_io.h"
+#include "internal/reserve.h"
 #include "internal/subsystem.h"
 
 using Microsoft::WRL::ComPtr;
@@ -166,8 +167,8 @@ ImageHandle Allocate(Cache& cache, SourceKind kind)
     try
     {
         internal::CheckAllocation();
-        cache.freeSlots.reserve(slotCount);
-        cache.releaseQueue.reserve(cache.releaseQueue.size() + slotCount);
+        internal::ReserveAtLeast(cache.freeSlots, slotCount);
+        internal::ReserveAtLeast(cache.releaseQueue, cache.releaseQueue.size() + slotCount);
         if (grow)
             cache.slots.emplace_back();
     }

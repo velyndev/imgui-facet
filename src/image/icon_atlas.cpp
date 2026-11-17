@@ -34,6 +34,7 @@
 #include "internal/alloc_guard.h"
 #include "internal/device.h"
 #include "internal/embedded_assets.h"
+#include "internal/reserve.h"
 #include "internal/subsystem.h"
 
 using Microsoft::WRL::ComPtr;
@@ -444,7 +445,7 @@ Icon RegisterIcon(const char* name, const char* svgSource)
         {
             // Room for the new id in the sorted order, so SortOrder below cannot allocate.
             internal::CheckAllocation();
-            registry->order.reserve(registry->entries.size() + 1);
+            internal::ReserveAtLeast(registry->order, registry->entries.size() + 1);
         }
     }
     catch (const std::bad_alloc&)
