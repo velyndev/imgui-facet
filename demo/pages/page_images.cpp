@@ -497,6 +497,10 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     SectionHeader("SVG");
     Paragraph("A full-color SVG keeps its colors. Each copy is rasterized at its design size times the UI "
               "scale, and again when the scale changes.");
+    // The copies sit on one bottom line, so their captions share a baseline.
+    float tallest = 0.0f;
+    for (const facet::ImageHandle handle : assets.svgScaled)
+        tallest = std::max(tallest, facet::ImageSize(handle).y);
     for (std::size_t i = 0; i < std::size(kSvgScales); ++i)
     {
         const ImVec2 pixels = facet::ImageSize(assets.svgScaled[i]);
@@ -507,6 +511,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         if (i > 0)
             Flow(pixels.x);
         ImGui::BeginGroup();
+        ImGui::Dummy(ImVec2(pixels.x, tallest - pixels.y));
         facet::Image(assets.svgScaled[i], ImVec2(0.0f, 0.0f));
         Caption(caption);
         ImGui::EndGroup();

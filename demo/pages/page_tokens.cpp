@@ -323,10 +323,15 @@ void DrawControlHeights()
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float width = facet::Px(theme.spacing.xxxl * 3.0f);
     const float right = facet::demo::ContentRight();
+    // Swatches sit on one bottom line, so their captions share a baseline.
+    float tallest = 0.0f;
+    for (const auto& step : steps)
+        tallest = std::max(tallest, facet::Px(step.value));
     for (size_t i = 0; i < std::size(steps); ++i)
     {
         const auto& step = steps[i];
         ImGui::BeginGroup();
+        ImGui::Dummy(ImVec2(width, tallest - facet::Px(step.value)));
         ImGui::Dummy(ImVec2(width, facet::Px(step.value)));
         const ImVec2 a = ImGui::GetItemRectMin();
         const ImVec2 b = ImGui::GetItemRectMax();
@@ -356,8 +361,14 @@ void DrawElevationLevels()
         facet::DrawElevation(drawList, a, b, radius, level);
         facet::FillRect(drawList, a, b, U32(theme.colors.ElevatedSurface(level)), radius);
         facet::StrokeRect(drawList, a, b, U32(theme.colors.separator), radius, facet::HairlineThickness());
-        Note("level %d: offset %.0f, blur %.0f, opacity %.2f", level, static_cast<double>(shadow.offset.y),
-             static_cast<double>(shadow.blur), static_cast<double>(shadow.opacity));
+        // The caption wraps at the card width, so every group is exactly one card wide and
+        // the cards keep their places when the figures change width between themes.
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+        char surface[48];
+        FormatColor(theme.colors.ElevatedSurface(level), surface, sizeof(surface));
+        Note("level %d: offset %.0f, blur %.0f, opacity %.2f, surface %s", level, static_cast<double>(shadow.offset.y),
+             static_cast<double>(shadow.blur), static_cast<double>(shadow.opacity), surface);
+        ImGui::PopTextWrapPos();
         ImGui::EndGroup();
         if (level < 3)
             facet::demo::SameLineIfFits(right, width, facet::Px(theme.spacing.xxl));
@@ -366,15 +377,16 @@ void DrawElevationLevels()
 
 } // namespace
 
-FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent")
+FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent", "elevation")
 {
-    // Capture state "accent" shows the second preset; "default" the theme's own accent.
+    // Capture state "accent" shows the second preset; "default" and "elevation" (scrolled to
+    // the elevation levels at the end of the page) the theme's own accent.
     if (ctx.capture && ctx.captureState == 1 && !facet::HasCustomAccent())
     {
         facet::SetAccent(facet::AccentPresets()[1].color);
         tokens.lastPreset = 1;
     }
-    if (ctx.capture && ctx.captureState == 0)
+    if (ctx.capture && ctx.captureState != 1)
         tokens.lastPreset = -1;
 
     facet::demo::PageHeader("Tokens", "Every color, length and level that widgets draw with, read live from the "
@@ -406,6 +418,8 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent")
     DrawElevationLevels();
     Paragraph("Shadows come from the effects module and appear only on floating layers. In the dark theme a "
               "black shadow cannot darken the black background, so each level also gets a lighter surface.");
+    if (ctx.captureState == 2)
+        ctx.RevealInCapture(1.0f);
 }
 
 FACET_DEMO_SELFTEST("tokens")
