@@ -482,6 +482,31 @@ TEST_CASE("Decimation of an unsorted series reaches its last sample and every ex
     }
 }
 
+TEST_CASE("A logarithmic range leaves out samples at or below 0")
+{
+    // Counts that start at 0 and a sample below 0: a logarithmic axis spans the positive data.
+    const float ys[] = {0.0f, 3.0f, 40.0f, -2.0f, 700.0f};
+    const SeriesView series{.y = ys, .count = 5};
+    const Range linear = SeriesRangeY(series);
+    CHECK(linear.min == -2.0);
+    const Range log = SeriesRangeY(series, ScaleKind::Logarithmic);
+    REQUIRE(log.valid);
+    CHECK(log.min == 3.0);
+    CHECK(log.max == 700.0);
+    const SeriesView both[] = {series, SeriesView{.y = ys + 1, .count = 2}};
+    CHECK(SeriesRangeY(both, ScaleKind::Logarithmic).min == 3.0);
+    const Range nice = NiceRange(PadRange(log, 0.0, ScaleKind::Logarithmic), 5, ScaleKind::Logarithmic);
+    CHECK(nice.min == doctest::Approx(1.0));
+    CHECK(nice.max == doctest::Approx(1000.0));
+    CHECK(SameValues(Values(nice.min, nice.max, 5, true), {1, 10, 100, 1000}));
+    // A series with no positive sample has no logarithmic range.
+    const float zeros[] = {0.0f, -1.0f};
+    CHECK_FALSE(SeriesRangeY(SeriesView{.y = zeros, .count = 2}, ScaleKind::Logarithmic).valid);
+    // Such samples map below the plot, where the clip rect cuts the line.
+    const Scale scale = MakeScale(ScaleKind::Logarithmic, nice.min, nice.max, 300.0f, 0.0f);
+    CHECK(scale.ToPixel(0.0) > 300.0f);
+}
+
 TEST_CASE("Ticks and labels stay readable at large magnitudes and tiny steps")
 {
     // Values near 2^53 with a step below 1: the ticks cannot be told apart, so there is one.

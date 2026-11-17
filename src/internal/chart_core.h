@@ -44,7 +44,10 @@ enum class ScaleKind
     Logarithmic,  // base 10; the domain must be positive
 };
 
-// The smallest value a logarithmic scale shows; values at or below 0 are drawn there.
+// The smallest value a logarithmic scale shows. Values at or below 0 map to it, far below any
+// range a chart shows, so a line to such a sample leaves the plot through its bottom edge,
+// where the clip rect cuts it. SeriesRangeY with ScaleKind::Logarithmic leaves them out of the
+// range, so they never stretch the axis down to kLogFloor.
 inline constexpr double kLogFloor = 1e-12;
 
 // Maps the domain [domainMin, domainMax] onto the pixels [pixelMin, pixelMax]. The pixel range
@@ -151,10 +154,11 @@ struct Range
 };
 
 // The smallest and largest finite x or y of the series; NaN and infinite samples are skipped.
+// For a logarithmic y axis (`kind`), samples at or below 0 are skipped too (see kLogFloor).
 Range SeriesRangeX(const SeriesView& series);
-Range SeriesRangeY(const SeriesView& series);
+Range SeriesRangeY(const SeriesView& series, ScaleKind kind = ScaleKind::Linear);
 // The range of y over every series in the span.
-Range SeriesRangeY(std::span<const SeriesView> series);
+Range SeriesRangeY(std::span<const SeriesView> series, ScaleKind kind = ScaleKind::Linear);
 
 // Widens a range by `fraction` of its span on each side (logarithmic: of its span in
 // decades). An empty range is first widened as in MakeScale. An invalid range stays invalid.

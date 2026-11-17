@@ -186,7 +186,7 @@ ChartOutcome DrawChart(const ChartSpec& spec, ChartCursor& cursor, const facet::
     const float gap = facet::Px(theme.spacing.sm);
 
     // Y range and ticks first: the widest y label decides where the plot starts.
-    const Range yData = SeriesRangeY(spec.series);
+    const Range yData = SeriesRangeY(spec.series, spec.yKind);
     const float plotTop = card.Min.y + padding;
     const float plotBottom = card.Max.y - padding - labelSize - gap;
     const int yTarget = TickTargetCount(plotBottom - plotTop, labelSize, facet::Px(theme.spacing.xl));

@@ -421,19 +421,24 @@ Range SeriesRangeX(const SeriesView& series)
     return RangeOf(series, [&](int i) { return static_cast<double>(series.X(i)); });
 }
 
-Range SeriesRangeY(const SeriesView& series)
+Range SeriesRangeY(const SeriesView& series, ScaleKind kind)
 {
     if (series.y == nullptr)
         return {};
-    return RangeOf(series, [&](int i) { return static_cast<double>(series.Y(i)); });
+    // A logarithmic axis cannot show values at or below 0, so they do not widen its range.
+    const bool positiveOnly = kind == ScaleKind::Logarithmic;
+    return RangeOf(series, [&](int i) {
+        const double value = series.Y(i);
+        return positiveOnly && value <= 0.0 ? std::numeric_limits<double>::quiet_NaN() : value;
+    });
 }
 
-Range SeriesRangeY(std::span<const SeriesView> series)
+Range SeriesRangeY(std::span<const SeriesView> series, ScaleKind kind)
 {
     Range all;
     for (const SeriesView& one : series)
     {
-        const Range range = SeriesRangeY(one);
+        const Range range = SeriesRangeY(one, kind);
         if (!range.valid)
             continue;
         all = all.valid ? Range{std::min(all.min, range.min), std::max(all.max, range.max), true} : range;
