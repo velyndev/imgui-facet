@@ -29,7 +29,7 @@ All rights reserved.
 
 - Version: stb_image 2.32 and stb_image_write 1.18 from commit
   9600522de53973336fa033a289858a4354cbb04c, https://github.com/nothings/stb
-- Use: image decoding; PNG output of the demo capture mode.
+- Use: image decoding in the library; PNG encoding in the demo (capture output and the generated sample image of the Images page).
 - License: MIT or public domain, at your choice. See `third_party/stb/LICENSE`.
   Copyright (c) 2017 Sean Barrett.
 
