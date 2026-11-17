@@ -288,6 +288,9 @@ bool HasCustomAccent();
 // reported and ignored, and facet::EndFrame reports accents still pushed and clears them, so
 // the next frame starts unscoped. Reports use ImGui's recoverable error path (an assert only
 // while io.ConfigErrorRecoveryEnableAssert is on) and the debugger output. No allocation.
+// Each depth has its own theme: a reference taken from T() inside a scope keeps its accent
+// while nested scopes are pushed and popped, and stays valid until the PopAccent of the scope
+// it was taken in or the next theme change.
 inline constexpr int kAccentStackDepth = 8;
 void PushAccent(const ImVec4& accent);
 void PopAccent();

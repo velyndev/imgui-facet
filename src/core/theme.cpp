@@ -181,14 +181,17 @@ ThemeState& State()
     return state;
 }
 
-// Accents pushed with PushAccent in this frame, and the theme T() returns while one is pushed.
+// Accents pushed with PushAccent in this frame, and the themes T() returns while they are pushed.
+// Each depth has its own theme, so a reference taken from T() in an outer scope keeps its accent
+// while a nested scope is pushed, read and popped.
 struct AccentScopes
 {
     ImVec4 accents[kAccentStackDepth];
     int depth = 0;     // entries in `accents`
     int overflow = 0;  // pushes beyond the capacity, ignored but balanced by their pops
-    Theme scoped;      // current theme with accents[depth - 1] applied
-    std::uint64_t scopedRevision = 0;  // theme revision `scoped` was built from; 0 rebuilds
+    Theme scoped[kAccentStackDepth];  // scoped[i]: the current theme with accents[i] applied
+    // Theme revision scoped[i] was built from; 0 rebuilds it.
+    std::uint64_t scopedRevision[kAccentStackDepth] = {};
 };
 
 AccentScopes& Scopes()
@@ -202,7 +205,8 @@ void ClearAccentScopes()
     AccentScopes& scopes = Scopes();
     scopes.depth = 0;
     scopes.overflow = 0;
-    scopes.scopedRevision = 0;
+    for (std::uint64_t& revision : scopes.scopedRevision)
+        revision = 0;
 }
 
 // Reports pushes without a pop and clears them, so every frame starts unscoped.
@@ -529,14 +533,16 @@ const Theme& T()
     AccentScopes& scopes = Scopes();
     if (scopes.depth == 0)
         return state.current;
-    // Rebuilt when the theme changed inside the scope (SetTheme, SetAccent) or the top moved.
-    if (scopes.scopedRevision != state.revision)
+    // The slot of the innermost scope is rebuilt when it was pushed anew or the theme changed
+    // inside the scope (SetTheme, SetAccent). The slots of outer scopes are left alone.
+    const int top = scopes.depth - 1;
+    if (scopes.scopedRevision[top] != state.revision)
     {
-        scopes.scoped = state.current;
-        scopes.scoped.ApplyAccent(scopes.accents[scopes.depth - 1]);
-        scopes.scopedRevision = state.revision;
+        scopes.scoped[top] = state.current;
+        scopes.scoped[top].ApplyAccent(scopes.accents[top]);
+        scopes.scopedRevision[top] = state.revision;
     }
-    return scopes.scoped;
+    return scopes.scoped[top];
 }
 
 void PushAccent(const ImVec4& accent)
@@ -550,8 +556,8 @@ void PushAccent(const ImVec4& accent)
         ++scopes.overflow;
         return;
     }
+    scopes.scopedRevision[scopes.depth] = 0;
     scopes.accents[scopes.depth++] = accent;
-    scopes.scopedRevision = 0;
 }
 
 void PopAccent()
@@ -568,7 +574,6 @@ void PopAccent()
         return;
     }
     --scopes.depth;
-    scopes.scopedRevision = 0;
 }
 
 void SetTheme(const Theme& theme, bool animate)

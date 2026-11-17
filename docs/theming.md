@@ -95,7 +95,9 @@ facet::PopAccent();
 Between the two calls `facet::T()` returns the current theme with the pushed accent applied,
 derived exactly as above. The current theme, the accent of `SetAccent` and the stock Dear ImGui
 style stay as they are, and nothing animates. Pushes nest up to `facet::kAccentStackDepth`
-deep. A `PopAccent` without a push, a push beyond that depth and an accent still pushed at
+deep, and each depth has its own theme: a `const Theme&` taken from `facet::T()` inside a
+scope keeps its accent while nested scopes come and go, and stays valid until the `PopAccent`
+of its own scope or the next theme change. A `PopAccent` without a push, a push beyond that depth and an accent still pushed at
 `facet::EndFrame` are reported through Dear ImGui's recoverable error path and the debugger
 output; `EndFrame` then clears the stack, so the next frame starts without a scoped accent.
 

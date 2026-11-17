@@ -78,6 +78,27 @@ TEST_CASE("Accent scopes nest and the innermost one wins")
     facet::PopAccent();
 }
 
+TEST_CASE("A theme reference held in an outer accent scope keeps its accent across a nested scope")
+{
+    DarkTheme dark;
+    facet::Theme green = facet::T();
+    green.ApplyAccent(kGreen);
+
+    facet::PushAccent(kGreen);
+    const facet::Theme& outer = facet::T();
+    facet::PushAccent(kOrange);
+    (void)facet::T();
+    facet::PopAccent();
+    CHECK(SameAccentTokens(outer.colors, green.colors));
+    // A second nested scope at the same depth does not reach it either.
+    facet::PushAccent(kOrange);
+    (void)facet::T();
+    CHECK(SameAccentTokens(outer.colors, green.colors));
+    facet::PopAccent();
+    CHECK(&facet::T() == &outer);
+    facet::PopAccent();
+}
+
 TEST_CASE("A theme change inside an accent scope keeps the scoped accent on the new surfaces")
 {
     DarkTheme dark;
