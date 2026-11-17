@@ -117,7 +117,8 @@ bool WaitForImage(ImageHandle image, float timeoutSeconds);
 // The image as an ImGui item of `size` pixels. A size component of 0 takes the image's
 // own size (keeping its aspect ratio when the other component is given); while the size
 // is unknown, a square of Px(T().metrics.controlHeightLarge) is used. With showStates, a
-// pending image shows a pulsing placeholder and a failed one an icon with a short label.
+// pending image shows a skeleton with a picture glyph and a failed one an icon with a short
+// label.
 void Image(ImageHandle image, ImVec2 size, const ImageOptions& options = {});
 // An app-owned texture as an item. Facet reads the texture size from the view and does not
 // keep a reference to it.

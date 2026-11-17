@@ -81,7 +81,8 @@ Facet reads the texture size from the view and keeps no reference to it.
 - `radius`: corner radius in pixels, usually `Px(T().radii.card)` or another radius token.
   Corners follow `FillRect`, so they match cards of the same radius.
 - `tint`: multiplies the image colors; the style alpha is applied on top.
-- `showStates`: while an image is loading, a pulsing placeholder (still with reduced motion);
+- `showStates`: while an image is loading, a skeleton with a picture glyph, on the shared
+  shimmer clock (flat with reduced motion);
   when it failed, was released or lost, the image-off icon and a short label.
 
 A size component of 0 takes the image's own size and keeps its aspect ratio.

@@ -431,8 +431,8 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     }
 
     ImGui::SeparatorText("Asynchronous loading");
-    ImGui::TextWrapped("Decoded on a worker thread and uploaded at the start of a later frame. A pulsing "
-                       "placeholder shows while decoding runs; a failed load shows an icon and a label.");
+    ImGui::TextWrapped("Decoded on a worker thread and uploaded at the start of a later frame. A skeleton "
+                       "with a picture glyph shows while decoding runs; a failed load shows an icon and a label.");
     {
         facet::ImageOptions options;
         options.fit = facet::ImageFit::Cover;

@@ -137,9 +137,9 @@ shadows only on floating layers; glow only as the focus ring plus one opt-in acc
   every UI scale.
 - Icons default to the label color; a tint replaces it. Accent-colored icons use
   accentText, which reaches 4.5:1 on every surface.
-- An image that is still loading shows a slow pulse between the two faintest fills
-  (fill[3] and fill[1], one cycle per four slow durations) with a faint picture glyph; with
-  reduced motion the fill stays still. A pulse says "waiting" without drawing attention.
+- An image that is still loading is a skeleton (the same sweep and shared clock as every
+  other skeleton) with a faint picture glyph in labelTertiary, which tells an image slot
+  apart from a text placeholder.
 - A failed image shows the image-off glyph and a short label in labelSecondary on fill[3]
   with a separator hairline, so the empty slot is explained instead of looking like a
   layout gap.

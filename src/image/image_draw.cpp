@@ -2,11 +2,9 @@
 
 #include <cfloat>
 #include <cmath>
-#include <numbers>
 
 #include <imgui.h>
 
-#include "facet/core/anim.h"
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
 #include "facet/core/icons.h"
@@ -14,15 +12,12 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "image/image_internal.h"
+#include "internal/loading.h"
 
 namespace facet::internal
 {
 namespace
 {
-
-// One pulse of the loading placeholder lasts this many slow durations: slow enough to
-// read as waiting rather than as a blinking alert.
-constexpr float kPulseDurations = 4.0f;
 
 float StyleAlpha()
 {
@@ -94,15 +89,9 @@ void DrawImageLoading(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radi
     const Colors& c = theme.colors;
     radius = ClampRadius(pMin, pMax, radius);
 
-    // A slow pulse between the two faintest fills; a steady fill with reduced motion.
-    float pulse = 0.5f;
-    const float period = theme.motion.durationSlow * theme.motion.scale * kPulseDurations;
-    if (!ReduceMotion() && period > 0.0f && ImGui::GetCurrentContext() != nullptr)
-    {
-        const double phase = std::fmod(ImGui::GetTime(), static_cast<double>(period)) / period;
-        pulse = 0.5f - 0.5f * static_cast<float>(std::cos(phase * 2.0 * std::numbers::pi));
-    }
-    FillRect(drawList, pMin, pMax, Token(Mix(c.fill[3], c.fill[1], pulse)), radius);
+    // The same skeleton as every other loading block, on the shared shimmer clock (flat with
+    // reduced motion).
+    DrawSkeleton(drawList, pMin, pMax, radius);
 
     // A faint picture glyph says what is coming, when the box has room for it.
     const float iconSize = std::floor(Px(theme.spacing.xl));
