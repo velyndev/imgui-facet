@@ -966,6 +966,62 @@ TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both 
     CHECK(regular.detail);
 }
 
+TEST_CASE("An outer list-detail or inspector pane placeholder keeps its state past a nested one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool outerList = false;
+    bool innerDetail = false;
+    bool outerDetail = true;
+    bool outerPane = false;
+    bool innerPane = true;
+    session.SetUi([&] {
+        const facet::Theme& theme = facet::T();
+        const float height = facet::Px(theme.metrics.controlHeightLarge * 8.0f);
+        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
+        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
+        CHECK_BALANCED({
+            bool outerOpen = false;
+            bool innerOpen = true;
+            facet::BeginListDetail("outer", &outerOpen);
+            outerList = facet::BeginListPane();
+            if (outerList)
+            {
+                facet::BeginListDetail("inner", &innerOpen);
+                if (facet::BeginListPane())
+                    facet::EndListPane();
+                innerDetail = facet::BeginDetailPane();
+                if (innerDetail)
+                    facet::EndDetailPane();
+                facet::EndListDetail();
+                facet::EndListPane();
+            }
+            outerDetail = facet::BeginDetailPane();
+            if (outerDetail)
+                facet::EndDetailPane();
+            facet::EndListDetail();
+        });
+        ImGui::EndChild();
+        CHECK_BALANCED({
+            bool outerVisible = true;
+            bool innerVisible = false;
+            facet::BeginInspectorPane("Outer pane", &outerVisible);
+            facet::BeginInspectorPane("Inner pane", &innerVisible);
+            innerPane = facet::InspectorPaneNext();
+            facet::EndInspectorPane();
+            outerPane = facet::InspectorPaneNext();
+            facet::EndInspectorPane();
+        });
+    });
+    session.Frame();
+    CHECK(outerList);
+    CHECK(innerDetail);
+    CHECK_FALSE(outerDetail);
+    CHECK_FALSE(innerPane);
+    CHECK(outerPane);
+}
+
 TEST_CASE("ApplyReorderMove moves one element and shifts the others")
 {
     // `to` is the moved element's index after the move.
