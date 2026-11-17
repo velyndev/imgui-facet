@@ -30,7 +30,8 @@ class ShellScope;
 
 A floating, resizable menu window: title bar as drag region, edge and corner resize, minimum and
 maximum size, snapping to display edges, size and position kept in design units and clamped back
-into the display after a resolution or scale change.
+into the display after a resolution or scale change. Like `ImGui::Begin` it makes a top-level
+window, so a page may open one from its own code.
 
 ### BeginAppFrame
 
@@ -48,7 +49,8 @@ bool LoadAppFramePlacement(const char* id, FramePlacement* placement);
 ```
 
 The root surface of a borderless desktop app that fills the host viewport, with the hit test, size
-limits and placement storage the host window needs to stay resizable and snappable.
+limits and placement storage the host window needs to stay resizable and snappable. The host calls
+it outside every window, so the widget gallery shows it only through the example below.
 
 ### BeginTitleBar
 
@@ -79,7 +81,7 @@ int GetOverlayInputRegions(std::span<ScreenRegion> regions);
 ```
 
 Shows and hides an overlay menu with a fade and a toggle key, and tells the host which screen
-regions take input.
+regions take input. Called by the host outside every window, like the mini window below.
 
 ### BeginMiniWindow
 

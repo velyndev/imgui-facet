@@ -63,8 +63,10 @@ struct ShellOptions
 // size are kept and saved in design units, so a shell reopens at the same place and size at
 // any scale. `open` (may be null: always open, no close button) is written false when the
 // close button or Escape (with closeOnEscape) closes it; the caller writes true to open it.
-// Returns false while closed or collapsed; call EndShell only after true. Call it outside any
-// other window, like ImGui::Begin. The content keeps ids under the shell's window.
+// Returns false while closed or collapsed; call EndShell only after true. Like ImGui::Begin it
+// makes a top-level window, also when it is called while another window is being submitted
+// (from a button handler in a page, say): the shell is not part of that window and does not
+// move with it. The content keeps ids under the shell's window.
 [[nodiscard]] bool BeginShell(const char* label, bool* open, const ShellOptions& options = {});
 void EndShell();
 

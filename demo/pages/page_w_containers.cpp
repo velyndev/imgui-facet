@@ -1,7 +1,10 @@
-// Demo page: Containers. Calls every v1 widget of facet/widgets/containers.h once, grouped by
-// purpose. The widgets are planned, so each call draws its placeholder; Phase 2 replaces them
-// one by one on this page. Window-like containers (shell, mini window) and the app frame are
-// shown in the page flow while they are planned; their finished forms float or fill the host.
+// Demo page: Containers. Calls the v1 widgets of facet/widgets/containers.h, grouped by purpose.
+// The widgets are planned, so each call draws its placeholder; Phase 2 replaces them one by one
+// on this page. The shell is a layer: it starts closed and a switch opens it, so a finished
+// shell never covers the gallery uninvited; the capture state "shell" shows it open. The app
+// frame, the overlay controller and mini windows are root containers that a host calls outside
+// every window, so they are not called inside this page; the page says so and the family doc
+// shows their host code.
 
 #include <imgui.h>
 
@@ -13,15 +16,21 @@
 namespace
 {
 
+using facet::demo::LabeledRow;
 using facet::demo::Note;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
 
+// Capture states of the page, in the order of the FACET_DEMO_PAGE registration.
+enum CaptureState
+{
+    kCaptureDefault = 0,
+    kCaptureShell = 1,
+};
+
 struct ContainersState
 {
-    bool shellOpen = true;
-    bool overlayVisible = true;
-    bool miniPinned = false;
+    bool shellOpen = false;
     bool disclosureOpen = false;
     bool inspectorVisible = true;
     ImGuiSelectionBasicStorage selection;
@@ -42,34 +51,31 @@ ContainersState& State()
     return state;
 }
 
-void Windows(ContainersState& s)
+void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Windows and frames");
-    Paragraph("The floating shell for overlay menus and the app frame for desktop apps, with a "
-              "title bar. The overlay controller wraps the menu and the mini window stays visible "
-              "when pinned.");
-    if (facet::BeginShell("Shell###shell", &s.shellOpen, {.icon = facet::Icon("settings")}))
+    Paragraph("The floating shell is a window of its own that a page opens; the switch sets its "
+              "open flag, and its close button or Escape will clear it. A planned shell shows one "
+              "placeholder line while the flag is on.");
+    if (ctx.capture)
+        s.shellOpen = ctx.captureState == kCaptureShell;
+    LabeledRow("Show the shell");
+    ImGui::Checkbox("##shell", &s.shellOpen);
+    ctx.Probe("containers.shell");
+    if (facet::BeginShell("Shell###shell", &s.shellOpen, {.icon = facet::Icon("settings"), .closeOnEscape = true}))
     {
         Note("Shell content.");
         facet::EndShell();
     }
-    if (facet::BeginAppFrame("appframe"))
-    {
-        facet::BeginTitleBar("Title", {.icon = facet::Icon("monitor"), .windowButtons = true});
-        facet::EndTitleBar();
-        Note("App frame content.");
-        facet::EndAppFrame();
-    }
-    if (facet::BeginOverlay("overlay", &s.overlayVisible, {.toggleKey = {.primary = ImGuiKey_Insert}}))
-    {
-        Note("Overlay menu content.");
-        facet::EndOverlay();
-    }
-    if (facet::BeginMiniWindow("Mini window", &s.miniPinned))
-    {
-        Note("Mini window content.");
-        facet::EndMiniWindow();
-    }
+    if (ctx.capture && ctx.captureState == kCaptureShell)
+        ctx.RevealInCapture();
+    Paragraph("A title row with an icon and window buttons, as the top of an app frame or a shell.");
+    facet::BeginTitleBar("Title", {.icon = facet::Icon("monitor"), .windowButtons = true});
+    facet::EndTitleBar();
+    Note("The app frame, the overlay controller and mini windows are root containers: the host "
+         "calls them once per frame outside every window, and the app frame fills the whole "
+         "viewport. They cannot sit inside a page, so this page does not call them; "
+         "docs/widgets/containers.md shows the host code for each.");
 }
 
 void Bars(ContainersState&)
@@ -146,7 +152,7 @@ void Scrolling(ContainersState& s)
 
 } // namespace
 
-FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80)
+FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell")
 {
     facet::demo::PageHeader("Containers",
                             "The floating shell, the app frame and its title bar, the overlay "
@@ -158,8 +164,20 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80)
     Note("Declared in facet/widgets/containers.h; the declarations and usage examples are in "
          "docs/widgets/containers.md.");
     ContainersState& s = State();
-    Windows(s);
+    Windows(ctx, s);
     Bars(s);
     Grouping(s);
     Scrolling(s);
+}
+
+// The shell starts closed, so a finished shell never opens over the gallery by itself, and the
+// switch opens and closes it.
+FACET_DEMO_SELFTEST("containers")
+{
+    test.Expect("the shell starts closed", [] { return !ContainersState{}.shellOpen; });
+    test.Do([] { State().shellOpen = false; });
+    test.Click("containers.shell");
+    test.Expect("the switch opens the shell", [] { return State().shellOpen; });
+    test.Click("containers.shell");
+    test.Expect("the switch closes the shell", [] { return !State().shellOpen; });
 }

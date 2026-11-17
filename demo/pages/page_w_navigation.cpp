@@ -1,6 +1,8 @@
 // Demo page: Navigation. Calls every v1 widget of facet/widgets/navigation.h once, grouped by
 // purpose. The widgets are planned, so each call draws its placeholder; Phase 2 replaces them
-// one by one on this page. Sample entries are neutral ("Page 1") with built-in icons.
+// one by one on this page. Sample entries are neutral ("Page 1") with built-in icons. The
+// shortcut sheet is a modal layer: it starts closed and a switch opens it; the capture state
+// "shortcuts" shows it open.
 
 #include <imgui.h>
 
@@ -35,7 +37,14 @@ struct NavigationState
     int wizardStep = 0;
     bool option = true;
     int radio = 0;
-    bool shortcutSheet = true;
+    bool shortcutSheet = false;
+};
+
+// Capture states of the page, in the order of the FACET_DEMO_PAGE registration.
+enum CaptureState
+{
+    kCaptureDefault = 0,
+    kCaptureShortcuts = 1,
 };
 
 NavigationState& State()
@@ -88,7 +97,7 @@ void Menus(NavigationState& s)
     facet::MenuItem("Item 3", &s.radio, 1);
 }
 
-void Steps(NavigationState& s)
+void Steps(facet::demo::PageCtx& ctx, NavigationState& s)
 {
     SectionHeader("Steps");
     LabeledRow("Step indicator");
@@ -97,14 +106,21 @@ void Steps(NavigationState& s)
     Note("Content of step %d.", s.wizardStep + 1);
     facet::WizardFooter({.canAdvance = true});
     facet::EndWizard();
-    Paragraph("The shortcut sheet lists the registered shortcuts in a modal sheet; it is open on "
-              "this page.");
+    Paragraph("The shortcut sheet lists the registered shortcuts in a modal sheet. The switch sets "
+              "its open flag; a planned sheet shows one placeholder line while the flag is on.");
+    if (ctx.capture)
+        s.shortcutSheet = ctx.captureState == kCaptureShortcuts;
+    LabeledRow("Show the shortcut sheet");
+    ImGui::Checkbox("##shortcuts", &s.shortcutSheet);
+    ctx.Probe("navigation.shortcuts");
     facet::ShortcutSheet("Shortcuts", &s.shortcutSheet);
+    if (ctx.capture && ctx.captureState == kCaptureShortcuts)
+        ctx.RevealInCapture();
 }
 
 } // namespace
 
-FACET_DEMO_PAGE("navigation", "Navigation", "Widgets", 70)
+FACET_DEMO_PAGE("navigation", "Navigation", "Widgets", 70, "default", "shortcuts")
 {
     facet::demo::PageHeader("Navigation",
                             "The sidebar, tab bars, menu bars, menus and menu items, breadcrumbs, "
@@ -116,5 +132,17 @@ FACET_DEMO_PAGE("navigation", "Navigation", "Widgets", 70)
     NavigationState& s = State();
     PageNavigation(s);
     Menus(s);
-    Steps(s);
+    Steps(ctx, s);
+}
+
+// The shortcut sheet starts closed, so a finished sheet never opens over the gallery by itself,
+// and the switch opens and closes it.
+FACET_DEMO_SELFTEST("navigation")
+{
+    test.Expect("the shortcut sheet starts closed", [] { return !NavigationState{}.shortcutSheet; });
+    test.Do([] { State().shortcutSheet = false; });
+    test.Click("navigation.shortcuts");
+    test.Expect("the switch opens the shortcut sheet", [] { return State().shortcutSheet; });
+    test.Click("navigation.shortcuts");
+    test.Expect("the switch closes the shortcut sheet", [] { return !State().shortcutSheet; });
 }

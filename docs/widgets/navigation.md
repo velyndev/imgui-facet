@@ -147,7 +147,8 @@ A modal sheet that lists the registered shortcuts by group with their key caps.
 ## Usage examples
 
 A sidebar that drives the app's page. The app owns the selection and tells each item whether it is
-the selected one; the selection pill follows it:
+the selected one; the selection pill follows it. With the default Auto mode the same code gives the
+expanded sidebar in a wide window and the icon rail, with labels as tooltips, in a narrow one:
 
 ```cpp
 static int page = 0;
