@@ -48,17 +48,28 @@ struct Subsystem
     bool (*createDeviceObjects)() = nullptr;
 };
 
-// One accessor per module, each defined in the file of its owner.
-Subsystem ThemeSubsystem();         // src/core/theme.cpp
-Subsystem ScaleSubsystem();         // src/core/scale.cpp
-Subsystem FontSubsystem();          // src/core/text.cpp
-Subsystem AnimSubsystem();          // src/core/anim.cpp
-Subsystem StateStorageSubsystem();  // src/internal/state_storage.cpp
-Subsystem ShadowSubsystem();        // src/effects/shadow.cpp
-Subsystem BlurSubsystem();          // src/effects/blur_dx11.cpp
-Subsystem TextureSubsystem();       // src/image/texture_cache.cpp
-Subsystem IconSubsystem();          // src/image/icon_atlas.cpp
-Subsystem WidgetsCommonSubsystem(); // src/widgets/common.cpp
+// One accessor per module, each defined in the file of its owner. A module that has nothing
+// to do per frame yet still has its entry, so its owner fills hooks without touching the table.
+Subsystem ThemeSubsystem();              // src/core/theme.cpp
+Subsystem ScaleSubsystem();              // src/core/scale.cpp
+Subsystem FontSubsystem();               // src/core/text.cpp
+Subsystem AnimSubsystem();               // src/core/anim.cpp
+Subsystem StateStorageSubsystem();       // src/internal/state_storage.cpp
+Subsystem ShadowSubsystem();             // src/effects/shadow.cpp
+Subsystem BlurSubsystem();               // src/effects/blur_dx11.cpp
+Subsystem TextureSubsystem();            // src/image/texture_cache.cpp
+Subsystem IconSubsystem();               // src/image/icon_atlas.cpp
+Subsystem InputSubsystem();              // src/core/input.cpp: key chords and shortcuts
+Subsystem FocusSubsystem();              // src/internal/focus.cpp: keyboard modality, focus
+Subsystem PopupHostSubsystem();          // src/internal/popup_host.cpp
+Subsystem ScrollSubsystem();             // src/internal/scroll.cpp
+Subsystem DragDropSubsystem();           // src/internal/drag_drop.cpp
+Subsystem TextFieldSubsystem();          // src/internal/text_field.cpp
+Subsystem WidgetsCommonSubsystem();      // src/widgets/common.cpp: control size stack
+Subsystem WidgetsControlsSubsystem();    // src/widgets/controls_frame.cpp
+Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp
+Subsystem WidgetsContentSubsystem();     // src/widgets/content_frame.cpp
+Subsystem ScopesSubsystem();             // src/internal/scope_stack.cpp
 
 // The ordered table (src/core/subsystems.cpp). Built on first use, valid for the whole run.
 std::span<const Subsystem> Subsystems();

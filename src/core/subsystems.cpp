@@ -1,16 +1,43 @@
 // The ordered subsystem table. See src/internal/subsystem.h for the hook rules.
 //
-// Order and its reasons:
-//   theme, scale     plain token state that every later module reads
-//   state storage    per-widget state other modules may keep entries in
-//   anim             motion store; reads theme motion tokens
-//   font             font atlas setup; needs the scale
-//   texture          image and texture cache; the icon atlas uploads through it
-//   icon             icon atlas; rasterized per scale
-//   shadow           shadow and glow atlas; rasterized per scale
-//   blur             backdrop blur pass; it is optional and may fall back
-//   widgets common   control size stack of the widgets; checked after every block
-// Shutdown runs in reverse, so every module still finds what it depends on.
+// Init, NewFrame and EndFrame run in table order, Shutdown in reverse, so every module still
+// finds what it depends on. The order and its reasons:
+//
+// Core, in place since Phase 1b:
+//   theme, scale       plain token state that every later module reads; theme's EndFrame
+//                      also closes accent scopes left open
+//   state storage      per-widget state other modules may keep entries in
+//   anim               motion store; reads theme motion tokens
+//   font               font atlas setup; needs the scale
+//   texture            image and texture cache; the icon atlas uploads through it
+//   icon               icon atlas; rasterized per scale
+//   shadow             shadow and glow atlas; rasterized per scale
+//   blur               backdrop blur pass; optional, it may fall back
+//
+// Interaction and surface blocks (Phase 1c), before every widget:
+//   input              key chord state and the shortcut triggers of the frame: plain input
+//                      bookkeeping that the later blocks may read
+//   focus              keyboard modality (whether focus rings show) and the Escape layer,
+//                      decided before any widget draws; EndFrame drops forced item states
+//                      no widget took
+//   popup host         the open popups and the closing ones it replays; before scroll, so a
+//                      wheel turn over a popup belongs to the popup
+//   scroll             smooth wheel and overlay scrollbars; before drag and drop, which
+//                      scrolls a list while a drag rests near its edge
+//   drag and drop      the drag in progress; at EndFrame its preview is drawn after the
+//                      popups, on the foreground layer, so it stays on top
+//   text field         per-frame state of the text field core
+//
+// Widgets (Phase 1c and 2), after the blocks they build on:
+//   widgets common     the control size stack; EndFrame closes sizes left pushed
+//   widgets controls   buttons, selection, sliders, inputs, pickers
+//   widgets structure  lists, navigation, containers, layout, overlays; EndFrame draws the
+//                      toast stack, after every page has drawn
+//   widgets content    display, charts, media, composites
+//
+// Last:
+//   scopes             EndFrame reports Begin / End pairs still open, after every module
+//                      above has drawn, so a scope a module opens in its own EndFrame counts
 
 #include "internal/subsystem.h"
 
@@ -21,7 +48,7 @@ namespace facet::internal
 
 std::span<const Subsystem> Subsystems()
 {
-    static const std::array<Subsystem, 10> table = {
+    static const std::array<Subsystem, 20> table = {
         ThemeSubsystem(),
         ScaleSubsystem(),
         StateStorageSubsystem(),
@@ -31,7 +58,17 @@ std::span<const Subsystem> Subsystems()
         IconSubsystem(),
         ShadowSubsystem(),
         BlurSubsystem(),
+        InputSubsystem(),
+        FocusSubsystem(),
+        PopupHostSubsystem(),
+        ScrollSubsystem(),
+        DragDropSubsystem(),
+        TextFieldSubsystem(),
         WidgetsCommonSubsystem(),
+        WidgetsControlsSubsystem(),
+        WidgetsStructureSubsystem(),
+        WidgetsContentSubsystem(),
+        ScopesSubsystem(),
     };
     return table;
 }

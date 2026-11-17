@@ -67,8 +67,16 @@ using Calls = std::vector<std::string>;
 TEST_CASE("The subsystem table lists every module once in dependency order")
 {
     const auto table = facet::internal::Subsystems();
-    const char* expected[] = {"theme",   "scale", "state_storage", "anim", "font",
-                              "texture", "icon",  "shadow",        "blur", "widgets_common"};
+    const char* expected[] = {"theme",          "scale",
+                              "state_storage",  "anim",
+                              "font",           "texture",
+                              "icon",           "shadow",
+                              "blur",           "input",
+                              "focus",          "popup_host",
+                              "scroll",         "drag_drop",
+                              "text_field",     "widgets_common",
+                              "widgets_controls", "widgets_structure",
+                              "widgets_content", "scopes"};
     REQUIRE(table.size() == std::size(expected));
     for (size_t i = 0; i < table.size(); ++i)
     {
