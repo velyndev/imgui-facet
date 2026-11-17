@@ -7,7 +7,7 @@
 // Two layers:
 //
 // 1. Pure logic (no Dear ImGui context needed, unit tested directly). Handle values are kept in
-//    ascending order in one span. HandleConstraints holds the range, the minimum gap between
+//    ascending order in one span (in any order with CollisionMode::Free). HandleConstraints holds the range, the minimum gap between
 //    neighbours, the collision mode and the optional mirror. MoveHandle moves one handle and
 //    resolves the constraints, MoveSpan moves a run of handles together, ConstrainHandles
 //    repairs values that came in invalid, InsertHandle and RemoveHandle change the count.
@@ -61,6 +61,9 @@ enum class CollisionMode
 {
     Clamp,  // it stops one minimum gap before the neighbour
     Push,   // it pushes the neighbour (and the ones beyond) along until the range ends
+    // Handles pass each other: the values keep no order (gradient stops, markers). No minimum
+    // gap, no mirror and no span; picking and the draw order sort the handles by position.
+    Free,
 };
 
 struct HandleConstraints
@@ -94,8 +97,9 @@ bool MoveHandle(std::span<double> values, int index, double target, const Handle
 bool MoveSpan(std::span<double> values, int first, int last, double delta, const HandleConstraints& constraints);
 
 // Inserts a handle at `value` into the first `count` entries of `storage` (ascending), keeping
-// the order. Returns its index, or -1 when storage is full or the value is closer than the
-// minimum gap to a neighbour.
+// the order; free handles go last. Returns its index, or -1 when storage is full or the value is
+// closer than the minimum gap to a neighbour. A caller with handle keys inserts a new key at
+// the same index.
 int InsertHandle(std::span<double> storage, int count, double value, const HandleConstraints& constraints);
 
 // Removes handle `index` from the first `count` values. Returns the new count; a count at or
@@ -130,6 +134,11 @@ struct MultiHandleOptions
     float handleSize = 0.0f;        // pixels, the square of a handle; 0: the slider knob token
     bool spanDrag = true;           // with two handles or more, the span between first and last drags
     bool removeKeys = false;        // Delete and Backspace on a focused handle ask to remove it
+    // One key per handle (same count as the values, unique within the widget): the handle's
+    // identity. Its item id, keyboard focus, drag and animations follow the key, so they stay on
+    // the same handle when handles are inserted or removed before it. Empty: the index is the
+    // identity, which suits a fixed number of handles.
+    std::span<const ImGuiID> keys = {};
 };
 
 struct MultiHandleResult
@@ -148,11 +157,12 @@ struct MultiHandleResult
 
 // Runs the items of a multi-handle widget. `widgetRect` is the area that takes the mouse (the
 // track with the handles), `track` the line the handle centres travel along (fraction 0 at its
-// left or bottom end). `values` holds the handle values in ascending order (at most
-// kMaxHandles); they are repaired with ConstrainHandles first, then edited. `handles` receives
-// the item state of each handle (same count as values). The part index of handle i for forced
-// states is i, the span's is values.size(). The parts' ids are ImGui::GetID(i) and "##span"
-// under `id`.
+// left or bottom end). `values` holds the handle values in ascending order (any order for free
+// handles; at most kMaxHandles); they are repaired with ConstrainHandles first, then edited.
+// `handles` receives the item state of each handle (same count as values). The part index of
+// handle i for forced states is i, the span's is values.size(). The parts' ids are derived from
+// `id` and the handle's key (or ImGui::GetID(i) under `id` without keys), and "##span" under
+// `id`.
 MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, const ImRect& track,
                                       std::span<double> values, std::span<ItemState> handles,
                                       const MultiHandleOptions& options);

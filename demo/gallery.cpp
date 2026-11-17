@@ -895,6 +895,7 @@ bool ProtoRange(PageCtx& ctx, const char* id, double* values, int count, const P
     multi.handleSize = knob;
     multi.spanDrag = options.spanDrag;
     multi.removeKeys = options.removeKeys;
+    multi.keys = options.keys;
 
     facet::internal::ItemState handles[facet::internal::kMaxHandles];
     ImGui::BeginGroup();

@@ -114,6 +114,7 @@ struct ProtoRangeOptions
     bool mirror = false;      // two handles move symmetrically around the middle of the range
     bool spanDrag = true;
     bool removeKeys = false;  // Delete or Backspace on a focused handle asks for its removal
+    std::span<const ImGuiID> keys = {};  // one identity per handle when handles come and go
 };
 // A slider with `count` handles on the multi-handle model. Returns true when a value was
 // written; *removeRequested (when not null) receives the handle whose removal was asked for, or -1.

@@ -77,6 +77,8 @@ struct MultiPageState
     int commits[kRangeCount] = {};
     int cancels[kRangeCount] = {};
     double multi[kMaxMulti] = {};
+    ImGuiID keys[kMaxMulti] = {};  // one per handle, so focus stays on a handle when others come and go
+    ImGuiID nextKey = 1;
     int multiCount = 0;
     bool full = false;  // the last add found no room
     bool initialized = false;
@@ -97,6 +99,8 @@ void Reset()
     page.multi[1] = 50.0;
     page.multi[2] = 80.0;
     page.multiCount = 3;
+    for (int i = 0; i < page.multiCount; ++i)
+        page.keys[i] = page.nextKey++;
     page.initialized = true;
 }
 
@@ -170,7 +174,23 @@ void AddHandle()
                                                     start + gap * 0.5, constraints);
     page.full = index < 0;
     if (index >= 0)
+    {
+        for (int i = page.multiCount; i > index; --i)
+            page.keys[i] = page.keys[i - 1];
+        page.keys[index] = page.nextKey++;
         ++page.multiCount;
+    }
+}
+
+void RemoveHandleAt(int index)
+{
+    const int count =
+        facet::internal::RemoveHandle(std::span<double>(page.multi, kMaxMulti), page.multiCount, index, kMinMulti);
+    if (count == page.multiCount)
+        return;
+    for (int i = index; i + 1 < page.multiCount; ++i)
+        page.keys[i] = page.keys[i + 1];
+    page.multiCount = count;
 }
 
 } // namespace
@@ -213,10 +233,10 @@ FACET_DEMO_PAGE("multi-handle", "Multi-handle", "Blocks", 60, "default", "draggi
     options.minGap = kMultiGap;
     options.spanDrag = false;
     options.removeKeys = true;
+    options.keys = std::span<const ImGuiID>(page.keys, static_cast<size_t>(page.multiCount));
     facet::demo::ProtoRange(ctx, "##value", page.multi, page.multiCount, options, "range.multi", &remove);
     if (remove >= 0)
-        page.multiCount =
-            facet::internal::RemoveHandle(std::span<double>(page.multi, kMaxMulti), page.multiCount, remove, kMinMulti);
+        RemoveHandleAt(remove);
     facet::internal::EndRow();
     ImGui::BeginDisabled(page.multiCount >= kMaxMulti);
     if (facet::demo::ProtoButton(ctx, "Add a handle", "range.add"))

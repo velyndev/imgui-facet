@@ -30,6 +30,7 @@ struct EditSnapshot
     ImGuiID owner = 0;
     int count = 0;
     double values[kMaxHandles] = {};
+    ImGuiID keys[kMaxHandles] = {};  // the handles' keys, all 0 without keys
 };
 
 EditSnapshot& Snapshot()
@@ -75,20 +76,59 @@ double ValueEpsilon(const HandleConstraints& c)
     return std::max(1e-12, (c.max - c.min) * 1e-9);
 }
 
-void TakeSnapshot(ImGuiID owner, const double* values, int count)
+// Writes into `order` the indices of `positions` sorted ascending; equal positions keep their
+// index order. At most kMaxHandles entries, no allocation.
+template <typename T>
+void SortByPosition(std::span<const T> positions, int* order)
+{
+    const int n = std::min(static_cast<int>(positions.size()), kMaxHandles);
+    for (int i = 0; i < n; ++i)
+    {
+        int j = i;
+        while (j > 0 && positions[static_cast<size_t>(order[j - 1])] > positions[static_cast<size_t>(i)])
+        {
+            order[j] = order[j - 1];
+            --j;
+        }
+        order[j] = i;
+    }
+}
+
+bool Mirrored(const HandleConstraints& c, int count)
+{
+    return c.mirror && count == 2 && c.collision != CollisionMode::Free;
+}
+
+// The key of handle `index`, 0 without keys.
+ImGuiID KeyOf(std::span<const ImGuiID> keys, int index)
+{
+    return index < static_cast<int>(keys.size()) ? keys[static_cast<size_t>(index)] : 0;
+}
+
+void TakeSnapshot(ImGuiID owner, const double* values, int count, std::span<const ImGuiID> keys)
 {
     EditSnapshot& snapshot = Snapshot();
     snapshot.owner = owner;
     snapshot.count = count;
     for (int i = 0; i < count; ++i)
+    {
         snapshot.values[i] = values[i];
+        snapshot.keys[i] = KeyOf(keys, i);
+    }
 }
 
-bool RestoreSnapshot(ImGuiID owner, std::span<double> values)
+// Restores the values of the snapshot when it belongs to this widget and the same handles (a
+// handle added or removed during the edit makes it stale).
+bool RestoreSnapshot(ImGuiID owner, std::span<double> values, std::span<const ImGuiID> keys)
 {
     const EditSnapshot& snapshot = Snapshot();
     if (snapshot.owner != owner || snapshot.count != static_cast<int>(values.size()))
         return false;
+    for (int i = 0; i < snapshot.count; ++i)
+    {
+        if (snapshot.keys[i] != KeyOf(keys, i))
+            return false;
+    }
     bool changed = false;
     for (int i = 0; i < snapshot.count; ++i)
     {
@@ -106,11 +146,16 @@ void HandleLimits(std::span<const double> values, int index, const HandleConstra
     const int n = static_cast<int>(values.size());
     const double gap = EffectiveGap(c, n);
     const auto at = [&](int i) { return values[static_cast<size_t>(i)]; };
-    if (c.mirror && n == 2)
+    if (Mirrored(c, n))
     {
         const double center = std::clamp(c.center, c.min, c.max);
         *low = index == 0 ? std::max(c.min, 2.0 * center - c.max) : center + gap * 0.5;
         *high = index == 0 ? center - gap * 0.5 : std::min(c.max, 2.0 * center - c.min);
+    }
+    else if (c.collision == CollisionMode::Free)
+    {
+        *low = c.min;
+        *high = c.max;
     }
     else if (c.collision == CollisionMode::Clamp)
     {
@@ -146,7 +191,7 @@ void ResetMultiHandleState()
 
 double EffectiveGap(const HandleConstraints& c, int count)
 {
-    if (count < 2 || !(c.minGap > 0.0))
+    if (count < 2 || !(c.minGap > 0.0) || c.collision == CollisionMode::Free)
         return 0.0;
     const double room = std::max(0.0, c.max - c.min) / static_cast<double>(count - 1);
     return std::min(c.minGap, room);
@@ -162,6 +207,13 @@ void ConstrainHandles(std::span<double> values, const HandleConstraints& c)
     HandleConstraints bounds = c;
     bounds.min = lo;
     bounds.max = hi;
+    if (c.collision == CollisionMode::Free)
+    {
+        // No order and no gap: only the range.
+        for (double& v : values)
+            v = std::isnan(v) ? lo : std::clamp(v, lo, hi);
+        return;
+    }
     const double gap = EffectiveGap(bounds, n);
     for (int i = 0; i < n; ++i)
     {
@@ -206,7 +258,7 @@ bool MoveHandle(std::span<double> values, int index, double target, const Handle
         before[i] = values[static_cast<size_t>(i)];
     const auto at = [&](int i) -> double& { return values[static_cast<size_t>(i)]; };
 
-    if (c.mirror && n == 2)
+    if (Mirrored(c, n))
     {
         const double center = std::clamp(c.center, c.min, c.max);
         if (index == 0)
@@ -227,6 +279,10 @@ bool MoveHandle(std::span<double> values, int index, double target, const Handle
             at(1) = std::clamp(target, low, high);
             at(0) = 2.0 * center - at(1);
         }
+    }
+    else if (c.collision == CollisionMode::Free)
+    {
+        at(index) = std::clamp(target, c.min, c.max);
     }
     else if (c.collision == CollisionMode::Clamp)
     {
@@ -260,7 +316,7 @@ bool MoveSpan(std::span<double> values, int first, int last, double delta, const
     const int n = static_cast<int>(values.size());
     first = std::max(0, first);
     last = std::min(n - 1, last);
-    if (first > last || std::isnan(delta) || delta == 0.0 || (c.mirror && n == 2))
+    if (first > last || std::isnan(delta) || delta == 0.0 || Mirrored(c, n) || c.collision == CollisionMode::Free)
         return false;
     const double gap = EffectiveGap(c, n);
     const auto at = [&](int i) -> double& { return values[static_cast<size_t>(i)]; };
@@ -289,6 +345,12 @@ int InsertHandle(std::span<double> storage, int count, double value, const Handl
     if (count >= static_cast<int>(storage.size()) || count >= kMaxHandles || std::isnan(value))
         return -1;
     value = std::clamp(value, c.min, c.max);
+    if (c.collision == CollisionMode::Free)
+    {
+        // No order to keep: the new handle goes last.
+        storage[static_cast<size_t>(count)] = value;
+        return count;
+    }
     const double gap = EffectiveGap(c, count + 1);
     int index = 0;
     while (index < count && storage[static_cast<size_t>(index)] <= value)
@@ -371,31 +433,35 @@ int PickHandle2D(std::span<const ImVec2> positions, ImVec2 pointer, float maxDis
 
 void HandleDrawOrder(std::span<const double> values, const HandleConstraints& c, int top, std::span<int> order)
 {
-    const int n = std::min(static_cast<int>(values.size()), static_cast<int>(order.size()));
+    const int n = std::min({static_cast<int>(values.size()), static_cast<int>(order.size()), kMaxHandles});
     const double eps = ValueEpsilon(c);
+    // Handles by position (index order among equal values), so the rules below also hold for
+    // free handles whose values are in any order.
+    int byValue[kMaxHandles];
+    SortByPosition(values.first(static_cast<size_t>(n)), byValue);
     int written = 0;
     const auto push = [&](int i) {
         if (i != top)
             order[static_cast<size_t>(written++)] = i;
     };
-    // Handles inside the range in index order, then those at the start (the last one ends on
-    // top), then those at the end in reverse (the first one ends on top), then `top`.
-    for (int i = 0; i < n; ++i)
+    // Handles inside the range by position, then those at the start (the last one ends on top),
+    // then those at the end in reverse (the first one ends on top), then `top`.
+    for (int k = 0; k < n; ++k)
     {
-        const double v = values[static_cast<size_t>(i)];
+        const double v = values[static_cast<size_t>(byValue[k])];
         if (v > c.min + eps && v < c.max - eps)
-            push(i);
+            push(byValue[k]);
     }
-    for (int i = 0; i < n; ++i)
+    for (int k = 0; k < n; ++k)
     {
-        if (values[static_cast<size_t>(i)] <= c.min + eps)
-            push(i);
+        if (values[static_cast<size_t>(byValue[k])] <= c.min + eps)
+            push(byValue[k]);
     }
-    for (int i = n - 1; i >= 0; --i)
+    for (int k = n - 1; k >= 0; --k)
     {
-        const double v = values[static_cast<size_t>(i)];
+        const double v = values[static_cast<size_t>(byValue[k])];
         if (v >= c.max - eps && v > c.min + eps)
-            push(i);
+            push(byValue[k]);
     }
     if (top >= 0 && top < n)
         order[static_cast<size_t>(written++)] = top;
@@ -440,21 +506,34 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
     const bool vertical = orientation == Orientation::Vertical;
     const float size = options.handleSize > 0.0f ? options.handleSize : Px(T().metrics.sliderKnobSize);
     const float length = std::max(1.0f, vertical ? track.GetHeight() : track.GetWidth());
-    const bool spanEnabled = options.spanDrag && n >= 2 && !(constraints.mirror && n == 2);
+    const bool free = constraints.collision == CollisionMode::Free;
+    const bool spanEnabled = options.spanDrag && n >= 2 && !Mirrored(constraints, n) && !free;
     const ForcedItemRequest forced = TakeForcedItemState();
+    // Keys give each handle its identity; without them the index does.
+    const std::span<const ImGuiID> keys =
+        options.keys.size() >= static_cast<size_t>(n) ? options.keys.first(static_cast<size_t>(n)) : std::span<const ImGuiID>();
 
     ImGui::PushOverrideID(id);
     ImGuiID handleIds[kMaxHandles];
     for (int i = 0; i < n; ++i)
-        handleIds[i] = ImGui::GetID(i);
+    {
+        const ImGuiID key = KeyOf(keys, i);
+        handleIds[i] = keys.empty() ? ImGui::GetID(i) : ImHashData(&key, sizeof(key), id);
+    }
     const ImGuiID spanId = ImGui::GetID("##span");
     const ImGuiID trackId = ImGui::GetID("##track");
     ImGui::PopID();
 
-    // Handle positions along the track in pixels, growing with the value.
-    float positions[kMaxHandles];
+    // Handle positions along the track in pixels, growing with the value, and the handles in
+    // the order of their positions (the index order, unless the handles are free).
+    float unsorted[kMaxHandles];
     for (int i = 0; i < n; ++i)
-        positions[i] = static_cast<float>(ValueToFraction(mapping, v[static_cast<size_t>(i)])) * length;
+        unsorted[i] = static_cast<float>(ValueToFraction(mapping, v[static_cast<size_t>(i)])) * length;
+    int byPosition[kMaxHandles];
+    SortByPosition(std::span<const float>(unsorted, static_cast<size_t>(n)), byPosition);
+    float positions[kMaxHandles];
+    for (int k = 0; k < n; ++k)
+        positions[k] = unsorted[byPosition[k]];
 
     ImGui::ItemSize(widgetRect.GetSize());
 
@@ -467,42 +546,45 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
     result.track = PartBehavior(trackId, widgetRect, trackOptions);
     const bool readOnly = options.drag.readOnly || result.track.readOnly;
 
-    int focusedIndex = -1;
-    for (int i = 0; i < n; ++i)
+    // The focused handle, as its place in position order (PickHandle prefers it in a stack).
+    int focusedSorted = -1;
+    for (int k = 0; k < n; ++k)
     {
-        if (g.NavId == handleIds[i])
-            focusedIndex = i;
+        if (g.NavId == handleIds[byPosition[k]])
+            focusedSorted = k;
     }
 
     const float pointer = static_cast<float>(TrackToFraction(track, orientation, g.IO.MousePos)) * length;
-    int pick = -1;
+    int pick = -1;        // handle index
+    int pickSorted = -1;  // its place in position order
     bool pickSpan = false;
     bool onHandle = false;
     if (result.track.hovered || result.track.pressed)
     {
-        pick = PickHandle(std::span<const float>(positions, static_cast<size_t>(n)), pointer, 0.0f, length, focusedIndex);
-        onHandle = std::fabs(positions[pick] - pointer) <= size * 0.5f;
+        pickSorted = PickHandle(std::span<const float>(positions, static_cast<size_t>(n)), pointer, 0.0f, length, focusedSorted);
+        pick = byPosition[pickSorted];
+        onHandle = std::fabs(positions[pickSorted] - pointer) <= size * 0.5f;
         pickSpan = !onHandle && spanEnabled && pointer > positions[0] && pointer < positions[n - 1];
     }
     PendingPick& pending = CurrentPendingPick();
     if (result.track.pressed && !result.track.disabled && !readOnly && result.track.forced == ForcedItemState::None)
     {
-        TakeSnapshot(id, before, n);
+        TakeSnapshot(id, before, n, keys);
         // A press on handles at one position (a press beside them moves the one PickHandle
         // chose to the pointer at once).
-        int first = pick;
-        int last = pick;
+        int first = pickSorted;
+        int last = pickSorted;
         if (!pickSpan && onHandle)
         {
-            while (first > 0 && std::fabs(positions[first - 1] - positions[pick]) <= kSamePosition)
+            while (first > 0 && std::fabs(positions[first - 1] - positions[pickSorted]) <= kSamePosition)
                 --first;
-            while (last + 1 < n && std::fabs(positions[last + 1] - positions[pick]) <= kSamePosition)
+            while (last + 1 < n && std::fabs(positions[last + 1] - positions[pickSorted]) <= kSamePosition)
                 ++last;
         }
         if (pickSpan)
             TransferMousePress(spanId, window, false);
         else if (first != last)
-            pending = {id, first, last, pick, pointer};
+            pending = {id, byPosition[first], byPosition[last], pick, pointer};
         else
             TransferMousePress(handleIds[pick], window, true);
     }
@@ -556,10 +638,10 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
         const ValueDragResult edit = ValueDragBehavior(handle, &value, track, drag);
         // A key press started an edit of this handle: remember where every handle was.
         if (!wasActive && g.ActiveId == handleIds[i])
-            TakeSnapshot(id, before, n);
+            TakeSnapshot(id, before, n, keys);
         if (edit.canceled)
         {
-            RestoreSnapshot(id, v);
+            RestoreSnapshot(id, v, keys);
             result.canceled = true;
             result.changed = true;
         }
@@ -714,7 +796,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             ImGui::SetKeyOwner(ImGuiKey_Escape, spanId);
             if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, spanId))
             {
-                RestoreSnapshot(id, v);
+                RestoreSnapshot(id, v, keys);
                 MarkEditCanceled(spanId);
                 ImGui::MarkItemEdited(spanId);
                 ImGui::ClearActiveID();

@@ -237,6 +237,35 @@ TEST_CASE("Multi-handle: picking on a plane for two-dimensional pads")
     CHECK(PickHandle2D(same, ImVec2(41.0f, 40.0f), 10.0f) == 1);  // the later one is on top
 }
 
+TEST_CASE("Multi-handle: free handles pass each other and keep no order")
+{
+    HandleConstraints c;
+    c.min = 0.0;
+    c.max = 100.0;
+    c.minGap = 10.0;  // ignored for free handles
+    c.collision = CollisionMode::Free;
+    CHECK(EffectiveGap(c, 3) == 0.0);
+    double values[3] = {70.0, 20.0, 140.0};
+    ConstrainHandles(values, c);
+    CHECK(values[0] == 70.0);
+    CHECK(values[1] == 20.0);
+    CHECK(values[2] == 100.0);
+    CHECK(MoveHandle(values, 1, 90.0, c));
+    CHECK(values[1] == 90.0);
+    CHECK(values[0] == 70.0);
+    CHECK_FALSE(MoveSpan(values, 0, 2, -5.0, c));
+    double storage[4] = {70.0, 90.0, 100.0, 0.0};
+    CHECK(InsertHandle(storage, 3, 10.0, c) == 3);  // last, whatever its value
+    CHECK(storage[3] == 10.0);
+    // The draw order goes by position: 10 and 70 inside, then 90, then the one at the end.
+    int order[4] = {};
+    HandleDrawOrder(storage, c, -1, order);
+    CHECK(order[0] == 3);
+    CHECK(order[1] == 0);
+    CHECK(order[2] == 1);
+    CHECK(order[3] == 2);
+}
+
 // ---- Behaviour --------------------------------------------------------------------------------
 
 namespace
@@ -312,6 +341,55 @@ TEST_CASE("Multi-handle behaviour: dragging a handle moves only that handle, cla
     session.Drag({TestRange::At(session, 40.0), TestRange::At(session, 95.0)});
     CHECK(range.values[0] == doctest::Approx(50.0));
     CHECK(range.values[1] == 60.0);
+}
+
+TEST_CASE("Multi-handle behaviour: free handles cross while dragged")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.options.constraints.collision = CollisionMode::Free;
+    Install(session, range);
+    session.Drag({TestRange::At(session, 20.0), TestRange::At(session, 80.0)});
+    CHECK(range.values[0] == doctest::Approx(80.0));
+    CHECK(range.values[1] == 60.0);
+    CHECK(range.commits == 1);
+    // The handle at 60 is now the lower one on screen: a press just below it grabs it.
+    session.Drag({TestRange::At(session, 58.0), TestRange::At(session, 30.0)});
+    CHECK(range.values[1] == doctest::Approx(32.0));
+    CHECK(range.values[0] == doctest::Approx(80.0));
+}
+
+TEST_CASE("Multi-handle behaviour: keys keep focus and identity when a handle is inserted before")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.options.spanDrag = false;
+    ImGuiID keys[3] = {101, 102, 0};
+    range.options.keys = std::span<const ImGuiID>(keys, 2);
+    Install(session, range);
+    session.Click(TestRange::At(session, 60.0));
+    REQUIRE(ImGui::GetFocusID() == range.handles[1].id);
+    const ImGuiID focusedId = range.handles[1].id;
+
+    // A handle with a new key goes in front: the focused handle is now index 2 and keeps its id.
+    range.count = 3;
+    range.values[2] = 60.0;
+    range.values[1] = 20.0;
+    range.values[0] = 5.0;
+    keys[2] = 102;
+    keys[1] = 101;
+    keys[0] = 103;
+    range.options.keys = std::span<const ImGuiID>(keys, 3);
+    session.Frames(2);
+    CHECK(range.handles[2].id == focusedId);
+    CHECK(ImGui::GetFocusID() == range.handles[2].id);
+    CHECK(range.last.focusedHandle == 2);
+    // The arrows move the same handle as before the insert.
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(range.values[2] == doctest::Approx(61.0));
+    CHECK(range.values[1] == 20.0);
 }
 
 TEST_CASE("Multi-handle behaviour: a handle held by its neighbour edits nothing")
