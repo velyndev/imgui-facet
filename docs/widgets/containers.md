@@ -273,17 +273,36 @@ case WM_NCHITTEST:
     // ... the other edges and corners ...
     default: return HTCLIENT;
     }
+// Over HTMAXBUTTON the system sends non-client button messages. The Win32 backend of Dear ImGui
+// already turns WM_NCMOUSEMOVE into a mouse position; the host forwards the button itself and
+// keeps the message from DefWindowProc, so the drawn button shows hover and press:
+case WM_NCLBUTTONDOWN:
+case WM_NCLBUTTONUP:
+    if (wParam == HTMAXBUTTON)
+    {
+        ImGui::GetIO().AddMouseButtonEvent(0, msg == WM_NCLBUTTONDOWN);
+        return 0;
+    }
+    break;
 ```
 
-The window placement is saved in design units, so the window reopens at the same size on a monitor
-with another scale. The host loads it before creating its window and saves it on every move:
+The window placement keeps its position in physical pixels of the virtual screen and its size in
+design units, so the window reopens at the same place and at the same apparent size on a monitor
+with another scale. Dear ImGui reads the ini file in the first `ImGui::NewFrame`, so a host that
+wants the placement before its window shows reads the ini file itself after `facet::Init`:
 
 ```cpp
+HWND hwnd = CreateHostWindowHidden();               // not visible yet
+CreateDevice(hwnd);
+ImGui::CreateContext();
+facet::Init(desc);
+ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
 facet::FramePlacement placement;
 if (facet::LoadAppFramePlacement("main", &placement))
-    CreateHostWindow(ClampToMonitors(placement));
-// WM_EXITSIZEMOVE:
-facet::SaveAppFramePlacement("main", CurrentPlacementInUnits(hwnd));
+    ApplyPlacement(hwnd, ClampToMonitors(placement));  // size in pixels: size * the monitor's scale
+ShowWindow(hwnd, placement.maximized ? SW_SHOWMAXIMIZED : SW_SHOW);
+// WM_EXITSIZEMOVE and WM_CLOSE:
+facet::SaveAppFramePlacement("main", CurrentPlacement(hwnd));   // restored rect, Scale() and IsZoomed
 ```
 
 A virtual list with ten thousand rows and multiple selection:

@@ -114,7 +114,12 @@ private:
 
 // What a point of the app frame is, for the host's non-client hit test (on Win32, the answer
 // to WM_NCHITTEST: Caption for HTCAPTION, the edges for HTLEFT and so on, MaximizeButton for
-// HTMAXBUTTON so the system shows its snap layouts over it).
+// HTMAXBUTTON so the system shows its snap layouts over it). Over a point answered with
+// HTMAXBUTTON the system sends non-client mouse messages instead of client ones. The Win32
+// backend of Dear ImGui turns WM_NCMOUSEMOVE and WM_NCMOUSELEAVE into mouse positions, but not
+// the buttons: the host passes WM_NCLBUTTONDOWN and WM_NCLBUTTONUP with HTMAXBUTTON to
+// io.AddMouseButtonEvent(0, down) and returns 0 without calling DefWindowProc, so the drawn
+// maximize button shows hover and press and TitleBarPressedButton reports it.
 enum class FrameHit
 {
     Client,          // Facet content: the host passes the input to Dear ImGui
@@ -142,20 +147,28 @@ FrameHit AppFrameHitTest(ImVec2 point);
 ImVec2 AppFrameMinSize();
 ImVec2 AppFrameMaxSize();
 
-// The host window's placement in design units (screen pixels divided by Scale() at the time
-// it was saved), so a window comes back at the same size on a monitor with another scale.
+// The host window's placement. The position stays in physical pixels of the virtual screen,
+// because monitors of different scales share that one coordinate space and a position in units
+// would have no single scale to convert with. The size is in design units (pixels divided by
+// Scale() when saved), so the window comes back at the same apparent size on a monitor with
+// another scale: the host multiplies it by the scale of the monitor that holds `position`.
 struct FramePlacement
 {
-    ImVec2 position = {0.0f, 0.0f};    // units; top-left corner of the restored window
+    ImVec2 position = {0.0f, 0.0f};    // pixels, virtual screen; top-left corner of the restored (not maximized) window
     ImVec2 size = {0.0f, 0.0f};        // units; size of the restored window
-    bool maximized = false;
+    float scale = 0.0f;                // Scale() when it was saved; 0 when unknown. With the same scale, size * scale is the exact pixel size
+    bool maximized = false;            // the window was maximized; position and size are its restored placement
 };
 
 // Stores the placement under `id` (hashed alone, not on the id stack) in Facet's part of the
-// Dear ImGui ini file. The host calls it when its window moves or resizes.
+// Dear ImGui ini file, which Dear ImGui writes at its next ini save. The host calls it when its
+// window moves, resizes or closes.
 void SaveAppFramePlacement(const char* id, const FramePlacement& placement);
 // Reads the placement saved under `id`. Returns false and leaves *placement unchanged when
-// nothing was saved. The host clamps the result to its monitors before using it.
+// nothing was saved, or when the ini file was not read yet. Dear ImGui reads it in the first
+// ImGui::NewFrame, so a host that wants the placement before its window shows creates the window
+// hidden, runs facet::Init, calls ImGui::LoadIniSettingsFromDisk(io.IniFilename) itself, reads
+// the placement, clamps it to its monitors, applies it and then shows the window.
 bool LoadAppFramePlacement(const char* id, FramePlacement* placement);
 
 // --- Title bar -----------------------------------------------------------------------------------
