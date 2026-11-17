@@ -963,15 +963,18 @@ TEST_CASE("Shadow tiles reach the page only when their upload runs")
     const UINT y = static_cast<UINT>(std::lround(tile->uv.y / tile->texelUv.y)) + static_cast<UINT>(tile->layout.size) - 1;
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
 
-    // One record per draw list and frame; another list or frame gets it again.
+    // One record per draw list, channel and frame; another list, channel or frame gets it
+    // again.
     const int listA = 0;
     const int listB = 0;
-    const std::span<const std::uint8_t> first = atlas.PendingUpload(key, &listA, 7);
+    const std::span<const std::uint8_t> first = atlas.PendingUpload(key, &listA, 0, 7);
     REQUIRE(first.size() > sizeof(fi::ShadowUploadHeader));
     const std::vector<std::uint8_t> record(first.begin(), first.end());
-    CHECK(atlas.PendingUpload(key, &listA, 7).empty());
-    CHECK_FALSE(atlas.PendingUpload(key, &listB, 7).empty());
-    CHECK_FALSE(atlas.PendingUpload(key, &listA, 8).empty());
+    CHECK(atlas.PendingUpload(key, &listA, 0, 7).empty());
+    CHECK_FALSE(atlas.PendingUpload(key, &listB, 0, 7).empty());
+    CHECK_FALSE(atlas.PendingUpload(key, &listA, 0, 8).empty());
+    CHECK_FALSE(atlas.PendingUpload(key, &listA, 1, 8).empty());
+    CHECK(atlas.PendingUpload(key, &listA, 1, 8).empty());
     // Recording alone has not touched the page.
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
 
@@ -982,7 +985,7 @@ TEST_CASE("Shadow tiles reach the page only when their upload runs")
     fi::ShadowAtlas::RunUpload(warp.context.Get(), record.data(), record.size());
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) > 200);
     CHECK(atlas.PendingCount() == 0);
-    CHECK(atlas.PendingUpload(key, &listB, 9).empty());
+    CHECK(atlas.PendingUpload(key, &listB, 0, 9).empty());
 }
 
 TEST_CASE("A shadow queues its tile upload in front of its first draw")
@@ -1022,6 +1025,43 @@ TEST_CASE("A shadow queues its tile upload in front of its first draw")
         facet::DrawShadow(&later, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 5.0f, spec);
         CHECK(CountCallbacks(later) == 0);
         CHECK(later.VtxBuffer.Size > 0);
+    }
+}
+
+TEST_CASE("Each split channel queues its own tile upload")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    facet::ShadowSpec spec;
+    spec.blur = 11.0f;
+    spec.color = IM_COL32(0, 0, 0, 80);
+
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+    // Channel 1 records first, but channel 0 comes first after the merge: both need the
+    // upload in front of their own draw.
+    drawList.ChannelsSplit(2);
+    drawList.ChannelsSetCurrent(1);
+    facet::DrawShadow(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 7.0f, spec);
+    drawList.ChannelsSetCurrent(0);
+    facet::DrawShadow(&drawList, ImVec2(20.0f, 20.0f), ImVec2(52.0f, 52.0f), 7.0f, spec);
+    facet::DrawShadow(&drawList, ImVec2(18.0f, 18.0f), ImVec2(50.0f, 50.0f), 7.0f, spec);
+    drawList.ChannelsMerge();
+    CHECK(CountCallbacks(drawList) == 2);
+    // After the merge, the first command with geometry follows an upload.
+    bool uploadSeen = false;
+    for (const ImDrawCmd& command : drawList.CmdBuffer)
+    {
+        if (command.UserCallback != nullptr)
+            uploadSeen = true;
+        else if (command.ElemCount > 0)
+        {
+            CHECK(uploadSeen);
+            break;
+        }
     }
 }
 

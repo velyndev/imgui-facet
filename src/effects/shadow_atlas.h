@@ -77,9 +77,13 @@ public:
     const ShadowTile* Acquire(const ShadowKey& key);
 
     // The upload record the caller must queue before its first draw with the tile of `key`,
-    // or an empty span when the upload is done or `drawList` already queued it in `frame`.
-    // The span stays valid until the next call on the atlas.
-    std::span<const std::uint8_t> PendingUpload(const ShadowKey& key, const void* drawList, std::uint64_t frame);
+    // or an empty span when the upload is done or `drawList` already queued it in `frame`
+    // on the same `channel`. The channel is the draw list's split channel: channels are
+    // merged in index order, not in recording order, so a record queued on one channel does
+    // not run before the draws of another. The span stays valid until the next call on the
+    // atlas.
+    std::span<const std::uint8_t> PendingUpload(const ShadowKey& key, const void* drawList, int channel,
+                                                std::uint64_t frame);
 
     // Runs an upload record on `context` and marks it done. Called from the draw callback.
     static void RunUpload(ID3D11DeviceContext* context, const std::uint8_t* record, size_t size);
@@ -114,6 +118,7 @@ private:
         std::uint64_t uploadId = 0;
         std::vector<std::uint8_t> record;  // empty once the upload is done
         const void* queuedList = nullptr;
+        int queuedChannel = 0;
         std::uint64_t queuedFrame = 0;
     };
 

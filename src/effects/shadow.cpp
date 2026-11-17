@@ -164,7 +164,8 @@ void ShadowAtlas::RunUpload(ID3D11DeviceContext* target, const std::uint8_t* rec
         header.confirmations[header.id % header.confirmationCount].store(header.id, std::memory_order_release);
 }
 
-std::span<const std::uint8_t> ShadowAtlas::PendingUpload(const ShadowKey& key, const void* drawList, std::uint64_t frame)
+std::span<const std::uint8_t> ShadowAtlas::PendingUpload(const ShadowKey& key, const void* drawList, int channel,
+                                                         std::uint64_t frame)
 {
     const auto found = tiles.find(key.Packed());
     if (found == tiles.end())
@@ -176,9 +177,10 @@ std::span<const std::uint8_t> ShadowAtlas::PendingUpload(const ShadowKey& key, c
             std::vector<std::uint8_t>().swap(entry.record);
         return {};
     }
-    if (entry.queuedList == drawList && entry.queuedFrame == frame)
+    if (entry.queuedList == drawList && entry.queuedChannel == channel && entry.queuedFrame == frame)
         return {};
     entry.queuedList = drawList;
+    entry.queuedChannel = channel;
     entry.queuedFrame = frame;
     return std::span<const std::uint8_t>(entry.record.data(), entry.record.size());
 }
@@ -358,8 +360,10 @@ void DrawBlurredShape(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radi
     const ShadowTile* tile = state.atlas.Acquire(key);
     if (tile == nullptr)
         return;
-    // A tile that is not on its page yet is uploaded by a callback in front of its draw.
-    const std::span<const std::uint8_t> upload = state.atlas.PendingUpload(key, drawList, FrameIndex());
+    // A tile that is not on its page yet is uploaded by a callback in front of its draw, on
+    // the same split channel (ImDrawListSplitter, tables), since channels merge in index order.
+    const int channel = drawList->_Splitter._Count > 1 ? drawList->_Splitter._Current : 0;
+    const std::span<const std::uint8_t> upload = state.atlas.PendingUpload(key, drawList, channel, FrameIndex());
     if (!upload.empty())
         drawList->AddCallback(&ShadowUploadCallback, const_cast<std::uint8_t*>(upload.data()), upload.size());
     const NineSlice grid = ShadowNineSlice(pMin, pMax, tile->layout, tile->uv, tile->texelUv);
