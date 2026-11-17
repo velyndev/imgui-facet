@@ -543,6 +543,24 @@ TEST_CASE("Multi-handle behaviour: a span drag on a logarithmic track keeps the 
     CHECK(range.commits == 1);
 }
 
+TEST_CASE("Multi-handle behaviour: the span reports the hover a press would grab it with")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    Install(session, range);
+    session.MouseMove(TestRange::At(session, 40.0));
+    session.Seconds(facet::T().motion.durationFast + 0.05f);
+    CHECK(range.last.spanHovered);
+    CHECK(range.last.span.hovered);
+    CHECK(range.last.span.hoverAmount == 1.0f);
+    // On a handle the span is not hovered.
+    session.MouseMove(TestRange::At(session, 20.0));
+    session.Seconds(facet::T().motion.durationFast + 0.05f);
+    CHECK_FALSE(range.last.span.hovered);
+    CHECK(range.last.span.hoverAmount == 0.0f);
+}
+
 TEST_CASE("Multi-handle behaviour: a span drag survives a lost pointer")
 {
     facet::test::Session session;

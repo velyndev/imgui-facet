@@ -931,6 +931,18 @@ bool ProtoRange(PageCtx& ctx, const char* id, double* values, int count, const P
                                : (slider.readOnly || result.track.readOnly) ? TrackLook::ReadOnly
                                                                             : TrackLook::Normal;
         DrawTrack(drawList, track, slider.orientation, first, last, look, m);
+        // The span thickens while a press would grab it and while it is dragged, so it shows
+        // that it moves as one piece.
+        const float spanAmount = std::max(result.span.hoverAmount, result.span.pressAmount);
+        if (count > 1 && look == TrackLook::Normal && spanAmount > 0.0f)
+        {
+            const float half = facet::PxSnapped(t.metrics.sliderTrackHeight) * 0.5f + facet::Px(t.spacing.xs) * 0.5f * spanAmount;
+            const float a = facet::internal::FractionToTrack(track, slider.orientation, first);
+            const float b = facet::internal::FractionToTrack(track, slider.orientation, last);
+            const ImRect span = vertical ? ImRect(track.Min.x - half, std::min(a, b), track.Min.x + half, std::max(a, b))
+                                         : ImRect(std::min(a, b), track.Min.y - half, std::max(a, b), track.Min.y + half);
+            facet::FillRect(drawList, span.Min, span.Max, Color(t.colors.accent), half);
+        }
         // The handle a press would take, or the one in use, is drawn on top.
         int top = result.activeHandle >= 0 ? result.activeHandle : result.focusedHandle;
         int order[facet::internal::kMaxHandles];
