@@ -100,7 +100,10 @@ looks one up; `IconCount`, `IconNameAt` and `IconName` list them.
 Icons are rasterized as a white mask the first time a pixel size is needed and stored in an
 atlas of 1024 x 1024 pages; drawing multiplies the mask by the color. Position and size are
 rounded to whole pixels. After a scale change the atlas is emptied at the next frame start
-and refilled at the new sizes. An unknown name draws a crossed box.
+and refilled at the new sizes. It holds at most four pages: a glyph that needs a fifth draws as
+a crossed box for that frame and empties the atlas at the next frame start, so icons whose
+size animates cannot grow it without bound. An unknown name or a source that cannot be
+rasterized draws a crossed box; a failed page creation is tried again in a later frame.
 
 ### Drawing a new icon
 

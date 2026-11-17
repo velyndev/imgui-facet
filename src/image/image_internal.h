@@ -87,6 +87,9 @@ ImageHandle CreateSvgImage(SvgSourcePtr source);
 // does not parse.
 bool RasterizeIcon(std::uint32_t iconId, int pixels, RgbaImage& out);
 
+// Pages the icon atlas holds now; at most four (icon_atlas.cpp).
+int IconAtlasPageCount();
+
 // Draws the loading placeholder or the failed marker of an image box. Used by DrawImage
 // and available to widgets that show their own image slots.
 void DrawImageLoading(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius);

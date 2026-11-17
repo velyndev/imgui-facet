@@ -623,3 +623,24 @@ TEST_CASE("An SVG raster beyond the texel budget or the side limit fails")
     // One side above the Direct3D limit: fails instead of being squeezed out of shape.
     CHECK_FALSE(facet::LoadSvgMemory(kSvg24, 0, ImVec2(20000.0f, 1.0f)).IsValid());
 }
+TEST_CASE("The icon atlas stays within its page budget and refills after a frame start")
+{
+    Session session;
+    REQUIRE(session.ok);
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
+    facet::NewFrame();
+    // Every size from 1 to 256 pixels: more glyphs than four pages hold.
+    for (int side = 1; side <= 256; ++side)
+        facet::DrawIcon(&drawList, facet::Icon("check"), ImVec2(0.0f, 0.0f), static_cast<float>(side), IM_COL32_WHITE);
+    CHECK(facet::internal::IconAtlasPageCount() <= 4);
+    // The next frame start empties the atlas; sizes in use are drawn again from there.
+    facet::NewFrame();
+    CHECK(facet::internal::IconAtlasPageCount() == 0);
+    const int vertices = drawList.VtxBuffer.Size;
+    facet::DrawIcon(&drawList, facet::Icon("check"), ImVec2(0.0f, 0.0f), 16.0f, IM_COL32_WHITE);
+    CHECK(facet::internal::IconAtlasPageCount() == 1);
+    // A textured quad, not the crossed placeholder box.
+    CHECK(drawList.VtxBuffer.Size - vertices == 4);
+}

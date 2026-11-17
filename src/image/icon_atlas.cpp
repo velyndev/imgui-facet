@@ -46,6 +46,10 @@ constexpr int kPageSize = 1024;
 constexpr int kMaxGlyphSide = 256;
 // Empty texels around every glyph, so filtering never picks up a neighbour.
 constexpr int kGlyphPadding = 1;
+// Most pages the atlas holds (16 MiB of textures). A glyph that needs one more empties the
+// atlas at the next frame start instead, so icons whose size animates, or apps that use many
+// sizes, cannot grow it without bound.
+constexpr int kMaxPages = 4;
 
 constexpr std::string_view kIconPrefix = "icons/";
 constexpr std::string_view kIconSuffix = ".svg";
@@ -149,6 +153,8 @@ struct Atlas
     bool initialized = false;
     bool deviceValid = false;
     bool resetPending = false;
+    // Frame of the last failed allocation; glyphs are not tried again in that frame.
+    std::uint64_t failedFrame = 0;
 };
 
 Atlas& State()
@@ -192,7 +198,9 @@ bool AddPage(Atlas& atlas)
     return true;
 }
 
-// Finds room for a side x side glyph; returns false when no page can be created.
+// Finds room for a side x side glyph; returns false when no page can be created. Past the
+// page budget it asks for the atlas to be emptied at the next frame start (recorded draws
+// may still read the pages this frame), where every glyph in use is drawn again.
 bool Allocate(Atlas& atlas, int side, int& pageIndex, int& x, int& y)
 {
     const int cell = side + kGlyphPadding;
@@ -215,6 +223,11 @@ bool Allocate(Atlas& atlas, int side, int& pageIndex, int& x, int& y)
             return true;
         }
     }
+    if (static_cast<int>(atlas.pages.size()) >= kMaxPages)
+    {
+        atlas.resetPending = true;
+        return false;
+    }
     if (!AddPage(atlas))
         return false;
     Page& page = atlas.pages.back();
@@ -233,23 +246,31 @@ const Glyph* GetGlyph(Atlas& atlas, std::uint32_t id, int side)
     if (found != atlas.glyphs.end())
         return &found->second;
 
+    // Only a source that cannot be rasterized is remembered as missing. A missing context or
+    // a full or failed page is transient: the glyph is tried again in a later frame.
+    ID3D11DeviceContext* context = internal::DeviceContext();
+    const std::uint64_t frame = internal::FrameIndex();
+    if (context == nullptr || (atlas.failedFrame != 0 && atlas.failedFrame == frame))
+        return nullptr;
     Glyph glyph;
+    if (!internal::RasterizeIcon(id, side, atlas.scratch))
+        return &atlas.glyphs.emplace(key, glyph).first->second;
     int pageIndex = 0;
     int x = 0;
     int y = 0;
-    ID3D11DeviceContext* context = internal::DeviceContext();
-    if (context != nullptr && internal::RasterizeIcon(id, side, atlas.scratch) &&
-        Allocate(atlas, side, pageIndex, x, y))
+    if (!Allocate(atlas, side, pageIndex, x, y))
     {
-        const D3D11_BOX box = {static_cast<UINT>(x), static_cast<UINT>(y), 0, static_cast<UINT>(x + side),
-                               static_cast<UINT>(y + side), 1};
-        context->UpdateSubresource(atlas.pages[static_cast<std::size_t>(pageIndex)].texture.Get(), 0, &box,
-                                   atlas.scratch.pixels.data(), static_cast<UINT>(side * 4), 0);
-        constexpr float kInv = 1.0f / static_cast<float>(kPageSize);
-        glyph.page = pageIndex;
-        glyph.uv0 = ImVec2(static_cast<float>(x) * kInv, static_cast<float>(y) * kInv);
-        glyph.uv1 = ImVec2(static_cast<float>(x + side) * kInv, static_cast<float>(y + side) * kInv);
+        atlas.failedFrame = frame;
+        return nullptr;
     }
+    const D3D11_BOX box = {static_cast<UINT>(x), static_cast<UINT>(y), 0, static_cast<UINT>(x + side),
+                           static_cast<UINT>(y + side), 1};
+    context->UpdateSubresource(atlas.pages[static_cast<std::size_t>(pageIndex)].texture.Get(), 0, &box,
+                               atlas.scratch.pixels.data(), static_cast<UINT>(side * 4), 0);
+    constexpr float kInv = 1.0f / static_cast<float>(kPageSize);
+    glyph.page = pageIndex;
+    glyph.uv0 = ImVec2(static_cast<float>(x) * kInv, static_cast<float>(y) * kInv);
+    glyph.uv1 = ImVec2(static_cast<float>(x + side) * kInv, static_cast<float>(y + side) * kInv);
     return &atlas.glyphs.emplace(key, glyph).first->second;
 }
 
@@ -427,6 +448,11 @@ const char* IconName(Icon icon)
 
 namespace internal
 {
+
+int IconAtlasPageCount()
+{
+    return static_cast<int>(State().pages.size());
+}
 
 bool RasterizeIcon(std::uint32_t iconId, int pixels, RgbaImage& out)
 {
