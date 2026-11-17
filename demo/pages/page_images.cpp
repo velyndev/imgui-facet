@@ -86,6 +86,15 @@ struct Assets
 
 Assets assets;
 
+// What the last frame drew, for the selftest.
+struct Drawn
+{
+    bool offGrid = false;  // an example box was not a whole number of pixels
+    int failedBoxes = 0;   // failed examples, which draw their own outline
+};
+
+Drawn drawn;
+
 // --- Pattern generation ---------------------------------------------------------------
 
 void Put(std::vector<unsigned char>& pixels, int width, int x, int y, const ImVec4& color)
@@ -279,15 +288,22 @@ void Caption(const char* text)
 }
 
 // One example: the image in a box with a hairline outline that shows the box bounds, and
-// a caption under it, laid out as a group so examples flow side by side.
+// a caption under it, laid out as a group so examples flow side by side. A failed image
+// draws its own outline, so the box gets no second one.
 void Example(facet::ImageHandle image, ImVec2 size, const facet::ImageOptions& options, const char* caption)
 {
     ImGui::BeginGroup();
     facet::Image(image, size, options);
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    facet::StrokeRect(ImGui::GetWindowDrawList(), min, max, facet::ToU32(facet::T().colors.separator),
-                      options.radius, facet::HairlineThickness());
+    const ImVec2 boxSize(max.x - min.x, max.y - min.y);
+    if (boxSize.x != std::floor(boxSize.x) || boxSize.y != std::floor(boxSize.y))
+        drawn.offGrid = true;
+    if (!facet::ImageFailed(image))
+        facet::StrokeRect(ImGui::GetWindowDrawList(), min, max, facet::ToU32(facet::T().colors.separator),
+                          options.radius, facet::HairlineThickness());
+    else
+        ++drawn.failedBoxes;
     Caption(caption);
     ImGui::EndGroup();
 }
@@ -298,7 +314,8 @@ float contentRight = 0.0f;
 // Starts the next example on the same line when it fits, otherwise on a new line.
 void Flow(float nextWidth)
 {
-    const float spacing = facet::Px(facet::T().spacing.lg);
+    // Whole pixels, so every box and its outline start on the pixel grid.
+    const float spacing = std::round(facet::Px(facet::T().spacing.lg));
     if (ImGui::GetItemRectMax().x + spacing + nextWidth <= contentRight)
         ImGui::SameLine(0.0f, spacing);
 }
@@ -329,6 +346,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     EnsureAssets(ctx.dark);
+    drawn = Drawn{};
     if (ctx.capture)
     {
         ui = ImagesUi{};
@@ -339,7 +357,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
                 facet::WaitForImage(handle, 10.0f);
     }
 
-    const float tile = facet::Px(theme.spacing.xxxl) * kTileSpans;
+    const float tile = std::floor(facet::Px(theme.spacing.xxxl) * kTileSpans);
     contentRight = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
 
     facet::demo::PageHeader("Images", "Every picture on this page is a generated test pattern (made with "
@@ -392,7 +410,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         options.fit = ui.fit;
         options.radius = facet::Px(theme.radii.*kRadii[ui.radius].token);
         options.tint = ui.tint ? facet::ToU32(c.accent) : IM_COL32_WHITE;
-        const float width = std::min(ImGui::GetContentRegionAvail().x, tile * kWideAspect);
+        const float width = std::floor(std::min(ImGui::GetContentRegionAvail().x, tile * kWideAspect));
         Example(assets.card, ImVec2(width, tile), options, "Preview with the options above");
     }
 
@@ -422,7 +440,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         {"none", c.label, true},     {"accent", c.accent, false},           {"success", c.success, false},
         {"warning", c.warning, false}, {"destructive", c.destructive, false},
     };
-    const float small = facet::Px(theme.spacing.xxxl) * kSmallTileSpans;
+    const float small = std::floor(facet::Px(theme.spacing.xxxl) * kSmallTileSpans);
     for (std::size_t i = 0; i < std::size(tints); ++i)
     {
         facet::ImageOptions options;
@@ -443,7 +461,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         char caption[96];
         std::snprintf(caption, sizeof(caption), "Generated PNG, %d x %d: %s", kAsyncWidth, kAsyncHeight,
                       StatusName(facet::GetImageStatus(assets.async)));
-        const float wide = std::min(ImGui::GetContentRegionAvail().x, tile * kWideAspect);
+        const float wide = std::floor(std::min(ImGui::GetContentRegionAvail().x, tile * kWideAspect));
         Example(assets.async, ImVec2(wide, tile), options, caption);
         Flow(tile);
         std::snprintf(caption, sizeof(caption), "Missing file: %s",
@@ -516,6 +534,9 @@ FACET_DEMO_SELFTEST("images")
                 [] { return facet::GetImageStatus(assets.missing) == facet::ImageStatus::Failed; });
     test.Expect("the truncated PNG ends in the failed state",
                 [] { return facet::GetImageStatus(assets.damaged) == facet::ImageStatus::Failed; });
+    test.Wait(1);
+    test.Expect("the two failed examples draw only their own outline", [] { return drawn.failedBoxes == 2; });
+    test.Expect("every example box is a whole number of pixels", [] { return !drawn.offGrid; });
     test.Expect("every SVG copy is rasterized at its design size times the scale", [] {
         for (std::size_t i = 0; i < std::size(kSvgScales); ++i)
         {
