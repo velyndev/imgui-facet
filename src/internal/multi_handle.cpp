@@ -49,6 +49,23 @@ SpanDrag& CurrentSpanDrag()
     return drag;
 }
 
+// A press on a run of handles at one position: which of them moves depends on the direction
+// of the drag, so the track keeps the press until the pointer moves along the track.
+struct PendingPick
+{
+    ImGuiID owner = 0;
+    int first = 0;        // the run, as handle indices
+    int last = 0;
+    int fallback = 0;     // the handle that gets the focus when the press ends without moving
+    float pressAlong = 0; // the press position along the track, pixels
+};
+
+PendingPick& CurrentPendingPick()
+{
+    static PendingPick pick;
+    return pick;
+}
+
 double ValueEpsilon(const HandleConstraints& c)
 {
     return std::max(1e-12, (c.max - c.min) * 1e-9);
@@ -120,6 +137,7 @@ void ResetMultiHandleState()
 {
     Snapshot() = {};
     CurrentSpanDrag() = {};
+    CurrentPendingPick() = {};
 }
 
 double EffectiveGap(const HandleConstraints& c, int count)
@@ -455,19 +473,56 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
     const float pointer = static_cast<float>(TrackToFraction(track, orientation, g.IO.MousePos)) * length;
     int pick = -1;
     bool pickSpan = false;
+    bool onHandle = false;
     if (result.track.hovered || result.track.pressed)
     {
         pick = PickHandle(std::span<const float>(positions, static_cast<size_t>(n)), pointer, 0.0f, length, focusedIndex);
-        const bool onHandle = std::fabs(positions[pick] - pointer) <= size * 0.5f;
+        onHandle = std::fabs(positions[pick] - pointer) <= size * 0.5f;
         pickSpan = !onHandle && spanEnabled && pointer > positions[0] && pointer < positions[n - 1];
     }
+    PendingPick& pending = CurrentPendingPick();
     if (result.track.pressed && !result.track.disabled && !readOnly && result.track.forced == ForcedItemState::None)
     {
         TakeSnapshot(id, before, n);
+        // A press on handles at one position (a press beside them moves the one PickHandle
+        // chose to the pointer at once).
+        int first = pick;
+        int last = pick;
+        if (!pickSpan && onHandle)
+        {
+            while (first > 0 && std::fabs(positions[first - 1] - positions[pick]) <= kSamePosition)
+                --first;
+            while (last + 1 < n && std::fabs(positions[last + 1] - positions[pick]) <= kSamePosition)
+                ++last;
+        }
         if (pickSpan)
             TransferMousePress(spanId, window, false);
+        else if (first != last)
+            pending = {id, first, last, pick, pointer};
         else
             TransferMousePress(handleIds[pick], window, true);
+    }
+    else if (pending.owner == id)
+    {
+        if (g.ActiveId == trackId)
+        {
+            // The first movement along the track decides: toward max the last handle of the run
+            // moves, toward min the first, so the one that can move in that direction takes it.
+            const float moved = pointer - pending.pressAlong;
+            if (std::fabs(moved) > kSamePosition)
+            {
+                const int chosen = moved > 0.0f ? pending.last : pending.first;
+                pending = {};
+                TransferMousePress(handleIds[chosen], window, true);
+            }
+        }
+        else
+        {
+            // Released without moving: the handle the press picked gets the focus.
+            if (g.ActiveId == 0 && pending.fallback < n)
+                ImGui::SetFocusID(handleIds[pending.fallback], window);
+            pending = {};
+        }
     }
     const bool partActive = g.ActiveId == spanId || std::find(handleIds, handleIds + n, g.ActiveId) != handleIds + n;
     if (result.track.hovered && !partActive)

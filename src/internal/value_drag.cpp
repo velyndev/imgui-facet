@@ -346,6 +346,12 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         const ImVec2 mouse = io.MousePos;
         if (session.id != id || !session.mouse)
         {
+            // From where the button went down: a press handed over from another item a few
+            // frames later (a run of handles waiting for the drag direction) keeps the travel
+            // since the press.
+            const ImVec2 press = ImGui::IsMousePosValid(&io.MouseClickedPos[ImGuiMouseButton_Left])
+                                     ? io.MouseClickedPos[ImGuiMouseButton_Left]
+                                     : mouse;
             session = {};
             session.id = id;
             session.mouse = true;
@@ -354,15 +360,15 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
             if (options.grabRadius >= 0.0f)
             {
                 const float knob = FractionToTrack(track, options.orientation, start);
-                const float along = vertical ? mouse.y : mouse.x;
+                const float along = vertical ? press.y : press.x;
                 if (std::fabs(along - knob) > options.grabRadius)
                 {
-                    start = TrackToFraction(track, options.orientation, mouse);
+                    start = TrackToFraction(track, options.orientation, press);
                     write(ApplySnapStops(m, FractionToValue(m, start), start, Px(T().spacing.sm) / trackLength));
                 }
             }
             session.tracker.Begin(start, dragLength);
-            session.lastMouse = mouse;
+            session.lastMouse = press;
             session.anchorValue = *value;
         }
         else

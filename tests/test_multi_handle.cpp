@@ -336,6 +336,54 @@ TEST_CASE("Multi-handle behaviour: a handle held by its neighbour edits nothing"
     CHECK(range.commits == 0);
 }
 
+TEST_CASE("Multi-handle behaviour: stacked handles separate in the direction of the drag")
+{
+    for (const float side : {-3.0f, 3.0f})
+    {
+        for (const double target : {10.0, 90.0})
+        {
+            facet::test::Session session;
+            REQUIRE(session.Ready());
+            TestRange range;
+            range.values[0] = 50.0;
+            range.values[1] = 50.0;
+            range.options.constraints.minGap = 0.0;
+            range.options.spanDrag = false;
+            Install(session, range);
+            const ImVec2 stack = TestRange::At(session, 50.0);
+            INFO("press offset " << side << ", drag to " << target);
+            session.Drag({ImVec2(stack.x + side, stack.y), TestRange::At(session, target + side / 3.0)});
+            if (target < 50.0)
+            {
+                CHECK(range.values[0] == doctest::Approx(target).epsilon(0.02));
+                CHECK(range.values[1] == 50.0);
+            }
+            else
+            {
+                CHECK(range.values[0] == 50.0);
+                CHECK(range.values[1] == doctest::Approx(target).epsilon(0.02));
+            }
+            CHECK(range.commits == 1);
+        }
+    }
+}
+
+TEST_CASE("Multi-handle behaviour: a click on stacked handles focuses one without moving them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.values[0] = 50.0;
+    range.values[1] = 50.0;
+    range.options.constraints.minGap = 0.0;
+    Install(session, range);
+    session.Click(TestRange::At(session, 50.0));
+    CHECK(range.values[0] == 50.0);
+    CHECK(range.values[1] == 50.0);
+    CHECK((ImGui::GetFocusID() == range.handles[0].id || ImGui::GetFocusID() == range.handles[1].id));
+    CHECK(range.commits == 0);
+}
+
 TEST_CASE("Multi-handle behaviour: push mode pushes the other handle")
 {
     facet::test::Session session;

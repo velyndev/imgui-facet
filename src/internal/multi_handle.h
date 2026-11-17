@@ -37,8 +37,11 @@
 //    keyboard). A press on the track picks a handle with PickHandle: within half a handle of
 //    one it grabs that handle without moving it, between the first and the last handle (when
 //    span dragging is on) it grabs the span, anywhere else it moves the nearest handle under
-//    the pointer. The grabbed part then becomes Dear ImGui's active item and keeps the drag
-//    until release; Escape restores every handle to where the drag or key press began.
+//    the pointer. A press on handles that sit at one position waits for the first movement
+//    along the track: toward max the last of them takes the drag, toward min the first, so
+//    stacked handles can always be pulled apart (a press released without moving focuses the
+//    one PickHandle chose). The grabbed part then becomes Dear ImGui's active item and keeps
+//    the drag until release; Escape restores every handle to where the drag or key press began.
 
 #include <span>
 
