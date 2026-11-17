@@ -14,7 +14,7 @@
 // Icon names hash at compile time.
 static_assert(facet::Icon("check").IsValid());
 static_assert(facet::Icon("check") == facet::Icon("check"));
-static_assert(!(facet::Icon("check") == facet::Icon("chevron")));
+static_assert(!(facet::Icon("check") == facet::Icon("chevron-right")));
 static_assert(!facet::Icon().IsValid());
 static_assert(!facet::Icon("").IsValid());
 // FNV-1a reference value for "a".

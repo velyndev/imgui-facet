@@ -27,12 +27,12 @@ TEST_CASE("Init rejects a missing device and context")
     ImGui::DestroyContext();
 }
 
-TEST_CASE("Embedded assets contain the placeholder icons")
+TEST_CASE("Embedded assets contain the icons of the built-in set")
 {
     const auto assets = facet::internal::EmbeddedAssets();
     CHECK(assets.size() >= 2);
 
-    for (const char* name : {"icons/check.svg", "icons/chevron.svg"})
+    for (const char* name : {"icons/check.svg", "icons/chevron-right.svg"})
     {
         CAPTURE(name);
         const facet::internal::EmbeddedAsset* asset = facet::internal::FindEmbeddedAsset(name);
