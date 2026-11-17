@@ -11,6 +11,7 @@
 
 #include "gallery.h"
 #include "pages/pages.h"
+#include "selftest.h"
 
 namespace
 {
@@ -169,8 +170,10 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
 
     SectionHeader("Onboarding");
     LabeledRow("Onboarding");
-    if (ImGui::Button(ui.onboarding ? "Hide onboarding" : "Show onboarding"))
+    // The text changes with the state, so "###" keeps one id and the button keeps its focus.
+    if (ImGui::Button(ui.onboarding ? "Hide onboarding###onboarding" : "Show onboarding###onboarding"))
         ui.onboarding = !ui.onboarding;
+    ctx.Probe("composites.onboarding");
     facet::ItemCursor();
     if (facet::BeginOnboarding("Welcome", &ui.onboarding, &ui.onboardingStep, 3))
     {
@@ -192,4 +195,20 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
         facet::AcceptDrop(kDemoPayload, {.indicator = facet::DropIndicator::Box});
         facet::EndDropTarget();
     }
+}
+
+FACET_DEMO_SELFTEST("composites")
+{
+    test.Do([] { ui.onboarding = false; });
+    test.Click("composites.onboarding");
+    test.Expect("the button shows the onboarding placeholder", [] { return ui.onboarding; });
+    test.ExpectFocused("composites.onboarding");
+    // Shift+Tab and Tab come back to the button with the keyboard cursor shown.
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.onboarding");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused button hides it again", [] { return !ui.onboarding; });
+    test.ExpectFocused("composites.onboarding");
+    test.Do([] { ui.onboarding = false; });
 }
