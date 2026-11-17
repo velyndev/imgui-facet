@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -34,6 +35,11 @@ constexpr double kTickTolerance = 1e-9;
 constexpr double kExponentFrom = 1e6;
 constexpr int kMaxFixedDecimals = 6;
 constexpr int kExponentDecade = 6;
+// Labels print at most this many digits after the point of the mantissa (15 significant
+// digits, what a double holds); a step finer than that next to the values gives one tick.
+constexpr int kMaxMantissaDigits = 14;
+// An empty linear domain is widened by this fraction of its value on each side (at least 0.5).
+constexpr double kEmptyWidening = 1e-9;
 
 // Series colors: the chroma of every series, the lightness each theme starts from, the step
 // the lightness moves by until the contrast is reached, and that contrast (WCAG non-text).
@@ -50,6 +56,60 @@ constexpr float kSeriesHueOffsets[kSeriesPaletteSize] = {0.0f, 180.0f, 90.0f, 27
 
 // Polylines are drawn in pieces of this many points (each piece overlaps the next by one).
 constexpr int kPolylineChunk = 4096;
+
+// Writes `value` in exponent form with `digits` after the point of the mantissa, with the
+// exponent as a plain integer: "1.5e6", "-2e-7". The mantissa is rounded once by printf, so a
+// value that rounds up to the next power of ten reads "1.0e6", never "10.0e5".
+void WriteExponent(char* text, std::size_t size, double value, int digits)
+{
+    char raw[64];
+    std::snprintf(raw, sizeof(raw), "%.*e", digits, value);
+    char* mark = std::strchr(raw, 'e');
+    if (mark == nullptr)
+    {
+        std::snprintf(text, size, "%s", raw);
+        return;
+    }
+    *mark = '\0';
+    std::snprintf(text, size, "%se%d", raw, std::atoi(mark + 1));
+}
+
+// The value as a double reads back at 15 significant digits.
+double AtFifteenDigits(double value)
+{
+    char text[64];
+    std::snprintf(text, sizeof(text), "%.*e", kMaxMantissaDigits, value);
+    return std::strtod(text, nullptr);
+}
+
+// The fewest mantissa digits after the point that keep the value at 15 significant digits.
+int ShortestExponentDigits(double value)
+{
+    const double target = AtFifteenDigits(value);
+    char text[64];
+    for (int digits = 0; digits < kMaxMantissaDigits; ++digits)
+    {
+        std::snprintf(text, sizeof(text), "%.*e", digits, value);
+        if (std::strtod(text, nullptr) == target)
+            return digits;
+    }
+    return kMaxMantissaDigits;
+}
+
+// The fewest decimals (at most kMaxFixedDecimals) that keep the value at 15 significant
+// digits in fixed point, or -1 when fixed point would lose digits.
+int ShortestFixedDecimals(double value)
+{
+    const double target = AtFifteenDigits(value);
+    char text[64];
+    for (int decimals = 0; decimals <= kMaxFixedDecimals; ++decimals)
+    {
+        std::snprintf(text, sizeof(text), "%.*f", decimals, value);
+        if (AtFifteenDigits(std::strtod(text, nullptr)) == target)
+            return decimals;
+    }
+    return -1;
+}
 
 } // namespace
 
@@ -113,8 +173,10 @@ Scale MakeScale(ScaleKind kind, double min, double max, float pixelMin, float pi
     }
     else if (min == max)
     {
-        min -= 0.5;
-        max += 0.5;
+        // Relative to the value, so the widening still changes a large value.
+        const double half = std::max(0.5, std::fabs(min) * kEmptyWidening);
+        min -= half;
+        max += half;
     }
     scale.domainMin = min;
     scale.domainMax = max;
@@ -161,22 +223,32 @@ TickSet LinearTicks(double min, double max, int targetCount, std::span<Tick> out
         return set;
     if (min > max)
         std::swap(min, max);
-    set.step = NiceStep(max - min, targetCount);
-    if (set.step <= 0.0)
-    {
+    // One tick at min, with step 0: for an empty or infinite span, and for a step so fine next
+    // to the values that a double cannot tell the ticks apart (or count them).
+    const auto single = [&]() {
+        TickSet one;
         if (!out.empty())
             out[0] = {min, true};
-        set.count = 1;
-        set.exponent = std::fabs(min) >= kExponentFrom;
-        return set;
-    }
-    set.decimals = StepDecimals(set.step);
+        one.count = 1;
+        const double magnitude = std::fabs(min);
+        const double smallest = std::pow(10.0, -kMaxFixedDecimals);
+        one.exponent = magnitude >= kExponentFrom || (magnitude > 0.0 && magnitude < smallest);
+        return one;
+    };
+    set.step = NiceStep(max - min, targetCount);
+    if (set.step <= 0.0)
+        return single();
     const double tolerance = set.step * kTickTolerance * 1e3;
     const double first = std::ceil((min - tolerance) / set.step);
     const double last = std::floor((max + tolerance) / set.step);
-    const double largest = std::max(std::fabs(first), std::fabs(last)) * set.step;
-    set.exponent = largest >= kExponentFrom || set.decimals > kMaxFixedDecimals;
-    for (double k = first; k <= last && set.count <= kMaxTicks * 4; k += 1.0)
+    const double largestIndex = std::max(std::fabs(first), std::fabs(last));
+    // No multiple of the step inside the range (a target of 2 asks for a step as long as the
+    // span), or too many to tell apart or count.
+    if (first > last || largestIndex >= std::pow(10.0, kMaxMantissaDigits) || last - first >= kMaxTicks * 4)
+        return single();
+    set.decimals = StepDecimals(set.step);
+    set.exponent = largestIndex * set.step >= kExponentFrom || set.decimals > kMaxFixedDecimals;
+    for (double k = first; k <= last; k += 1.0)
     {
         double value = k * set.step;
         if (std::fabs(value) < tolerance)
@@ -256,9 +328,25 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize)
         else
             std::snprintf(text, sizeof(text), "%.*f", std::max(0, -exponent), mantissa * std::pow(10.0, exponent));
     }
+    else if (set.step <= 0.0)
+    {
+        // A single tick without a step: the shortest text that keeps the value.
+        if (value == 0.0)
+        {
+            std::snprintf(text, sizeof(text), "%s", "0");
+        }
+        else
+        {
+            const int decimals = set.exponent ? -1 : ShortestFixedDecimals(value);
+            if (decimals >= 0)
+                std::snprintf(text, sizeof(text), "%.*f", decimals, value);
+            else
+                WriteExponent(text, sizeof(text), value, ShortestExponentDigits(value));
+        }
+    }
     else
     {
-        const double step = set.step > 0.0 ? set.step : 1.0;
+        const double step = set.step;
         if (std::fabs(value) < step * 1e-6)
             value = 0.0;
         if (set.exponent && value == 0.0)
@@ -269,9 +357,7 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize)
         {
             const int exponent = static_cast<int>(std::floor(std::log10(std::fabs(value)) + kTickTolerance));
             const int stepExponent = static_cast<int>(std::floor(std::log10(step) + kTickTolerance));
-            const int digits = std::max(0, exponent - stepExponent);
-            const double mantissa = value / std::pow(10.0, exponent);
-            std::snprintf(text, sizeof(text), "%.*fe%d", digits, mantissa, exponent);
+            WriteExponent(text, sizeof(text), value, std::clamp(exponent - stepExponent, 0, kMaxMantissaDigits));
         }
         else
         {

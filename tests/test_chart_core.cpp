@@ -482,6 +482,58 @@ TEST_CASE("Decimation of an unsorted series reaches its last sample and every ex
     }
 }
 
+TEST_CASE("Ticks and labels stay readable at large magnitudes and tiny steps")
+{
+    // Values near 2^53 with a step below 1: the ticks cannot be told apart, so there is one.
+    const double big = 9007199254740992.0;
+    Tick ticks[kMaxTicks * 4];
+    const TickSet nearLimit = LinearTicks(big, big + 2.0, 8, ticks);
+    CHECK(nearLimit.count == 1);
+    CHECK(Label(ticks[0].value, nearLimit) == "9.00719925474099e15");
+    // An infinite span: one tick, whose label keeps its exponent.
+    const TickSet whole = LinearTicks(-1e308, 1e308, 8, ticks);
+    CHECK(whole.count == 1);
+    CHECK(Label(ticks[0].value, whole) == "-1e308");
+    // A step far below the values: one tick with the short label of its value.
+    const TickSet fine = LinearTicks(1e12, 1e12 + 0.001, 8, ticks);
+    CHECK(fine.count == 1);
+    CHECK(Label(ticks[0].value, fine) == "1e12");
+    // A single tick prints the digits of its value.
+    CHECK(Label(3.25, LinearTicks(3.25, 3.25, 5, ticks)) == "3.25");
+    CHECK(Label(0.1234567, LinearTicks(0.1234567, 0.1234567, 5, ticks)) == "1.234567e-1");
+    CHECK(Label(2e-9, LinearTicks(2e-9, 2e-9, 5, ticks)) == "2e-9");
+    // A constant series at 1e20 still gets a domain and ticks.
+    const Range padded = PadRange({1e20, 1e20, true}, 0.05, ScaleKind::Linear);
+    CHECK(padded.max > padded.min);
+    const Scale scale = MakeScale(ScaleKind::Linear, 1e20, 1e20, 0.0f, 100.0f);
+    CHECK(scale.domainMax > scale.domainMin);
+    CHECK(LinearTicks(scale.domainMin, scale.domainMax, 5, ticks).count >= 2);
+
+    // Over many magnitudes and spans: at most kMaxTicks + 1 ticks, distinct short labels.
+    for (const double origin : {-1e300, -7.5e15, -1e6, -1.0, 0.0, 1e-9, 0.3, 1e3, 1e12, big, 1e20, 1e300})
+    {
+        for (const double relative : {1e-15, 1e-12, 1e-6, 1e-3, 1.0, 1e3})
+        {
+            const double span = std::max(std::fabs(origin), 1.0) * relative;
+            for (const int target : {2, 5, 12})
+            {
+                const TickSet set = LinearTicks(origin, origin + span, target, ticks);
+                INFO("origin ", origin, " span ", span, " target ", target);
+                REQUIRE(set.count >= 1);
+                CHECK(set.count <= kMaxTicks + 1);
+                std::vector<std::string> labels;
+                for (int i = 0; i < set.count; ++i)
+                {
+                    const std::string label = Label(ticks[i].value, set);
+                    CHECK(label.size() <= 24);
+                    CHECK(std::find(labels.begin(), labels.end(), label) == labels.end());
+                    labels.push_back(label);
+                }
+            }
+        }
+    }
+}
+
 TEST_CASE("A plot rectangle snaps inward to whole pixels")
 {
     // The chart page at scale 0.75: the left edge follows a label width such as 31.83 pixels.

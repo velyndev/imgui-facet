@@ -64,7 +64,8 @@ struct Scale
 };
 
 // A scale with a usable domain: min > max is swapped; an empty domain (min == max) is widened
-// to [v - 0.5, v + 0.5] (linear) or [v / sqrt(10), v * sqrt(10)] (logarithmic); a logarithmic
+// to [v - h, v + h] with h = max(0.5, |v| * 1e-9) (linear, so a large value still gets a
+// span) or [v / sqrt(10), v * sqrt(10)] (logarithmic); a logarithmic
 // domain is raised to kLogFloor where it is not positive. NaN or infinite bounds give [0, 1]
 // (linear) or [1, 10] (logarithmic).
 Scale MakeScale(ScaleKind kind, double min, double max, float pixelMin, float pixelMax);
@@ -101,7 +102,11 @@ int TickTargetCount(float pixelLength, float labelExtent, float gap);
 double NiceStep(double span, int targetCount);
 
 // Ticks at the multiples of NiceStep inside [min, max] (ends included up to a small
-// tolerance), all major, written into `out` in increasing order.
+// tolerance), all major, written into `out` in increasing order. A single tick at min with
+// step 0 when the span is empty or not finite, when no multiple of the step lies inside the
+// range (a target of 2 over a span between two multiples), or when the step is so fine next
+// to the values that labels would need more than 15 significant digits (1e12 to
+// 1e12 + 0.001, values near 2^53 with steps below 1). So there is always at least one tick.
 TickSet LinearTicks(double min, double max, int targetCount, std::span<Tick> out);
 
 // Major ticks at powers of ten inside [min, max] (every n-th decade when more than
@@ -116,8 +121,10 @@ int StepDecimals(double step);
 
 // Writes the label of a tick of `set` (zero terminated, cut at bufferSize) and returns its
 // full length. Fixed point with set.decimals digits, or exponent form ("2e6", "1.5e-7") when
-// set.exponent is true, with only the digits the step needs. 0 prints as "0" in exponent
-// form, and -0 never shows a sign.
+// set.exponent is true, with only the digits the step needs and at most 15 significant
+// digits. A set with step 0 (a single tick) prints the shortest text that keeps the value
+// ("3.25", "-1e308"). 0 prints as "0" in exponent form, and -0 never shows a sign. Labels are
+// at most 24 characters long.
 int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize);
 
 // --- Data ------------------------------------------------------------------------------------
