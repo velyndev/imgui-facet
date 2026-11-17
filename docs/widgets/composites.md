@@ -150,8 +150,11 @@ if (r.action == facet::LayerAction::Moved)
 
 ### Drag and drop between custom items
 
+An `ItemTile` is an inventory drag source by default; one item has one drag source, so the tile
+turns its own off before it becomes the source of an application payload.
+
 ```cpp
-facet::ItemTile("tile", item);
+facet::ItemTile("tile", item, {.dragSource = false});
 if (facet::BeginDragSource("app.item", &itemId, sizeof(itemId), {.previewText = item.label}))
     facet::EndDragSource();
 
