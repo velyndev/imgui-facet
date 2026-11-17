@@ -10,13 +10,13 @@ the reason for each are listed in `DESIGN.md`.
 
 | Group | Holds |
 |---|---|
-| `colors` | Surfaces, translucent fills, four label strengths, separators, the accent and its derived states, status colors, focus ring, shadow, glass tint, scrim |
+| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states, status colors, focus ring, shadow, glass tint, scrim |
 | `spacing` | The 4 px grid: `xs` 4 to `xxxl` 32 |
 | `radii` | `element`, `control`, `card`, `popover`, `window`, and where continuous corners start |
 | `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target |
 | `type` | Size and weight of every `TextStyle` |
 | `motion` | Springs, durations, loading periods, a global `scale` and `reduceMotion` |
-| `elevation` | Three shadow levels |
+| `elevation` | Three shadow levels (their surfaces are in `colors`) |
 | `glass` | Backdrop blur settings |
 
 Lengths are design units. Widgets convert them with `facet::Px()` (see `docs/scaling.md`).
@@ -92,6 +92,8 @@ The unit tests check, for both presets:
   Text that must be read uses only these two (placeholders use `labelSecondary`).
   `labelTertiary` and `labelQuaternary` stay below 4.5:1 on purpose, for disabled text and
   decoration.
+- In the dark preset the elevation surfaces get lighter with the level, because a black
+  shadow cannot darken the black background; in the light preset they are all white.
 - The status colors reach 4.5:1 as text on `bg`, `bgSecondary` and `bgTertiary`.
 - For accents across 24 hues at five lightness levels, every accent state carries readable
   `onAccent` text and `accentText` is readable on every surface.
@@ -105,8 +107,11 @@ after changing them, because `accentText` depends on the surfaces.
 `facet::ApplyImGuiStyle()` writes the current theme and scale into the Dear ImGui style: every
 color, the paddings, spacings, roundings and border sizes from the tokens (scaled), the font
 scale factors and the Body text size as the base font size. A stock control is then exactly
-one control height tall and has a hairline outline. Settings without a token (anti-aliasing,
-tessellation, global alpha, hover delays) keep their values.
+one control height tall and has a hairline outline. Sizes without a token take the Dear ImGui
+default times the scale. Settings that are not sizes and have no token keep their values:
+anti-aliasing, tessellation, global and disabled alpha, hover delays and tooltip flags, text
+and title alignment, the window menu and color button positions, tree line flags, angled
+table header settings and the mouse cursor scale.
 
 `facet::SyncImGuiStyle(true)` makes `facet::NewFrame` call it whenever the theme or the scale
 changed, including every step of a theme transition. It is off by default, so a host with a
