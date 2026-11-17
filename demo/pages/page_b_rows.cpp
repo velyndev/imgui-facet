@@ -35,8 +35,11 @@ constexpr double kDefaultScale = 100.0;
 // The narrowest region the width slider offers, and the width of the narrow capture, in units.
 constexpr double kMinRegion = 160.0;
 constexpr double kNarrowRegion = 220.0;
-constexpr const char* kLongLabel = "A label much longer than any label column of this group can hold, so it ends "
-                                   "in an ellipsis";
+// The region the selftest checks truncation in: the label column is capped at 40 % of it, far
+// narrower than the long label, whatever the scale and the window size.
+constexpr double kTruncationRegion = 480.0;
+constexpr const char* kLongLabel = "A long label that ends in an ellipsis whenever the label column is narrower than "
+                                   "its text";
 
 struct RowsPageState
 {
@@ -213,7 +216,10 @@ FACET_DEMO_SELFTEST("rows")
     test.ExpectNear("Tab reaches the reset button and Enter presses it", [] { return page.scale; }, kDefaultScale, 0.0);
     test.ExpectNear("two resets", [] { return page.resets; }, 2.0, 0.0);
 
-    // A long label is truncated and shows its full text on hover.
+    // A long label is truncated and shows its full text on hover. The region is set to a width
+    // where the label cannot fit, so the check holds at every scale and window size.
+    test.Do([] { page.region = kTruncationRegion; });
+    test.Wait(2);
     test.Expect("the long label is truncated", [] { return page.truncated; });
     test.Hover(T::Item("rows.longlabel"), 0.3f);
     test.Expect("hovering it shows the full text", [] {
