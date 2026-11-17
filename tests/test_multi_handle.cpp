@@ -2,6 +2,7 @@
 // items of a widget with several handles.
 
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -462,6 +463,26 @@ TEST_CASE("Multi-handle behaviour: a span drag on a logarithmic track keeps the 
     CHECK(range.values[0] < 100.0);
     CHECK(range.values[1] / range.values[0] == doctest::Approx(3.0).epsilon(0.001));  // the same span on screen
     CHECK(range.commits == 1);
+}
+
+TEST_CASE("Multi-handle behaviour: a span drag survives a lost pointer")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    Install(session, range);
+    const ImVec2 middle = TestRange::At(session, 40.0);
+    session.MouseMove(middle);
+    session.MouseDown();
+    session.MouseMove(TestRange::At(session, 45.0));
+    CHECK(range.values[0] == doctest::Approx(25.0));
+    session.MouseMove(ImVec2(-FLT_MAX, -FLT_MAX));
+    session.MouseMove(TestRange::At(session, 45.0));
+    CHECK(range.values[0] == doctest::Approx(25.0));
+    CHECK(range.values[1] == doctest::Approx(65.0));
+    session.MouseMove(TestRange::At(session, 50.0));
+    CHECK(range.values[0] == doctest::Approx(30.0));
+    session.MouseUp();
 }
 
 TEST_CASE("Multi-handle behaviour: Escape restores every handle")

@@ -44,6 +44,7 @@ struct SpanDrag
     ImGuiID id = 0;
     DragTracker tracker;
     ImVec2 lastMouse;
+    bool pointerLost = false;  // the mouse position was invalid on a frame of the drag
 };
 
 SpanDrag& CurrentSpanDrag()
@@ -512,7 +513,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             // The first movement along the track decides: toward max the last handle of the run
             // moves, toward min the first, so the one that can move in that direction takes it.
             const float moved = pointer - pending.pressAlong;
-            if (std::fabs(moved) > kSamePosition)
+            if (ImGui::IsMousePosValid(&g.IO.MousePos) && std::fabs(moved) > kSamePosition)
             {
                 const int chosen = moved > 0.0f ? pending.last : pending.first;
                 pending = {};
@@ -621,6 +622,16 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
                 spanDrag = {};
                 spanDrag.id = spanId;
                 spanDrag.tracker.Begin(0.0, length);
+                spanDrag.lastMouse = mouse;
+            }
+            else if (!ImGui::IsMousePosValid(&mouse))
+            {
+                // The pointer is unknown: the span stays and the drag goes on from where it returns.
+                spanDrag.pointerLost = true;
+            }
+            else if (spanDrag.pointerLost)
+            {
+                spanDrag.pointerLost = false;
                 spanDrag.lastMouse = mouse;
             }
             else

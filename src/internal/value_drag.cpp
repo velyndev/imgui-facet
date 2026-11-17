@@ -77,6 +77,7 @@ struct Session
     double anchorValue = 0.0;  // the value at the drag's start fraction (after a jump)
     DragTracker tracker;
     ImVec2 lastMouse;
+    bool pointerLost = false;  // the mouse position was invalid on a frame of the drag
 };
 
 Session& CurrentSession()
@@ -389,6 +390,17 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
             session.tracker.Begin(start, dragLength);
             session.lastMouse = press;
             session.anchorValue = *value;
+        }
+        else if (!ImGui::IsMousePosValid(&mouse))
+        {
+            // The pointer is unknown (it left the platform window, or the backend lost it): the
+            // value stays, and the drag goes on from wherever the pointer comes back.
+            session.pointerLost = true;
+        }
+        else if (session.pointerLost)
+        {
+            session.pointerLost = false;
+            session.lastMouse = mouse;
         }
         else
         {

@@ -1,6 +1,7 @@
 // Value drag core (src/internal/value_drag.h): mapping, keyboard steps, drag accumulation and
 // the input behaviour with its edit sessions.
 
+#include <cfloat>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -458,6 +459,28 @@ TEST_CASE("Value drag: the wheel steps only when focused or with Alt")
     session.Click(knob);
     session.Wheel(knob, -2.0f);
     CHECK(slider.value == doctest::Approx(0.49));
+}
+
+TEST_CASE("Value drag: a pointer that is lost mid-drag keeps the value and the offset")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    Install(session, slider);
+    const ImVec2 knob = TestSlider::At(session, 0.5);
+    session.MouseMove(knob);
+    session.MouseDown();
+    session.MouseMove(ImVec2(knob.x + 20.0f, knob.y));
+    CHECK(slider.value == doctest::Approx(0.6));
+    session.MouseMove(ImVec2(-FLT_MAX, -FLT_MAX));
+    CHECK(slider.value == doctest::Approx(0.6));
+    // Back where it was lost: still 0.6; the drag then goes on from there.
+    session.MouseMove(ImVec2(knob.x + 20.0f, knob.y));
+    CHECK(slider.value == doctest::Approx(0.6));
+    session.MouseMove(ImVec2(knob.x + 40.0f, knob.y));
+    CHECK(slider.value == doctest::Approx(0.7));
+    session.MouseUp();
+    CHECK(slider.commits == 1);
 }
 
 TEST_CASE("Value drag: fractions of a wheel notch add up to steps")
