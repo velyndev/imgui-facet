@@ -20,7 +20,8 @@
 //
 // Durations and spring responses are multiplied by T().motion.scale. While ReduceMotion()
 // is true every function returns its target immediately. Values snap exactly onto their
-// target once the remaining distance is negligible.
+// target once the remaining distance is negligible. The store is not synchronized: query it
+// only from the thread that runs the Dear ImGui frame (see context.h).
 
 #include <imgui.h>
 

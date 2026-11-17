@@ -223,6 +223,8 @@ void InvalidateDeviceObjects()
     ContextState& state = State();
     if (!state.initialized || !state.deviceObjectsValid)
         return;
+    // Draw commands recorded in this frame still point at the objects released here.
+    IM_ASSERT(!state.inFrame && "facet::InvalidateDeviceObjects called inside a frame");
     InvalidateAll(internal::Subsystems());
     state.deviceObjectsValid = false;
 }
@@ -234,6 +236,7 @@ bool CreateDeviceObjects()
         return false;
     if (state.deviceObjectsValid)
         return true;
+    IM_ASSERT(!state.inFrame && "facet::CreateDeviceObjects called inside a frame");
     state.deviceObjectsValid = CreateAll(internal::Subsystems());
     return state.deviceObjectsValid;
 }

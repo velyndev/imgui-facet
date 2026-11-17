@@ -10,8 +10,10 @@
 //
 // Recording a frame never touches the device context: a new tile is baked into an upload
 // record, and the caller queues that record as a draw callback in front of the draw that
-// samples the tile. The texels therefore reach the page while the frame is rendered, on the
-// thread that renders it, and in the same order as the draws that read them. A tile stays
+// samples the tile. The texels therefore reach the page while the frame is rendered, through
+// the immediate context given to facet::Init, in the same order as the draws that read them.
+// Rendering happens on the frame thread (see context.h); the done list is atomic only so a
+// confirmation is never read half written, not to support another render thread. A tile stays
 // pending until a callback reports its upload as done, so a draw list that is recorded but
 // never rendered (a window hidden for its first frame) cannot leave a tile empty.
 

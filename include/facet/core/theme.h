@@ -5,7 +5,8 @@
 // A Theme is a plain struct of token groups. Widgets read every color, spacing, radius,
 // size and duration from facet::T() and pass lengths through facet::Px() (scale.h); they
 // never use literals. Lengths here are in design units: pixels at scale 1.
-// Colors are ImVec4 in sRGB with straight alpha (see color.h).
+// Colors are ImVec4 in sRGB with straight alpha (see color.h). Like every Facet function,
+// these are for the thread that runs the Dear ImGui frame (see context.h).
 
 #include <span>
 

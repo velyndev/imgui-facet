@@ -1,5 +1,13 @@
 #pragma once
 
+// Library lifetime: Init, the per-frame calls, device object handling and Shutdown.
+//
+// Threading: every Facet function is for the thread that runs the Dear ImGui frame. The
+// only work on other threads is the image decoding of asynchronous loads, on worker threads
+// Facet owns (image.h).
+// The draw data of a frame is rendered on that same thread, with the context given to Init,
+// before the next facet::NewFrame. Facet supports one Dear ImGui context at a time.
+
 #include <cstdint>
 
 // Direct3D types are forward declared so that including Facet does not pull in d3d11.h.
@@ -43,11 +51,16 @@ void Shutdown();
 // resources it shares with Facet, then CreateDeviceObjects() to rebuild them on the same
 // device. For a new device, use Shutdown() and Init() instead. Does nothing when Facet is
 // not initialized or the objects are already released.
+// Call it only outside a frame: before facet::NewFrame, or after the renderer has rendered
+// the previous frame's draw data. Never between recording a frame and rendering it: draw
+// commands already recorded hold raw texture pointers (images, icons, shadows, glass) that
+// this releases, and the renderer would then bind freed objects. Debug builds assert when it
+// is called between facet::NewFrame and facet::EndFrame.
 void InvalidateDeviceObjects();
 
 // Recreates the objects released by InvalidateDeviceObjects(). Returns true when they
 // exist afterwards (also when they were never released), false when Facet is not
-// initialized or a module failed to create its objects.
+// initialized or a module failed to create its objects. The same timing rule applies.
 bool CreateDeviceObjects();
 
 bool IsInitialized();

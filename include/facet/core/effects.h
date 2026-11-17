@@ -75,7 +75,10 @@ struct GlassSpec
 // (with the first panel's blur radius and saturation). Draw the backdrop of every glass
 // panel before the first one. The render target is copied, never bound as an input, so it
 // works in a swap chain owned by a host application, with multisampled, sRGB and typeless
-// formats. Must be drawn into a draw list of the main viewport. A panel wholly outside the
+// formats. Must be drawn into a draw list of the main viewport. The blurred image is one
+// shared texture of the main viewport's size, so all glass panels of a frame must come from
+// one Dear ImGui context with one viewport size: a panel recorded for another size samples a
+// texture the blur no longer writes. A panel wholly outside the
 // draw list's clip rect records no capture and no panel, only its shadow when that reaches
 // into view.
 void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const GlassSpec& spec = {});
