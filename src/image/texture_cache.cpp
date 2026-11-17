@@ -46,6 +46,9 @@ namespace facet
 namespace
 {
 
+// A worker keeps its file buffer between jobs up to this capacity (4 MiB).
+constexpr std::size_t kKeptReadBufferBytes = std::size_t{4} << 20;
+
 enum class SourceKind : std::uint8_t
 {
     None,
@@ -167,6 +170,9 @@ void Free(Cache& cache, std::uint32_t index)
     cache.freeSlots.push_back(index);
 }
 
+// The decoder's side limit is the upload limit, so no image is decoded only to be rejected.
+static_assert(internal::kMaxImageSide == D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION);
+
 ComPtr<ID3D11ShaderResourceView> CreateTexture(const void* pixels, int width, int height, int stride)
 {
     ID3D11Device* device = internal::Device();
@@ -248,8 +254,10 @@ bool ReadFile(const std::string& path, std::vector<std::uint8_t>& out)
     bool ok = false;
     if (_fseeki64(file, 0, SEEK_END) == 0)
     {
+        // Larger files are rejected before anything is allocated (internal/image_io.h).
         const long long length = _ftelli64(file);
-        if (length > 0 && length <= INT_MAX && _fseeki64(file, 0, SEEK_SET) == 0)
+        if (length > 0 && static_cast<unsigned long long>(length) <= internal::kMaxEncodedImageBytes &&
+            _fseeki64(file, 0, SEEK_SET) == 0)
         {
             out.resize(static_cast<std::size_t>(length));
             ok = std::fread(out.data(), 1, out.size(), file) == out.size();
@@ -282,14 +290,29 @@ void WorkerMain()
         Result result;
         result.index = job.index;
         result.generation = job.generation;
-        if (!job.path.empty())
+        // An exception leaving a worker would end the host process. A failed allocation (or
+        // any other throw) turns into an empty image, so the slot still resolves to Failed.
+        try
         {
-            if (ReadFile(job.path, fileBytes))
-                internal::DecodeImage(fileBytes.data(), fileBytes.size(), result.image);
+            if (!job.path.empty())
+            {
+                if (ReadFile(job.path, fileBytes))
+                    internal::DecodeImage(fileBytes.data(), fileBytes.size(), result.image);
+            }
+            else
+            {
+                internal::DecodeImage(job.data.data(), job.data.size(), result.image);
+            }
         }
-        else
+        catch (...)
         {
-            internal::DecodeImage(job.data.data(), job.data.size(), result.image);
+            internal::FreeImage(result.image);
+        }
+        // Do not keep the buffer of an unusually large file for the rest of the run.
+        if (fileBytes.capacity() > kKeptReadBufferBytes)
+        {
+            fileBytes.clear();
+            fileBytes.shrink_to_fit();
         }
 
         {
@@ -622,7 +645,8 @@ ImageHandle LoadImageFileAsync(const char* path)
 
 ImageHandle LoadImageMemoryAsync(const void* data, std::size_t size)
 {
-    if (data == nullptr || size == 0)
+    // Larger data would be rejected by the decoder; refuse it before copying it.
+    if (data == nullptr || size == 0 || size > internal::kMaxEncodedImageBytes)
         return {};
     Job job;
     const auto* bytes = static_cast<const std::uint8_t*>(data);

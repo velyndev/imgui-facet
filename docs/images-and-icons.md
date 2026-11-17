@@ -25,7 +25,13 @@ gets a new generation. Handles from before `Shutdown` stay invalid after the nex
 | `ReleaseImage(handle)` | Frees the slot; the texture is released in the next `NewFrame`. |
 
 Synchronous loads return an invalid handle when the source cannot be read or decoded.
-Asynchronous loads always return a valid handle; a failure shows as `ImageStatus::Failed`.
+Asynchronous loads return a valid handle; a failure shows as `ImageStatus::Failed`.
+
+Limits, so a small hostile file cannot cost gigabytes: an encoded file or memory block of at
+most 256 MiB (larger memory passed to `LoadImageMemoryAsync` returns an invalid handle at
+once), sides of at most 16384 pixels (the Direct3D 11 texture limit) and at most 64 M pixels
+(8192 x 8192). The size is read from the header first, so an image beyond them fails before
+any pixel is decoded.
 
 ### Asynchronous decoding
 

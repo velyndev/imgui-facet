@@ -68,7 +68,9 @@ enum class ImageStatus
 };
 
 // Decodes a PNG, JPEG, BMP, TGA or GIF file (UTF-8 path) and uploads it. Returns an
-// invalid handle when the file cannot be read or decoded.
+// invalid handle when the file cannot be read or decoded. Limits, which apply to every
+// load: files and memory up to 256 MiB, sides up to 16384 pixels (the Direct3D 11 texture
+// limit), and at most 64 M pixels (8192 x 8192); larger images fail like broken data.
 ImageHandle LoadImageFile(const char* path);
 // The same for an encoded file in memory; the data is not kept.
 ImageHandle LoadImageMemory(const void* data, std::size_t size);

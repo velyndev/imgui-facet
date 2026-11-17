@@ -6,6 +6,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -88,6 +89,58 @@ const char kSvg24[] = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" he
                       "<rect x=\"2\" y=\"2\" width=\"20\" height=\"20\" fill=\"#ff0000\"/></svg>";
 
 const unsigned char kGarbage[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99};
+
+void PutBigEndian(std::vector<unsigned char>& out, std::uint32_t value)
+{
+    for (int shift = 24; shift >= 0; shift -= 8)
+        out.push_back(static_cast<unsigned char>(value >> shift));
+}
+
+void PutChunk(std::vector<unsigned char>& out, const char* type, const std::vector<unsigned char>& data)
+{
+    PutBigEndian(out, static_cast<std::uint32_t>(data.size()));
+    out.insert(out.end(), type, type + 4);
+    out.insert(out.end(), data.begin(), data.end());
+    PutBigEndian(out, 0);  // CRC: the decoder does not check it
+}
+
+// A valid 8-bit grey PNG of any size, all pixels 0x80. The image data is stored without
+// compression (deflate blocks of type 0), so the file is about width * height bytes and the
+// decoder really has to produce every pixel.
+std::vector<unsigned char> MakeGreyPng(std::uint32_t width, std::uint32_t height)
+{
+    std::vector<unsigned char> raw;
+    raw.reserve(static_cast<std::size_t>(width + 1) * height);
+    for (std::uint32_t y = 0; y < height; ++y)
+    {
+        raw.push_back(0);  // filter: none
+        raw.insert(raw.end(), width, 0x80);
+    }
+    std::vector<unsigned char> zlib = {0x78, 0x01};
+    constexpr std::size_t kBlock = 65535;
+    for (std::size_t offset = 0; offset < raw.size(); offset += kBlock)
+    {
+        const std::size_t length = std::min(kBlock, raw.size() - offset);
+        zlib.push_back(offset + length == raw.size() ? 1 : 0);
+        zlib.push_back(static_cast<unsigned char>(length & 0xFF));
+        zlib.push_back(static_cast<unsigned char>(length >> 8));
+        zlib.push_back(static_cast<unsigned char>(~length & 0xFF));
+        zlib.push_back(static_cast<unsigned char>((~length >> 8) & 0xFF));
+        zlib.insert(zlib.end(), raw.begin() + static_cast<std::ptrdiff_t>(offset),
+                    raw.begin() + static_cast<std::ptrdiff_t>(offset + length));
+    }
+    PutBigEndian(zlib, 0);  // Adler-32: not checked either
+
+    std::vector<unsigned char> png = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    std::vector<unsigned char> header;
+    PutBigEndian(header, width);
+    PutBigEndian(header, height);
+    header.insert(header.end(), {8, 0, 0, 0, 0});  // 8-bit grey, no interlace
+    PutChunk(png, "IHDR", header);
+    PutChunk(png, "IDAT", zlib);
+    PutChunk(png, "IEND", {});
+    return png;
+}
 
 // An ImGui context, a WARP device and an initialized Facet for the lifetime of the object.
 struct Session
@@ -489,4 +542,60 @@ TEST_CASE("SVG rasterizes at its design size times the scale")
     CHECK_FALSE(facet::LoadSvgMemory("<svg").IsValid());
     CHECK_FALSE(facet::LoadSvgMemory("").IsValid());
     CHECK_FALSE(facet::LoadSvgFile("facet-test-missing-file.svg").IsValid());
+}
+TEST_CASE("The decoder rejects images beyond the side limit and the pixel budget")
+{
+    facet::internal::DecodedImage image;
+    // The longest side Direct3D 11 can upload still decodes.
+    const auto edge = MakeGreyPng(facet::internal::kMaxImageSide, 1);
+    REQUIRE(facet::internal::DecodeImage(edge.data(), edge.size(), image));
+    CHECK(image.width == facet::internal::kMaxImageSide);
+    facet::internal::FreeImage(image);
+    // One pixel more, or a far larger side, fails before decoding.
+    for (const std::uint32_t width : {16385u, 20000u})
+    {
+        CAPTURE(width);
+        const auto wide = MakeGreyPng(width, 1);
+        CHECK_FALSE(facet::internal::DecodeImage(wide.data(), wide.size(), image));
+        CHECK(image.pixels == nullptr);
+    }
+    // Both sides within the limit, but more pixels than the budget.
+    const auto many = MakeGreyPng(facet::internal::kMaxImageSide, 4100);
+    CHECK_FALSE(facet::internal::DecodeImage(many.data(), many.size(), image));
+    CHECK(image.pixels == nullptr);
+}
+
+TEST_CASE("The decoder accepts only the documented formats")
+{
+    // A valid 1 x 1 binary PGM; the PNM format is not part of the documented set.
+    const unsigned char pgm[] = {'P', '5', '\n', '1', ' ', '1', '\n', '2', '5', '5', '\n', 0x80};
+    facet::internal::DecodedImage image;
+    CHECK_FALSE(facet::internal::DecodeImage(pgm, sizeof(pgm), image));
+    CHECK(facet::internal::DecodeImage(kJpeg, sizeof(kJpeg), image));
+    facet::internal::FreeImage(image);
+}
+
+TEST_CASE("Loads refuse files and memory beyond the size limit")
+{
+    Session session;
+    REQUIRE(session.ok);
+    const std::size_t tooLarge = facet::internal::kMaxEncodedImageBytes + 1;
+    // Refused before the bytes are read or copied: the buffer is far shorter than the size.
+    CHECK_FALSE(facet::LoadImageMemory(kPng, tooLarge).IsValid());
+    CHECK_FALSE(facet::LoadImageMemoryAsync(kPng, tooLarge).IsValid());
+
+    // A sparse file of that size: refused without reading it.
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / "facet_test_image_large.png";
+    {
+        std::ofstream file(path, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(kPng), sizeof(kPng));
+    }
+    std::filesystem::resize_file(path, tooLarge);
+    const std::string utf8 = reinterpret_cast<const char*>(path.u8string().c_str());
+    CHECK_FALSE(facet::LoadImageFile(utf8.c_str()).IsValid());
+    const facet::ImageHandle async = facet::LoadImageFileAsync(utf8.c_str());
+    REQUIRE(async.IsValid());
+    CHECK_FALSE(facet::WaitForImage(async, 10.0f));
+    CHECK(facet::GetImageStatus(async) == facet::ImageStatus::Failed);
+    std::filesystem::remove(path);
 }
