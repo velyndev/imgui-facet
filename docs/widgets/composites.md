@@ -41,7 +41,7 @@ Item data always belongs to the caller and is read during the call.
 | PropertyGrid | `void BeginPropertyGrid(const char* id, const PropertyGridOptions& options = {})`, `void EndPropertyGrid()`, `[[nodiscard]] bool BeginPropertyCategory(...)`, `void EndPropertyCategory()`, `[[nodiscard]] bool BeginPropertyRow(...)`, `void EndPropertyRow()`, with scopes | Inspector of labelled rows in collapsible categories with a filter | planned |
 | ConsoleView | `bool ConsoleView(const char* id, std::string* command, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {})`, overloads with a getter and with a `char*` buffer | Log view with a command field, history and Tab completion | planned |
 | SearchFilterBar | `bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {})`, overload with a `char*` buffer | Search field with toggleable filter chips and a result count | planned |
-| SettingsSearch | `void BeginSettingsSearch(const char* id, const char* query)`, `void EndSettingsSearch()`, `bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {})`, `int SettingsSearchHitCount(const char* id, const char* section)`, `SettingsSearchScope` | Search over settings rows with hit counts per section | planned |
+| SettingsSearch | `void BeginSettingsSearch(const char* id, const SettingsSearchOptions& options = {})`, `void EndSettingsSearch()`, `bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {})`, `int SettingsSearchHitCount(const char* id, const char* section)`, `SettingsSearchScope` | Search over settings rows with hit counts per section | planned |
 | KeybindList | `bool KeybindList(const char* id, const KeybindListOptions& options = {})` (the shortcut registry), overload with `std::span<KeybindListItem>` | Editable table of key binds with conflict marks and reset | planned |
 | PresetList | `PresetListResult PresetList(const char* id, int* active, std::span<const PresetItem> presets, const PresetListOptions& options = {})` | Preset manager with create, save, rename, duplicate, delete, import and export | planned |
 | ThemeModeControl | `bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {})` | Light, Dark and System segments that can apply the mode | planned |
@@ -107,7 +107,7 @@ The rows are the caller's settings rows (layout.h); the search decides which are
 
 ```cpp
 facet::SearchField("##search", &query);
-facet::BeginSettingsSearch("settings", query.c_str());
+facet::BeginSettingsSearch("settings", {.filter = query.c_str()});
 if (facet::SettingsSearchMatch("Vertical sync", {.keywords = "vsync tearing", .section = "Display"}))
 {
     facet::BeginSettingsRow("Vertical sync");

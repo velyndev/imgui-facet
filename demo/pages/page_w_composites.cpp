@@ -123,7 +123,7 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     facet::SearchFilterBar("Search##filter bar", &ui.query, ui.filters);
     LabeledRow("SettingsSearch");
     ImGui::BeginGroup();
-    facet::BeginSettingsSearch("settings", ui.settingsQuery.c_str());
+    facet::BeginSettingsSearch("settings", {.filter = ui.settingsQuery.c_str()});
     if (facet::SettingsSearchMatch("Setting 1", {.keywords = "placeholder"}))
         facet::StyledText("Setting 1", {.secondary = true});
     facet::EndSettingsSearch();

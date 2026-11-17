@@ -147,6 +147,7 @@ static_assert(OptionsFollowConventions<facet::PropertyCategoryOptions>());
 static_assert(OptionsFollowConventions<facet::PropertyRowOptions>());
 static_assert(OptionsFollowConventions<facet::ConsoleViewOptions>());
 static_assert(OptionsFollowConventions<facet::SearchFilterBarOptions>());
+static_assert(OptionsFollowConventions<facet::SettingsSearchOptions>());
 static_assert(OptionsFollowConventions<facet::SettingsSearchMatchOptions>());
 static_assert(OptionsFollowConventions<facet::KeybindListOptions>());
 static_assert(OptionsFollowConventions<facet::PresetListOptions>());
@@ -532,11 +533,11 @@ void ToolCalls()
     CHECK(filters[1].active);
 
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
-        BeginSettingsSearch("settings", "query");
+        BeginSettingsSearch("settings", {.filter = "query"});
         CHECK(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));
         EndSettingsSearch();
     });
-    Check("SettingsSearchScope", Expect::NoItem, nullptr, [] { SettingsSearchScope search("settings 2", ""); });
+    Check("SettingsSearchScope", Expect::NoItem, nullptr, [] { SettingsSearchScope search("settings 2"); });
     Check("SettingsSearchHitCount", Expect::NoItem, nullptr,
           [] { CHECK(SettingsSearchHitCount("settings", nullptr) == 0); });
 

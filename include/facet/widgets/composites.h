@@ -268,14 +268,19 @@ struct SettingsSearchMatchOptions
     const char* section = nullptr;         // the section the row belongs to, for SettingsSearchHitCount
 };
 
+struct SettingsSearchOptions
+{
+    const char* filter = nullptr;          // the search text (usually from a search field); null or empty matches every row
+};
+
 // Settings search over rows the caller submits: between BeginSettingsSearch and
 // EndSettingsSearch, ask SettingsSearchMatch before each settings row and submit the row only
-// when it returns true. `query` is the search text (usually from a search field); an empty
-// query matches every row. Content is always submitted; EndSettingsSearch is always called.
-void BeginSettingsSearch(const char* id, const char* query);
+// when it returns true. The filter is an option, as in PropertyGridOptions and
+// KeybindListOptions. Content is always submitted; EndSettingsSearch is always called.
+void BeginSettingsSearch(const char* id, const SettingsSearchOptions& options = {});
 void EndSettingsSearch();
-// True when the row should be shown: outside a settings search, for an empty query, or when the
-// query matches the label, description or keywords (fuzzy). Counts the hit for its section.
+// True when the row should be shown: outside a settings search, for an empty filter, or when the
+// filter matches the label, description or keywords (fuzzy). Counts the hit for its section.
 bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {});
 // Hits of the settings search `id` in its last completed frame, for one section (null: all),
 // so a navigation drawn before the page can show counts.
@@ -284,7 +289,10 @@ int SettingsSearchHitCount(const char* id, const char* section);
 class [[nodiscard]] SettingsSearchScope
 {
 public:
-    SettingsSearchScope(const char* id, const char* query) { BeginSettingsSearch(id, query); }
+    explicit SettingsSearchScope(const char* id, const SettingsSearchOptions& options = {})
+    {
+        BeginSettingsSearch(id, options);
+    }
     ~SettingsSearchScope() { EndSettingsSearch(); }
     SettingsSearchScope(const SettingsSearchScope&) = delete;
     SettingsSearchScope& operator=(const SettingsSearchScope&) = delete;

@@ -1,5 +1,5 @@
 // Settings search (facet/widgets/composites.h): planned. A placeholder until Phase 2 implements
-// it. SettingsSearchMatch matches every row, as for an empty query, so the caller's rows show.
+// it. SettingsSearchMatch matches every row, as for an empty filter, so the caller's rows show.
 
 #include "facet/widgets/composites.h"
 #include "widgets/content_stub.h"
@@ -7,7 +7,7 @@
 namespace facet
 {
 
-void BeginSettingsSearch(const char* id, const char*)
+void BeginSettingsSearch(const char* id, const SettingsSearchOptions&)
 {
     namespace stub = internal::content;
     stub::StubBegin("BeginSettingsSearch", "SettingsSearch", id, stub::ResolveWidth(0.0f, 0.0f), stub::ControlRows(1.0f));
