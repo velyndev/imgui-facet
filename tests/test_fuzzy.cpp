@@ -340,8 +340,27 @@ TEST_CASE("Filtering 10000 candidates takes milliseconds and allocates nothing")
 #endif
     CHECK(matched > 0);
     MESSAGE("7 queries over 10000 candidates: ", seconds * 1000.0, " ms");
+
+    // Queries that match nothing (a typo, a letter no name has): every candidate is rejected
+    // by its byte scan before it is decoded. The best of five runs keeps a busy machine from
+    // failing the bound.
+    double rejectSeconds = 1.0;
+    int rejected = 0;
+    for (int run = 0; run < 5; ++run)
+    {
+        const auto rejectStart = std::chrono::steady_clock::now();
+        rejected = 0;
+        for (const char* query : {"zz", "qz", "frame zq"})
+            rejected += FuzzyFilter(query, names, results);
+        rejectSeconds = std::min(
+            rejectSeconds, std::chrono::duration<double>(std::chrono::steady_clock::now() - rejectStart).count());
+    }
+    CHECK(rejected == 0);
+    MESSAGE("3 queries without a match over 10000 candidates: ", rejectSeconds * 1000.0, " ms");
 #ifdef NDEBUG
     // One key press must stay well inside a frame; the bound is loose for slow machines.
-    CHECK(seconds / 7.0 < 0.05);
+    CHECK(seconds / 7.0 < 0.02);
+    // Decoding every candidate costs about 5 ms per query; the byte scan about 1 ms.
+    CHECK(rejectSeconds / 3.0 < 0.0025);
 #endif
 }

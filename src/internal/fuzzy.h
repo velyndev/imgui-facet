@@ -18,6 +18,9 @@
 // diacritics match their base letter ("e" matches "é"), so Latin names rank as expected.
 // Text is UTF-8; invalid bytes count as one character each and match only themselves.
 //
+// Cost: a candidate that does not contain the query characters in order is rejected by one
+// pass over its bytes; only the others are decoded and scored.
+//
 // Memory: nothing here allocates. Scoring uses a fixed scratch table per thread for up to
 // kFuzzyMaxQuery query characters against kFuzzyMaxCandidate candidate characters. A longer
 // candidate or query is matched by the fallback: one greedy left-to-right pass with the same
@@ -69,7 +72,9 @@ struct FuzzyResult
     int score = 0;
 };
 
-// Candidate `index` of a lazy list; return nullptr for an entry that should never match.
+// Candidate `index` of a lazy list; return nullptr for an entry that should never match. The
+// getter must not call FuzzyScore or FuzzyFilter: the query is decoded once into the same
+// per-thread scratch.
 using FuzzyGetter = const char* (*)(int index, void* user);
 
 // Scores every candidate and writes the matching ones into `out`, best score first; equal

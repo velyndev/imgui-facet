@@ -74,7 +74,7 @@ static_assert(sizeof(kExtendedABase) - 1 == 128, "one entry per character of Lat
 constexpr char kLatin1Base[] = "aaaaaa*ceeeeiiii*nooooo*ouuuuy*y";
 static_assert(sizeof(kLatin1Base) - 1 == 32, "one entry per character from U+00E0 to U+00FF");
 
-bool IsAsciiSeparator(std::uint32_t c)
+constexpr bool IsAsciiSeparator(std::uint32_t c)
 {
     return c == ' ' || c == '-' || c == '_' || c == '.' || c == '/' || c == '\\' || c == ':' || c == '\t';
 }
@@ -464,22 +464,71 @@ int ExactBonus(const Scratch& s, int m, int n)
     return kBonusExact;
 }
 
-} // namespace
+// Fold of every ASCII byte, for the byte scan below.
+struct AsciiFoldTable
+{
+    std::uint8_t folded[128] = {};
+    constexpr AsciiFoldTable()
+    {
+        for (std::uint32_t c = 0; c < 128; ++c)
+        {
+            std::uint32_t f = c;
+            if (c >= 'A' && c <= 'Z')
+                f = c + ('a' - 'A');
+            else if (IsAsciiSeparator(c))
+                f = ' ';
+            folded[c] = static_cast<std::uint8_t>(f);
+        }
+    }
+};
+constexpr AsciiFoldTable kAsciiFold;
 
-FuzzyMatch FuzzyScore(std::string_view query, std::string_view candidate, std::span<TextRange> ranges)
+// Whether the first `m` folded query characters appear in order in `text`. It reads the text
+// once without filling the scratch, so a candidate that cannot match costs one byte scan:
+// ASCII bytes fold through a table, other characters are decoded on the way.
+bool ContainsInOrder(const Char* query, int m, std::string_view text)
+{
+    if (m <= 0)
+        return true;
+    int i = 0;
+    std::uint32_t want = query[0].folded;
+    std::size_t pos = 0;
+    const std::size_t size = text.size();
+    const char* data = text.data();
+    while (pos < size)
+    {
+        const auto byte = static_cast<std::uint8_t>(data[pos]);
+        std::uint32_t folded = 0;
+        if (byte < 0x80)
+        {
+            folded = kAsciiFold.folded[byte];
+            ++pos;
+        }
+        else
+        {
+            int length = 1;
+            folded = Fold(Decode(text, pos, &length));
+            pos += static_cast<std::size_t>(length);
+        }
+        if (folded == want)
+        {
+            if (++i == m)
+                return true;
+            want = query[i].folded;
+        }
+    }
+    return false;
+}
+
+// Scores a candidate against the query already decoded into s.query (`m` characters in the
+// whole query, of which up to kFuzzyMaxQuery are decoded). `query` is the trimmed text, which
+// the greedy fallback reads again.
+FuzzyMatch ScoreCandidate(Scratch& s, int m, std::string_view query, std::string_view candidate,
+                          std::span<TextRange> ranges)
 {
     FuzzyMatch result;
-    query = TrimSpaces(query);
-    if (query.empty())
-    {
-        result.matched = true;
+    if (candidate.empty() || !ContainsInOrder(s.query, std::min(m, kFuzzyMaxQuery), candidate))
         return result;
-    }
-    if (candidate.empty())
-        return result;
-
-    Scratch& s = ThreadScratch();
-    const int m = DecodeText(query, s.query, kFuzzyMaxQuery);
     const int n = DecodeText(candidate, s.text, kFuzzyMaxCandidate);
     if (m > n)
         return result;
@@ -521,6 +570,18 @@ FuzzyMatch FuzzyScore(std::string_view query, std::string_view candidate, std::s
     return result;
 }
 
+} // namespace
+
+FuzzyMatch FuzzyScore(std::string_view query, std::string_view candidate, std::span<TextRange> ranges)
+{
+    query = TrimSpaces(query);
+    if (query.empty())
+        return {.matched = true};
+    Scratch& s = ThreadScratch();
+    const int m = DecodeText(query, s.query, kFuzzyMaxQuery);
+    return ScoreCandidate(s, m, query, candidate, ranges);
+}
+
 namespace
 {
 
@@ -559,12 +620,17 @@ int FuzzyFilter(std::string_view query, int candidateCount, FuzzyGetter getter, 
     int worst = -1;  // index into out of the entry that ranks last, once out is full
     if (getter == nullptr || candidateCount < 0)
         candidateCount = 0;
+    // The query is trimmed and decoded once for the whole list.
+    query = TrimSpaces(query);
+    Scratch& s = ThreadScratch();
+    const int m = query.empty() ? 0 : DecodeText(query, s.query, kFuzzyMaxQuery);
     for (int index = 0; index < candidateCount; ++index)
     {
         const char* text = getter(index, user);
         if (text == nullptr)
             continue;
-        const FuzzyMatch match = FuzzyScore(query, text);
+        const FuzzyMatch match =
+            query.empty() ? FuzzyMatch{.matched = true} : ScoreCandidate(s, m, query, text, {});
         if (!match.matched)
             continue;
         ++total;
