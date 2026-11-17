@@ -83,11 +83,11 @@ if (facet::ShortcutPressed(save))
 |---|---|---|
 | `Global` | always | `ImGuiInputFlags_RouteGlobal` |
 | `Window` | the window that calls `ShortcutPressed`, or a child of it, has the focus | `ImGuiInputFlags_RouteFocused` |
-| `FocusedItem` | the item submitted right before `ShortcutPressed` has keyboard focus | `RouteFocused` with `RouteOverActive` |
+| `FocusedItem` | the item submitted right before `ShortcutPressed` has keyboard focus | `RouteFocused`, with `RouteOverActive` while no item is active |
 
-When several scopes want a chord in the same frame, the innermost wins: the focused item, then the focused window (the deepest child first), then global.
+When several scopes want a chord in the same frame, the innermost wins: the focused item, then the focused window (the deepest child first), then global. A `Window` shortcut steps aside for a chord that a `FocusedItem` shortcut in the same window holds while its item has keyboard focus, so the order of the `ShortcutPressed` calls does not matter.
 
-**Text fields.** While a text field is being edited, chords that type a character (a letter, digit or punctuation key without Ctrl) never fire, and the field's own chords (Ctrl+A, Ctrl+Z and the others it uses) win over every scope. Function keys and Ctrl chords the field does not use still fire.
+**Active items and text fields.** An active item (a text field being edited, a slider being dragged) keeps the chords it asks Dear ImGui for, against every scope: a `FocusedItem` shortcut gives up `RouteOverActive` while any item is active. While a text field is being edited, chords that type a character (a letter, digit or punctuation key without Ctrl) never fire, and the field's own chords (Ctrl+A, Ctrl+Z and the others it uses) win. Function keys and Ctrl chords the field does not use still fire.
 
 **Disabled.** `SetShortcutEnabled(id, false)` keeps an entry listed but stops it firing. Shortcuts also never fire inside `ImGui::BeginDisabled`.
 

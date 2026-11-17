@@ -129,10 +129,12 @@ struct ShortcutId
 // Where a shortcut fires. The routing is Dear ImGui's shortcut routing (ImGui::Shortcut with an
 // owner id per shortcut chord), decided where ShortcutPressed is called. When several scopes
 // want the same chord in a frame, the innermost one wins: the focused item, then the focused
-// window (the deepest child first), then global. A text field that is being edited keeps the
-// keys it uses: chords that type a character (a letter, digit or punctuation key without Ctrl)
-// never fire while one is active, and the field's own chords (Ctrl+A, Ctrl+Z) win over every
-// scope. Shortcuts never fire inside ImGui::BeginDisabled.
+// window (the deepest child first), then global, whatever order ShortcutPressed is called in.
+// An active item (a text field being edited, a slider being dragged) keeps the chords it asks
+// Dear ImGui for against every scope. A text field that is being edited keeps the keys it
+// uses: chords that type a character (a letter, digit or punctuation key without Ctrl) never
+// fire while one is active, and the field's own chords (Ctrl+A, Ctrl+Z) win. Shortcuts never
+// fire inside ImGui::BeginDisabled.
 enum class ShortcutScope
 {
     Global,       // anywhere in the app

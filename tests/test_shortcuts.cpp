@@ -347,6 +347,56 @@ TEST_CASE("A text field keeps typed characters and its own chords")
     CHECK(functionCount == 1);
 }
 
+TEST_CASE("A focused-item shortcut leaves an active text field its own chords")
+{
+    RegistryGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId selectAll = facet::RegisterShortcut(
+        "field.select_all", ImGuiMod_Ctrl | ImGuiKey_A, {.scope = facet::ShortcutScope::FocusedItem});
+    const facet::ShortcutId rename =
+        facet::RegisterShortcut("field.rename", ImGuiKey_F2, {.scope = facet::ShortcutScope::FocusedItem});
+    const facet::ShortcutId windowRename =
+        facet::RegisterShortcut("window.rename", ImGuiKey_F2, {.scope = facet::ShortcutScope::Window});
+    int selectAllCount = 0, renameCount = 0, windowRenameCount = 0;
+    char text[32] = "abc";
+    session.SetUi([&] {
+        // The window shortcut is asked first, so only the step-aside rule lets the item win.
+        windowRenameCount += facet::ShortcutPressed(windowRename) ? 1 : 0;
+        ImGui::InputText("field", text, sizeof(text));
+        session.Track("field");
+        selectAllCount += facet::ShortcutPressed(selectAll) ? 1 : 0;
+        renameCount += facet::ShortcutPressed(rename) ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frame();
+    REQUIRE(ImGui::GetActiveID() == session.ItemId("field"));
+    REQUIRE(GImGui->NavId == session.ItemId("field"));
+    ImGuiInputTextState* state = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(state != nullptr);
+    state->ClearSelection();
+    session.Frame();
+    REQUIRE_FALSE(state->HasSelection());
+
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_A);
+    CHECK(selectAllCount == 0);  // the field's select-all wins over the item's shortcut
+    CHECK(state->HasSelection());
+
+    // A chord the field does not use goes to the item, not to its window, while editing ...
+    session.KeyPress(ImGuiKey_F2);
+    CHECK(renameCount == 1);
+    CHECK(windowRenameCount == 0);
+
+    // ... and while the field has keyboard focus without being edited.
+    session.KeyPress(ImGuiKey_Escape);
+    REQUIRE(ImGui::GetActiveID() == 0);
+    REQUIRE(GImGui->NavId == session.ItemId("field"));
+    session.KeyPress(ImGuiKey_F2);
+    CHECK(renameCount == 2);
+    CHECK(windowRenameCount == 0);
+}
+
 TEST_CASE("Shortcuts do not fire inside a disabled block")
 {
     RegistryGuard guard;

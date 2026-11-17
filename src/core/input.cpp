@@ -125,6 +125,7 @@ struct Entry
     int queryFrame = -1;          // ImGui frame of the last ShortcutPressed
     ImGuiID windowId = 0;         // window of the last ShortcutPressed
     ImGuiID itemId = 0;           // item before the last ShortcutPressed (FocusedItem)
+    bool itemFocused = false;     // that item had keyboard focus then (FocusedItem)
 };
 
 struct Registry
@@ -182,12 +183,41 @@ bool IsRoutable(ImGuiKeyChord chord)
     return key >= ImGuiKey_NamedKey_BEGIN && key < ImGuiKey_NamedKey_END;
 }
 
+bool SameChord(const Entry& entry, ImGuiKeyChord chord)
+{
+    const ImGuiKeyChord wanted = NormalizeChord(chord);
+    return (entry.chords[0] != ImGuiKey_None && NormalizeChord(entry.chords[0]) == wanted) ||
+           (entry.chords[1] != ImGuiKey_None && NormalizeChord(entry.chords[1]) == wanted);
+}
+
+// A FocusedItem shortcut in the window of `window` has `chord` and its item had keyboard
+// focus when it was last asked, in this frame or the one before. The window's shortcut then
+// steps aside for that chord: both would score the same in Dear ImGui's routing while an item
+// is active, and the inner scope must win whatever order they are asked in.
+bool FocusedItemTakes(const Entry& window, ImGuiKeyChord chord)
+{
+    const int frame = GImGui->FrameCount;
+    for (const std::unique_ptr<Entry>& other : Shortcuts().entries)
+    {
+        if (other.get() != &window && other->enabled && other->scope == ShortcutScope::FocusedItem &&
+            other->itemFocused && other->queryFrame >= frame - 1 && other->windowId == window.windowId &&
+            SameChord(*other, chord))
+            return true;
+    }
+    return false;
+}
+
 // Requests the routes of the entry's chords for this frame and reports whether one fired.
 bool PollEntry(Entry& entry)
 {
     ImGuiContext& g = *GImGui;
     entry.queryFrame = g.FrameCount;
     entry.windowId = g.CurrentWindow != nullptr ? g.CurrentWindow->ID : 0;
+    if (entry.scope == ShortcutScope::FocusedItem)
+    {
+        entry.itemId = g.LastItemData.ID;
+        entry.itemFocused = entry.itemId != 0 && g.NavId == entry.itemId && g.NavWindow == g.CurrentWindow;
+    }
 
     bool fired = entry.triggered;
     bool route = true;
@@ -201,11 +231,14 @@ bool PollEntry(Entry& entry)
         flags |= ImGuiInputFlags_RouteFocused;
         break;
     case ShortcutScope::FocusedItem:
-        // Above the window's own shortcuts and an active item, but only while the item has
-        // keyboard focus; characters typed into a text field are still filtered by Dear ImGui.
-        flags |= ImGuiInputFlags_RouteFocused | ImGuiInputFlags_RouteOverActive;
-        entry.itemId = g.LastItemData.ID;
-        route = entry.itemId != 0 && g.NavId == entry.itemId && g.NavWindow == g.CurrentWindow;
+        // Only while the item has keyboard focus. With no active item, RouteOverActive ranks
+        // it above the window's own shortcuts. While an item is active (a text field being
+        // edited, a slider being dragged) it is left out: the active item keeps its own chords
+        // (Ctrl+A, Ctrl+Z) and an item that takes every key (a chord capture) keeps them all.
+        flags |= ImGuiInputFlags_RouteFocused;
+        if (g.ActiveId == 0)
+            flags |= ImGuiInputFlags_RouteOverActive;
+        route = entry.itemFocused;
         break;
     }
     if (route)
@@ -214,6 +247,8 @@ bool PollEntry(Entry& entry)
         {
             const ImGuiKeyChord chord = entry.chords[slot];
             if (chord == ImGuiKey_None || !IsRoutable(chord))
+                continue;
+            if (entry.scope == ShortcutScope::Window && FocusedItemTakes(entry, chord))
                 continue;
             // Both chords request their route every frame, so neither may short-circuit.
             if (ImGui::Shortcut(chord, flags, entry.routeOwners[slot]))
@@ -653,15 +688,12 @@ ShortcutId FindChordConflict(ImGuiKeyChord chord, ShortcutId except)
 {
     if (chord == ImGuiKey_None)
         return {};
-    const ImGuiKeyChord wanted = NormalizeChord(chord);
     const Entry* reference = FindEntry(except);
     for (const std::unique_ptr<Entry>& entry : Shortcuts().entries)
     {
         if (entry->id == except || !entry->enabled)
             continue;
-        const bool sameChord = (entry->chords[0] != ImGuiKey_None && NormalizeChord(entry->chords[0]) == wanted) ||
-                               (entry->chords[1] != ImGuiKey_None && NormalizeChord(entry->chords[1]) == wanted);
-        if (sameChord && ScopesOverlap(reference, *entry))
+        if (SameChord(*entry, chord) && ScopesOverlap(reference, *entry))
             return entry->id;
     }
     return {};
