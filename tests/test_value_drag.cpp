@@ -305,15 +305,16 @@ TEST_CASE("Value drag: no drift after moving back to the start")
     facet::test::Session session;
     REQUIRE(session.Ready());
     TestSlider slider;
-    slider.options.mapping = {.min = 0.0, .max = 7.0};
-    slider.value = 0.3;
+    // 1.3 / 9.9 * 9.9 is not exactly 1.3 in double precision, so only returning the start value is exact.
+    slider.options.mapping = {.min = 0.0, .max = 9.9};
+    slider.value = 1.3;
     Install(session, slider);
-    const ImVec2 knob = TestSlider::At(session, 0.3 / 7.0);
+    const ImVec2 knob = TestSlider::At(session, 1.3 / 9.9);
     const ImVec2 start(knob.x + 3.0f, knob.y);
     session.Drag({start, ImVec2(start.x + 37.0f, start.y), ImVec2(start.x - 53.0f, start.y),
                   ImVec2(start.x + 11.0f, start.y), start},
                  3);
-    CHECK(slider.value == 0.3);
+    CHECK(slider.value == 1.3);
     CHECK(slider.changes > 0);
 }
 
