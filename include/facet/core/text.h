@@ -32,8 +32,12 @@ namespace facet
 {
 
 // One font face, from a file or from memory. `data` is not copied: it must stay valid
-// until Shutdown. `faceIndex` is passed to the rasterizer as the face index (for a named
-// instance of a variable font: (instanceIndex + 1) << 16).
+// until Shutdown removes the fonts. A Shutdown while the font atlas is locked (inside a frame,
+// with a renderer that does not update textures itself) cannot remove them and logs a
+// warning; the fonts then stay in the atlas and read `data` until the next facet::Init
+// replaces them or the Dear ImGui context is destroyed, so keep it valid until then.
+// `faceIndex` is passed to the rasterizer as the face index (for a named instance of a
+// variable font: (instanceIndex + 1) << 16).
 struct FontSource
 {
     const char* path = nullptr;  // UTF-8 file path; used when data is null
