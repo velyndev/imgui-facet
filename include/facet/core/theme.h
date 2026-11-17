@@ -293,6 +293,7 @@ bool HasCustomAccent();
 // it was taken in or the next theme change.
 inline constexpr int kAccentStackDepth = 8;
 void PushAccent(const ImVec4& accent);
+void PushAccent(ImU32 accent);
 void PopAccent();
 
 // `a` blended toward `b`: colors in OKLab (alpha linearly), lengths, durations and springs

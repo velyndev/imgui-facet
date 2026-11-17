@@ -78,6 +78,16 @@ TEST_CASE("Accent scopes nest and the innermost one wins")
     facet::PopAccent();
 }
 
+TEST_CASE("PushAccent takes a packed color like SetAccent")
+{
+    DarkTheme dark;
+    facet::Theme expected = facet::T();
+    expected.ApplyAccent(ImGui::ColorConvertU32ToFloat4(IM_COL32(0xC9, 0x34, 0x00, 0xFF)));
+    facet::PushAccent(IM_COL32(0xC9, 0x34, 0x00, 0xFF));
+    CHECK(SameAccentTokens(facet::T().colors, expected.colors));
+    facet::PopAccent();
+}
+
 TEST_CASE("A theme reference held in an outer accent scope keeps its accent across a nested scope")
 {
     DarkTheme dark;

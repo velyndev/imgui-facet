@@ -560,6 +560,11 @@ void PushAccent(const ImVec4& accent)
     scopes.accents[scopes.depth++] = accent;
 }
 
+void PushAccent(ImU32 accent)
+{
+    PushAccent(FromU32(accent));
+}
+
 void PopAccent()
 {
     AccentScopes& scopes = Scopes();
