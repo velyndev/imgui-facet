@@ -276,11 +276,24 @@ inline void ControlStub(const char* widget, const char* label, float width, floa
     DrawStub(box, widget, label, ImGui::IsItemHovered());
 }
 
+// True when the last item is an item in the content of the current window. Its id does not
+// tell: groups (and with them stock composite widgets such as ImGui::InputInt) and text items
+// have id 0 while idle, and Begin leaves the title bar as the last item with the move id. The
+// rect tells: an item has height and lies at or below the content start, the title bar lies
+// above it and a child window's empty title bar has no height.
+inline bool StubLastItemInContent()
+{
+    ImGuiContext& g = *GImGui;
+    const ImRect& rect = g.LastItemData.Rect;
+    return rect.Max.y > rect.Min.y && rect.Min.y >= g.CurrentWindow->DC.CursorStartPos.y;
+}
+
 // The placeholder of a message line under the last item (FieldValidation): one Footnote line
 // starting at the item's left edge, spacing.xs below it, reaching the right edge of the content
-// region. The box is spacing.xs taller than the line so its outline never crosses the text.
-// It is layout only, not an item: the last item stays the one the message belongs to, so item
-// queries after the call still describe it. Does nothing outside a frame.
+// region; at the cursor when the window has no item yet. The box is spacing.xs taller than the
+// line so its outline never crosses the text. It is layout only, not an item: the last item
+// stays the one the message belongs to, so item queries after the call still describe it. Does
+// nothing outside a frame.
 inline void MessageStub(const char* widget, const char* text)
 {
     if (!StubCanDraw())
@@ -288,9 +301,10 @@ inline void MessageStub(const char* widget, const char* text)
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
     const ImGuiLastItemData last = g.LastItemData;
+    const bool underItem = StubLastItemInContent();
     const float right = window->DC.CursorPos.x + ImGui::GetContentRegionAvail().x;
-    const float x = last.ID != 0 ? last.Rect.Min.x : window->DC.CursorPos.x;
-    const float y = last.ID != 0 ? last.Rect.Max.y + Px(T().spacing.xs) : window->DC.CursorPos.y;
+    const float x = underItem ? last.Rect.Min.x : window->DC.CursorPos.x;
+    const float y = underItem ? last.Rect.Max.y + Px(T().spacing.xs) : window->DC.CursorPos.y;
     const float height = MeasureText(TextStyle::Footnote, "Ag").y + Px(T().spacing.xs);
     const ImRect box(ImVec2(x, y), ImVec2(right > x + 1.0f ? right : x + 1.0f, y + height));
     ImGui::SetCursorScreenPos(box.Min);

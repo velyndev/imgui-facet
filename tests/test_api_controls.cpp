@@ -873,6 +873,54 @@ TEST_CASE("FieldValidation sits under the validated item and keeps it as the las
     CHECK(cursorAfter > drawnMin.y);
 }
 
+TEST_CASE("FieldValidation follows items without an id and ignores the title bar")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int port = 8;
+    ImRect field;
+    ImGuiID fieldId = 1;
+    ImVec2 fieldDrawn(FLT_MAX, FLT_MAX);
+    ImVec2 firstDrawn(FLT_MAX, FLT_MAX);
+    ImVec2 contentStart;
+    float spacing = 0.0f;
+    const auto drawnMin = [](int firstVertex) {
+        ImVec2 result(FLT_MAX, FLT_MAX);
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        for (int i = firstVertex; i < drawList->VtxBuffer.Size; ++i)
+            result = ImMin(result, drawList->VtxBuffer[i].pos);
+        return result;
+    };
+    session.SetUi([&] {
+        spacing = facet::Px(facet::T().spacing.xs);
+        // A stock composite widget is a group: id 0 while idle, with a real rect.
+        ImGui::TextUnformatted("Port");
+        ImGui::SameLine();
+        ImGui::InputInt("##port", &port);
+        fieldId = GImGui->LastItemData.ID;
+        field = GImGui->LastItemData.Rect;
+        int firstVertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::FieldValidation("Message");
+        fieldDrawn = drawnMin(firstVertex);
+        // First thing in a window with a title bar: the last item is the title bar, so the
+        // message starts at the cursor, not under the title bar.
+        ImGui::Begin("Titled window", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        contentStart = ImGui::GetCursorScreenPos();
+        firstVertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::FieldValidation("Message");
+        firstDrawn = drawnMin(firstVertex);
+        ImGui::End();
+    });
+    session.Frame();
+
+    REQUIRE(fieldId == 0);
+    // Within a pixel: the anti-aliased fringe of the outline lies half a pixel outside the box.
+    CHECK(std::abs(fieldDrawn.x - field.Min.x) <= 1.0f);
+    CHECK(std::abs(fieldDrawn.y - (field.Max.y + spacing)) <= 1.0f);
+    CHECK(std::abs(firstDrawn.x - contentStart.x) <= 1.0f);
+    CHECK(std::abs(firstDrawn.y - contentStart.y) <= 1.0f);
+}
+
 TEST_CASE("A shortened placeholder shows its whole text in a tooltip on hover")
 {
     facet::test::Session session;
