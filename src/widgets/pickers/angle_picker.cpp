@@ -1,0 +1,32 @@
+// AnglePicker: planned. Draws the placeholder at the picker's default size until Phase 2
+// implements the widget in this file.
+
+#include "facet/widgets/pickers.h"
+
+#include "facet/core/scale.h"
+#include "facet/core/theme.h"
+#include "widgets/controls_stub.h"
+
+namespace facet
+{
+namespace
+{
+
+// Width of the degrees field beside the dial, in spacing.xxxl.
+constexpr float kFieldInXxxl = 2.5f;
+
+} // namespace
+
+bool AnglePicker(const char* label, float*, const AnglePickerOptions& options)
+{
+    const Theme& t = T();
+    const float diameter = internal::StubDial(options.diameter, options.size);
+    float width = internal::StubLabelWidth(label, options.size) + diameter;
+    if (options.field)
+        width += Px(t.spacing.sm) + Px(t.spacing.xxxl) * kFieldInXxxl;
+    internal::ControlStub("AnglePicker", label, width,
+                          diameter + internal::StubMessageHeight(options.error, options.helpText));
+    return false;
+}
+
+} // namespace facet
