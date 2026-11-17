@@ -422,6 +422,22 @@ TEST_CASE("Value drag: Escape during a drag restores the value and cancels the e
     CHECK(slider.commits == 0);
 }
 
+TEST_CASE("Value drag: Escape before the value moved cancels without an edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    Install(session, slider);
+    session.MouseMove(TestSlider::At(session, 0.5));
+    session.MouseDown();
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    CHECK(slider.value == 0.5);
+    CHECK(slider.cancels == 1);
+    CHECK(slider.changes == 0);
+    CHECK(slider.afterEdit == 0);
+}
+
 TEST_CASE("Value drag: keys step while focused, one edit session per press")
 {
     facet::test::Session session;

@@ -206,7 +206,7 @@ inline constexpr double kCoarseDeltaFactor = 10.0;
 struct ValueDragResult
 {
     bool changed = false;   // *value was written this frame
-    bool canceled = false;  // Escape restored the value from the start of the edit (changed too)
+    bool canceled = false;  // Escape ended the edit; changed too when the value had moved and was restored
     bool dragging = false;  // a mouse drag is under way
     bool keyboard = false;  // a key edit is under way
 };

@@ -561,6 +561,31 @@ TEST_CASE("Multi-handle behaviour: the span reports the hover a press would grab
     CHECK(range.last.span.hoverAmount == 0.0f);
 }
 
+TEST_CASE("Multi-handle behaviour: Escape before anything moved changes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    Install(session, range);
+    int changedFrames = 0;
+    session.SetUi([&] {
+        range.Ui(session);
+        changedFrames += range.last.changed ? 1 : 0;
+    });
+    // A handle, then the span: pressed, Escape, released, without a move.
+    for (const double at : {20.0, 40.0})
+    {
+        session.MouseMove(TestRange::At(session, at));
+        session.MouseDown();
+        session.KeyPress(ImGuiKey_Escape);
+        session.MouseUp();
+    }
+    CHECK(range.cancels == 2);
+    CHECK(changedFrames == 0);
+    CHECK(range.values[0] == 20.0);
+    CHECK(range.values[1] == 60.0);
+}
+
 TEST_CASE("Multi-handle behaviour: a span drag survives a lost pointer")
 {
     facet::test::Session session;

@@ -458,7 +458,8 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         }
     };
     const auto cancel = [&]() {
-        if (!readOnly)
+        // Only a value that moved is written back: a session canceled before any change edits nothing.
+        if (!readOnly && *value != session.startValue)
         {
             *value = session.startValue;
             result.changed = true;

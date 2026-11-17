@@ -641,9 +641,13 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             TakeSnapshot(id, before, n, keys);
         if (edit.canceled)
         {
-            RestoreSnapshot(id, v, keys);
+            // Every handle back where the edit began; written only when one had moved.
+            if (RestoreSnapshot(id, v, keys))
+            {
+                ImGui::MarkItemEdited(handleIds[i]);
+                result.changed = true;
+            }
             result.canceled = true;
-            result.changed = true;
         }
         else if (edit.changed)
         {
@@ -801,20 +805,22 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             ImGui::SetKeyOwner(ImGuiKey_Escape, spanId);
             if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, spanId))
             {
-                RestoreSnapshot(id, v, keys);
+                if (RestoreSnapshot(id, v, keys))
+                {
+                    ImGui::MarkItemEdited(spanId);
+                    result.changed = true;
+                }
                 MarkEditCanceled(spanId);
-                ImGui::MarkItemEdited(spanId);
                 ImGui::ClearActiveID();
                 spanDrag = {};
                 result.canceled = true;
-                result.changed = true;
             }
         }
         result.spanActive = g.ActiveId == spanId;
     }
 
     // Report a change only when the values really differ from the frame's start.
-    if (result.changed && !result.canceled)
+    if (result.changed)
     {
         bool differs = false;
         for (int i = 0; i < n; ++i)
