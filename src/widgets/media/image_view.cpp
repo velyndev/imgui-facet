@@ -44,4 +44,9 @@ bool ImageView(const char* label, ID3D11ShaderResourceView*, const ImageViewOpti
     return false;
 }
 
+bool ImageViewRetryPressed()
+{
+    return false;
+}
+
 } // namespace facet

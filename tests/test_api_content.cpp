@@ -345,6 +345,9 @@ void MediaCalls()
     Check("ImageView, texture", Expect::Item, "Texture", [] {
         CHECK_FALSE(ImageView("Texture", static_cast<ID3D11ShaderResourceView*>(nullptr)));
     });
+    Check("ImageView, retry", Expect::Item, "Image 3",
+          [&] { CHECK_FALSE(ImageView("Image 3", none, {.activatable = true, .retryLabel = "Retry"})); });
+    Check("ImageViewRetryPressed", Expect::NoItem, nullptr, [] { CHECK_FALSE(ImageViewRetryPressed()); });
     Check("Avatar", Expect::Item, "Name", [&] { CHECK_FALSE(Avatar("Name", none, {.activatable = true})); });
     Check("AvatarGroup", Expect::Item, "Group", [] { CHECK_FALSE(AvatarGroup("Group", avatars, {.maxVisible = 1})); });
 

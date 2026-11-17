@@ -45,11 +45,13 @@ struct ImageViewOptions
 // in the failed state and as the tooltip, and the accessible name. While the handle is
 // loading, the box keeps its size (control height large square while the size is unknown).
 // When the image becomes ready it fades in over motion.durationFast, keyed by the id. Returns
-// true on the frame it was activated (activatable) or its retry button was activated (tell
-// them apart with ImageFailed).
+// true on the frame the image was activated (activatable only); the retry button is reported
+// by ImageViewRetryPressed, never by the result.
 bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {});
 // An app-owned texture; Facet reads its size and keeps no reference. It never loads or fails.
 bool ImageView(const char* label, ID3D11ShaderResourceView* texture, const ImageViewOptions& options = {});
+// True on the frame the retry button (retryLabel) of the last ImageView call was activated.
+bool ImageViewRetryPressed();
 
 // --- Avatars --------------------------------------------------------------------------------
 

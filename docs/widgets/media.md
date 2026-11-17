@@ -22,7 +22,7 @@ returns the neutral result.
 | Widget | Declaration | What it does | Status |
 |---|---|---|---|
 | IconGlyph (core) | `void IconGlyph(Icon icon, float size = 0.0f, ImU32 color = 0)` in `core/icons.h` | A tinted icon on the text line, sized in pixels | ready |
-| ImageView | `bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {})`, overload with `ID3D11ShaderResourceView*` | An image as one item in design units, with loading and failed states, optional activation and retry | planned |
+| ImageView | `bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {})`, overload with `ID3D11ShaderResourceView*`, `bool ImageViewRetryPressed()` | An image as one item in design units, with loading and failed states, optional activation and retry | planned |
 | Avatar | `bool Avatar(const char* label, ImageHandle image, const AvatarOptions& options = {})` | Round picture with an initials fallback, status dot and selection ring | planned |
 | AvatarGroup | `bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const AvatarGroupOptions& options = {})` | Overlapping avatars with a "+N" chip; the names show on hover | planned |
 | ThumbnailStrip | `bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem> items, const ThumbnailStripOptions& options = {})`, overload with count and `ImageItemGetter` | Scrolling row of thumbnails with one selected | planned |
@@ -36,16 +36,18 @@ returns the neutral result.
 
 ### Image with a retry for failed loads
 
+The result reports activation; the retry button has its own query, the same pattern as
+`DataStateViewRetryPressed`, so an activatable image in the failed state stays unambiguous.
+
 ```cpp
 static facet::ImageHandle cover = facet::LoadImageFileAsync(path);
-if (facet::ImageView("Cover image", cover, {.corners = facet::Radius::Card, .retryLabel = "Try again",
-                                            .width = 160.0f, .height = 90.0f}))
+if (facet::ImageView("Cover image", cover, {.corners = facet::Radius::Card, .activatable = true,
+                                            .retryLabel = "Try again", .width = 160.0f, .height = 90.0f}))
+    OpenLightbox(cover);                   // the application's own function
+if (facet::ImageViewRetryPressed())
 {
-    if (facet::ImageFailed(cover))
-    {
-        facet::ReleaseImage(cover);
-        cover = facet::LoadImageFileAsync(path);
-    }
+    facet::ReleaseImage(cover);
+    cover = facet::LoadImageFileAsync(path);
 }
 ```
 
