@@ -5,8 +5,9 @@
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. The family is planned: its widgets are declared here and implemented in
-// Phase 2 (docs/widgets/inputs.md). Until then every function draws a placeholder of the
-// widget's default size, returns false and writes nothing.
+// Phase 2 (docs/widgets/inputs.md). Until then every widget function draws a placeholder of
+// the widget's default size, returns false and writes nothing. The queries report that nothing
+// happened (false or -1); PassesFilter states its placeholder result in its own comment.
 //
 // Common to every widget here:
 //   - Text editing, IME, undo, selection and the clipboard are Dear ImGui's own (InputTextEx in
@@ -156,7 +157,8 @@ bool FilterField(const char* label, char* buffer, std::size_t bufferSize, Filter
 
 // Whether `text` matches `query` under `settings`: every space-separated word of the query occurs
 // in the text (as a whole word with wholeWord, ASCII case-insensitive unless matchCase). An
-// empty query matches everything. No allocation; usable from any thread.
+// empty query matches everything. No allocation; usable from any thread. Until Phase 2
+// implements it, every text passes, as with an empty query.
 bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 
 // --- Autocomplete -----------------------------------------------------------------------------

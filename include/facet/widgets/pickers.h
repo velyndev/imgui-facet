@@ -5,8 +5,9 @@
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. The family is planned: its widgets are declared here and implemented in
-// Phase 2 (docs/widgets/pickers.md). Until then every function draws a placeholder of the
-// widget's default size, returns false and writes nothing.
+// Phase 2 (docs/widgets/pickers.md). Until then every widget function draws a placeholder of
+// the widget's default size, returns false and writes nothing. SampleAnimatedColor states its
+// placeholder result in its own comment.
 //
 // Common to every widget here:
 //   - Colors are ImVec4 in gamma-encoded sRGB with straight alpha (color.h), everywhere: the
@@ -220,7 +221,7 @@ struct AnimatedColor
 
 // The color of `animated` at `seconds` (any running clock, for example ImGui::GetTime()). While
 // facet::ReduceMotion() is true (the theme token or the system animation setting) it is `color`.
-// No allocation.
+// No allocation. Until Phase 2 implements it, it returns `color`, the reduced motion result.
 ImVec4 SampleAnimatedColor(const AnimatedColor& animated, double seconds);
 
 struct ColorModeEditorOptions

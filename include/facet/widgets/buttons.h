@@ -5,8 +5,8 @@
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. The family is planned: its widgets are declared here and implemented in
-// Phase 2 (docs/widgets/buttons.md). Until then every function draws a placeholder of the
-// widget's default size, returns false and writes nothing.
+// Phase 2 (docs/widgets/buttons.md). Until then every widget function draws a placeholder of
+// the widget's default size, returns false and writes nothing.
 //
 // Common to every widget here:
 //   - Activation is a click released inside, Enter or Space while focused, or the gamepad

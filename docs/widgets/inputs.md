@@ -2,8 +2,8 @@
 
 Header: `facet/widgets/inputs.h`. The declarations follow [the API conventions](../api-conventions.md);
 the comment above each declaration in the header is the full reference. Every widget here is
-**planned**: the function exists, draws a placeholder of the widget's default size, returns false and
-writes nothing. Phase 2 implements the widgets and changes their status to ready. See
+**planned**: the function exists, draws a placeholder of the widget's default size, returns the neutral
+result and writes nothing. Phase 2 implements the widgets and changes their status to ready. See
 [the widget index](../widgets.md).
 
 Text editing, IME, undo, selection and the clipboard are Dear ImGui's own (`InputTextEx`); Facet
