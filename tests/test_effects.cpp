@@ -1028,6 +1028,52 @@ TEST_CASE("A shadow queues its tile upload in front of its first draw")
     }
 }
 
+TEST_CASE("A glass panel with a small radius builds its corners as geometry")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    REQUIRE(facet::GlassAvailable());
+    // The flags a frame starts with when the atlas has baked round corners.
+    // The atlas is not built here, so the corner UV table is a stand-in.
+    ImDrawListSharedData* shared = ImGui::GetDrawListSharedData();
+    const ImDrawFlags saved = shared->InitialDrawFlags;
+    const ImVec4* savedCorners = shared->TexUvCorners;
+    static const ImVec4 corners[IM_DRAWLIST_TEX_CORNERS_ROUNDING_MAX * IM_DRAWLIST_TEX_CORNERS_THICKNESS_MAX] = {};
+    shared->TexUvCorners = corners;
+    shared->InitialDrawFlags |= ImDrawFlags_AAFill | ImDrawFlags_UseTexForRoundCorners | ImDrawFlags_AllowTexForRoundCorners_;
+
+    ImDrawList drawList(shared);
+    drawList._ResetForNewFrame();
+    drawList._SetPixelDensity(1.0f);
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+    facet::GlassSpec spec;
+    spec.hairline = false;
+    const ImVec2 pMin(8.0f, 8.0f);
+    facet::DrawGlass(&drawList, pMin, ImVec2(56.0f, 56.0f), 6.0f, spec);
+    // Baked corners are a 9-slice whose outer vertex sits on the corner point, with the
+    // corner's alpha mask in the font atlas UVs. A rounded path never reaches that point.
+    // Only the panel samples a texture here (the blurred output); the tint over it does not.
+    bool panelFound = false;
+    bool cornerVertex = false;
+    for (const ImDrawCmd& command : drawList.CmdBuffer)
+    {
+        if (command.UserCallback != nullptr || command.GetTexID() == ImTextureID_Invalid || command.ElemCount == 0)
+            continue;
+        panelFound = true;
+        for (unsigned int i = 0; i < command.ElemCount; ++i)
+        {
+            const ImDrawVert& vertex = drawList.VtxBuffer[command.VtxOffset + drawList.IdxBuffer[command.IdxOffset + i]];
+            cornerVertex = cornerVertex || (vertex.pos.x == pMin.x && vertex.pos.y == pMin.y);
+        }
+    }
+    CHECK(panelFound);
+    CHECK_FALSE(cornerVertex);
+    shared->InitialDrawFlags = saved;
+    shared->TexUvCorners = savedCorners;
+}
+
 TEST_CASE("Each split channel queues its own tile upload")
 {
     Warp warp;

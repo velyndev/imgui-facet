@@ -206,7 +206,10 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
     DrawShadow(drawList, pMin, pMax, radius, spec.shadow);
 
     // The panel shape in white with the blurred output, UVs mapping the viewport onto 0..1.
+    // Its corners must be real geometry: baked corner shapes live in the font atlas, and the
+    // UVs set below would replace their alpha mask.
     drawList->PushTexture(ImTextureRef(static_cast<ImTextureID>(reinterpret_cast<std::uintptr_t>(output))));
+    drawList->PushDrawFlag(ImDrawFlags_UseTexForRoundCorners, false);
     const int firstVertex = drawList->VtxBuffer.Size;
     FillRect(drawList, pMin, pMax, IM_COL32_WHITE, radius);
     const ImVec2 origin = viewport->Pos;
@@ -216,6 +219,7 @@ void DrawGlass(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, con
         ImDrawVert& vertex = drawList->VtxBuffer[i];
         vertex.uv = ImVec2((vertex.pos.x - origin.x) * inverseSize.x, (vertex.pos.y - origin.y) * inverseSize.y);
     }
+    drawList->PopDrawFlag();
     drawList->PopTexture();
 
     FillRect(drawList, pMin, pMax, ToU32(WithAlpha(glass.tint, glass.tintOpacity)), radius);
