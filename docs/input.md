@@ -49,12 +49,14 @@ A `Keybind` holds a primary and an alternate chord and a `BindMode`:
 
 | Mode | `IsBindActive` |
 |---|---|
-| `Hold` | Either chord is held (`IsChordDown`): the state follows the keys. |
+| `Hold` | Either chord is held: the state follows the keys. |
 | `Toggle` | A press of either chord flips the caller's latch and returns it. A held key flips once (no repeat); both chords pressed in the same frame flip once. |
 | `Always` | True. |
 | `Off` | False; the latch is left alone. |
 
 The caller owns the toggle latch, so one bind can drive several states. A latch flips at most once per frame, so asking twice in a frame gives the same answer. With a null latch, Toggle returns whether a chord was pressed this frame. `IsBindPressed` reports a press of either chord in any mode except Off.
+
+**Modifiers.** Every mode, and `IsBindPressed`, uses one rule: a chord counts while its key and at least its modifiers are down. A Toggle bind on C flips while Shift is held for a sprint bind, and switching a bind between Hold and Toggle never changes which key combinations count. Set `exactModifiers` when no other modifier may be down: a bind on C then ignores Ctrl+C, in every mode. `IsChordPressed` and the shortcut registry always need exactly the chord's modifiers, since Ctrl+S and Ctrl+Shift+S are different commands.
 
 While a text field has the keyboard (`io.WantTextInput`), keyboard chords of a bind are ignored, so typing a G never triggers a bind on G. Set `whileTextInput` to keep them working; mouse and gamepad chords work either way.
 

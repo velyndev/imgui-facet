@@ -99,11 +99,15 @@ struct Keybind
     // typing never triggers the bind; true keeps them working. Mouse and gamepad chords work
     // either way.
     bool whileTextInput = false;
+    // Every mode matches a chord while its key and at least its modifiers are down, so a Hold
+    // bind on C stays held and a Toggle bind on C flips while Shift is held for another bind.
+    // true also requires that no other modifier is down: a bind on C then ignores Ctrl+C.
+    bool exactModifiers = false;
 };
 
-// Whether the bind is active this frame. Hold: IsChordDown of either chord, so the state
-// follows the keys. Toggle: a press of either chord (IsChordPressed without repeat, so a held
-// key flips once) flips *toggleState, once even when both chords go down in the same frame,
+// Whether the bind is active this frame. Hold: either chord is down, so the state follows the
+// keys. Toggle: a press of either chord (without repeat, so a held key flips once) flips
+// *toggleState, once even when both chords go down in the same frame,
 // and the result is *toggleState; the caller owns the latch, so one Keybind can drive several
 // states. Always: true. Off: false, and the latch is left alone. `toggleState` may be null for
 // the modes other than Toggle; Toggle with a null latch returns whether a chord was pressed
@@ -114,7 +118,7 @@ struct Keybind
 bool IsBindActive(const Keybind& bind, bool* toggleState);
 
 // Either chord of the bind was pressed this frame (no repeat), whatever the mode (Off
-// excepted), with the same text field rule as IsBindActive.
+// excepted), with the same modifier and text field rules as IsBindActive.
 bool IsBindPressed(const Keybind& bind);
 
 // --- Shortcut registry ----------------------------------------------------------------------

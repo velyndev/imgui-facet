@@ -307,6 +307,64 @@ TEST_CASE("Key binds: hold follows the key, toggle flips once per press, always 
     CHECK_FALSE(toggleActive);
 }
 
+TEST_CASE("Key binds use one modifier rule in every mode")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind hold{.primary = ImGuiKey_C, .mode = facet::BindMode::Hold};
+    facet::Keybind toggle{.primary = ImGuiKey_C, .mode = facet::BindMode::Toggle};
+    facet::Keybind holdExact{.primary = ImGuiKey_C, .mode = facet::BindMode::Hold, .exactModifiers = true};
+    facet::Keybind toggleExact{.primary = ImGuiKey_C, .mode = facet::BindMode::Toggle, .exactModifiers = true};
+    facet::Keybind ctrlToggle{.primary = ImGuiMod_Ctrl | ImGuiKey_C, .mode = facet::BindMode::Toggle};
+    bool latch = false, exactLatch = false, ctrlLatch = false;
+    bool holdActive = false, holdExactActive = false;
+    int pressed = 0, pressedExact = 0;
+    session.SetUi([&] {
+        holdActive = facet::IsBindActive(hold, nullptr);
+        holdExactActive = facet::IsBindActive(holdExact, nullptr);
+        facet::IsBindActive(toggle, &latch);
+        facet::IsBindActive(toggleExact, &exactLatch);
+        facet::IsBindActive(ctrlToggle, &ctrlLatch);
+        pressed += facet::IsBindPressed(hold) ? 1 : 0;
+        pressedExact += facet::IsBindPressed(holdExact) ? 1 : 0;
+    });
+    session.Frame();
+
+    // Shift held for another bind: C still counts as C in every mode.
+    session.KeyDown(ImGuiMod_Shift);
+    session.KeyDown(ImGuiKey_C);
+    CHECK(holdActive);
+    CHECK(latch);
+    CHECK(pressed == 1);
+    // With exact modifiers, Shift+C is not C in any mode.
+    CHECK_FALSE(holdExactActive);
+    CHECK_FALSE(exactLatch);
+    CHECK(pressedExact == 0);
+    session.KeyUp(ImGuiKey_C);
+    session.KeyUp(ImGuiMod_Shift);
+
+    // Ctrl+C: the plain binds count it, the exact ones do not, and a Ctrl+C bind flips.
+    session.KeyDown(ImGuiMod_Ctrl | ImGuiKey_C);
+    CHECK(holdActive);
+    CHECK_FALSE(latch);
+    CHECK(pressed == 2);
+    CHECK_FALSE(holdExactActive);
+    CHECK_FALSE(exactLatch);
+    CHECK(pressedExact == 0);
+    CHECK(ctrlLatch);
+    session.KeyUp(ImGuiMod_Ctrl | ImGuiKey_C);
+
+    // Plain C: every bind on C counts it.
+    session.KeyDown(ImGuiKey_C);
+    CHECK(holdActive);
+    CHECK(holdExactActive);
+    CHECK(latch);
+    CHECK(exactLatch);
+    CHECK(pressedExact == 1);
+    CHECK(ctrlLatch);  // Ctrl+C needs Ctrl
+    session.KeyUp(ImGuiKey_C);
+}
+
 TEST_CASE("Key binds ignore keyboard chords while a text field has the keyboard, unless asked")
 {
     facet::test::Session session;

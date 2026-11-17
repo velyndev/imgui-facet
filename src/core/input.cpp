@@ -93,14 +93,39 @@ bool BindChordBlocked(const Keybind& bind, ImGuiKeyChord chord)
     return !bind.whileTextInput && GImGui->IO.WantTextInput && IsKeyboardChord(chord);
 }
 
+// Every mode of a bind uses one modifier rule: the chord's modifiers must be down, and other
+// modifiers may be down too unless the bind asks for exact modifiers.
+bool BindModifiersExact(const Keybind& bind, ImGuiKeyChord chord)
+{
+    return !bind.exactModifiers || GImGui->IO.KeyMods == RequiredModifiers(chord);
+}
+
 bool BindChordDown(const Keybind& bind, ImGuiKeyChord chord)
 {
-    return chord != ImGuiKey_None && !BindChordBlocked(bind, chord) && IsChordDown(chord);
+    if (chord == ImGuiKey_None || BindChordBlocked(bind, chord))
+        return false;
+    return IsChordDown(chord) && BindModifiersExact(bind, chord);
 }
 
 bool BindChordPressed(const Keybind& bind, ImGuiKeyChord chord)
 {
-    return chord != ImGuiKey_None && !BindChordBlocked(bind, chord) && IsChordPressed(chord, false);
+    if (chord == ImGuiKey_None || BindChordBlocked(bind, chord))
+        return false;
+    // IsChordDown checks the key and the chord's modifiers; the press is then the key's.
+    if (!IsChordDown(chord) || !BindModifiersExact(bind, chord))
+        return false;
+    const ImGuiKey key = ChordKey(chord);
+    if (key != ImGuiKey_None)
+        return ImGui::IsKeyPressed(key, ImGuiInputFlags_None, ImGuiKeyOwner_Any);
+    // Modifiers alone: the set is complete in the frame its last modifier went down.
+    const ImGuiKeyChord mods = RequiredModifiers(chord);
+    for (const ImGuiKeyChord mod : kChordModifiers)
+    {
+        const ImGuiKey modKey = static_cast<ImGuiKey>(mod);
+        if ((mods & mod) != 0 && ImGui::IsKeyPressed(modKey, ImGuiInputFlags_None, ImGuiKeyOwner_Any))
+            return true;
+    }
+    return false;
 }
 
 // --- Shortcut registry --------------------------------------------------------------------------
