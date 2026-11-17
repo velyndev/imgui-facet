@@ -175,8 +175,8 @@ bool AllocationBar(const char* label, std::span<float> shares, std::span<const c
 ```
 
 One bar split into segments whose shares always add up to 1; a divider moves share between its two
-neighbours. The shares are 0 to 1; `format` and `formatter` both get them in percent. Status:
-planned.
+neighbours. The shares are 0 to 1; `format` and `formatter` both get them in percent.
+Status: planned.
 
 ## Usage
 
