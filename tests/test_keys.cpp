@@ -496,6 +496,54 @@ TEST_CASE("Chord capture: modifiers alone, mouse buttons only when allowed")
     CHECK(harness.capture.Result() == (ImGuiMod_Ctrl | ImGuiKey_MouseX1));
 }
 
+TEST_CASE("Chord capture: a new session ends the one listening before it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ChordCapture first, second;
+    ChordCaptureEvent firstEvent = ChordCaptureEvent::None, secondEvent = ChordCaptureEvent::None;
+    int firstEvents = 0, secondEvents = 0;
+    session.SetUi([&] {
+        // Both sessions are updated every frame, as two rows of a keybind list would be.
+        if (const ChordCaptureEvent e = first.Update(); e != ChordCaptureEvent::None)
+        {
+            firstEvent = e;
+            ++firstEvents;
+        }
+        if (const ChordCaptureEvent e = second.Update(); e != ChordCaptureEvent::None)
+        {
+            secondEvent = e;
+            ++secondEvents;
+        }
+    });
+    session.Frame();
+    first.Start(ImHashStr("first"));
+    session.Frame();
+    REQUIRE(first.Listening());
+    second.Start(ImHashStr("second"));
+    session.Frame();
+    CHECK_FALSE(first.Listening());
+    CHECK(firstEvent == ChordCaptureEvent::Canceled);
+    CHECK(facet::internal::ActiveChordCaptureOwner() == second.Owner());
+
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_K);
+    CHECK(secondEvent == ChordCaptureEvent::Captured);
+    CHECK(second.Result() == (ImGuiMod_Ctrl | ImGuiKey_K));
+    CHECK(first.Result() == 0);
+    CHECK(firstEvents == 1);
+    CHECK(secondEvents == 1);
+
+    // Two sessions with the same owner id: the later Start still wins alone.
+    first.Start(ImHashStr("same"));
+    second.Start(ImHashStr("same"));
+    session.Frame();
+    session.KeyPress(ImGuiKey_J);
+    CHECK(second.Result() == ImGuiKey_J);
+    CHECK(first.Result() == 0);
+    CHECK(firstEvents == 2);
+    CHECK(secondEvents == 2);
+}
+
 TEST_CASE("While capturing, host shortcuts, binds, stock key queries and navigation see nothing")
 {
     facet::test::Session session;

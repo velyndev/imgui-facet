@@ -124,6 +124,9 @@ struct CaptureState
     ImGuiID owner = 0;
     ChordCaptureOptions options;
     int frame = -1;  // ImGui frame count of its last Update
+    // Counts Start calls. A session listens only while its own count is the latest, so a
+    // newer Start ends every older session, even one with the same owner id.
+    std::uint32_t generation = 0;
 };
 
 CaptureState& Capture()
@@ -301,6 +304,10 @@ void ChordCapture::Start(ImGuiID ownerId, const ChordCaptureOptions& captureOpti
     peakMods = 0;
     gesture = false;
     std::fill(std::begin(ignored), std::end(ignored), 0ull);
+    CaptureState& state = Capture();
+    generation = ++state.generation;
+    state.owner = owner;
+    state.options = options;
     if (GImGui == nullptr)
         return;
     for (int i = 0; i < kNamedKeyCount; ++i)
@@ -308,9 +315,6 @@ void ChordCapture::Start(ImGuiID ownerId, const ChordCaptureOptions& captureOpti
         if (ImGui::GetKeyData(static_cast<ImGuiKey>(ImGuiKey_NamedKey_BEGIN + i))->Down)
             ignored[i / 64] |= 1ull << (i % 64);
     }
-    CaptureState& state = Capture();
-    state.owner = owner;
-    state.options = options;
     state.frame = GImGui->FrameCount;
 }
 
@@ -321,7 +325,7 @@ void ChordCapture::Finish(ChordCaptureEvent event)
     held = 0;
     gesture = false;
     CaptureState& state = Capture();
-    if (state.owner == owner)
+    if (state.generation == generation)
         state.owner = 0;
 }
 
@@ -354,6 +358,12 @@ ChordCaptureEvent ChordCapture::Update()
         return ChordCaptureEvent::None;
 
     CaptureState& state = Capture();
+    if (state.generation != generation)
+    {
+        // A newer session started: this one ends without recording anything.
+        Finish(ChordCaptureEvent::Canceled);
+        return ChordCaptureEvent::Canceled;
+    }
     state.owner = owner;
     state.options = options;
     state.frame = GImGui->FrameCount;

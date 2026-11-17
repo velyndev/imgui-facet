@@ -81,12 +81,14 @@ enum class ChordCaptureEvent
 {
     None,      // not listening, or still listening
     Captured,  // the last key of a chord was released; Result() holds the chord
-    Canceled,  // Escape was pressed, or a mouse button while mouse buttons are not accepted
+    Canceled,  // Escape was pressed, a mouse button while mouse buttons are not accepted, or
+               // another session started
     Cleared,   // Clear() ended the session
 };
 
 // One capture session. Plain data: keep it in the widget's state under its id. Only one
-// session listens at a time; starting one ends any other.
+// session listens at a time; starting one ends any other: the older session's next Update
+// returns Canceled and records nothing.
 class ChordCapture
 {
 public:
@@ -124,6 +126,7 @@ private:
     ImGuiID owner = 0;
     ChordCaptureOptions options;
     bool listening = false;
+    std::uint32_t generation = 0;       // the Start count of this session (see keys.cpp)
     ChordCaptureEvent pendingEnd = ChordCaptureEvent::None;
     ChordCaptureEvent last = ChordCaptureEvent::None;
     ImGuiKeyChord held = 0;
