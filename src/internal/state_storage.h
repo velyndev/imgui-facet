@@ -137,6 +137,11 @@ StateStore& GlobalStateStore();
 // Marks the ini file as changed so Dear ImGui saves it (after changing a persistent state).
 void MarkStateDirty();
 
+// Feeds the "[<handlerName>][<record>]" sections of ini text to store.BeginRecord and
+// RecordLine and skips every other section. Used when facet::Init runs after Dear ImGui
+// already read the ini file.
+void LoadRecordsFromIni(StateStore& store, const char* handlerName, const char* text, std::size_t size);
+
 std::uint32_t NextStateTypeIndex();
 
 template <class T>

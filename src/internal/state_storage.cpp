@@ -237,6 +237,44 @@ std::uint32_t NextStateTypeIndex()
     return next++;
 }
 
+void LoadRecordsFromIni(StateStore& store, const char* handlerName, const char* text, size_t size)
+{
+    if (text == nullptr || handlerName == nullptr)
+        return;
+    const char* const end = text + size;
+    const size_t handlerLength = std::strlen(handlerName);
+    bool inRecord = false;
+    std::string line;
+    for (const char* cursor = text; cursor < end;)
+    {
+        const char* lineEnd = cursor;
+        while (lineEnd < end && *lineEnd != '\n' && *lineEnd != '\r')
+            ++lineEnd;
+        line.assign(cursor, lineEnd);
+        cursor = lineEnd;
+        while (cursor < end && (*cursor == '\n' || *cursor == '\r'))
+            ++cursor;
+        if (line.empty())
+            continue;
+        if (line.front() == '[' && line.back() == ']')
+        {
+            // "[type][name]": a record of this handler starts, any other section ends it.
+            inRecord = false;
+            const size_t split = line.find("][");
+            if (split == std::string::npos)
+                continue;
+            if (split - 1 == handlerLength && line.compare(1, handlerLength, handlerName) == 0)
+            {
+                const std::string name = line.substr(split + 2, line.size() - split - 3);
+                inRecord = store.BeginRecord(name.c_str());
+            }
+            continue;
+        }
+        if (inRecord)
+            store.RecordLine(line.c_str());
+    }
+}
+
 void MarkStateDirty()
 {
     if (ImGui::GetCurrentContext() != nullptr)
@@ -274,6 +312,21 @@ bool StateInit()
         handler.ReadLineFn = &ReadLine;
         handler.WriteAllFn = &WriteAll;
         ImGui::AddSettingsHandler(&handler);
+
+        // Dear ImGui reads the ini file once, in the first ImGui::NewFrame, and skips the
+        // sections of handlers it does not know yet. When the host calls facet::Init after
+        // that, read Facet's own sections now, so the next save does not drop them.
+        const ImGuiIO& io = ImGui::GetIO();
+        if (GImGui->SettingsLoaded && io.IniFilename != nullptr)
+        {
+            size_t size = 0;
+            char* text = static_cast<char*>(ImFileLoadToMemory(io.IniFilename, "rb", &size));
+            if (text != nullptr)
+            {
+                LoadRecordsFromIni(GlobalStateStore(), kHandlerName, text, size);
+                IM_FREE(text);
+            }
+        }
     }
     return true;
 }
@@ -298,8 +351,9 @@ void StateEndFrame()
 
 } // namespace
 
-// Registers the ini handler at Init (once per Dear ImGui context, before the first ImGui::NewFrame loads the ini file, when
-// the host keeps the usual order), counts frames and collects unused states.
+// Registers the ini handler at Init (once per Dear ImGui context; when Dear ImGui already read
+// the ini file, Facet's sections are read from it at once), counts frames and collects
+// unused states.
 Subsystem StateStorageSubsystem()
 {
     Subsystem subsystem;

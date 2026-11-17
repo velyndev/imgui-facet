@@ -21,6 +21,11 @@ struct InitDesc
 // Starts Facet. Requires a current Dear ImGui context and a valid device and context.
 // Returns false (and leaves Facet uninitialized) when a requirement is missing, when a
 // module fails to start, or when Facet is already initialized.
+// Call it before the first ImGui::NewFrame: Dear ImGui reads its ini file there, and Facet's
+// saved widget state is part of that file. A later Init reads Facet's sections from
+// io.IniFilename itself. A host that loads the ini text on its own (io.IniFilename null,
+// ImGui::LoadIniSettingsFromMemory) must call Init before that, or Facet's sections are
+// skipped and dropped at the next save.
 bool Init(const InitDesc& desc);
 
 // Call once per frame after ImGui::NewFrame(). Reads the frame's delta time from ImGui,
