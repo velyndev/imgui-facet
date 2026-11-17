@@ -130,6 +130,35 @@ static_assert(HasTwoHandleMembers<facet::RangeSliderOptions>());
 static_assert(HasTwoHandleMembers<facet::RangeInputOptions>());
 static_assert(HasTwoHandleMembers<facet::RangeSliderHistogramOptions>());
 
+// Every options struct with a printf format also takes a formatter, with the same names in the
+// same order (designated initializers must follow the declaration order).
+template <class Options>
+constexpr bool HasFormatMembers()
+{
+    return requires {
+        Options{.format = nullptr, .formatter = nullptr, .formatterUser = nullptr};
+        requires std::same_as<decltype(Options::formatter), facet::FormatFn>;
+        requires std::same_as<decltype(Options::formatterUser), void*>;
+    };
+}
+static_assert(HasFormatMembers<facet::SliderOptions>());
+static_assert(HasFormatMembers<facet::SliderSteppedOptions>());
+static_assert(HasFormatMembers<facet::SliderWithInputOptions>());
+static_assert(HasFormatMembers<facet::RangeSliderOptions>());
+static_assert(HasFormatMembers<facet::RangeInputOptions>());
+static_assert(HasFormatMembers<facet::RangeSliderHistogramOptions>());
+static_assert(HasFormatMembers<facet::MultiSliderOptions>());
+static_assert(HasFormatMembers<facet::KnobOptions>());
+static_assert(HasFormatMembers<facet::XYPadOptions>());
+static_assert(HasFormatMembers<facet::ArcRangeSliderOptions>());
+static_assert(HasFormatMembers<facet::BoxRangePadOptions>());
+static_assert(HasFormatMembers<facet::AllocationBarOptions>());
+static_assert(HasFormatMembers<facet::NumberInputOptions>());
+static_assert(HasFormatMembers<facet::DragNumberOptions>());
+static_assert(HasFormatMembers<facet::UnitInputOptions>());
+static_assert(HasFormatMembers<facet::VectorInputOptions>());
+static_assert(HasFormatMembers<facet::SizeInputOptions>());
+
 // The zero member of every choice enum is the default (rule 12).
 static_assert(facet::ButtonVariant{} == facet::ButtonVariant::Secondary);
 static_assert(facet::HandleCollision{} == facet::HandleCollision::Clamp);

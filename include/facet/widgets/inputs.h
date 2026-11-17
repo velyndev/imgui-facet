@@ -398,6 +398,8 @@ bool VectorInput(const char* label, std::span<int> components, const VectorInput
 struct SizeInputOptions
 {
     const char* format = nullptr;
+    FormatFn formatter = nullptr;       // used instead of format for both values
+    void* formatterUser = nullptr;
     ImVec2 min = {0.0f, 0.0f};
     ImVec2 max = {FLT_MAX, FLT_MAX};
     double step = 1.0;
