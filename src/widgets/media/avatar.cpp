@@ -10,7 +10,7 @@ bool Avatar(const char* label, ImageHandle, const AvatarOptions& options)
 {
     namespace stub = internal::content;
     const float diameter = options.diameter > 0.0f ? Px(options.diameter) : ControlHeight(options.size);
-    stub::Stub("Avatar", label, diameter, diameter);
+    stub::Stub("Avatar", label, stub::ContentWidth("Avatar", diameter), diameter);
     return false;
 }
 

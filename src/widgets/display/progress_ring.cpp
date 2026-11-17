@@ -10,7 +10,8 @@ void ProgressRing(const char* label, float, const ProgressRingOptions& options)
 {
     namespace stub = internal::content;
     const float diameter = options.diameter > 0.0f ? Px(options.diameter) : ControlHeight(options.size);
-    stub::Stub("ProgressRing", label, diameter + stub::TextWidth(label, ControlTextStyle(options.size)), diameter);
+    stub::Stub("ProgressRing", label,
+               stub::ContentWidth("ProgressRing", diameter + stub::TextWidth(label, ControlTextStyle(options.size))), diameter);
 }
 
 } // namespace facet

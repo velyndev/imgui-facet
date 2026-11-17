@@ -24,7 +24,8 @@ void CountBadge(int count, const CountBadgeOptions& options)
     else
         std::snprintf(text, sizeof(text), "%d", count < 0 ? 0 : count);
     const float height = ControlHeight(ControlSize::Small);
-    stub::Stub("CountBadge", text, stub::TextWidth(text, TextStyle::Footnote, height), height);
+    stub::Stub("CountBadge", text, stub::ContentWidth("CountBadge", stub::TextWidth(text, TextStyle::Footnote, height)),
+               height);
 }
 
 } // namespace facet

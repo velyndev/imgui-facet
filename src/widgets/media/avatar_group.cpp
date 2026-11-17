@@ -15,7 +15,8 @@ bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const Ava
     int shown = static_cast<int>(items.size());
     if (options.maxVisible > 0)
         shown = std::min(shown, options.maxVisible);
-    stub::Stub("AvatarGroup", label, diameter * static_cast<float>(std::max(1, shown)), diameter);
+    stub::Stub("AvatarGroup", label, stub::ContentWidth("AvatarGroup", diameter * static_cast<float>(std::max(1, shown))),
+               diameter);
     return false;
 }
 

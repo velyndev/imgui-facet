@@ -10,7 +10,7 @@ bool ItemTile(const char* id, const InventoryItem&, const ItemTileOptions& optio
 {
     namespace stub = internal::content;
     const float slot = options.slotSize > 0.0f ? Px(options.slotSize) : stub::Spans(stub::kSlotSpans);
-    stub::Stub("ItemTile", id, slot, slot);
+    stub::Stub("ItemTile", id, stub::ContentWidth("ItemTile", slot), slot);
     return false;
 }
 

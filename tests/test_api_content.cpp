@@ -128,7 +128,7 @@ enum class Expect
 template <class Call>
 void Check(const char* name, Expect expect, const char* label, Call&& call)
 {
-    INFO("call: ", name);
+    INFO("call: " << name);
     ImGui::Dummy(ImVec2(0.0f, 0.0f));  // the last item now has a zero size
     const Stacks before = CurrentStacks();
     call();
@@ -638,7 +638,7 @@ TEST_CASE("Stubs without a label submit an item whose id is not the window id")
     REQUIRE(session.Ready());
     int checked = 0;
     const auto first = [&](const char* name, auto&& call) {
-        INFO("call: ", name);
+        INFO("call: " << name);
         session.SetUi([&] {
             call();
             CHECK(ImGui::GetItemID() != 0);
@@ -654,6 +654,53 @@ TEST_CASE("Stubs without a label submit an item whose id is not the window id")
     first("Badge, empty text", [] { facet::Badge(""); });
     first("StyledText, null text", [] { facet::StyledText(nullptr); });
     CHECK(checked == 5);
+}
+
+TEST_CASE("Content-sized stubs are wide enough to name the widget and say planned")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        using namespace facet;
+        const auto wide = [&](const char* widget, auto&& call) {
+            INFO("widget: " << widget);
+            call();
+            char text[64];
+            ImFormatString(text, sizeof(text), "%s: planned", widget);
+            CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
+            ++checked;
+        };
+        static const AvatarItem avatars[] = {{"Name 1"}};
+        const InventoryItem item{"Item"};
+        ThemeMode mode = ThemeMode::Light;
+        ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
+        CanvasElementState element;
+        wide("StyledText", [] { StyledText("A"); });
+        wide("ProgressRing", [] { ProgressRing("##ring", 0.5f); });
+        wide("Spinner", [] { Spinner("##spinner"); });
+        wide("Badge", [] { Badge("A"); });
+        wide("CountBadge", [] { CountBadge(1); });
+        wide("StatusDot", [] { StatusDot("##dot"); });
+        wide("StatusPill", [] { StatusPill("A"); });
+        wide("KeyCap", [] { KeyCap(ImGuiKey_A); });
+        wide("CharacterCounter", [] { CharacterCounter(1, 0); });
+        wide("CharacterCounter", [] { CharacterCounter(1, 0, {.ring = true}); });
+        wide("InlineCode", [] { InlineCode("a"); });
+        wide("ImageView", [] { ImageView("A", ImageHandle{}); });
+        wide("Avatar", [] { Avatar("A", ImageHandle{}); });
+        wide("AvatarGroup", [] { AvatarGroup("A", avatars); });
+        wide("ItemTile", [&] { ItemTile("tile", item); });
+        wide("ItemSlot", [&] { ItemSlot("A", item); });
+        wide("UserChip", [] { UserChip("A", ImageHandle{}, {.compact = true}); });
+        wide("ThemeModeControl", [&] { ThemeModeControl("##theme", &mode); });
+        wide("AccentPicker", [&] { AccentPicker("##accent", &accent, {.customColor = false}); });
+        BeginPreviewCanvas("canvas", ImVec2(100.0f, 100.0f));
+        wide("CanvasElement", [&] { CanvasElement("A", &element); });
+        EndPreviewCanvas();
+    });
+    session.Frame();
+    CHECK(checked == 20);
 }
 
 TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack")

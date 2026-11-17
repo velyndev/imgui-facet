@@ -13,13 +13,14 @@ namespace
 void ImageViewStub(const char* label, ImVec2 natural, const ImageViewOptions& options)
 {
     namespace stub = internal::content;
-    if (natural.x <= 0.0f || natural.y <= 0.0f)
+    const bool unknown = natural.x <= 0.0f || natural.y <= 0.0f;
+    if (unknown)
         natural = ImVec2(stub::ControlRows(1.0f, ControlSize::Large), stub::ControlRows(1.0f, ControlSize::Large));
     float width = options.width > 0.0f ? Px(options.width) : 0.0f;
     float height = options.height > 0.0f ? Px(options.height) : 0.0f;
     if (width <= 0.0f && height <= 0.0f)
     {
-        width = natural.x;
+        width = unknown ? stub::ContentWidth("ImageView", natural.x) : natural.x;
         height = natural.y;
     }
     else if (width <= 0.0f)

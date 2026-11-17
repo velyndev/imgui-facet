@@ -10,7 +10,7 @@ bool ThemeModeControl(const char* label, ThemeMode*, const ThemeModeControlOptio
 {
     namespace stub = internal::content;
     // Three segments as wide as the longest segment text.
-    const float natural = 3.0f * stub::TextWidth("System", ControlTextStyle(options.size));
+    const float natural = stub::ContentWidth("ThemeModeControl", 3.0f * stub::TextWidth("System", ControlTextStyle(options.size)));
     stub::Stub("ThemeModeControl", label, stub::ResolveWidth(options.width, natural), ControlHeight(options.size));
     return false;
 }

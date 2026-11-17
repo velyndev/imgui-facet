@@ -109,6 +109,19 @@ inline float TextWidth(const char* text, TextStyle style, float minimum = 0.0f)
     return std::max(minimum, textWidth + 2.0f * Px(T().spacing.sm));
 }
 
+// Width of a content-sized placeholder: `natural` pixels (the size the finished widget will
+// have), but at least the placeholder text "<widget>: planned" in Footnote plus the sm
+// spacing on each side, so a small widget still says what it is and that it is planned.
+// Widths the caller sets through options.width are not widened.
+inline float ContentWidth(const char* widget, float natural)
+{
+    if (!CanSubmit() || widget == nullptr)
+        return natural;
+    char text[64];
+    ImFormatString(text, sizeof(text), "%s: planned", widget);
+    return std::max(natural, MeasureText(TextStyle::Footnote, text).x + 2.0f * Px(T().spacing.sm));
+}
+
 // The placeholder item: `widget` is the public function name, `label` the label, id or text
 // the widget was given (null for none). Sizes in pixels. A null or empty label is replaced by
 // "##<widget>": an empty string hashes to the id of the window itself, which Dear ImGui

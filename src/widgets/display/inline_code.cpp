@@ -10,7 +10,7 @@ bool InlineCode(const char* label, const InlineCodeOptions&)
 {
     namespace stub = internal::content;
     const float height = ControlHeight(ControlSize::Small);
-    stub::Stub("InlineCode", label, stub::TextWidth(label, TextStyle::Body, height), height);
+    stub::Stub("InlineCode", label, stub::ContentWidth("InlineCode", stub::TextWidth(label, TextStyle::Body, height)), height);
     return false;
 }
 

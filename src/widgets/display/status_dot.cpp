@@ -10,7 +10,7 @@ void StatusDot(const char* label, const StatusDotOptions&)
 {
     namespace stub = internal::content;
     const float height = ControlHeight(ControlSize::Small);
-    stub::Stub("StatusDot", label, height + stub::TextWidth(label, TextStyle::Body), height);
+    stub::Stub("StatusDot", label, stub::ContentWidth("StatusDot", height + stub::TextWidth(label, TextStyle::Body)), height);
 }
 
 } // namespace facet

@@ -9,7 +9,8 @@ namespace facet
 bool CanvasElement(const char* label, CanvasElementState*, const CanvasElementOptions&)
 {
     namespace stub = internal::content;
-    stub::Stub("CanvasElement", label, stub::TextWidth(label, TextStyle::Footnote, stub::Spans(stub::kSlotSpans)),
+    stub::Stub("CanvasElement", label,
+               stub::ContentWidth("CanvasElement", stub::TextWidth(label, TextStyle::Footnote, stub::Spans(stub::kSlotSpans))),
                stub::ControlRows(1.0f));
     return false;
 }

@@ -9,7 +9,7 @@ namespace facet
 void StyledText(const char* text, const StyledTextOptions& options)
 {
     namespace stub = internal::content;
-    const float natural = options.wrap ? 0.0f : stub::TextWidth(text, options.style);
+    const float natural = options.wrap ? 0.0f : stub::ContentWidth("StyledText", stub::TextWidth(text, options.style));
     stub::Stub("StyledText", text, stub::ResolveWidth(options.width, natural), stub::LineHeight(options.style));
 }
 

@@ -10,7 +10,8 @@ void StatusPill(const char* label, const StatusPillOptions& options)
 {
     namespace stub = internal::content;
     const float height = ControlHeight(options.size);
-    stub::Stub("StatusPill", label, height + stub::TextWidth(label, ControlTextStyle(options.size)), height);
+    stub::Stub("StatusPill", label,
+               stub::ContentWidth("StatusPill", height + stub::TextWidth(label, ControlTextStyle(options.size))), height);
 }
 
 } // namespace facet

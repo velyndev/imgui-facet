@@ -14,7 +14,7 @@ void CharacterCounter(int count, int max, const CharacterCounterOptions& options
     const float height = ControlHeight(ControlSize::Small);
     if (options.ring)
     {
-        stub::Stub("CharacterCounter", nullptr, height, height);
+        stub::Stub("CharacterCounter", nullptr, stub::ContentWidth("CharacterCounter", height), height);
         return;
     }
     char text[32];
@@ -22,7 +22,8 @@ void CharacterCounter(int count, int max, const CharacterCounterOptions& options
         std::snprintf(text, sizeof(text), "%d / %d", count, max);
     else
         std::snprintf(text, sizeof(text), "%d", count);
-    stub::Stub("CharacterCounter", text, stub::TextWidth(text, TextStyle::Footnote, height), height);
+    stub::Stub("CharacterCounter", text,
+               stub::ContentWidth("CharacterCounter", stub::TextWidth(text, TextStyle::Footnote, height)), height);
 }
 
 } // namespace facet

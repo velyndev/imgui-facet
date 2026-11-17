@@ -10,7 +10,8 @@ void Spinner(const char* label, const SpinnerOptions& options)
 {
     namespace stub = internal::content;
     const float height = ControlHeight(options.size);
-    stub::Stub("Spinner", label, height + stub::TextWidth(label, ControlTextStyle(options.size)), height);
+    stub::Stub("Spinner", label, stub::ContentWidth("Spinner", height + stub::TextWidth(label, ControlTextStyle(options.size))),
+               height);
 }
 
 } // namespace facet

@@ -10,7 +10,7 @@ void Badge(const char* text, const BadgeOptions&)
 {
     namespace stub = internal::content;
     const float height = ControlHeight(ControlSize::Small);
-    stub::Stub("Badge", text, stub::TextWidth(text, TextStyle::Footnote, height), height);
+    stub::Stub("Badge", text, stub::ContentWidth("Badge", stub::TextWidth(text, TextStyle::Footnote, height)), height);
 }
 
 } // namespace facet

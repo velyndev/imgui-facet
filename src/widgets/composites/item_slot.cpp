@@ -10,7 +10,7 @@ InventoryResult ItemSlot(const char* label, const InventoryItem&, const ItemSlot
 {
     namespace stub = internal::content;
     const float slot = options.slotSize > 0.0f ? Px(options.slotSize) : stub::Spans(stub::kSlotSpans);
-    stub::Stub("ItemSlot", label, slot, slot);
+    stub::Stub("ItemSlot", label, stub::ContentWidth("ItemSlot", slot), slot);
     return {};
 }
 
