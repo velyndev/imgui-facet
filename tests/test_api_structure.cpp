@@ -184,13 +184,21 @@ struct Values
     }
 };
 
-// The Dear ImGui and Facet stacks a stub must leave as it found them, the placeholder frame's
-// narrowing of the window included, plus the values and the usage error count.
+// The Dear ImGui and Facet stacks a stub must leave as it found them (rule 11 of the
+// conventions), the placeholder frame's narrowing of the window included, plus the values and
+// the usage error count.
 struct Snapshot
 {
     int ids = 0;
     int windows = 0;
     int groups = 0;
+    int fonts = 0;
+    int styleVars = 0;
+    int colors = 0;
+    int itemFlagStack = 0;
+    int focusScopes = 0;
+    int itemWidths = 0;
+    int textWrapPos = 0;
     int scopes = 0;
     int errors = 0;
     ImGuiItemFlags itemFlags = 0;
@@ -206,6 +214,13 @@ struct Snapshot
         s.ids = g.CurrentWindow->IDStack.Size;
         s.windows = g.CurrentWindowStack.Size;
         s.groups = g.GroupStack.Size;
+        s.fonts = g.FontStack.Size;
+        s.styleVars = g.StyleVarStack.Size;
+        s.colors = g.ColorStack.Size;
+        s.itemFlagStack = g.ItemFlagsStack.Size;
+        s.focusScopes = g.FocusScopeStack.Size;
+        s.itemWidths = g.CurrentWindow->DC.ItemWidthStack.Size;
+        s.textWrapPos = g.CurrentWindow->DC.TextWrapPosStack.Size;
         s.scopes = facet::internal::OpenScopeCount();
         s.errors = facet::internal::UsageErrorCount();
         s.itemFlags = g.CurrentItemFlags;
