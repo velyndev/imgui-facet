@@ -11,6 +11,7 @@
 
 #include "core/core_internal.h"
 #include "facet/core/scale.h"
+#include "internal/row_layout.h"
 #include "internal/subsystem.h"
 #include "internal/value_drag.h"
 
@@ -32,9 +33,10 @@ ControlSizeStack& SizeStack()
     return stack;
 }
 
-// Reports sizes still pushed at the end of the frame and clears them.
+// Reports sizes, rows and row groups still open at the end of the frame and clears them.
 void CommonEndFrame()
 {
+    internal::EndFrameRows();
     ControlSizeStack& stack = SizeStack();
     const int open = stack.depth + stack.overflow;
     if (open > 0)

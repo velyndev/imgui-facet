@@ -1,0 +1,253 @@
+// Labelled rows (src/internal/row_layout.h).
+
+#include <cmath>
+
+#include <doctest/doctest.h>
+#include <imgui.h>
+#include <imgui_internal.h>
+
+#include <facet/facet.h>
+
+#include "core/core_internal.h"
+#include "internal/row_layout.h"
+#include "support/session.h"
+
+using facet::internal::BeginRow;
+using facet::internal::EndRow;
+using facet::internal::RowLayout;
+using facet::internal::RowOptions;
+
+namespace
+{
+
+struct LayoutGuard
+{
+    LayoutGuard()
+    {
+        facet::SetTheme(facet::Theme::Light(), false);
+        facet::SetUiScale(1.0f);
+    }
+    ~LayoutGuard()
+    {
+        facet::SetTheme(facet::Theme::Light(), false);
+        facet::SetUiScale(1.0f);
+    }
+};
+
+// What one row reports, plus the control the caller submitted in it.
+struct RowProbe
+{
+    RowLayout layout;
+    float itemWidth = 0.0f;
+    ImRect control;
+    ImRect row;
+    ImGuiID controlId = 0;
+    float controlBaseline = 0.0f;
+    bool reset = false;
+};
+
+// A row with a control that draws its text like a Facet control of the regular size.
+void Row(const char* label, const RowOptions& options, RowProbe& probe)
+{
+    probe.layout = BeginRow(label, options);
+    probe.itemWidth = ImGui::CalcItemWidth();
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float height = facet::ControlHeight(options.size);
+    probe.controlId = ImGui::GetID("##value");
+    ImGui::Dummy(ImVec2(probe.itemWidth, height));
+    probe.control = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    facet::PushTextStyle(facet::ControlTextStyle(options.size));
+    ImFontBaked* baked = ImGui::GetFontBaked();
+    probe.controlBaseline = facet::CenteredTextY(pos.y, height) + baked->Ascent * ImGui::GetFontSize() / baked->Size;
+    facet::PopTextStyle();
+    probe.reset = EndRow();
+    probe.row = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+}
+
+} // namespace
+
+TEST_CASE("Rows: label column beside the control, baselines aligned")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe probe;
+    float origin = 0.0f;
+    session.SetUi([&] {
+        origin = ImGui::GetCursorScreenPos().x;
+        Row("Volume", {}, probe);
+    });
+    session.Frames(2);
+    const facet::Theme& t = facet::T();
+    CHECK_FALSE(probe.layout.stacked);
+    CHECK(probe.control.Min.x == doctest::Approx(origin + t.layout.labelColumn));
+    CHECK(probe.itemWidth == doctest::Approx(probe.layout.control.GetWidth()));
+    CHECK(probe.layout.baseline == doctest::Approx(probe.controlBaseline));
+    CHECK_FALSE(probe.layout.truncated);
+    // The row is one item as tall as the control.
+    CHECK(probe.row.GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+
+    // Large controls move the label baseline with them.
+    RowProbe large;
+    session.SetUi([&] { Row("Volume", {.size = facet::ControlSize::Large}, large); });
+    session.Frame();
+    CHECK(large.layout.baseline == doctest::Approx(large.controlBaseline));
+    CHECK(large.layout.baseline > probe.layout.baseline);
+}
+
+TEST_CASE("Rows: narrow regions stack the label above a full-width control")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe probe;
+    float width = 600.0f;
+    session.SetUi([&] {
+        ImGui::BeginChild("narrow", ImVec2(width, 300.0f));
+        Row("Volume", {}, probe);
+        ImGui::EndChild();
+    });
+    const facet::Theme& t = facet::T();
+    width = t.layout.labelColumn + t.layout.minRowControl - 20.0f;
+    session.Frames(2);
+    CHECK(probe.layout.stacked);
+    CHECK(probe.control.Min.x == doctest::Approx(probe.layout.label.Min.x));
+    CHECK(probe.control.Min.y >= probe.layout.label.Max.y);
+    CHECK(probe.itemWidth == doctest::Approx(probe.layout.control.GetWidth()));
+    CHECK(probe.itemWidth == doctest::Approx(width));
+}
+
+TEST_CASE("Rows: a long label ends in an ellipsis and shows the full text on hover")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe probe;
+    session.SetUi([&] { Row("A label much longer than the label column can hold", {}, probe); });
+    session.Frames(2);
+    CHECK(probe.layout.truncated);
+    CHECK(probe.layout.label.GetWidth() <= facet::T().layout.labelColumn - facet::T().spacing.sm + 0.5f);
+    session.MouseMove(probe.layout.label.GetCenter());
+    session.Frame();
+    ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
+    REQUIRE(tooltip != nullptr);
+    CHECK(tooltip->Active);
+    // The control still gets the rest of the row.
+    CHECK(probe.itemWidth > 0.0f);
+}
+
+TEST_CASE("Rows: a group shares one label column sized by its widest label")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(800.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe a;
+    RowProbe b;
+    RowProbe outside;
+    session.SetUi([&] {
+        facet::internal::BeginRowGroup("group");
+        Row("Short", {}, a);
+        Row("A clearly longer label here", {}, b);
+        facet::internal::EndRowGroup();
+        Row("Short", {}, outside);
+    });
+    session.Frames(3);
+    CHECK(a.control.Min.x == b.control.Min.x);
+    CHECK(a.control.Min.x > outside.control.Min.x);  // wider than the token column
+    CHECK_FALSE(b.layout.truncated);
+    // At most the configured share of the width.
+    CHECK(a.control.Min.x - a.layout.label.Min.x <= 800.0f * facet::internal::kRowGroupMaxShare + 1.0f);
+}
+
+TEST_CASE("Rows: description, help text and error lines add to the row")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe plain;
+    RowProbe help;
+    RowProbe error;
+    RowProbe described;
+    session.SetUi([&] {
+        Row("Plain", {}, plain);
+        Row("Help", {.helpText = "Applies after a restart."}, help);
+        Row("Error", {.error = "Enter a value from 1 to 10.", .helpText = "Replaced by the error."}, error);
+        Row("Described", {.description = "A second line that explains the setting in more words."}, described);
+    });
+    session.Frames(2);
+    CHECK(help.row.GetHeight() > plain.row.GetHeight());
+    CHECK(error.row.GetHeight() > plain.row.GetHeight());
+    CHECK(described.row.GetHeight() > plain.row.GetHeight());
+    // The control keeps its place: messages go under it.
+    CHECK(error.control.Min.y == doctest::Approx(error.row.Min.y));
+}
+
+TEST_CASE("Rows: the reset button keeps its slot and reports activation")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe probe;
+    bool modified = false;
+    int resets = 0;
+    session.SetUi([&] {
+        Row("Scale", {.modified = modified, .resettable = true}, probe);
+        resets += probe.reset ? 1 : 0;
+    });
+    session.Frames(2);
+    const float widthUnmodified = probe.itemWidth;
+    modified = true;
+    session.Frame();
+    CHECK(probe.itemWidth == widthUnmodified);  // the slot was reserved
+    const float h = facet::ControlHeight(facet::ControlSize::Regular);
+    const ImVec2 button(probe.layout.control.Max.x + facet::Px(facet::T().spacing.sm) + h * 0.5f,
+                        probe.layout.control.Min.y + h * 0.5f);
+    session.Click(button);
+    CHECK(resets == 1);
+    modified = false;
+    session.Click(button);
+    CHECK(resets == 1);  // not shown while unmodified
+}
+
+TEST_CASE("Rows: each row scopes its control's id by the label")
+{
+    LayoutGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    RowProbe a;
+    RowProbe b;
+    session.SetUi([&] {
+        Row("First", {}, a);
+        Row("Second", {}, b);
+    });
+    session.Frame();
+    CHECK(a.controlId != 0);
+    CHECK(a.controlId != b.controlId);
+}
+
+TEST_CASE("Rows: rows and groups left open are reported and cleared at EndFrame")
+{
+    LayoutGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        facet::internal::BeginRowGroup("open");
+        BeginRow("Open");
+        // Closes the Dear ImGui groups the row opened, but not the row itself.
+        ImGui::PopItemWidth();
+        ImGui::EndGroup();
+        ImGui::PopID();
+        ImGui::EndGroup();
+    });
+    const int before = facet::internal::UsageErrorCount();
+    session.Frame();
+    CHECK(facet::internal::UsageErrorCount() == before + 2);
+    session.SetUi([] {});
+    const int after = facet::internal::UsageErrorCount();
+    session.Frame();
+    CHECK(facet::internal::UsageErrorCount() == after);
+    // EndRow without BeginRow is reported too.
+    session.SetUi([] { EndRow(); });
+    session.Frame();
+    CHECK(facet::internal::UsageErrorCount() == after + 1);
+}
