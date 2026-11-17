@@ -6,7 +6,9 @@
 // changed. Every options struct is checked against the conventions at compile time.
 
 #include <cmath>
+#include <cstddef>
 #include <cstring>
+#include <type_traits>
 #include <string>
 
 #include <doctest/doctest.h>
@@ -71,6 +73,42 @@ static_assert(HasEntryId<facet::KeybindListItem>);
 static_assert(HasEntryId<facet::PresetItem>);
 static_assert(HasEntryId<facet::InventoryItem>);
 static_assert(HasEntryId<facet::LayerItem>);
+
+// Views of caller data have the data block of rule 7 (state, emptyText, errorText) in that
+// order, before the common block.
+template <class T>
+consteval bool HasDataBlock()
+{
+    if constexpr (requires {
+                      requires std::is_same_v<decltype(T::state), facet::DataState>;
+                      requires std::is_same_v<decltype(T::emptyText), const char*>;
+                      requires std::is_same_v<decltype(T::errorText), const char*>;
+                  })
+    {
+        bool ordered = offsetof(T, state) < offsetof(T, emptyText) && offsetof(T, emptyText) < offsetof(T, errorText);
+        if constexpr (requires { &T::width; })
+            ordered = ordered && offsetof(T, errorText) < offsetof(T, width);
+        return ordered;
+    }
+    else
+    {
+        return false;
+    }
+}
+static_assert(HasDataBlock<facet::LogViewOptions>());
+static_assert(HasDataBlock<facet::DataTableOptions>());
+static_assert(HasDataBlock<facet::LineChartOptions>());
+static_assert(HasDataBlock<facet::BarChartOptions>());
+static_assert(HasDataBlock<facet::DonutChartOptions>());
+static_assert(HasDataBlock<facet::ThumbnailStripOptions>());
+static_assert(HasDataBlock<facet::CarouselOptions>());
+static_assert(HasDataBlock<facet::ConsoleViewOptions>());
+static_assert(HasDataBlock<facet::KeybindListOptions>());
+static_assert(HasDataBlock<facet::PresetListOptions>());
+static_assert(HasDataBlock<facet::InventoryGridOptions>());
+static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
+static_assert(HasDataBlock<facet::LayerListOptions>());
+static_assert(!HasDataBlock<facet::SparklineOptions>());  // the check itself works
 
 // One alignment enum for styled text and table columns.
 static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);

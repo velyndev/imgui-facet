@@ -212,6 +212,9 @@ struct ConsoleViewOptions
     std::span<const char* const> commands = {};  // names for Tab completion (fuzzy matched)
     const char* placeholder = nullptr;     // prompt text while empty; null for none
     bool timestamps = false;               // as in LogViewOptions
+    DataState state = DataState::Ready;    // of the log, as in LogViewOptions; the command field stays usable
+    const char* emptyText = nullptr;       // shown for 0 entries; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fills the available height
 };
@@ -294,6 +297,10 @@ struct KeybindListOptions
     const char* filter = nullptr;          // only rows whose label or chord text match (fuzzy)
     bool alternate = true;                 // a second capture slot per row
     bool groups = true;                    // group headers from the group text
+    DataState state = DataState::Ready;    // Loading shows skeleton rows, Error the error state
+    const char* emptyText = nullptr;       // shown when no row is listed; null uses Strings::empty
+                                           // (Strings::noResults while a filter is set)
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
 };
@@ -350,6 +357,10 @@ struct PresetListResult
 struct PresetListOptions
 {
     bool importExport = false;             // import and export entries in the menu
+    DataState state = DataState::Ready;    // Loading shows skeleton rows, Error the error state; the
+                                           // menu keeps create and import
+    const char* emptyText = nullptr;       // shown for 0 presets; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
 };
@@ -416,6 +427,9 @@ struct InventoryGridOptions
     int columns = 0;                       // 0 fits as many slots as the width allows
     float slotSize = 0.0f;                 // units; 0 for twice the xxxl spacing
     const char* payloadType = nullptr;     // null uses kInventoryPayloadType
+    DataState state = DataState::Ready;    // Loading shows skeleton slots, Error the error state
+    const char* emptyText = nullptr;       // shown for 0 slots; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
@@ -516,6 +530,10 @@ struct ProfileSwitcherOptions
 {
     const char* addLabel = nullptr;        // an add entry with this text; null for none
     const char* manageLabel = nullptr;     // a manage entry with this text; null for none
+    DataState state = DataState::Ready;    // Loading shows skeleton rows, Error the error state; the
+                                           // add and manage entries stay usable
+    const char* emptyText = nullptr;       // shown for 0 profiles; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
@@ -619,6 +637,9 @@ struct LayerListResult
 struct LayerListOptions
 {
     bool solo = true;                      // Alt+click on a visibility toggle shows only that layer
+    DataState state = DataState::Ready;    // Loading shows skeleton rows, Error the error state
+    const char* emptyText = nullptr;       // shown for 0 layers; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
 };

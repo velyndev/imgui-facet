@@ -112,6 +112,9 @@ struct ThumbnailStripOptions
 {
     float thumbnailHeight = 0.0f;          // units; 0 for four times the xxxl spacing
     bool captions = false;                 // the item label under each thumbnail
+    DataState state = DataState::Ready;    // Loading shows skeleton thumbnails, Error the error state
+    const char* emptyText = nullptr;       // shown for 0 items; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
@@ -130,6 +133,9 @@ struct CarouselOptions
     float autoplay = 0.0f;                 // seconds per slide; 0 off. Pauses while hovered or
                                            // focused, has a pause button, and is off with reduced motion
     ImageFit fit = ImageFit::Cover;
+    DataState state = DataState::Ready;    // Loading shows a skeleton slide, Error the error state
+    const char* emptyText = nullptr;       // shown for 0 slides; null uses Strings::empty
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for 9/16 of the width
 };
