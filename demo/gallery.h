@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
+
+#include <facet/widgets/common.h>
 
 #include "pages/pages.h"
 
@@ -65,8 +68,65 @@ void Note(const char* fmt, ...) IM_FMTARGS(1);
 // facet::LayoutLabeledRow (the layout tokens), centered on the control height, with the cursor
 // placed after the column for the control (submit the control with a "##" label). When the
 // content is too narrow for the column and a control, the label goes on its own line above the
-// control. Every page labels its settings this way.
+// control. The Foundations and Media pages label their settings this way; the Blocks pages use
+// the row layout block (src/internal/row_layout.h) instead.
 void LabeledRow(const char* label);
+
+// Prototype controls for the Blocks pages, built only from the interaction blocks in
+// src/internal (item behaviour, focus ring, value drag core, multi-handle model, selection
+// pill). They are not the Phase 2 widgets: each draws the plainest look that shows its block
+// working, and the pages label them as prototypes. Every one records probes for selftests:
+// `probe` for the whole control, and for sliders "<probe>.track" (the line the knob centres
+// travel along, so a target fraction is a value fraction) and "<probe>.h<i>" per handle.
+// Lengths are in design units; 0 takes the available width.
+
+// A push button with `label` as its text. Returns true when pressed. `repeat` presses again
+// while held.
+bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat = false);
+// An on/off switch with the label in front; Space, Enter or a click flips *value. Returns
+// true when *value was written.
+bool ProtoToggle(PageCtx& ctx, const char* label, bool* value, const char* probe);
+
+struct ProtoSliderOptions
+{
+    double min = 0.0;
+    double max = 1.0;
+    double step = 0.0;
+    bool integer = false;
+    facet::ValueScale scale = facet::ValueScale::Linear;
+    facet::Orientation orientation = facet::Orientation::Horizontal;
+    std::span<const double> stops = {};
+    // Units along the track. Horizontal: > 0 that many units, otherwise the width precedence of
+    // the API conventions (SetNextItemWidth, PushItemWidth, then the available width).
+    // Vertical: 0 takes five times spacing.xxxl.
+    float length = 0.0f;
+    bool readOnly = false;
+};
+// A single value slider on the value drag core. `id` is never shown. Returns true when *value
+// was written.
+bool ProtoSlider(PageCtx& ctx, const char* id, double* value, const ProtoSliderOptions& options, const char* probe);
+
+struct ProtoRangeOptions
+{
+    ProtoSliderOptions slider;
+    double minGap = 0.0;
+    bool push = false;        // push the neighbour instead of stopping at it
+    bool mirror = false;      // two handles move symmetrically around the middle of the range
+    bool spanDrag = true;
+    bool removeKeys = false;  // Delete or Backspace on a focused handle asks for its removal
+};
+// A slider with `count` handles on the multi-handle model. Returns true when a value was
+// written; *removeRequested (when not null) receives the handle whose removal was asked for, or -1.
+bool ProtoRange(PageCtx& ctx, const char* id, double* values, int count, const ProtoRangeOptions& options,
+                const char* probe, int* removeRequested = nullptr);
+
+// A segmented control: one Tab stop, the arrows move the selection, the selection pill slides
+// between the segments. Returns true when *index was written. Segment i records "<probe>.<i>".
+bool ProtoSegmented(PageCtx& ctx, const char* id, int* index, std::span<const char* const> items, const char* probe,
+                    float width = 0.0f);
+
+// Records a probe for a rectangle that is not Dear ImGui's last item (a handle, a track).
+void ProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 max);
 
 // Row wrapping for narrow windows and large scales. ContentRight() is the right edge of the
 // content area at the cursor; take it at the start of a row. SameLineIfFits continues the
