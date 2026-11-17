@@ -172,4 +172,10 @@ facet::KeybindModeSelector("##mode", &menuKey.mode, {.allowAlways = false});
 
 ## Planned, not declared yet
 
-The later tier of this family is empty: every selection widget of the catalogue is declared above.
+The later tier of this family is empty. One extended widget of the selection family is not
+declared here:
+
+- **SearchableChecklist**: an inline multi-select over hundreds of items with a filter field, a
+  select-all-visible checkbox, a selected count and a show-only-selected toggle. It is a
+  virtualized list with checkboxes, so it belongs in `lists.h` on the list and selection core of
+  part B; it is planned there and not declared yet.
