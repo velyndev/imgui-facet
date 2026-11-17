@@ -76,6 +76,11 @@ std::unique_ptr<lunasvg::Document> ParseSvgDocument(const char* data, std::size_
     return lunasvg::Document::loadFromData(data, length);
 }
 
+bool SvgBitmapAllocationFailed(bool bitmapIsNull, float documentWidth, float documentHeight)
+{
+    return bitmapIsNull && documentWidth > 0.0f && documentHeight > 0.0f;
+}
+
 bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int height, bool mask, RgbaImage& out)
 {
     out = RgbaImage{};
@@ -83,6 +88,8 @@ bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int heig
         return false;
     CheckAllocation();
     const lunasvg::Bitmap bitmap = document.renderToBitmap(width, height);
+    if (SvgBitmapAllocationFailed(bitmap.isNull(), document.width(), document.height()))
+        throw std::bad_alloc();
     if (bitmap.isNull() || bitmap.width() != width || bitmap.height() != height)
         return false;
     out.pixels.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);

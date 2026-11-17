@@ -168,3 +168,12 @@ TEST_CASE("Icons registered at runtime join the registry")
     facet::internal::ResetIconRegistry();
     CHECK_FALSE(facet::FindIcon("test-runtime-dot").IsValid());
 }
+
+TEST_CASE("A missing bitmap counts as a failed allocation only for a document with a size")
+{
+    CHECK(facet::internal::SvgBitmapAllocationFailed(true, 16.0f, 16.0f));
+    // No size of its own: the renderer returns no bitmap for every request.
+    CHECK_FALSE(facet::internal::SvgBitmapAllocationFailed(true, 0.0f, 16.0f));
+    CHECK_FALSE(facet::internal::SvgBitmapAllocationFailed(true, 16.0f, 0.0f));
+    CHECK_FALSE(facet::internal::SvgBitmapAllocationFailed(false, 16.0f, 16.0f));
+}

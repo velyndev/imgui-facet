@@ -73,11 +73,17 @@ void PremultipliedBgraToStraightRgba(const std::uint8_t* src, int srcStride, int
                                      std::uint8_t* dst, bool mask = false);
 
 // Rasterizes a parsed document into `width` x `height` pixels (its view box stretched to
-// that size). Returns false when the size is not positive or rendering fails. A failed
-// allocation throws std::bad_alloc, here and in RasterizeSvgSource and RasterizeIcon, which
-// call this; the texture cache and the icon atlas catch it.
+// that size). Returns false when the size is not positive or the document has no size of
+// its own. A failed allocation throws std::bad_alloc, also when it happened inside the
+// renderer (a document with a size that yields no bitmap), here and in RasterizeSvgSource
+// and RasterizeIcon, which call this; the texture cache and the icon atlas catch it.
 bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int height, bool mask,
                           RgbaImage& out);
+
+// How RasterizeSvgDocument reads a missing bitmap: the renderer returns none for a document
+// without a size of its own, which is a property of the document, and when it could not
+// allocate the surface, which is not. True for the second case.
+bool SvgBitmapAllocationFailed(bool bitmapIsNull, float documentWidth, float documentHeight);
 
 // An SVG kept by the texture cache so it can be rasterized again at a new scale.
 // Defined in svg_raster.cpp.
