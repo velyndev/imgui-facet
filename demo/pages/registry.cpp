@@ -66,6 +66,12 @@ void PageCtx::RevealInCapture(float ratio) const
         ImGui::SetScrollHereY(ratio);
 }
 
+void PageCtx::ForceNextItemState(ForcedItemState state, int part) const
+{
+    if (capture)
+        facet::internal::ForceNextItemState(state, part);
+}
+
 std::span<const PageInfo> Pages()
 {
     Registry& registry = GetRegistry();

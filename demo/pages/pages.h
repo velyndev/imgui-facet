@@ -15,6 +15,20 @@
 // every page once per state with ctx.captureState set to the index of that state.
 // When a state changes something below the first screen, call ctx.RevealInCapture() right
 // after that content so the change is scrolled into the captured image.
+//
+// Interaction states in capture runs: a capture renders without input, so a page shows the
+// hovered, pressed, focused, dragging or open look of a Facet widget by asking for it right
+// before submitting the widget:
+//
+//     ctx.ForceNextItemState(ForcedItemState::Hovered);        // Pressed, Focused, Dragging, Open
+//     facet::Button("Save");
+//     ctx.ForceNextItemState(ForcedItemState::Dragging, 1);    // part 1: the second handle
+//     facet::RangeSlider("Range", &low, &high, 0.0f, 1.0f);
+//
+// The request goes to the item behaviour block (src/internal/item.h), which shows the state
+// without writing any value; it does nothing outside capture runs, so interactive use and
+// selftests keep real input. The disabled look needs no request: wrap the widget in
+// ImGui::BeginDisabled / EndDisabled. Stock Dear ImGui widgets ignore the request.
 
 #include <initializer_list>
 #include <span>
@@ -22,10 +36,13 @@
 #include <string_view>
 #include <vector>
 
+#include "internal/item.h"
 #include "selftest.h"
 
 namespace facet::demo
 {
+
+using facet::internal::ForcedItemState;
 
 // Per-frame information passed to a page.
 struct PageCtx
@@ -46,6 +63,11 @@ struct PageCtx
     // a capture state changes, so the change is visible even when the page is taller than
     // the capture size. Does nothing outside capture runs.
     void RevealInCapture(float ratio = 0.5f) const;
+
+    // In capture runs, asks the next Facet widget to show `state` (see the top of this file);
+    // `part` selects a sub-item of a widget made of several items, -1 the widget itself.
+    // Does nothing outside capture runs.
+    void ForceNextItemState(ForcedItemState state, int part = -1) const;
 };
 
 using PageFn = void (*)(PageCtx& ctx);
