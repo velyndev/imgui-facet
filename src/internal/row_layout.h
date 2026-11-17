@@ -24,6 +24,8 @@
 // optional description is a second line under the label (footnote, labelSecondary, wrapped in
 // the column). Under the control come the help text (footnote, labelSecondary) or, replacing
 // it, the error message with the error icon in the destructive color, wrapped in the slot.
+// A row begun inside ImGui::BeginDisabled draws its label, marker, description and help text in
+// labelTertiary like its disabled control (the error keeps its color: it still applies).
 // `modified` puts a marker dot after the label; `resettable` reserves a square reset button at
 // the end of the row (so the control does not change width), shown and focusable while
 // `modified` is on. Tab order follows the visual order: the control, then the reset button.
@@ -69,6 +71,7 @@ struct RowLayout
     ImRect control;           // the control slot: its width, and one control height tall
     float baseline = 0.0f;    // the baseline of the label and of the control's text
     bool truncated = false;   // the label did not fit and ends in an ellipsis
+    bool disabled = false;    // inside ImGui::BeginDisabled: the texts are in the disabled color
 };
 
 // Starts a row (see the top of this file). Returns its layout, valid until EndRow.

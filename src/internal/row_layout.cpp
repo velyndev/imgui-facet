@@ -155,6 +155,10 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
 
     RowLayout& layout = row.layout;
     layout.stacked = columns.stacked;
+    // Disabled with its control (ImGui::BeginDisabled around the row): the texts go quiet too.
+    layout.disabled = (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
+    const ImU32 labelColor = Color(layout.disabled ? c.labelTertiary : c.label);
+    const ImU32 secondaryColor = Color(layout.disabled ? c.labelTertiary : c.labelSecondary);
     const float textRoom = std::max(0.0f, columns.labelWidth - markerSpace);
     char text[kLabelBuffer];
     const TruncateResult truncated =
@@ -175,12 +179,12 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     }
     layout.baseline = labelTop + Ascent();
     layout.label = ImRect(row.origin.x, labelTop, row.origin.x + truncated.width, labelTop + lineHeight);
-    drawList->AddText(ImVec2(row.origin.x, labelTop), Color(c.label), text);
+    drawList->AddText(ImVec2(row.origin.x, labelTop), labelColor, text);
     if (options.modified)
     {
         const float x = row.origin.x + truncated.width + Px(theme.spacing.xs);
         const float centerY = labelTop + lineHeight * 0.5f;
-        drawList->AddCircleFilled(ImVec2(x + markerSize * 0.5f, centerY), markerSize * 0.5f, Color(c.labelSecondary));
+        drawList->AddCircleFilled(ImVec2(x + markerSize * 0.5f, centerY), markerSize * 0.5f, secondaryColor);
     }
     PopTextStyle();
 
@@ -197,7 +201,7 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
         const float wrap = std::max(1.0f, columns.labelWidth);
         const ImVec2 descSize = ImGui::CalcTextSize(options.description, nullptr, false, wrap);
         const float top = blockTop;
-        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(row.origin.x, top), Color(c.labelSecondary),
+        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(row.origin.x, top), secondaryColor,
                           options.description, nullptr, wrap);
         blockBottom = top + descSize.y;
         PopTextStyle();
@@ -250,7 +254,7 @@ bool EndRow()
         const float lineHeight = ImGui::GetFontSize();
         const float top = controlBottom + Px(theme.spacing.xs);
         float textX = layout.control.Min.x;
-        const ImU32 color = Color(error ? c.destructive : c.labelSecondary);
+        const ImU32 color = Color(error ? c.destructive : (layout.disabled ? c.labelTertiary : c.labelSecondary));
         if (error)
         {
             const float iconSize = std::round(lineHeight);

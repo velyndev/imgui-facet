@@ -91,6 +91,9 @@ void SliderRow(facet::demo::PageCtx& ctx, int index)
     std::snprintf(value, sizeof(value), spec.format, page.values[index]);
     std::snprintf(readout, sizeof(readout), "%s. Committed %d, canceled %d.", value, page.commits[index],
                   page.cancels[index]);
+    // Disabled around the whole row, so its label goes quiet with the control.
+    if (index == kDisabled)
+        ImGui::BeginDisabled();
     facet::internal::BeginRow(spec.label, {.helpText = readout});
     if (index == kLinear && ctx.capture)
     {
@@ -101,14 +104,12 @@ void SliderRow(facet::demo::PageCtx& ctx, int index)
         else if (ctx.captureState == kFocused)
             ctx.ForceNextItemState(ForcedItemState::Focused);
     }
-    if (index == kDisabled)
-        ImGui::BeginDisabled();
     facet::demo::ProtoSlider(ctx, "##value", &page.values[index], spec.options, spec.probe);
     page.commits[index] += facet::IsItemEditCommitted() ? 1 : 0;
     page.cancels[index] += facet::IsItemEditCanceled() ? 1 : 0;
+    facet::internal::EndRow();
     if (index == kDisabled)
         ImGui::EndDisabled();
-    facet::internal::EndRow();
 }
 
 } // namespace

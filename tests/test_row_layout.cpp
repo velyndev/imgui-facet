@@ -182,6 +182,49 @@ TEST_CASE("Rows: description, help text and error lines add to the row")
     CHECK(error.control.Min.y == doctest::Approx(error.row.Min.y));
 }
 
+TEST_CASE("Rows: a disabled row draws its texts in the disabled color")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    // The colors of the vertices a row draws before its control, enabled and disabled.
+    const auto rowColors = [](bool disabled, bool* reported) {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        if (disabled)
+            ImGui::BeginDisabled();
+        const int from = drawList->VtxBuffer.Size;
+        *reported = BeginRow("Volume", {.description = "Second line.", .modified = true}).disabled;
+        ImVector<ImU32> colors;
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+            colors.push_back(drawList->VtxBuffer[i].col);
+        ImGui::Button("##value");
+        EndRow();
+        if (disabled)
+            ImGui::EndDisabled();
+        return colors;
+    };
+    ImVector<ImU32> enabled;
+    ImVector<ImU32> disabled;
+    bool enabledReported = true;
+    bool disabledReported = false;
+    session.SetUi([&] {
+        enabled = rowColors(false, &enabledReported);
+        disabled = rowColors(true, &disabledReported);
+    });
+    session.Frames(2);
+    const facet::Colors& c = facet::T().colors;
+    const ImU32 label = facet::ToU32(c.label);
+    const ImU32 secondary = facet::ToU32(c.labelSecondary);
+    const ImU32 tertiary = facet::ToU32(c.labelTertiary);
+    CHECK_FALSE(enabledReported);
+    CHECK(disabledReported);
+    CHECK(enabled.contains(label));
+    CHECK(enabled.contains(secondary));
+    CHECK_FALSE(disabled.contains(label));
+    CHECK_FALSE(disabled.contains(secondary));
+    CHECK(disabled.contains(tertiary));
+}
+
 TEST_CASE("Rows: the reset button keeps its slot and reports activation")
 {
     LayoutGuard guard;

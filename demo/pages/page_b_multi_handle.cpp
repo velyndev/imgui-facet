@@ -134,18 +134,19 @@ void RangeRow(facet::demo::PageCtx& ctx, int index)
     std::snprintf(high, sizeof(high), spec.format, page.values[index][1]);
     std::snprintf(readout, sizeof(readout), "%s to %s. Committed %d, canceled %d.", low, high, page.commits[index],
                   page.cancels[index]);
-    facet::internal::BeginRow(spec.label, {.helpText = readout});
-    if (index == kClamp)
-        ForceForCapture(ctx);
+    // Disabled around the whole row, so its label goes quiet with the control.
     const bool disabled = ctx.capture && ctx.captureState == kDisabled && index == kClamp;
     if (disabled)
         ImGui::BeginDisabled();
+    facet::internal::BeginRow(spec.label, {.helpText = readout});
+    if (index == kClamp)
+        ForceForCapture(ctx);
     facet::demo::ProtoRange(ctx, "##value", page.values[index], 2, spec.options, spec.probe);
     page.commits[index] += facet::IsItemEditCommitted() ? 1 : 0;
     page.cancels[index] += facet::IsItemEditCanceled() ? 1 : 0;
+    facet::internal::EndRow();
     if (disabled)
         ImGui::EndDisabled();
-    facet::internal::EndRow();
 }
 
 // Adds a handle in the middle of the widest gap.
