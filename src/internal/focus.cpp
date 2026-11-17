@@ -131,36 +131,44 @@ ImVec4 FocusRingColor()
     return c.focusRing;
 }
 
+float FocusRingOutset()
+{
+    return HairlineThickness() + PxSnapped(T().metrics.focusRingWidth);
+}
+
 ImRect FocusRingRect(const ImRect& rect)
 {
-    const Theme& theme = T();
-    const float offset = HairlineThickness() + PxSnapped(theme.metrics.focusRingWidth);
     ImRect ring = rect;
-    ring.Expand(offset);
+    ring.Expand(FocusRingOutset());
     return ring;
 }
 
-void DrawFocusRing(ImDrawList* drawList, const ImRect& rect, float radius, float amount, ImDrawFlags corners)
+void DrawFocusRing(ImDrawList* drawList, const ImRect& rect, float radius, float amount, ImDrawFlags corners,
+                   RingShape shape)
 {
     amount = std::clamp(amount, 0.0f, 1.0f);
     if (drawList == nullptr || amount <= 0.0f)
         return;
     const Theme& theme = T();
     const float width = PxSnapped(theme.metrics.focusRingWidth);
-    const float offset = HairlineThickness() + width;
+    const float offset = FocusRingOutset();
     const ImRect ring = FocusRingRect(rect);
     const float ringRadius = std::max(0.0f, radius) + offset;
     const ImVec4 color = FocusRingColor();
     DrawGlow(drawList, ring.Min, ring.Max, ringRadius, ToU32(WithAlpha(color, color.w * kHaloAlpha * amount)),
              Px(theme.spacing.xs));
-    StrokeRect(drawList, ring.Min, ring.Max, ToU32(WithAlpha(color, color.w * amount)), ringRadius, width, corners);
+    const ImU32 stroke = ToU32(WithAlpha(color, color.w * amount));
+    if (shape == RingShape::Round)
+        StrokeRoundRect(drawList, ring.Min, ring.Max, stroke, ringRadius, width, corners);
+    else
+        StrokeRect(drawList, ring.Min, ring.Max, stroke, ringRadius, width, corners);
 }
 
-void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners)
+void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners, RingShape shape)
 {
     if (!item.visible || item.focusAmount <= 0.0f || ImGui::GetCurrentContext() == nullptr)
         return;
-    DrawFocusRing(ImGui::GetWindowDrawList(), item.rect, radius, item.focusAmount, corners);
+    DrawFocusRing(ImGui::GetWindowDrawList(), item.rect, radius, item.focusAmount, corners, shape);
 }
 
 Subsystem FocusSubsystem()

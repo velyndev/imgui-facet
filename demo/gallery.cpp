@@ -742,7 +742,9 @@ void DrawKnob(ImDrawList* drawList, const ImRect& rect, const facet::internal::I
     const ImVec4 outline = disabled ? c.labelTertiary : facet::Mix(boundary, c.label, item.hoverAmount * 0.5f);
     drawList->AddCircleFilled(center, radius, Color(c.bg));
     drawList->AddCircle(center, radius, Color(outline), 0, facet::HairlineThickness() * 1.5f);
-    facet::internal::DrawFocusRing(drawList, rect, rect.GetWidth() * 0.5f, item.focusAmount);
+    // Round, like the knob, so the ring keeps an even gap all around it.
+    facet::internal::DrawFocusRing(drawList, rect, rect.GetWidth() * 0.5f, item.focusAmount, 0,
+                                   facet::internal::RingShape::Round);
 }
 
 } // namespace

@@ -10,9 +10,10 @@
 // mouse button press or a wheel turn switches it off. The focus subsystem updates the modality
 // in facet::NewFrame from the input Dear ImGui received for the frame.
 //
-// The ring: a continuous-corner stroke of T().metrics.focusRingWidth just outside the control,
-// one hairline away from its edge, with corners concentric to the control's radius, plus a
-// soft halo (the glow the dose rules allow for focus). Its color is colors.focusRing when that
+// The ring: a stroke of T().metrics.focusRingWidth just outside the control, one hairline away
+// from its edge, with corners concentric to the control's radius and of the control's corner
+// shape (RingShape: the theme's corners for rectangles, circular arcs for knobs and capsules),
+// plus a soft halo (the glow the dose rules allow for focus). Its color is colors.focusRing when that
 // reaches 3:1 against every content surface of the theme, otherwise colors.accentText, which
 // reaches 4.5:1 on all of them; so the ring stays visible for any accent in both themes. It
 // fades in and out with ItemState::focusAmount (motion.durationFast). It is drawn into the
@@ -26,6 +27,10 @@
 // Widgets with inner parts that take focus (slider handles, segments) draw it around the part:
 //
 //     DrawFocusRing(drawList, handleRect, handleRadius, handle.focusAmount);
+//
+// A round knob drawn with AddCircle takes the round ring, so the gap stays even:
+//
+//     DrawFocusRing(drawList, knobRect, knobRect.GetWidth() * 0.5f, knob.focusAmount, 0, RingShape::Round);
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -45,14 +50,25 @@ ImVec4 FocusRingColor();
 
 // The rectangle the ring covers around a control rectangle (the halo not included).
 ImRect FocusRingRect(const ImRect& rect);
+// How far the ring reaches out from the control's edge, in pixels (the halo not included):
+// leave at least this much plus spacing between a control and its neighbours.
+float FocusRingOutset();
+
+// The corner shape of the ring, matching how the control draws its own outline, so the gap
+// between the two stays even all around.
+enum class RingShape
+{
+    Rect,   // corners as facet::FillRect draws them (continuous from the token radius on)
+    Round,  // circular arcs: circles (a square with radius half its side) and capsules
+};
 
 // Draws the ring around `rect` (screen pixels) whose corners have `radius` pixels, at
 // `amount` (0 nothing, 1 fully shown). `corners` takes ImDrawFlags_RoundCorners* as in draw.h.
 void DrawFocusRing(ImDrawList* drawList, const ImRect& rect, float radius, float amount = 1.0f,
-                   ImDrawFlags corners = 0);
+                   ImDrawFlags corners = 0, RingShape shape = RingShape::Rect);
 
 // The ring of an item: around item.rect with item.focusAmount, into the current window's draw
 // list. Nothing when the item is not visible or the amount is 0.
-void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners = 0);
+void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners = 0, RingShape shape = RingShape::Rect);
 
 } // namespace facet::internal

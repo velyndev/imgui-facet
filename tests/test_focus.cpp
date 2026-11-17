@@ -1,6 +1,9 @@
 // Focus ring and keyboard modality (src/internal/focus.h).
 
+#include <algorithm>
+#include <cmath>
 #include <span>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -32,6 +35,19 @@ struct ThemeGuard
         facet::SetUiScale(1.0f);
     }
 };
+
+// The positions of the vertices drawn into `drawList` from index `from` on, in index order.
+std::vector<ImVec2> Positions(const ImDrawList* drawList, int from)
+{
+    std::vector<ImVec2> positions;
+    for (const ImDrawCmd& cmd : drawList->CmdBuffer)
+    {
+        const int end = static_cast<int>(cmd.IdxOffset + cmd.ElemCount);
+        for (int k = std::max(static_cast<int>(cmd.IdxOffset), from); k < end; ++k)
+            positions.push_back(drawList->VtxBuffer[static_cast<int>(cmd.VtxOffset + drawList->IdxBuffer[k])].pos);
+    }
+    return positions;
+}
 
 } // namespace
 
@@ -124,6 +140,45 @@ TEST_CASE("Focus ring: it sits just outside the control and fades with the amoun
     session.Frame();
     CHECK(verticesNone == 0);
     CHECK(verticesFull > 0);
+}
+
+TEST_CASE("Focus ring: the round shape draws circular arcs around a circle")
+{
+    ThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetTheme(facet::Theme::Light(), false);
+    facet::SetUiScale(1.0f);
+    // A knob drawn as a circle of radius 12, like the slider knobs. Its round ring must be the
+    // halo plus a circular-arc stroke of the ring rectangle at the knob radius plus the outset,
+    // which for a square with half its side as the radius is a circle concentric to the knob.
+    // The theme's corners would make a squircle, whose gap to the knob is wider at the diagonals.
+    const ImRect knob(100.0f, 100.0f, 124.0f, 124.0f);
+    const float ringRadius = 12.0f + facet::internal::FocusRingOutset();
+    const float width = facet::PxSnapped(facet::T().metrics.focusRingWidth);
+    std::vector<ImVec2> ring;
+    std::vector<ImVec2> expected;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImRect outer = facet::internal::FocusRingRect(knob);
+        const ImU32 color = facet::ToU32(facet::internal::FocusRingColor());
+        int from = drawList->IdxBuffer.Size;
+        facet::internal::DrawFocusRing(drawList, knob, 12.0f, 1.0f, 0, facet::internal::RingShape::Round);
+        ring = Positions(drawList, from);
+        from = drawList->IdxBuffer.Size;
+        facet::DrawGlow(drawList, outer.Min, outer.Max, ringRadius, color, facet::Px(facet::T().spacing.xs));
+        facet::StrokeRoundRect(drawList, outer.Min, outer.Max, color, ringRadius, width);
+        expected = Positions(drawList, from);
+    });
+    session.Frames(3);
+    REQUIRE_FALSE(ring.empty());
+    REQUIRE(ring.size() == expected.size());
+    for (size_t i = 0; i < ring.size(); ++i)
+    {
+        INFO(i);
+        CHECK(ring[i].x == expected[i].x);
+        CHECK(ring[i].y == expected[i].y);
+    }
 }
 
 TEST_CASE("Focus ring: an item shows it only after keyboard input, animated, and clipped by its window")
