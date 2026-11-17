@@ -84,6 +84,21 @@ facet::SetAccent(IM_COL32(0x24, 0x8A, 0x3D, 0xFF));
 `facet::ClearAccent()`; `SetTheme` shows the accent of the theme passed to it.
 `facet::AccentPresets()` lists named accent choices for pickers.
 
+### An accent for one region
+
+```cpp
+facet::PushAccent(facet::Rgb(0xC93400));
+// ... Facet drawing in this region reads the orange accent from facet::T() ...
+facet::PopAccent();
+```
+
+Between the two calls `facet::T()` returns the current theme with the pushed accent applied,
+derived exactly as above. The current theme, the accent of `SetAccent` and the stock Dear ImGui
+style stay as they are, and nothing animates. Pushes nest up to `facet::kAccentStackDepth`
+deep. A `PopAccent` without a push, a push beyond that depth and an accent still pushed at
+`facet::EndFrame` are reported through Dear ImGui's recoverable error path and the debugger
+output; `EndFrame` then clears the stack, so the next frame starts without a scoped accent.
+
 ## Contrast guarantees
 
 The unit tests check, for both presets:

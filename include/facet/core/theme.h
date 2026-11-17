@@ -268,6 +268,19 @@ void SetAccent(ImU32 accent);
 void ClearAccent();
 bool HasCustomAccent();
 
+// A scoped accent for one region of a frame. Until the matching PopAccent, T() returns the
+// current theme with `accent` applied through Theme::ApplyAccent, so every derived accent token
+// (hover, pressed, subtle, onAccent, accentText, focusRing) follows it. The current theme, the
+// accent of SetAccent and the Dear ImGui style are not changed, and nothing animates: the
+// region simply draws with the other accent. Pushes nest up to kAccentStackDepth deep; deeper
+// pushes are reported and ignored (their pops still balance). A PopAccent without a push is
+// reported and ignored, and facet::EndFrame reports accents still pushed and clears them, so
+// the next frame starts unscoped. Reports use ImGui's recoverable error path (an assert only
+// while io.ConfigErrorRecoveryEnableAssert is on) and the debugger output. No allocation.
+inline constexpr int kAccentStackDepth = 8;
+void PushAccent(const ImVec4& accent);
+void PopAccent();
+
 // `a` blended toward `b`: colors in OKLab (alpha linearly), lengths, durations and springs
 // linearly, switches and enums taken from `b` from t = 0.5 on. t is clamped to 0 to 1, and
 // t = 0 and t = 1 return exact copies of `a` and `b`.

@@ -160,7 +160,8 @@ void ApplyImGuiStyle(ImGuiStyle* target)
             return;
         target = &ImGui::GetStyle();
     }
-    const Theme& theme = T();
+    // Never the accent of a PushAccent scope: that one belongs to a region of Facet widgets.
+    const Theme& theme = internal::UnscopedTheme();
 
     // Start from the defaults so repeated calls never compound the scaling, then carry over
     // the settings that are not sizes and have no token. Sizes without a token take the

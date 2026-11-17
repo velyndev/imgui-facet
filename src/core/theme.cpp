@@ -181,6 +181,40 @@ ThemeState& State()
     return state;
 }
 
+// Accents pushed with PushAccent in this frame, and the theme T() returns while one is pushed.
+struct AccentScopes
+{
+    ImVec4 accents[kAccentStackDepth];
+    int depth = 0;     // entries in `accents`
+    int overflow = 0;  // pushes beyond the capacity, ignored but balanced by their pops
+    Theme scoped;      // current theme with accents[depth - 1] applied
+    std::uint64_t scopedRevision = 0;  // theme revision `scoped` was built from; 0 rebuilds
+};
+
+AccentScopes& Scopes()
+{
+    static AccentScopes scopes;
+    return scopes;
+}
+
+void ClearAccentScopes()
+{
+    AccentScopes& scopes = Scopes();
+    scopes.depth = 0;
+    scopes.overflow = 0;
+    scopes.scopedRevision = 0;
+}
+
+// Reports pushes without a pop and clears them, so every frame starts unscoped.
+void ThemeEndFrame()
+{
+    AccentScopes& scopes = Scopes();
+    const int open = scopes.depth + scopes.overflow;
+    if (open > 0)
+        internal::ReportUsageError("PushAccent without PopAccent: %d accent(s) still pushed at EndFrame", open);
+    ClearAccentScopes();
+}
+
 void Changed()
 {
     ++State().revision;
@@ -278,6 +312,7 @@ bool ThemeInit()
 void ThemeShutdown()
 {
     ThemeState& state = State();
+    ClearAccentScopes();
     FinishTransition();
     if (state.personalizeEvent != nullptr)
         CloseHandle(state.personalizeEvent);
@@ -485,7 +520,50 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
 
 const Theme& T()
 {
-    return State().current;
+    ThemeState& state = State();
+    AccentScopes& scopes = Scopes();
+    if (scopes.depth == 0)
+        return state.current;
+    // Rebuilt when the theme changed inside the scope (SetTheme, SetAccent) or the top moved.
+    if (scopes.scopedRevision != state.revision)
+    {
+        scopes.scoped = state.current;
+        scopes.scoped.ApplyAccent(scopes.accents[scopes.depth - 1]);
+        scopes.scopedRevision = state.revision;
+    }
+    return scopes.scoped;
+}
+
+void PushAccent(const ImVec4& accent)
+{
+    AccentScopes& scopes = Scopes();
+    if (scopes.depth >= kAccentStackDepth)
+    {
+        if (scopes.overflow == 0)
+            internal::ReportUsageError("PushAccent nested deeper than %d; the extra accents are ignored",
+                                       kAccentStackDepth);
+        ++scopes.overflow;
+        return;
+    }
+    scopes.accents[scopes.depth++] = accent;
+    scopes.scopedRevision = 0;
+}
+
+void PopAccent()
+{
+    AccentScopes& scopes = Scopes();
+    if (scopes.overflow > 0)
+    {
+        --scopes.overflow;
+        return;
+    }
+    if (scopes.depth == 0)
+    {
+        internal::ReportUsageError("PopAccent without PushAccent");
+        return;
+    }
+    --scopes.depth;
+    scopes.scopedRevision = 0;
 }
 
 void SetTheme(const Theme& theme, bool animate)
@@ -572,8 +650,13 @@ std::uint64_t ThemeRevision()
     return State().revision;
 }
 
+const Theme& UnscopedTheme()
+{
+    return State().current;
+}
+
 // The theme is plain state that exists before Init and after Shutdown. The hooks watch the
-// Windows app mode and advance animated switches.
+// Windows app mode, advance animated switches and close accent scopes left open.
 Subsystem ThemeSubsystem()
 {
     Subsystem subsystem;
@@ -581,6 +664,7 @@ Subsystem ThemeSubsystem()
     subsystem.init = &ThemeInit;
     subsystem.shutdown = &ThemeShutdown;
     subsystem.newFrame = &ThemeNewFrame;
+    subsystem.endFrame = &ThemeEndFrame;
     return subsystem;
 }
 
