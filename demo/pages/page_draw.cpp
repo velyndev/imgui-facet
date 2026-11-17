@@ -241,28 +241,23 @@ void DrawGroupDemo(facet::demo::PageCtx& ctx)
 {
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
-    // Room for the label after each slider.
-    const float sliderWidth = std::min(facet::Px(theme.spacing.xxxl * 5.0f),
-                                       ImGui::GetContentRegionAvail().x - facet::Px(theme.spacing.xxxl * 2.0f));
+    const float sliderWidth = facet::Px(theme.spacing.xxxl * 5.0f);
 
-    ImGui::SetNextItemWidth(sliderWidth);
+    facet::demo::LabeledRow("Alpha");
+    ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##alpha", &draw.alpha, 0.0f, 1.0f, "%.2f");
     facet::ItemCursor();
     ctx.Probe("draw.alpha");
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Alpha");
-    ImGui::SetNextItemWidth(sliderWidth);
+    facet::demo::LabeledRow("Scale");
+    ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##scale", &draw.scale, 0.8f, 1.1f, "%.2f");
     facet::ItemCursor();
     ctx.Probe("draw.scale");
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Scale");
-    ImGui::SetNextItemWidth(sliderWidth);
+    facet::demo::LabeledRow("Slide");
+    ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##offset", &draw.offset, -1.0f, 1.0f, "%.2f");
     facet::ItemCursor();
     ctx.Probe("draw.offset");
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Slide");
     // A fixed id: the label changes, the item (and its keyboard focus) stays.
     if (ImGui::Button(draw.shown ? "Hide card###toggle" : "Show card###toggle"))
         draw.shown = !draw.shown;

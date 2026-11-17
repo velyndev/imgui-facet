@@ -359,9 +359,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     }
 
     SectionHeader("Options");
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Fit");
-    ImGui::SameLine();
+    facet::demo::LabeledRow("Fit");
     if (ImGui::RadioButton("Contain", ui.fit == facet::ImageFit::Contain))
         ui.fit = facet::ImageFit::Contain;
     ctx.Probe("images.fit.contain");
@@ -374,11 +372,11 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         ui.fit = facet::ImageFit::Fill;
     ctx.Probe("images.fit.fill");
 
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Radius");
+    facet::demo::LabeledRow("Radius");
     for (int i = 0; i < static_cast<int>(std::size(kRadii)); ++i)
     {
-        ImGui::SameLine();
+        if (i > 0)
+            ImGui::SameLine();
         ImGui::PushID(i);
         if (ImGui::RadioButton(kRadii[i].name, ui.radius == i))
             ui.radius = i;
@@ -386,6 +384,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         if (i == 0)
             ctx.Probe("images.radius.element");
     }
+    facet::demo::LabeledRow("Tint");
     ImGui::Checkbox("Accent tint", &ui.tint);
     ctx.Probe("images.tint");
     {

@@ -37,6 +37,9 @@ constexpr float kNavMinWidthInXxxl = 4.0f;  // navigation column in narrow windo
 // Largest share of the window the navigation takes, so narrow windows keep room for the page.
 constexpr float kNavMaxShare = 0.3f;
 constexpr float kComboWidthInXxxl = 3.0f;   // theme and scale lists
+// Settings rows of the pages: the label column, and the narrowest control kept beside it.
+constexpr float kLabelColumnInXxxl = 3.5f;
+constexpr float kMinRowControlInXxxl = 4.0f;
 
 // Sub keys of the animated values of the navigation.
 constexpr int kPillY = 0;
@@ -498,6 +501,29 @@ float ButtonWidth(const char* label)
 float CheckboxWidth(const char* label)
 {
     return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(label, nullptr, true).x;
+}
+
+void LabeledRow(const char* label)
+{
+    const facet::Theme& theme = facet::T();
+    const float column = facet::Px(theme.spacing.xxxl * kLabelColumnInXxxl);
+    const float minControl = facet::Px(theme.spacing.xxxl * kMinRowControlInXxxl);
+    const bool beside = ImGui::GetContentRegionAvail().x >= column + minControl;
+    const float height = beside ? ImGui::GetFrameHeight() : facet::Px(theme.type[facet::TextStyle::Footnote].size);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float startX = ImGui::GetCursorPosX();
+    ImGui::Dummy(ImVec2(beside ? column : ImGui::GetContentRegionAvail().x, height));
+    facet::PushTextStyle(facet::TextStyle::Footnote);
+    const float y = beside ? facet::CenteredTextY(pos.y, height) : pos.y;
+    // Clipped to the column, so a long label never runs under the control.
+    const ImVec2 clipMax(beside ? pos.x + column - facet::Px(theme.spacing.sm) : pos.x + ImGui::GetContentRegionAvail().x,
+                         pos.y + height);
+    ImGui::GetWindowDrawList()->PushClipRect(pos, clipMax, true);
+    ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x, y), Color(theme.colors.labelSecondary), label);
+    ImGui::GetWindowDrawList()->PopClipRect();
+    facet::PopTextStyle();
+    if (beside)
+        ImGui::SameLine(startX + column, 0.0f);
 }
 
 void Note(const char* fmt, ...)

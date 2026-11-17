@@ -2,6 +2,7 @@
 // busy backdrop, and the two glow uses. The sliders change the shadow strength and the glass
 // blur radius live; every color and length comes from the theme tokens.
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -67,13 +68,16 @@ void DrawControls(facet::demo::PageCtx& ctx)
     facet::demo::Note("Glass available: %s", facet::GlassAvailable() ? "yes, panels blur the backdrop"
                                                                      : "no, panels use the opaque fallback");
     const float sliderWidth = ImGui::GetFontSize() * kSliderWidthEm;
-    ImGui::SetNextItemWidth(sliderWidth);
-    ImGui::SliderFloat("Shadow strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, "%.2fx");
+    facet::demo::LabeledRow("Shadow strength");
+    ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
+    ImGui::SliderFloat("##strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, "%.2fx");
     ctx.Probe("effects.strength");
-    ImGui::SetNextItemWidth(sliderWidth);
+    facet::demo::LabeledRow("Blur radius");
+    ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     BlurRadius();
-    ImGui::SliderFloat("Blur radius", &effects.blurRadius, kBlurMin, kBlurMax, "%.0f");
+    ImGui::SliderFloat("##blur", &effects.blurRadius, kBlurMin, kBlurMax, "%.0f");
     ctx.Probe("effects.blur");
+    facet::demo::LabeledRow("Glow");
     ImGui::Checkbox("Accent glow", &effects.accentGlow);
     ctx.Probe("effects.glow");
 }

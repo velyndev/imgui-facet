@@ -213,7 +213,7 @@ FACET_DEMO_PAGE("type", "Type", "Foundations", 1, "default", "narrow")
     DrawStyleTable();
 
     SectionHeader("Truncation");
-    Note("Column width");
+    facet::demo::LabeledRow("Column width");
     ImGui::SetNextItemWidth(std::min(facet::Px(facet::T().spacing.xxxl * 6.0f), ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##width", &type.widthFraction, kMinWidthFraction, kMaxWidthFraction, "%.2f");
     facet::ItemCursor();

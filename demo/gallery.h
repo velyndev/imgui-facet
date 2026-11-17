@@ -57,6 +57,12 @@ void SectionHeader(const char* title);
 void Paragraph(const char* text);
 // Footnote text in labelSecondary, printf formatted, wrapped at the content width.
 void Note(const char* fmt, ...) IM_FMTARGS(1);
+// Starts a settings row: `label` in Footnote labelSecondary in a label column of a fixed
+// width, centered on the control height, with the cursor placed after the column for the
+// control (submit the control with a "##" label). When the content is too narrow for the
+// column and a control, the label goes on its own line above the control. Every page labels
+// its settings this way.
+void LabeledRow(const char* label);
 
 // Row wrapping for narrow windows and large scales. ContentRight() is the right edge of the
 // content area at the cursor; take it at the start of a row. SameLineIfFits continues the
