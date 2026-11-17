@@ -15,6 +15,30 @@
 // facet_demo --selftest renders the page offscreen with a fixed time step, executes the
 // steps in order with synthetic mouse and keyboard events, and prints PASS or FAIL for
 // every expectation.
+//
+// Determinism: every step is a fixed number of frames at the fixed time step of 1/60 s, and
+// steps that last a while take seconds of frame time (HoldKey, Hover, Drag, WaitSeconds), so a
+// script means the same at any speed of the machine. Positions are taken from the probes of
+// the latest frame; offsets are in design units and follow the run's UI scale.
+//
+// The steps beyond clicks and key presses, with examples:
+//
+//     using T = facet::demo::Target;
+//     test.MouseMove(T::Item("slider", 0.25f));                  // a quarter into the item
+//     test.MouseDown();  test.MouseUp();                         // press and release apart
+//     test.Drag({T::Item("slider", 0.2f), T::Item("slider", 0.8f), T::Item("slider", 0.3f)},
+//               0.5f);                                          // through points, in 0.5 s
+//     test.Drag({T::Item("slider", 0.5f), T::Display(1.2f, 0.5f)}, 0.25f);  // out of the window
+//     test.Wheel(T::Item("list"), -2.0f);                        // two notches down
+//     test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);                 // modifiers: Ctrl, Shift, Alt
+//     test.HoldKey(ImGuiKey_RightArrow, 1.0f);                   // key repeat runs for 1 s
+//     test.Hover(T::Item("button"), 0.6f);                       // rest the mouse for 0.6 s
+//     test.Type("hello");                                        // UTF-8 text input
+//     test.ExpectNear("value is about 0.3", [] { return value; }, 0.3, 0.05);
+//     test.ExpectText("the field holds hi", [] { return std::string(text); }, "hi");
+//     test.ExpectVisible("nav.composites");                      // scrolled into view
+//     test.SelectPage("composites");                             // as --page would
+//     test.ExpectPage("composites");                             // the page shown
 
 #include <functional>
 #include <string>
@@ -38,7 +62,7 @@ struct ProbeRecord
     ImGuiID id = 0;
     ImVec2 min;
     ImVec2 max;
-    bool visible = false;  // the item's center lies inside its window's visible area
+    bool visible = false;  // the item's center lies inside the clip rect it was drawn with
 };
 
 // Item rects recorded by PageCtx::Probe during the most recent frame.
@@ -59,6 +83,19 @@ private:
     std::string pendingReveal;
 };
 
+// A point for the mouse: a position inside a probed item, or on the display.
+struct Target
+{
+    std::string probe;                   // empty: the display
+    ImVec2 fraction = ImVec2(0.5f, 0.5f);  // of the item rect (or the display); outside 0 to 1
+                                           // lies outside it, which is how a drag leaves a window
+    ImVec2 offset = ImVec2(0.0f, 0.0f);    // design units, times the run's UI scale
+
+    static Target Item(std::string_view probe, float fx = 0.5f, float fy = 0.5f);
+    static Target Display(float fx, float fy);
+    Target Offset(float dx, float dy) const;
+};
+
 class SelftestScript
 {
 public:
@@ -70,16 +107,38 @@ public:
         Wait,
         Expect,
         ExpectFocused,
+        MouseMove,
+        MouseButton,
+        Drag,
+        Wheel,
+        KeyHold,
+        KeyChange,
+        Type,
+        ExpectNear,
+        ExpectText,
+        ExpectVisible,
+        SelectPage,
+        ExpectPage,
     };
 
     struct Step
     {
         StepKind kind = StepKind::Wait;
-        std::string text;            // probe name or expectation description
-        ImGuiKeyChord chord = 0;     // KeyPress: key plus optional ImGuiMod_* flags
+        std::string text;            // probe name, description, typed text or page id
+        ImGuiKeyChord chord = 0;     // key steps: key plus optional ImGuiMod_* flags
         int frames = 0;              // Wait
+        float seconds = 0.0f;        // Drag, KeyHold, MouseMove (Hover)
+        bool down = false;           // MouseButton, KeyChange
+        ImGuiMouseButton button = ImGuiMouseButton_Left;
+        std::vector<Target> path;    // mouse steps: one point, or the drag path
+        ImVec2 wheel = ImVec2(0.0f, 0.0f);
+        double expected = 0.0;       // ExpectNear
+        double tolerance = 0.0;
+        std::string expectedText;    // ExpectText
         std::function<void()> action;
         std::function<bool()> check;
+        std::function<double()> number;
+        std::function<std::string()> string;
     };
 
     // Runs arbitrary code between frames, typically to reset page state.
@@ -91,10 +150,48 @@ public:
     void KeyPress(ImGuiKeyChord chord);
     // Renders this many extra frames.
     void Wait(int frames);
+    // Renders frames for this many seconds of frame time (at least one frame).
+    void WaitSeconds(float seconds);
     // Records PASS when check() returns true, FAIL otherwise.
     void Expect(std::string_view description, std::function<bool()> check);
     // Records PASS when the keyboard focus is on the probed item.
     void ExpectFocused(std::string_view probe);
+
+    // Moves the mouse to the target in one frame. An item target outside the visible area of
+    // its window is scrolled into view first, as for Click.
+    void MouseMove(const Target& target);
+    // Rests the mouse on the target for `seconds` of frame time (hover delays, tooltips).
+    void Hover(const Target& target, float seconds);
+    // Presses or releases a mouse button where the mouse is, one frame each.
+    void MouseDown(ImGuiMouseButton button = ImGuiMouseButton_Left);
+    void MouseUp(ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Presses at the first point, moves along the path through every point at an even speed
+    // over `seconds` (at least one frame per segment), and releases at the last point. Every
+    // point is resolved when the drag starts; only the first one is scrolled into view.
+    void Drag(std::vector<Target> path, float seconds = 0.25f, ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Moves to the target, then turns the wheel by (wheelX, wheelY) notches in one frame;
+    // positive wheelY scrolls up.
+    void Wheel(const Target& target, float wheelY, float wheelX = 0.0f);
+    // Holds a key (with modifiers) for `seconds` of frame time, so key repeat runs, then
+    // releases it.
+    void HoldKey(ImGuiKeyChord chord, float seconds);
+    // Presses or releases a key with its modifiers and leaves it there, one frame each.
+    void KeyDown(ImGuiKeyChord chord);
+    void KeyUp(ImGuiKeyChord chord);
+    // Types UTF-8 text as character input, in one frame.
+    void Type(std::string_view text);
+
+    // Records PASS when value() is within `tolerance` of `expected`; the result line shows
+    // the value found.
+    void ExpectNear(std::string_view description, std::function<double()> value, double expected, double tolerance);
+    // Records PASS when value() equals `expected`; the result line shows the text found.
+    void ExpectText(std::string_view description, std::function<std::string()> value, std::string_view expected);
+    // Records PASS when the center of the probed item lies in the visible part of its window.
+    void ExpectVisible(std::string_view probe);
+    // Shows the page with this id, as a click in the navigation or --page would.
+    void SelectPage(std::string_view pageId);
+    // Records PASS when the page with this id is the one shown.
+    void ExpectPage(std::string_view pageId);
 
     const std::vector<Step>& Steps() const { return steps; }
 

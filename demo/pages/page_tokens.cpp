@@ -77,6 +77,7 @@ constexpr ColorToken kStatus[] = {
 struct TokensState
 {
     int lastPreset = -1;  // index of the accent preset applied last, -1 for the theme default
+    float scrollY = 0.0f; // for the selftest: how far the page is scrolled
 };
 
 TokensState tokens;
@@ -420,6 +421,7 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent", "elev
               "black shadow cannot darken the black background, so each level also gets a lighter surface.");
     if (ctx.captureState == 2)
         ctx.RevealInCapture(1.0f);
+    tokens.scrollY = ImGui::GetScrollY();
 }
 
 FACET_DEMO_SELFTEST("tokens")
@@ -529,4 +531,9 @@ FACET_DEMO_SELFTEST("tokens")
         return facet::T().dark && !facet::HasCustomAccent() &&
                facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Dark().colors.accent);
     });
+
+    // The mouse wheel scrolls the page under the mouse.
+    using facet::demo::Target;
+    test.Wheel(Target::Item("tokens.accent.1"), -3.0f);
+    test.Expect("three notches down scroll the page", [] { return tokens.scrollY > 0.0f; });
 }

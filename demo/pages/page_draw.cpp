@@ -38,9 +38,12 @@ struct DrawPageState
     float offset = 0.0f;  // in multiples of spacing.xxxl
     bool shown = true;
     float appear = 1.0f;  // animated 0 (hidden) to 1 (shown)
+    // For the selftest: the toggle button has been hovered for the normal hover delay.
+    bool toggleHoverDelay = false;
 };
 
 DrawPageState draw;
+float alphaBefore = 0.0f;  // selftest: the alpha before a held key
 
 ImU32 U32(const ImVec4& color)
 {
@@ -263,6 +266,7 @@ void DrawGroupDemo(facet::demo::PageCtx& ctx)
         draw.shown = !draw.shown;
     facet::ItemCursor();
     ctx.Probe("draw.toggle");
+    draw.toggleHoverDelay = ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal);
 
     draw.appear = facet::Tween(ImGui::GetID("##appear"), 0, draw.shown ? 1.0f : 0.0f, theme.motion.durationStandard,
                                facet::Ease::OutCubic);
@@ -381,4 +385,35 @@ FACET_DEMO_SELFTEST("draw")
     test.Click("draw.offset");
     test.Expect("clicking the middle of the slide slider centers the card",
                 [] { return draw.offset > -0.15f && draw.offset < 0.15f; });
+
+    using facet::demo::Target;
+    // A drag through intermediate points: the value follows the pointer to the last point.
+    test.Drag({Target::Item("draw.alpha", 0.1f), Target::Item("draw.alpha", 0.9f), Target::Item("draw.alpha", 0.3f)},
+              0.5f);
+    test.ExpectNear("dragging the alpha slider out to 0.9 and back to 0.3 leaves about 0.3",
+                    [] { return static_cast<double>(draw.alpha); }, 0.3, 0.06);
+    // A drag that leaves the window: the slider follows to the end of its range.
+    test.Drag({Target::Item("draw.offset"), Target::Display(1.3f, 0.5f)}, 0.25f);
+    test.ExpectNear("dragging the slide slider out of the window ends at the maximum",
+                    [] { return static_cast<double>(draw.offset); }, 1.0, 1e-6);
+
+    // A held key repeats: one second of the right arrow moves the activated slider many steps.
+    // The first Tab after a click opens the slider's text input on the clicked slider; Enter
+    // leaves it unchanged, and Space then lets the arrow keys move the value.
+    test.Click("draw.alpha");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("draw.alpha");
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Space);
+    test.Do([] { alphaBefore = draw.alpha; });
+    test.HoldKey(ImGuiKey_RightArrow, 1.0f);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("holding the right arrow for 1 s raises the alpha by many steps",
+                [] { return draw.alpha > alphaBefore + 0.1f; });
+
+    // Hovering for a while: the hover delay of tooltips counts seconds of frame time.
+    test.Hover(Target::Item("draw.toggle"), 0.1f);
+    test.Expect("after 0.1 s the button is not yet hovered for a tooltip", [] { return !draw.toggleHoverDelay; });
+    test.Hover(Target::Item("draw.toggle"), 0.5f);
+    test.Expect("after 0.6 s in all it is", [] { return draw.toggleHoverDelay; });
 }

@@ -217,11 +217,11 @@ FACET_DEMO_SELFTEST("icons")
     test.Expect("without a search every icon is shown", [] { return shownCount == facet::IconCount(); });
 
     test.Click("icons.search");
-    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("arrow"); });
+    test.Type("arrow");
     test.Wait(2);
     test.Expect("typing \"arrow\" leaves the four arrows", [] { return shownCount == 4; });
 
-    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("xyz"); });
+    test.Type("xyz");
     test.Wait(2);
     test.Expect("a search without a match shows the empty state",
                 [] { return emptyStateShown && shownCount == 0; });
@@ -232,7 +232,7 @@ FACET_DEMO_SELFTEST("icons")
 
     // The same by keyboard: from the field, Tab passes the tint option and reaches Clear search.
     test.Click("icons.search");
-    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("xyz"); });
+    test.Type("xyz");
     test.Wait(2);
     test.KeyPress(ImGuiKey_Tab);
     test.ExpectFocused("icons.tint");

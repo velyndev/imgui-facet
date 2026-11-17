@@ -240,6 +240,12 @@ FACET_DEMO_SELFTEST("type")
     // Shift+Tab moves at once, also right after a click.
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.ExpectFocused("type.query");
+    // Typed text, then Ctrl+A to select all of it, so the next text replaces it.
+    test.Type("headline");
+    test.ExpectText("typing into the filter writes it", [] { return std::string(type.query); }, "headline");
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("body");
+    test.ExpectText("Ctrl+A and typing replace the filter", [] { return std::string(type.query); }, "body");
 
     test.Do([] { std::snprintf(type.query, sizeof(type.query), "%s", "body"); });
     test.Click("type.width");
