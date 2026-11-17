@@ -642,3 +642,34 @@ TEST_CASE("While capturing, host shortcuts, binds, stock key queries and navigat
     CHECK(harness.capture.Result() == ImGuiKey_Tab);
     CHECK(GImGui->NavId == navBefore);
 }
+
+TEST_CASE("While capturing, host code that runs before the capture sees nothing")
+{
+    // A menu bar or a global hotkey handler usually runs before the widget that captures, so in
+    // the frame a key goes down only the locks of facet::NewFrame keep the key from it.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CaptureHarness harness;
+    int hostShortcut = 0, legacyPressed = 0, bindPressed = 0;
+    const facet::Keybind bind{.primary = ImGuiMod_Ctrl | ImGuiKey_K, .mode = facet::BindMode::Toggle};
+    session.SetUi([&] {
+        hostShortcut += ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_K, ImGuiInputFlags_RouteGlobal) ? 1 : 0;
+        legacyPressed += ImGui::IsKeyPressed(ImGuiKey_K, false) ? 1 : 0;
+        bindPressed += facet::IsBindPressed(bind) ? 1 : 0;
+        harness.Draw(session);
+    });
+    session.Frame();
+
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_K);
+    REQUIRE(hostShortcut == 1);
+    REQUIRE(legacyPressed == 1);
+    REQUIRE(bindPressed == 1);
+
+    session.Click(session.ItemCenter("capture"));
+    REQUIRE(harness.capture.Listening());
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_K);
+    CHECK(harness.capture.Result() == (ImGuiMod_Ctrl | ImGuiKey_K));
+    CHECK(hostShortcut == 1);
+    CHECK(legacyPressed == 1);
+    CHECK(bindPressed == 1);
+}
