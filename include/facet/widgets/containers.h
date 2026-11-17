@@ -213,9 +213,10 @@ struct OverlayOptions
 // with reduced motion), and take no input while fading out. Mini windows outside the pair
 // stay visible while pinned and let input through while the menu is hidden. `visible` is the
 // caller's: write it to show or hide the menu; Facet writes it when toggleKey is pressed.
-// Returns false once the menu is fully hidden; call EndOverlay only after true. Call it outside
-// any window, once per frame. Where input goes is read with OverlayWantsMouse,
-// OverlayWantsKeyboard, OverlayHitTest and GetOverlayInputRegions.
+// Returns false once the menu is fully hidden, and when `visible` is null; call EndOverlay only
+// after true. Call it outside any window, once per frame: the menu's windows are top-level.
+// Where input goes is read with OverlayWantsMouse, OverlayWantsKeyboard, OverlayHitTest and
+// GetOverlayInputRegions.
 [[nodiscard]] bool BeginOverlay(const char* id, bool* visible, const OverlayOptions& options = {});
 void EndOverlay();
 
@@ -575,8 +576,9 @@ struct InspectorPaneOptions
 
 // A region with a details pane at its trailing edge. The main content follows BeginInspectorPane;
 // InspectorPaneNext switches to the pane and returns whether its content is shown (the pane is
-// open or sliding). EndInspectorPane is always called. The visible label part is the pane's
-// title; its close button writes *visible = false, and the caller writes true to open it. In a
+// open or sliding), false while *visible is false. EndInspectorPane is always called. The
+// visible label part is the pane's title; its close button writes *visible = false, and the
+// caller writes true to open it. A null `visible` keeps the pane open without a close button. In a
 // Compact width the pane floats over the main content as a drawer. The pane width is kept in
 // units under the id and saved in the ini file.
 void BeginInspectorPane(const char* label, bool* visible, const InspectorPaneOptions& options = {});

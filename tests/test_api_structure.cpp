@@ -815,6 +815,91 @@ TEST_CASE("Scope classes of the structure families end only what began")
     session.Frame();
 }
 
+TEST_CASE("Structure stubs return false where their own arguments hide the content")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    session.SetUi([&] {
+        bool hidden = false;
+        CHECK_BALANCED({
+            facet::BeginInspectorPane("Hidden pane", &hidden);
+            CHECK_FALSE(facet::InspectorPaneNext());
+            facet::EndInspectorPane();
+        });
+        CHECK_BALANCED({
+            facet::BeginInspectorPane("Pane without a flag", nullptr);
+            CHECK(facet::InspectorPaneNext());
+            facet::EndInspectorPane();
+        });
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginDependentGroup("Hidden group", false, {.mode = facet::DependentMode::Hide})));
+        CHECK_BALANCED({
+            const bool open = facet::BeginDependentGroup("Shown group", true, {.mode = facet::DependentMode::Hide});
+            CHECK(open);
+            if (open)
+                facet::EndDependentGroup();
+        });
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginSidebar("Hidden sidebar", {.mode = facet::SidebarMode::Hidden})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginSidebarSection("Closed section", {.collapsible = true, .defaultOpen = false})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Hidden overlay", &hidden)));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Overlay without a flag", nullptr)));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginGroupBox("Closed group box", {.collapsible = true, .defaultOpen = false})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Loading list", 10, nullptr, {.state = facet::DataState::Loading})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Empty list", 0, nullptr)));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginItemGrid("Failed grid", 10, nullptr, {.state = facet::DataState::Error})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginItemGrid("Empty grid", 0, nullptr)));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginTreeView("Loading tree", nullptr, {.state = facet::DataState::Loading})));
+        CHECK(hidden == false);
+    });
+    session.Frame();
+}
+
+TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both otherwise")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    struct Shown
+    {
+        bool list = false;
+        bool detail = false;
+    };
+    Shown compactList;
+    Shown compactDetail;
+    Shown regular;
+    const auto run = [](const char* id, bool detailOpen) {
+        Shown shown;
+        facet::BeginListDetail(id, &detailOpen);
+        shown.list = facet::BeginListPane();
+        if (shown.list)
+            facet::EndListPane();
+        shown.detail = facet::BeginDetailPane();
+        if (shown.detail)
+            facet::EndDetailPane();
+        facet::EndListDetail();
+        return shown;
+    };
+    session.SetUi([&] {
+        const facet::Theme& theme = facet::T();
+        const float height = facet::Px(theme.metrics.controlHeightLarge * 4.0f);
+        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
+        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
+        compactList = run("list", false);
+        compactDetail = run("detail", true);
+        ImGui::EndChild();
+        ImGui::BeginChild("regular", ImVec2(facet::Px(theme.layout.regularFrom + 40.0f), height));
+        CHECK(facet::AvailableWidthClass() != facet::WidthClass::Compact);
+        regular = run("both", true);
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(compactList.list);
+    CHECK_FALSE(compactList.detail);
+    CHECK_FALSE(compactDetail.list);
+    CHECK(compactDetail.detail);
+    CHECK(regular.list);
+    CHECK(regular.detail);
+}
+
 TEST_CASE("ApplyReorderMove moves one element and shifts the others")
 {
     std::vector<int> data = {0, 1, 2, 3, 4};

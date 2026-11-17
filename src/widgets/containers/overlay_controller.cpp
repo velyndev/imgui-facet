@@ -1,6 +1,7 @@
 // BeginOverlay, EndOverlay and the input region queries (containers.h). Planned: until Phase 2
-// implements the controller, the menu content always shows, inside the frame placeholder of
-// src/widgets/structure_stub.h, nothing fades and nothing reports input. *visible is never
+// implements the controller, the menu content shows inside the frame placeholder of
+// src/widgets/structure_stub.h while *visible is true and is skipped at once while it is false;
+// nothing fades, the toggle key does nothing and nothing reports input. *visible is never
 // written.
 
 #include "facet/widgets/containers.h"
@@ -9,9 +10,9 @@
 namespace facet
 {
 
-bool BeginOverlay(const char* id, bool*, const OverlayOptions&)
+bool BeginOverlay(const char* id, bool* visible, const OverlayOptions&)
 {
-    if (!internal::StubCanDraw())
+    if (visible == nullptr || !*visible || !internal::StubCanDraw())
         return false;
     internal::BeginStubFrame("BeginOverlay", "Overlay", id, false);
     return true;

@@ -15,8 +15,14 @@
 //     None, -1, an invalid id) and never writes through a value pointer.
 //   - A container whose content sits in the page flow calls BeginStubFrame and EndStubFrame:
 //     the same header line, then the caller's content, inside one dashed outline. A bool
-//     Begin of this kind returns true, so the content shows; collapsible sections return false
-//     (closed). The frame pushes the Begin's scope (internal::PushScope) and, where the widget
+//     Begin of this kind returns true, so the content shows, unless the caller's own arguments
+//     already say the content is hidden: a sidebar in Hidden mode, an overlay whose visible flag
+//     is false, a dependent group in Hide mode while its parent is off, the pane a Compact
+//     list-detail does not show, an inspector pane whose visible flag is false, a collapsible
+//     group box or sidebar section that starts closed, a virtual list, item grid or tree view
+//     that is not Ready (or has no rows). Those draw one StubItem line instead, where the
+//     finished widget draws its state. A stub never returns true where the declaration promises
+//     false. Collapsible sections return false (closed). The frame pushes the Begin's scope (internal::PushScope) and, where the widget
 //     scopes ids, the id.
 //   - A layer (a window, dialog, popup or drawer) returns false and opens nothing. It calls
 //     StubLayer, which draws one placeholder line in the page flow while the caller asks for

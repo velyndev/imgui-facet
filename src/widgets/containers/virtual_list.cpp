@@ -1,7 +1,8 @@
 // BeginVirtualList, VirtualListRow, EndVirtualList and SetNextVirtualListScrollTo
 // (containers.h). Planned: draws the placeholders of src/widgets/structure_stub.h until Phase 2
 // implements the list. NextVisibleRows (common.h) hands out no rows yet, so a row loop inside
-// the frame submits nothing.
+// the frame submits nothing. While the list is loading, failed or empty, BeginVirtualList draws
+// one placeholder line where the state will be and returns false, as declared.
 
 #include "facet/widgets/containers.h"
 #include "widgets/structure_stub.h"
@@ -9,10 +10,15 @@
 namespace facet
 {
 
-bool BeginVirtualList(const char* id, int, ImGuiSelectionBasicStorage*, const VirtualListOptions&)
+bool BeginVirtualList(const char* id, int rowCount, ImGuiSelectionBasicStorage*, const VirtualListOptions& options)
 {
     if (!internal::StubCanDraw())
         return false;
+    if (options.state != DataState::Ready || rowCount <= 0)
+    {
+        internal::StubItem("VirtualList", id, internal::StubWidth(0.0f, true), ControlHeight(ControlSize::Regular));
+        return false;
+    }
     internal::BeginStubFrame("BeginVirtualList", "VirtualList", id, false);
     return true;
 }

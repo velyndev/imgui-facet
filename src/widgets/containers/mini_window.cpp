@@ -11,8 +11,8 @@ namespace facet
 
 bool BeginMiniWindow(const char* label, bool*, const MiniWindowOptions&)
 {
-    // A mini window shows while the overlay menu is visible, and the stub controller always
-    // shows the menu.
+    // A mini window shows while the overlay menu is visible or while it is pinned. The stub
+    // controller keeps no menu state to ask, so the placeholder line shows at every call.
     internal::StubLayer("MiniWindow", label, true);
     return false;
 }
