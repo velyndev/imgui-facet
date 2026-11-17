@@ -75,7 +75,7 @@ void PremultipliedBgraToStraightRgba(const std::uint8_t* src, int srcStride, int
 // Rasterizes a parsed document into `width` x `height` pixels (its view box stretched to
 // that size). Returns false when the size is not positive or rendering fails. A failed
 // allocation throws std::bad_alloc, here and in RasterizeSvgSource and RasterizeIcon, which
-// call this; the texture cache catches it.
+// call this; the texture cache and the icon atlas catch it.
 bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int height, bool mask,
                           RgbaImage& out);
 

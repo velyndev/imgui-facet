@@ -763,3 +763,65 @@ TEST_CASE("Releasing images after failed loads needs no allocation")
     facet::EndFrame();
     CHECK(facet::IsImageReady(facet::LoadImageMemory(kPng, sizeof(kPng))));
 }
+
+TEST_CASE("Icon registration and drawing survive failed allocations")
+{
+    Session session;
+    REQUIRE(session.ok);
+    const char* name = "facet-test-allocation-icon";
+    const int count = facet::IconCount();
+    REQUIRE_FALSE(facet::FindIcon(name).IsValid());
+
+    // A failed registration leaves the registry as it was.
+    facet::Icon icon;
+    int failures = 0;
+    for (int n = 1; n <= 16 && !icon.IsValid(); ++n)
+    {
+        CAPTURE(n);
+        facet::internal::FailGuardedAllocation(n);
+        CHECK_NOTHROW(icon = facet::RegisterIcon(name, kSvg24));
+        const bool failed = facet::internal::GuardedAllocationFailed();
+        facet::internal::FailGuardedAllocation(0);
+        if (failed)
+        {
+            ++failures;
+            CHECK_FALSE(icon.IsValid());
+            CHECK(facet::IconCount() == count);
+            CHECK_FALSE(facet::FindIcon(name).IsValid());
+        }
+    }
+    REQUIRE(icon.IsValid());
+    CHECK(failures > 0);
+    CHECK(facet::IconCount() == count + 1);
+    CHECK(facet::FindIcon(name) == icon);
+
+    // A glyph that cannot be rasterized or placed draws the placeholder and is tried again
+    // in a later frame.
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList._SetPixelDensity(1.0f);
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
+    failures = 0;
+    bool drawn = false;
+    for (int n = 1; n <= 16 && !drawn; ++n)
+    {
+        CAPTURE(n);
+        facet::NewFrame();
+        const int vertices = drawList.VtxBuffer.Size;
+        facet::internal::FailGuardedAllocation(n);
+        CHECK_NOTHROW(facet::DrawIcon(&drawList, icon, ImVec2(0.0f, 0.0f), 20.0f, IM_COL32_WHITE));
+        const bool failed = facet::internal::GuardedAllocationFailed();
+        facet::internal::FailGuardedAllocation(0);
+        const int added = drawList.VtxBuffer.Size - vertices;
+        if (failed)
+        {
+            ++failures;
+            CHECK(added > 4);  // the crossed box
+            continue;
+        }
+        CHECK(added == 4);  // a textured quad
+        drawn = true;
+    }
+    CHECK(drawn);
+    CHECK(failures > 0);
+}

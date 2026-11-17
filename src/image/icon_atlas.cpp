@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -30,6 +31,7 @@
 #include "facet/core/draw.h"
 #include "facet/core/theme.h"
 #include "image/image_internal.h"
+#include "internal/alloc_guard.h"
 #include "internal/device.h"
 #include "internal/embedded_assets.h"
 #include "internal/subsystem.h"
@@ -80,48 +82,67 @@ void SortOrder(Registry& registry)
     });
 }
 
-Registry& Icons()
+// The registry with the embedded icons, built on first use. nullptr while it cannot be
+// built for lack of memory; the next call tries again.
+Registry* Icons()
 {
-    static Registry registry = [] {
-        Registry built;
-        for (const internal::EmbeddedAsset& asset : internal::EmbeddedAssets())
+    static std::unique_ptr<Registry> registry;
+    if (registry == nullptr)
+    {
+        try
         {
-            const std::string_view path(asset.name);
-            if (!path.starts_with(kIconPrefix) || !path.ends_with(kIconSuffix))
-                continue;
-            const std::string_view name =
-                path.substr(kIconPrefix.size(), path.size() - kIconPrefix.size() - kIconSuffix.size());
-            // Icons live directly in assets/icons; subfolders are not part of the set.
-            if (name.empty() || name.find('/') != std::string_view::npos)
-                continue;
-            IconEntry entry;
-            entry.name = std::string(name);
-            entry.source = std::string_view(reinterpret_cast<const char*>(asset.data), asset.size);
-            built.entries.emplace(Icon::Hash(name), std::move(entry));
+            internal::CheckAllocation();
+            auto built = std::make_unique<Registry>();
+            for (const internal::EmbeddedAsset& asset : internal::EmbeddedAssets())
+            {
+                const std::string_view path(asset.name);
+                if (!path.starts_with(kIconPrefix) || !path.ends_with(kIconSuffix))
+                    continue;
+                const std::string_view name =
+                    path.substr(kIconPrefix.size(), path.size() - kIconPrefix.size() - kIconSuffix.size());
+                // Icons live directly in assets/icons; subfolders are not part of the set.
+                if (name.empty() || name.find('/') != std::string_view::npos)
+                    continue;
+                IconEntry entry;
+                entry.name = std::string(name);
+                entry.source = std::string_view(reinterpret_cast<const char*>(asset.data), asset.size);
+                built->entries.emplace(Icon::Hash(name), std::move(entry));
+            }
+            SortOrder(*built);
+            registry = std::move(built);
         }
-        SortOrder(built);
-        return built;
-    }();
-    return registry;
+        catch (const std::bad_alloc&)
+        {
+            return nullptr;
+        }
+    }
+    return registry.get();
 }
 
 const IconEntry* FindEntry(std::uint32_t id)
 {
-    Registry& registry = Icons();
-    const auto it = registry.entries.find(id);
-    return it != registry.entries.end() ? &it->second : nullptr;
+    const Registry* registry = Icons();
+    if (registry == nullptr)
+        return nullptr;
+    const auto it = registry->entries.find(id);
+    return it != registry->entries.end() ? &it->second : nullptr;
 }
 
+// Parses the icon on first use. A source that does not parse is remembered as broken; a
+// failed allocation throws std::bad_alloc and leaves the entry as it was, so the next use
+// tries again.
 const lunasvg::Document* Document(std::uint32_t id)
 {
-    Registry& registry = Icons();
-    const auto it = registry.entries.find(id);
-    if (it == registry.entries.end())
+    Registry* registry = Icons();
+    if (registry == nullptr)
+        return nullptr;
+    const auto it = registry->entries.find(id);
+    if (it == registry->entries.end())
         return nullptr;
     IconEntry& entry = it->second;
     if (entry.document == nullptr && !entry.parseFailed)
     {
-        entry.document = lunasvg::Document::loadFromData(entry.source.data(), entry.source.size());
+        entry.document = internal::ParseSvgDocument(entry.source.data(), entry.source.size());
         entry.parseFailed = entry.document == nullptr;
     }
     return entry.document.get();
@@ -167,6 +188,9 @@ void Clear(Atlas& atlas)
 {
     atlas.pages.clear();
     atlas.glyphs.clear();
+    // Frame numbers restart at Init, so a failure remembered from before would block glyphs
+    // in an unrelated frame later.
+    atlas.failedFrame = 0;
 }
 
 bool AddPage(Atlas& atlas)
@@ -184,7 +208,9 @@ bool AddPage(Atlas& atlas)
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-    // Transparent from the start, so padding texels sample as empty.
+    // Transparent from the start, so padding texels sample as empty. A failed allocation
+    // throws std::bad_alloc to GetGlyph.
+    internal::CheckAllocation();
     const std::vector<std::uint8_t> zeros(static_cast<std::size_t>(kPageSize) * kPageSize * 4u, 0);
     D3D11_SUBRESOURCE_DATA data = {};
     data.pSysMem = zeros.data();
@@ -252,26 +278,37 @@ const Glyph* GetGlyph(Atlas& atlas, std::uint32_t id, int side)
     const std::uint64_t frame = internal::FrameIndex();
     if (context == nullptr || (atlas.failedFrame != 0 && atlas.failedFrame == frame))
         return nullptr;
-    Glyph glyph;
-    if (!internal::RasterizeIcon(id, side, atlas.scratch))
+    // Running out of memory is transient as well: the glyph is not remembered, and at
+    // worst the shelf space it took on a page stays unused until the atlas is emptied.
+    try
+    {
+        Glyph glyph;
+        if (!internal::RasterizeIcon(id, side, atlas.scratch))
+            return &atlas.glyphs.emplace(key, glyph).first->second;
+        int pageIndex = 0;
+        int x = 0;
+        int y = 0;
+        if (!Allocate(atlas, side, pageIndex, x, y))
+        {
+            atlas.failedFrame = frame;
+            return nullptr;
+        }
+        const D3D11_BOX box = {static_cast<UINT>(x), static_cast<UINT>(y), 0, static_cast<UINT>(x + side),
+                               static_cast<UINT>(y + side), 1};
+        context->UpdateSubresource(atlas.pages[static_cast<std::size_t>(pageIndex)].texture.Get(), 0, &box,
+                                   atlas.scratch.pixels.data(), static_cast<UINT>(side * 4), 0);
+        constexpr float kInv = 1.0f / static_cast<float>(kPageSize);
+        glyph.page = pageIndex;
+        glyph.uv0 = ImVec2(static_cast<float>(x) * kInv, static_cast<float>(y) * kInv);
+        glyph.uv1 = ImVec2(static_cast<float>(x + side) * kInv, static_cast<float>(y + side) * kInv);
+        internal::CheckAllocation();
         return &atlas.glyphs.emplace(key, glyph).first->second;
-    int pageIndex = 0;
-    int x = 0;
-    int y = 0;
-    if (!Allocate(atlas, side, pageIndex, x, y))
+    }
+    catch (const std::bad_alloc&)
     {
         atlas.failedFrame = frame;
         return nullptr;
     }
-    const D3D11_BOX box = {static_cast<UINT>(x), static_cast<UINT>(y), 0, static_cast<UINT>(x + side),
-                           static_cast<UINT>(y + side), 1};
-    context->UpdateSubresource(atlas.pages[static_cast<std::size_t>(pageIndex)].texture.Get(), 0, &box,
-                               atlas.scratch.pixels.data(), static_cast<UINT>(side * 4), 0);
-    constexpr float kInv = 1.0f / static_cast<float>(kPageSize);
-    glyph.page = pageIndex;
-    glyph.uv0 = ImVec2(static_cast<float>(x) * kInv, static_cast<float>(y) * kInv);
-    glyph.uv1 = ImVec2(static_cast<float>(x + side) * kInv, static_cast<float>(y + side) * kInv);
-    return &atlas.glyphs.emplace(key, glyph).first->second;
 }
 
 // The placeholder for an unknown or unreadable icon: a crossed box in the tint color.
@@ -385,20 +422,38 @@ Icon RegisterIcon(const char* name, const char* svgSource)
         return {};
     const std::string_view nameView(name);
     const std::uint32_t id = Icon::Hash(nameView);
-    Registry& registry = Icons();
-    const auto existing = registry.entries.find(id);
-    if (existing != registry.entries.end() && existing->second.name != nameView)
+    Registry* registry = Icons();
+    if (registry == nullptr)
+        return {};
+    const auto existing = registry->entries.find(id);
+    if (existing != registry->entries.end() && existing->second.name != nameView)
         return {};
 
+    // Everything that allocates happens before the registry changes, so running out of
+    // memory leaves it as it was.
     IconEntry entry;
-    entry.name = std::string(nameView);
-    entry.owned = svgSource;
-    entry.document = lunasvg::Document::loadFromData(entry.owned);
-    if (entry.document == nullptr)
+    try
+    {
+        internal::CheckAllocation();
+        entry.name = std::string(nameView);
+        entry.owned = svgSource;
+        entry.document = internal::ParseSvgDocument(entry.owned.data(), entry.owned.size());
+        if (entry.document == nullptr)
+            return {};
+        if (existing == registry->entries.end())
+        {
+            // Room for the new id in the sorted order, so SortOrder below cannot allocate.
+            internal::CheckAllocation();
+            registry->order.reserve(registry->entries.size() + 1);
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
         return {};
+    }
     entry.source = entry.owned;
 
-    if (existing != registry.entries.end())
+    if (existing != registry->entries.end())
     {
         existing->second = std::move(entry);
         // std::string moves may keep the small-string buffer inside the object, so point
@@ -411,9 +466,18 @@ Icon RegisterIcon(const char* name, const char* svgSource)
     }
     else
     {
-        auto inserted = registry.entries.emplace(id, std::move(entry)).first;
-        inserted->second.source = inserted->second.owned;
-        SortOrder(registry);
+        try
+        {
+            internal::CheckAllocation();
+            // A single insertion that throws has no effect.
+            auto inserted = registry->entries.emplace(id, std::move(entry)).first;
+            inserted->second.source = inserted->second.owned;
+        }
+        catch (const std::bad_alloc&)
+        {
+            return {};
+        }
+        SortOrder(*registry);
     }
     return Icon(nameView);
 }
@@ -429,15 +493,16 @@ Icon FindIcon(const char* name)
 
 int IconCount()
 {
-    return static_cast<int>(Icons().order.size());
+    const Registry* registry = Icons();
+    return registry != nullptr ? static_cast<int>(registry->order.size()) : 0;
 }
 
 const char* IconNameAt(int index)
 {
-    const Registry& registry = Icons();
-    if (index < 0 || static_cast<std::size_t>(index) >= registry.order.size())
+    const Registry* registry = Icons();
+    if (registry == nullptr || index < 0 || static_cast<std::size_t>(index) >= registry->order.size())
         return nullptr;
-    return registry.entries.at(registry.order[static_cast<std::size_t>(index)]).name.c_str();
+    return registry->entries.at(registry->order[static_cast<std::size_t>(index)]).name.c_str();
 }
 
 const char* IconName(Icon icon)

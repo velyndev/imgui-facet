@@ -21,7 +21,9 @@
 //
 // The registry exists for the whole process: FindIcon and RegisterIcon work before Init
 // and registrations survive Shutdown. Drawing needs Facet to be initialized. Every function
-// here is for the thread that runs the Dear ImGui frame.
+// here is for the thread that runs the Dear ImGui frame. None of them throws: when memory
+// runs out, RegisterIcon returns an invalid icon without changing the registry, and a glyph
+// that cannot be rasterized draws the placeholder and is tried again in a later frame.
 
 #include <cstdint>
 #include <string_view>
