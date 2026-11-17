@@ -5,6 +5,7 @@
 // with the id of its label, the neutral result must come back and no value argument may have
 // changed. Every options struct is checked against the conventions at compile time.
 
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -51,6 +52,13 @@ static_assert(OptionsFollowConventions<facet::StatTileOptions>());
 static_assert(OptionsFollowConventions<facet::DataTableOptions>());
 
 // Log rows have one height, so the view can read only the visible entries.
+TEST_CASE("Values that mean none default to NaN, outside every value range")
+{
+    // -1 would be a valid x or time for a range or clock that includes it.
+    CHECK(std::isnan(facet::CurveEditorOptions{}.marker));
+    CHECK(std::isnan(facet::LogEntry{}.time));
+}
+
 template <class T>
 concept HasWrap = requires(T options) { options.wrap; };
 static_assert(!HasWrap<facet::LogViewOptions>);

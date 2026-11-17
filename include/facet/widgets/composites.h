@@ -51,7 +51,7 @@ struct CurveEditorOptions
     CurveInterpolation interpolation = CurveInterpolation::Smooth;
     bool lockEnds = true;                  // the first and last point stay at min.x and max.x
     bool grid = true;
-    float marker = -1.0f;                  // x of a live marker on the curve (the current input); < min.x none
+    float marker = std::numeric_limits<float>::quiet_NaN();  // x of a live marker on the curve (the current input); NaN none
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for the editor height default
     bool readOnly = false;

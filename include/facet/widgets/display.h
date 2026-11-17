@@ -387,7 +387,7 @@ struct LogEntry
 {
     std::string_view text;
     LogLevel level = LogLevel::Info;
-    double time = -1.0;                    // seconds (the caller's clock); < 0 shows no timestamp
+    double time = std::numeric_limits<double>::quiet_NaN();  // seconds (the caller's clock, any sign); NaN shows no timestamp
     const char* source = nullptr;          // short origin tag drawn before the text; null for none
 };
 
