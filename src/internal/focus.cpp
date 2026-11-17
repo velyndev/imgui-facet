@@ -12,6 +12,7 @@
 #include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
+#include "internal/multi_handle.h"
 #include "internal/subsystem.h"
 #include "internal/value_drag.h"
 
@@ -81,6 +82,7 @@ void ResetInteraction()
     Modality() = false;
     ClearForcedItemState();
     ResetValueDragState();
+    ResetMultiHandleState();
 }
 
 bool FocusInit()
