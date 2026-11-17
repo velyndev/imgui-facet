@@ -3,7 +3,6 @@
 
 #include "facet/widgets/inputs.h"
 
-#include "facet/core/text.h"
 #include "widgets/controls_stub.h"
 
 namespace facet
@@ -11,14 +10,10 @@ namespace facet
 
 void FieldValidation(const char* message, const FieldValidationOptions&)
 {
-    if (message == nullptr || !internal::StubCanDraw())
+    if (message == nullptr)
         return;
-    // One Footnote line under the last item, the width of the content region, with an id under
-    // the item it belongs to so several messages in a window never share one.
-    ImGui::PushID(static_cast<int>(GImGui->LastItemData.ID));
-    internal::ControlStub("FieldValidation", "##message", internal::StubWidth(0.0f, 0.0f),
-                          MeasureText(TextStyle::Footnote, "Ag").y);
-    ImGui::PopID();
+    // Layout only, under the validated item, which stays the last item.
+    internal::MessageStub("FieldValidation", message);
 }
 
 bool ValidationSummary(const char* label, const ValidationSummaryOptions& options)

@@ -176,29 +176,19 @@ inline bool StubCaption(const char* widget, const char* label, float room, char*
     return labelEnd > label || std::strcmp(out, shortText) != 0;
 }
 
-// Submits the placeholder item of `widget` (the public function name) with the id of `label`
-// (Dear ImGui rules; null counts as "") and the size in pixels. Does nothing outside a frame.
-inline void ControlStub(const char* widget, const char* label, float width, float height)
+// Draws the placeholder look into `box` (pixels): the fill wash, the hairline outline and the
+// caption, and the whole text in a tooltip when `hovered` and the caption had to be shortened.
+// Submits no item; ControlStub and MessageStub decide what the box is.
+inline void DrawStub(const ImRect& box, const char* widget, const char* label, bool hovered)
 {
-    if (!StubCanDraw())
-        return;
     if (label == nullptr)
         label = "";
     if (widget == nullptr)
         widget = "";
     const Theme& theme = T();
-    if (width < 1.0f)
-        width = 1.0f;
-    if (height < 1.0f)
-        height = 1.0f;
-
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImRect box(pos, ImVec2(pos.x + width, pos.y + height));
-    const ImGuiID id = ImGui::GetID(label);
+    const float width = box.GetWidth();
+    const float height = box.GetHeight();
     const bool disabled = (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
-    ImGui::ItemSize(box);
-    if (!ImGui::ItemAdd(box, id, nullptr, ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop))
-        return;
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float radius = Px(theme.radii.control);
@@ -223,7 +213,7 @@ inline void ControlStub(const char* widget, const char* label, float width, floa
     PopTextStyle();
 
     // The whole text in a tooltip when the box had to shorten it.
-    if (shortened && ImGui::IsItemHovered())
+    if (shortened && hovered)
     {
         const char* labelEnd = ImGui::FindRenderedTextEnd(label);
         if (labelEnd > label)
@@ -231,6 +221,48 @@ inline void ControlStub(const char* widget, const char* label, float width, floa
         else
             ImGui::SetTooltip("%s: planned", widget);
     }
+}
+
+// Submits the placeholder item of `widget` (the public function name) with the id of `label`
+// (Dear ImGui rules; null counts as "") and the size in pixels. Does nothing outside a frame.
+inline void ControlStub(const char* widget, const char* label, float width, float height)
+{
+    if (!StubCanDraw())
+        return;
+    if (label == nullptr)
+        label = "";
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImRect box(pos, ImVec2(pos.x + (width < 1.0f ? 1.0f : width), pos.y + (height < 1.0f ? 1.0f : height)));
+    const ImGuiID id = ImGui::GetID(label);
+    ImGui::ItemSize(box);
+    if (!ImGui::ItemAdd(box, id, nullptr, ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop))
+        return;
+    DrawStub(box, widget, label, ImGui::IsItemHovered());
+}
+
+// The placeholder of a message line under the last item (FieldValidation): one Footnote line
+// starting at the item's left edge, spacing.xs below it, reaching the right edge of the content
+// region. The box is spacing.xs taller than the line so its outline never crosses the text.
+// It is layout only, not an item: the last item stays the one the message belongs to, so item
+// queries after the call still describe it. Does nothing outside a frame.
+inline void MessageStub(const char* widget, const char* text)
+{
+    if (!StubCanDraw())
+        return;
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    const ImGuiLastItemData last = g.LastItemData;
+    const float right = window->DC.CursorPos.x + ImGui::GetContentRegionAvail().x;
+    const float x = last.ID != 0 ? last.Rect.Min.x : window->DC.CursorPos.x;
+    const float y = last.ID != 0 ? last.Rect.Max.y + Px(T().spacing.xs) : window->DC.CursorPos.y;
+    const float height = MeasureText(TextStyle::Footnote, "Ag").y + Px(T().spacing.xs);
+    const ImRect box(ImVec2(x, y), ImVec2(right > x + 1.0f ? right : x + 1.0f, y + height));
+    ImGui::SetCursorScreenPos(box.Min);
+    ImGui::ItemSize(box);
+    const bool hovered = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(box.Min, box.Max);
+    if (ImGui::IsRectVisible(box.Min, box.Max))
+        DrawStub(box, widget, text, hovered);
+    g.LastItemData = last;
 }
 
 } // namespace facet::internal

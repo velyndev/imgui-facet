@@ -592,8 +592,11 @@ struct FieldValidationOptions
 
 // A message under the last item, for items without an `error` option (stock Dear ImGui
 // widgets, groups, custom items). Draws `message` (read during the call) in Footnote in the
-// tone's color under the item's rect and advances the cursor past it. Destructive messages are
-// collected for ValidationSummary. Keeps no state of its own. A null message draws nothing.
+// tone's color, starting at the item's left edge spacing.xs below its rect and wrapping at the
+// right edge of the content region, and advances the cursor past it. It submits no item: the
+// validated item stays the last item, so ImGui::IsItemDeactivatedAfterEdit, IsItemHovered and
+// GetItemRect* after the call still describe it. Destructive messages are collected for
+// ValidationSummary. Keeps no state of its own. A null message draws nothing.
 void FieldValidation(const char* message, const FieldValidationOptions& options = {});
 
 struct ValidationSummaryOptions

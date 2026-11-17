@@ -5,6 +5,8 @@
 // helper the stubs share (src/widgets/controls_stub.h).
 
 #include <array>
+#include <cfloat>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -320,14 +322,25 @@ void CheckCall(const char* call, const Stacks& before, ImGuiID itemBefore, Resul
         CheckCall(#__VA_ARGS__, facetBefore, facetItemBefore, facetResult, neutral);               \
     } while (false)
 
-// A void call that must submit one item and leave the stacks alone.
-#define FACET_CHECK_VOID_STUB(...)                                                                 \
+// A void call that only lays out under the last item: it leaves the stacks alone, moves the
+// cursor down and keeps the last item as it was.
+void CheckLayoutCall(const char* call, const Stacks& before, ImGuiID itemBefore, float cursorBefore)
+{
+    ++g_calls;
+    INFO(call);
+    CHECK(Snapshot() == before);
+    CHECK(GImGui->LastItemData.ID == itemBefore);
+    CHECK(ImGui::GetCursorScreenPos().y > cursorBefore);
+}
+
+#define FACET_CHECK_LAYOUT_STUB(...)                                                               \
     do                                                                                             \
     {                                                                                              \
         const Stacks facetBefore = Snapshot();                                                     \
         const ImGuiID facetItemBefore = GImGui->LastItemData.ID;                                   \
+        const float facetCursorBefore = ImGui::GetCursorScreenPos().y;                             \
         __VA_ARGS__;                                                                               \
-        CheckCall(#__VA_ARGS__, facetBefore, facetItemBefore, 0, 0);                               \
+        CheckLayoutCall(#__VA_ARGS__, facetBefore, facetItemBefore, facetCursorBefore);            \
     } while (false)
 
 // Calls every function of the five families once, with the overloads, as an app would.
@@ -441,7 +454,7 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, KeybindCapture("Keybind 1", &v.bind, {.showMode = true, .showAlternate = true}));
     FACET_CHECK_STUB(false, Rating("Rating 1", &v.rating, {.halfSteps = true}));
     FACET_CHECK_STUB(false, Rating("Rating 2", &v.ratingInt));
-    FACET_CHECK_VOID_STUB(FieldValidation("Message", {.tone = Tone::Warning}));
+    FACET_CHECK_LAYOUT_STUB(FieldValidation("Message", {.tone = Tone::Warning}));
     FACET_CHECK_STUB(false, ValidationSummary("Summary 1"));
 
     // Pickers
@@ -466,7 +479,7 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
 }
 
-// Number of FACET_CHECK_STUB and FACET_CHECK_VOID_STUB calls in CallEveryStub.
+// Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
 constexpr int kStubCalls = 108;
 
 } // namespace
@@ -635,6 +648,43 @@ TEST_CASE("The placeholder text drops the label, then shortens with an ellipsis"
     CHECK(shortened[1]);
     CHECK(shortened[2]);
     CHECK(shortened[3]);
+}
+
+TEST_CASE("FieldValidation sits under the validated item and keeps it as the last item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool checked = false;
+    ImGuiID checkboxId = 0;
+    ImGuiID lastAfter = 0;
+    ImRect checkbox;
+    ImVec2 drawnMin(FLT_MAX, FLT_MAX);
+    float spacing = 0.0f;
+    float cursorAfter = 0.0f;
+    session.SetUi([&] {
+        spacing = facet::Px(facet::T().spacing.xs);
+        // The validated item does not start at the line start, so the message must follow it.
+        ImGui::TextUnformatted("Label");
+        ImGui::SameLine();
+        ImGui::Checkbox("Option 1##validated", &checked);
+        checkboxId = GImGui->LastItemData.ID;
+        checkbox = GImGui->LastItemData.Rect;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int firstVertex = drawList->VtxBuffer.Size;
+        facet::FieldValidation("Message");
+        for (int i = firstVertex; i < drawList->VtxBuffer.Size; ++i)
+            drawnMin = ImMin(drawnMin, drawList->VtxBuffer[i].pos);
+        lastAfter = GImGui->LastItemData.ID;
+        cursorAfter = ImGui::GetCursorScreenPos().y;
+    });
+    session.Frame();
+
+    REQUIRE(checkboxId != 0);
+    CHECK(lastAfter == checkboxId);
+    // Within a pixel: the anti-aliased fringe of the outline lies half a pixel outside the box.
+    CHECK(std::abs(drawnMin.x - checkbox.Min.x) <= 1.0f);
+    CHECK(std::abs(drawnMin.y - (checkbox.Max.y + spacing)) <= 1.0f);
+    CHECK(cursorAfter > drawnMin.y);
 }
 
 TEST_CASE("A shortened placeholder shows its whole text in a tooltip on hover")

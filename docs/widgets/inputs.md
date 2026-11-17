@@ -236,7 +236,8 @@ bool ValidationSummary(const char* label, const ValidationSummaryOptions& option
 ```
 
 A message under the last item, for items without an `error` option, and a summary of the errors
-in a window whose entries focus their fields. Status: planned.
+in a window whose entries focus their fields. The message is not an item, so item queries after
+`FieldValidation` still describe the validated field. Status: planned.
 
 ## Usage
 
@@ -311,8 +312,11 @@ A stock Dear ImGui field with a Facet message, and the summary at the top of the
 ```cpp
 facet::ValidationSummary("Problems");
 ImGui::InputInt("Port", &port);
-if (port < 1 || port > 65535)
+const bool valid = port >= 1 && port <= 65535;
+if (!valid)
     facet::FieldValidation("Use a port from 1 to 65535");
+if (valid && ImGui::IsItemDeactivatedAfterEdit())  // still the port field
+    SavePort(port);
 ```
 
 ## Planned, not declared yet
