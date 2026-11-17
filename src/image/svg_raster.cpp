@@ -87,10 +87,13 @@ bool RasterizeSvgSource(const SvgSource& source, float scale, RgbaImage& out)
 {
     if (source.document == nullptr || !(scale > 0.0f))
         return false;
-    // The texture limit of Direct3D 11 feature level 11.
-    constexpr float kMaxSide = 16384.0f;
-    const float width = std::clamp(std::round(source.designSize.x * scale), 1.0f, kMaxSide);
-    const float height = std::clamp(std::round(source.designSize.y * scale), 1.0f, kMaxSide);
+    // A raster beyond the limits fails instead of being squeezed: shrinking one side alone
+    // would change the aspect ratio, and the raster runs on the frame thread (again after
+    // every scale change), so its cost must stay bounded.
+    const double width = std::max(1.0, std::round(static_cast<double>(source.designSize.x) * scale));
+    const double height = std::max(1.0, std::round(static_cast<double>(source.designSize.y) * scale));
+    if (width > kMaxImageSide || height > kMaxImageSide || width * height > kMaxSvgTexels)
+        return false;
     return RasterizeSvgDocument(*source.document, static_cast<int>(width), static_cast<int>(height), false, out);
 }
 

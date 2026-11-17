@@ -61,9 +61,11 @@ old texture until the next `facet::NewFrame`, after that draw data was rendered.
 
 The SVG source is parsed once and kept. The image is rasterized at its design size times
 `facet::Scale()`, rounded to whole pixels, and again at the start of the frame after the scale
-changes. Colors stay as written in the document (`currentColor` is black). The rasterizer
-produces premultiplied pixels; they are converted to straight alpha before upload, since the
-Dear ImGui renderer blends straight alpha.
+changes. A raster above 16 M pixels (4096 x 4096) or 16384 pixels on a side fails instead
+of being squeezed, because it runs on the frame thread. Colors stay as written in the
+document (`currentColor` is black). The rasterizer produces premultiplied pixels; they are
+converted to straight alpha before upload, since the Dear ImGui renderer blends straight
+alpha.
 
 ## Drawing images
 

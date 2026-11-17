@@ -612,3 +612,14 @@ TEST_CASE("WaitForImage with an unlimited timeout waits for the decode")
         facet::ReleaseImage(image);
     }
 }
+TEST_CASE("An SVG raster beyond the texel budget or the side limit fails")
+{
+    Session session;
+    REQUIRE(session.ok);
+    // Within both limits.
+    CHECK(facet::LoadSvgMemory(kSvg24, 0, ImVec2(2000.0f, 1.0f)).IsValid());
+    // 25 M pixels: above the 16 M budget.
+    CHECK_FALSE(facet::LoadSvgMemory(kSvg24, 0, ImVec2(5000.0f, 5000.0f)).IsValid());
+    // One side above the Direct3D limit: fails instead of being squeezed out of shape.
+    CHECK_FALSE(facet::LoadSvgMemory(kSvg24, 0, ImVec2(20000.0f, 1.0f)).IsValid());
+}

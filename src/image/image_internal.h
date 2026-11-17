@@ -11,6 +11,7 @@
 #include <imgui.h>
 
 #include "facet/core/image.h"
+#include "internal/image_io.h"
 
 namespace lunasvg
 {
@@ -29,7 +30,8 @@ struct RgbaImage
 };
 
 // Reads a whole file; `path` is UTF-8. Returns false for a missing, empty or unreadable
-// file and for files of 2 GiB or more. Safe on any thread (texture_cache.cpp).
+// file and for files larger than kMaxEncodedImageBytes (internal/image_io.h). Safe on any
+// thread (texture_cache.cpp).
 bool ReadFileBytes(const char* path, std::vector<std::uint8_t>& out);
 
 // Where an image of `imageSize` pixels lands inside the box [boxMin, boxMax] and which part
@@ -68,7 +70,12 @@ struct SvgSourceDeleter
 };
 using SvgSourcePtr = std::unique_ptr<SvgSource, SvgSourceDeleter>;
 
-// Rasterizes the source at its design size times `scale`, rounded to whole pixels.
+// Most pixels of one SVG raster: 16 M (4096 x 4096, 64 MiB of RGBA). The raster runs on the
+// frame thread and again after every scale change, so its cost has to stay bounded.
+inline constexpr double kMaxSvgTexels = 4096.0 * 4096.0;
+
+// Rasterizes the source at its design size times `scale`, rounded to whole pixels. Fails
+// when a side would exceed kMaxImageSide or the raster kMaxSvgTexels.
 bool RasterizeSvgSource(const SvgSource& source, float scale, RgbaImage& out);
 
 // Takes ownership of a parsed SVG, rasterizes it at Scale() and returns its handle, or an

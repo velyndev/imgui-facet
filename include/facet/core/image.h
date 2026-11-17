@@ -87,7 +87,9 @@ ImageHandle CreateImageRGBA(const void* pixels, int width, int height, int strid
 // Rasterizes an SVG document at `size` design units (0 for the document's own size) times
 // Scale(), and again whenever the scale changes, so it stays sharp. When only one of the
 // two components is 0, it follows the document's aspect ratio. Colors are kept as written
-// in the document (currentColor is black).
+// in the document (currentColor is black). A raster larger than 16 M pixels (4096 x 4096)
+// or 16384 pixels on a side fails: the load returns an invalid handle, and an image that
+// grows beyond the limit after a scale change reports Failed.
 ImageHandle LoadSvgFile(const char* path, ImVec2 size = ImVec2(0.0f, 0.0f));
 // `length` 0 means the source is zero terminated. The source is copied.
 ImageHandle LoadSvgMemory(const char* svg, std::size_t length = 0, ImVec2 size = ImVec2(0.0f, 0.0f));
