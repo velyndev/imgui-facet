@@ -107,8 +107,9 @@ ImVec2 ImageSize(ImageHandle image);
 ImTextureRef ImageTexture(ImageHandle image);
 
 // Blocks until the pending decode of `image` finished and uploads it, or until
-// `timeoutSeconds` passed. Returns IsImageReady(image). For loading screens and tests;
-// widgets watch the status instead.
+// `timeoutSeconds` passed. A timeout of one day or more (or INFINITY) waits until the decode
+// finished. Returns IsImageReady(image). For loading screens and tests; widgets watch the
+// status instead.
 bool WaitForImage(ImageHandle image, float timeoutSeconds);
 
 // The image as an ImGui item of `size` pixels. A size component of 0 takes the image's

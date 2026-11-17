@@ -48,6 +48,9 @@ namespace
 
 // A worker keeps its file buffer between jobs up to this capacity (4 MiB).
 constexpr std::size_t kKeptReadBufferBytes = std::size_t{4} << 20;
+// WaitForImage treats a timeout of this length (one day) or longer, infinity included, as
+// "no time limit".
+constexpr float kUnlimitedWaitSeconds = 86400.0f;
 
 enum class SourceKind : std::uint8_t
 {
@@ -717,9 +720,14 @@ ImTextureRef ImageTexture(ImageHandle image)
 bool WaitForImage(ImageHandle image, float timeoutSeconds)
 {
     Cache& cache = State();
+    // Converting a huge float to clock ticks would overflow into a deadline in the past, so
+    // timeouts from one day up (and infinity) wait without a limit. NaN counts as 0.
+    const bool unlimited = timeoutSeconds >= kUnlimitedWaitSeconds;
+    const float seconds = timeoutSeconds > 0.0f && !unlimited ? timeoutSeconds : 0.0f;
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                              std::chrono::duration<float>(std::max(0.0f, timeoutSeconds)));
+                              std::chrono::duration<float>(seconds));
+    const auto hasResult = [&] { return !cache.results.empty(); };
     for (;;)
     {
         ProcessResults(cache);
@@ -729,7 +737,12 @@ bool WaitForImage(ImageHandle image, float timeoutSeconds)
         std::unique_lock lock(cache.mutex);
         if (!cache.results.empty())
             continue;
-        if (!cache.resultReady.wait_until(lock, deadline, [&] { return !cache.results.empty(); }))
+        if (unlimited)
+        {
+            cache.resultReady.wait(lock, hasResult);
+            continue;
+        }
+        if (!cache.resultReady.wait_until(lock, deadline, hasResult))
         {
             lock.unlock();
             ProcessResults(cache);

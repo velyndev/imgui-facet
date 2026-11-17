@@ -599,3 +599,16 @@ TEST_CASE("Loads refuse files and memory beyond the size limit")
     CHECK(facet::GetImageStatus(async) == facet::ImageStatus::Failed);
     std::filesystem::remove(path);
 }
+TEST_CASE("WaitForImage with an unlimited timeout waits for the decode")
+{
+    Session session;
+    REQUIRE(session.ok);
+    for (const float timeout : {INFINITY, 1e30f, 1e10f})
+    {
+        CAPTURE(timeout);
+        const facet::ImageHandle image = facet::LoadImageMemoryAsync(kPng, sizeof(kPng));
+        REQUIRE(image.IsValid());
+        CHECK(facet::WaitForImage(image, timeout));
+        facet::ReleaseImage(image);
+    }
+}

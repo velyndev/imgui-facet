@@ -21,7 +21,7 @@ gets a new generation. Handles from before `Shutdown` stay invalid after the nex
 | `LoadSvgFile(path, size)`, `LoadSvgMemory(svg, length, size)` | Rasterizes an SVG at `size` design units times `Scale()`. |
 | `GetImageStatus`, `IsImageReady`, `ImageFailed` | `Invalid`, `Loading`, `Ready`, `Failed` or `Lost`. |
 | `ImageSize`, `ImageTexture` | Pixel size and the `ImTextureRef` of a ready image. |
-| `WaitForImage(handle, timeout)` | Blocks until a pending decode finished and uploads it. |
+| `WaitForImage(handle, timeout)` | Blocks until a pending decode finished and uploads it; a timeout of one day or more waits without a limit. |
 | `ReleaseImage(handle)` | Frees the slot; the texture is released in the next `NewFrame`. |
 
 Synchronous loads return an invalid handle when the source cannot be read or decoded.
