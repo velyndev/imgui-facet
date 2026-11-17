@@ -83,11 +83,17 @@ void SortOrder(Registry& registry)
     });
 }
 
+std::unique_ptr<Registry>& RegistryStorage()
+{
+    static std::unique_ptr<Registry> registry;
+    return registry;
+}
+
 // The registry with the embedded icons, built on first use. nullptr while it cannot be
 // built for lack of memory; the next call tries again.
 Registry* Icons()
 {
-    static std::unique_ptr<Registry> registry;
+    std::unique_ptr<Registry>& registry = RegistryStorage();
     if (registry == nullptr)
     {
         try
@@ -279,18 +285,27 @@ const Glyph* GetGlyph(Atlas& atlas, std::uint32_t id, int side)
     const std::uint64_t frame = internal::FrameIndex();
     if (context == nullptr || (atlas.failedFrame != 0 && atlas.failedFrame == frame))
         return nullptr;
-    // Running out of memory is transient as well: the glyph is not remembered, and at
-    // worst the shelf space it took on a page stays unused until the atlas is emptied.
+    // Running out of memory is transient as well: the glyph is not remembered. That
+    // includes a registry that could not be built yet, which says nothing about the icon.
+    if (Icons() == nullptr)
+    {
+        atlas.failedFrame = frame;
+        return nullptr;
+    }
+    // The map entry is created before a page gives out room, and nothing after that can
+    // fail, so a failed attempt takes no room in the atlas.
     try
     {
-        Glyph glyph;
         if (!internal::RasterizeIcon(id, side, atlas.scratch))
-            return &atlas.glyphs.emplace(key, glyph).first->second;
+            return &atlas.glyphs.emplace(key, Glyph{}).first->second;
+        internal::CheckAllocation();
+        Glyph& glyph = atlas.glyphs.emplace(key, Glyph{}).first->second;
         int pageIndex = 0;
         int x = 0;
         int y = 0;
         if (!Allocate(atlas, side, pageIndex, x, y))
         {
+            atlas.glyphs.erase(key);
             atlas.failedFrame = frame;
             return nullptr;
         }
@@ -302,11 +317,12 @@ const Glyph* GetGlyph(Atlas& atlas, std::uint32_t id, int side)
         glyph.page = pageIndex;
         glyph.uv0 = ImVec2(static_cast<float>(x) * kInv, static_cast<float>(y) * kInv);
         glyph.uv1 = ImVec2(static_cast<float>(x + side) * kInv, static_cast<float>(y + side) * kInv);
-        internal::CheckAllocation();
-        return &atlas.glyphs.emplace(key, glyph).first->second;
+        return &glyph;
     }
     catch (const std::bad_alloc&)
     {
+        // A page that could not be created throws from Allocate: drop the unfinished entry.
+        atlas.glyphs.erase(key);
         atlas.failedFrame = frame;
         return nullptr;
     }
@@ -518,6 +534,11 @@ namespace internal
 int IconAtlasPageCount()
 {
     return static_cast<int>(State().pages.size());
+}
+
+void ResetIconRegistry()
+{
+    RegistryStorage().reset();
 }
 
 bool RasterizeIcon(std::uint32_t iconId, int pixels, RgbaImage& out)

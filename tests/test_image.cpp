@@ -825,3 +825,106 @@ TEST_CASE("Icon registration and drawing survive failed allocations")
     CHECK(drawn);
     CHECK(failures > 0);
 }
+TEST_CASE("A glyph whose allocation fails takes no room in the icon atlas")
+{
+    Session session;
+    REQUIRE(session.ok);
+    REQUIRE(facet::internal::IconAtlasPageCount() == 0);
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList._SetPixelDensity(1.0f);
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
+
+    // A small glyph first: the registry, the parsed icon and the first page exist from
+    // here on, so the attempts below fail only in the raster and in the glyph entry.
+    facet::NewFrame();
+    facet::DrawIcon(&drawList, facet::Icon("check"), ImVec2(0.0f, 0.0f), 16.0f, IM_COL32_WHITE);
+    REQUIRE(drawList.VtxBuffer.Size == 4);
+    REQUIRE(facet::internal::IconAtlasPageCount() == 1);
+
+    // Glyphs of 256 pixels: nine of them fit on the page next to the small one.
+    const float size = 256.0f;
+    int failures = 0;
+    bool drawn = false;
+    for (int n = 1; n <= 16 && !drawn; ++n)
+    {
+        CAPTURE(n);
+        facet::NewFrame();
+        const int vertices = drawList.VtxBuffer.Size;
+        facet::internal::FailGuardedAllocation(n);
+        CHECK_NOTHROW(facet::DrawIcon(&drawList, facet::Icon("check"), ImVec2(0.0f, 0.0f), size, IM_COL32_WHITE));
+        const bool failed = facet::internal::GuardedAllocationFailed();
+        facet::internal::FailGuardedAllocation(0);
+        const int added = drawList.VtxBuffer.Size - vertices;
+        if (failed)
+        {
+            ++failures;
+            CHECK(added > 4);  // the crossed box
+            continue;
+        }
+        CHECK(added == 4);
+        drawn = true;
+    }
+    REQUIRE(drawn);
+    CHECK(failures >= 2);
+
+    // Eight more glyphs fill the page. A failed attempt that had kept its room would push
+    // the last of them onto a second page.
+    for (const char* name : {"arrow-down", "arrow-left", "arrow-right", "arrow-up", "bell", "calendar", "close", "plus"})
+    {
+        CAPTURE(name);
+        const int vertices = drawList.VtxBuffer.Size;
+        facet::DrawIcon(&drawList, facet::Icon(name), ImVec2(0.0f, 0.0f), size, IM_COL32_WHITE);
+        CHECK(drawList.VtxBuffer.Size - vertices == 4);
+    }
+    CHECK(facet::internal::IconAtlasPageCount() == 1);
+}
+TEST_CASE("Each allocation on the way to an icon glyph can fail without breaking the icon")
+{
+    Session session;
+    REQUIRE(session.ok);
+    facet::EndFrame();
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList._SetPixelDensity(1.0f);
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
+    const facet::Icon icon("check");
+
+    // Every attempt starts from nothing (no registry, no parsed icon, no atlas page), so
+    // attempt n fails the n-th allocation on the way to a glyph: building the registry,
+    // parsing the icon, the raster, the glyph entry and the page.
+    int failures = 0;
+    bool through = false;
+    for (int n = 1; n <= 16 && !through; ++n)
+    {
+        CAPTURE(n);
+        facet::InvalidateDeviceObjects();
+        REQUIRE(facet::CreateDeviceObjects());
+        facet::internal::ResetIconRegistry();
+        facet::NewFrame();
+        int vertices = drawList.VtxBuffer.Size;
+        facet::internal::FailGuardedAllocation(n);
+        CHECK_NOTHROW(facet::DrawIcon(&drawList, icon, ImVec2(0.0f, 0.0f), 20.0f, IM_COL32_WHITE));
+        const bool failed = facet::internal::GuardedAllocationFailed();
+        facet::internal::FailGuardedAllocation(0);
+        facet::EndFrame();
+        if (!failed)
+        {
+            CHECK(drawList.VtxBuffer.Size - vertices == 4);
+            through = true;
+            continue;
+        }
+        ++failures;
+        CHECK(drawList.VtxBuffer.Size - vertices > 4);  // the crossed box
+        CHECK(facet::internal::IconAtlasPageCount() == 0);
+        // The failure is forgotten: the next frame draws the glyph.
+        facet::NewFrame();
+        vertices = drawList.VtxBuffer.Size;
+        facet::DrawIcon(&drawList, icon, ImVec2(0.0f, 0.0f), 20.0f, IM_COL32_WHITE);
+        CHECK(drawList.VtxBuffer.Size - vertices == 4);
+        CHECK(facet::internal::IconAtlasPageCount() == 1);
+        facet::EndFrame();
+    }
+    CHECK(through);
+    CHECK(failures >= 5);
+}
