@@ -4,13 +4,16 @@ Every visual choice in Facet with a one-line reason. Values are the starting tok
 `include/facet/core/theme.h` and `src/core/theme.cpp`, in design units (pixels at scale 1).
 Widgets read them from `facet::T()` and pass lengths through `facet::Px()`.
 
+This document sets the rules for the planned widgets as well as for the parts that exist;
+README.md lists what exists today.
+
 ## Direction
 
 Facet is a component framework and gallery for C++ developers who build desktop tools and
 in-game overlay menus. The look is restrained and quiet: it should feel at home next to the
 system's own windows and step back behind the content.
 
-Three dials set the character, each from 0 (none) to 3 (a lot):
+Three dials set the character, each from 1 (calm) to 3 (bold):
 
 | Dial | Setting | Meaning |
 |---|---|---|
@@ -20,8 +23,8 @@ Three dials set the character, each from 0 (none) to 3 (a lot):
 
 **Identity motif: the sliding selection pill.** One soft accent-tinted highlight sits behind
 the selected entry and springs to the next one when the selection changes (standard spring).
-Tabs, the sidebar, segmented controls and lists share this one gesture, so it is recognisably
-Facet without any ornament. The demo navigation uses it today.
+Tabs, the sidebar, segmented controls and lists are to share this one gesture once they exist,
+so it is recognisably Facet without any ornament; today the demo navigation uses it.
 
 **Dose caps.** Effects are allowed only where they carry meaning:
 
@@ -60,22 +63,28 @@ cursor, disabled ones the not-allowed cursor.
 | bgElevatedLevels 1 / 2 / 3 | #FFFFFF for all three | #2C2C2E, #3A3A3C, #444446 | A black shadow cannot darken black, so in dark a higher layer is a lighter surface; level 2 is bgElevated |
 | label, labelSecondary, labelTertiary, labelQuaternary | black at 100 / 60 / 30 / 16 % | white at 100 / 60 / 30 / 16 % | One text color in four strengths keeps every surface consistent |
 | fill[0] to fill[3] | #787880 at 20 / 16 / 12 / 8 % | #787880 at 36 / 32 / 24 / 18 % | Translucent control fills work on every surface |
+| separator | #3C3C43 at 29 % | #545458 at 60 % | A translucent hairline reads the same on every surface |
+| separatorOpaque | #C6C6C8 | #38383A | Where a translucent line would double up (crossing table borders) |
 | Accent | #0066CC | #1F6FEB | One blue, dark enough in each theme for white text on it |
+| accentSubtle | the accent at 14 % | the accent at 24 % | A selection background that tints without competing with the text on it |
 | Accent presets | blue, purple, pink, red, orange, yellow, green, graphite | the same | A short list of distinct hues; any of them derives readable states |
 | Status: destructive, success, warning | #C4000F, #146C2E, #8A5300 | #FF6B5F, #32D74B, #FFD60A | Readable as text on the content surfaces |
-| Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Shadows need more strength to show on dark surfaces |
+| shadow | black | black | A neutral shadow; its strength comes from the elevation opacity |
+| Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Dark surfaces need more strength for a shadow to show over bgSecondary and bgTertiary |
+| glassTint | #FFFFFF | #1C1C1E | The panel tint matches the theme's base surfaces, so glass reads as a surface |
 | Scrim | black at 20 % | black at 48 % | Dims the content behind a modal layer without hiding it |
 
 Contrast rules, checked by the unit tests:
 
-- label and labelSecondary reach 4.5:1 on every surface and on every fill over a surface; they
-  are the only label tokens for text that must be read, placeholders included.
+- label and labelSecondary reach 4.5:1 on every surface, the elevation surfaces included, and
+  on every fill over a surface; they are the only label tokens for text that must be read,
+  placeholders included.
 - labelTertiary is below 4.5:1 and is used only for disabled text and decorative glyphs.
 - The accent is set at runtime. `Theme::ApplyAccent` derives the other accent colors in OKLCH:
   onAccent is white or black, whichever is more readable; hover and pressed move the lightness
   away from onAccent so text on them stays at 4.5:1 or more; accentText keeps the hue and moves
-  the lightness until it reaches 4.5:1 on all four surfaces, for links and accent text. The
-  tests check this for 24 hues at five lightness levels in both themes.
+  the lightness until it reaches 4.5:1 on every surface, for links and accent text. The tests
+  check this for 24 hues at five lightness levels in both themes.
 - Outlines of controls reach 3:1 (non-text contrast) on the content surfaces.
 
 ## Core
@@ -105,12 +114,12 @@ Contrast rules, checked by the unit tests:
   makes a stock control exactly one control height, frames get a hairline outline of 3:1, and
   the scrollbar is a pill.
 - **Loading states.** A skeleton is a fill[2] block with a fill[3] band sweeping left to right;
-  every skeleton on screen sweeps in step from one shared clock.
+  every skeleton on screen sweeps in step from one shared clock, so one screen has one loading
+  language.
 
 ## Effects
 
-Rules for where effects may appear: backdrop blur only on the menu shell and popovers;
-shadows only on floating layers; glow only as the focus ring plus one opt-in accent glow.
+The dose caps in Direction apply. The choices behind each effect:
 
 | Choice | Reason |
 |---|---|
@@ -119,7 +128,7 @@ shadows only on floating layers; glow only as the focus ring plus one opt-in acc
 | Tiles are white with the shadow in alpha | The vertex color sets the shadow color and strength without a new tile |
 | Tiles are baked in physical pixels and rebuilt after a scale change | Soft edges stay as smooth at 200 % as at 100 % |
 | Glow is cut out inside its shape | It can sit on top of translucent fills without tinting them |
-| The shadow strength comes from the theme, stronger in dark | Black shadows on near-black surfaces need more opacity to be seen |
+| In dark, height is carried by the elevation surface as well as the shadow | Over the black background only the lighter surface can show which layer is higher |
 | Glass copies the render target instead of reading it | Host swap chains rarely allow reading, and multisampled targets need a resolve anyway |
 | The blur halves and doubles the image a few times (dual filter) | A wide, smooth blur at a small, fixed cost per pixel |
 | The blur works in 16-bit float | Wide gradients show no banding, and sRGB targets are blurred in linear light |
@@ -129,31 +138,36 @@ shadows only on floating layers; glow only as the focus ring plus one opt-in acc
 
 ## Images
 
-- Icons are drawn on a 16 unit grid with 1.5 unit strokes, round caps and joins, and a
-  1 unit margin. One stroke weight and one corner style make glyphs from different places
-  read as one set; the margin keeps them from touching the edges of buttons and fields.
-- Icons are rasterized at the whole pixel size they are drawn at and placed on whole
-  pixels, so a 16 unit icon is never a scaled copy of a 24 unit one and stays sharp at
+- **Icon grid.** Icons are drawn on a 16 unit grid with 1.5 unit strokes, round caps and joins,
+  and a 1 unit margin. One stroke weight and one corner style make glyphs from different
+  places read as one set; the margin keeps them from touching the edges of buttons and fields.
+- **Icon pixels.** Icons are rasterized at the whole pixel size they are drawn at and placed on
+  whole pixels, so a 16 unit icon is never a scaled copy of a 24 unit one and stays sharp at
   every UI scale.
-- Icons default to the label color; a tint replaces it. Accent-colored icons use
+- **Icon color.** Icons default to the label color; a tint replaces it. Accent-colored icons use
   accentText, which reaches 4.5:1 on every surface.
-- An image that is still loading is a skeleton (the same sweep and shared clock as every
-  other skeleton) with a faint picture glyph in labelTertiary, which tells an image slot
-  apart from a text placeholder.
-- A failed image shows the image-off glyph and a short label in labelSecondary on fill[3]
-  with a separator hairline, so the empty slot is explained instead of looking like a
-  layout gap.
-- Image corners follow FillRect, so images and cards with the same radius token have the
+- **Loading image.** An image that is still loading is a skeleton (the same sweep and shared
+  clock as every other skeleton) with a faint picture glyph in labelTertiary, which tells an
+  image slot apart from a text placeholder.
+- **Failed image.** It shows the image-off glyph and a short label in labelSecondary on fill[3]
+  with a separator hairline, so the empty slot is explained instead of looking like a layout
+  gap.
+- **Image corners** follow FillRect, so images and cards with the same radius token have the
   same corner shape.
 
 ## Demo
 
-- The gallery maps the theme tokens onto the stock Dear ImGui style with
-  `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme
-  and the scale.
-- Title strip: the window background with a hairline below it; the title in the headline
+- **Stock controls.** The gallery maps the theme tokens onto the stock Dear ImGui style with
+  `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme and
+  the scale.
+- **Title strip.** The window background with a hairline below it; the title in the headline
   style, labels in labelSecondary in front of their controls.
-- Navigation: bgSecondary, group names in footnote labelSecondary, rows one control height
+- **Navigation.** bgSecondary, group names in footnote labelSecondary, rows one control height
   tall, and the selection pill in accentSubtle that springs between rows.
-- Content: the window background with 24 / 20 padding; every page starts with a Title1
-  heading and a one-paragraph summary, sections with a Title3 heading.
+- **Pages.** The window background with 24 / 20 padding; every page starts with a Title1
+  heading and a one-paragraph summary in labelSecondary, sections with a Title3 heading.
+- **Settings rows.** A page labels each setting in one fixed label column in footnote
+  labelSecondary, with the control after it, so option rows line up; in narrow windows the
+  label moves above its control.
+- **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
+  caption names them, so nothing that cannot be operated looks like a control.
