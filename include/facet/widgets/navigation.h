@@ -29,23 +29,25 @@ namespace facet
 // How a sidebar shows its items.
 enum class SidebarMode
 {
-    Auto,      // Expanded in an Expanded width, Rail in a Regular one, Hidden in a Compact one
+    Auto,      // Expanded in an Expanded width, Rail in a Regular or Compact one
     Expanded,  // icons and labels
     Rail,      // icons only; labels become tooltips
-    Hidden,    // not drawn
+    Hidden,    // not drawn; only on the caller's request, never chosen by Auto
 };
 
 struct SidebarOptions
 {
-    SidebarMode mode = SidebarMode::Auto;
+    SidebarMode mode = SidebarMode::Auto;  // Auto follows the width class of the available width
     float width = 0.0f;                // units; width while expanded; 0 for the token default
     float height = 0.0f;               // units; 0 fills the available height
 };
 
 // A vertical navigation column. Submit SidebarItem and BeginSidebarSection between
 // BeginSidebar and EndSidebar. The width animates between the modes, and the selection pill
-// slides to the selected item. Up and Down move between the items. Returns false while the
-// sidebar is hidden; call EndSidebar only after true. The width class decides Auto (core/layout.h).
+// slides to the selected item. Up and Down move between the items. With Auto the width class
+// (core/layout.h) picks the mode, and the narrowest form is the icon rail, so navigation stays
+// reachable at every width. Returns false only while the caller's mode is Hidden; call
+// EndSidebar only after true.
 [[nodiscard]] bool BeginSidebar(const char* id, const SidebarOptions& options = {});
 void EndSidebar();
 

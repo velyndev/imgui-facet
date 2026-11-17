@@ -26,8 +26,9 @@ class SidebarScope;
 class SidebarSectionScope;
 ```
 
-Vertical navigation with expanded, icon rail and hidden modes chosen by the width class, badges and
-the sliding selection pill.
+Vertical navigation with badges and the sliding selection pill. In the Auto mode the width class
+picks expanded in an Expanded width and the icon rail in a Regular or Compact one, so navigation
+stays reachable at every width; the hidden mode exists only when the caller asks for it.
 
 ### TabBar
 
