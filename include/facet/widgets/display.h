@@ -373,6 +373,9 @@ struct CodeViewOptions
 // scroll position under its id.
 bool CodeView(const char* id, std::string_view code, const CodeViewOptions& options = {});
 
+// Severity of a log entry, ordered from least to most severe so a caller can filter with
+// `level >= LogLevel::Warning`. It is entry data, not a choice option: the member order is the
+// severity order, so the zero member is the lowest level and LogEntry defaults to Info.
 enum class LogLevel
 {
     Trace,
