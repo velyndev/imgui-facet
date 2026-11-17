@@ -963,29 +963,49 @@ TEST_CASE("Shadow tiles reach the page only when their upload runs")
     const UINT y = static_cast<UINT>(std::lround(tile->uv.y / tile->texelUv.y)) + static_cast<UINT>(tile->layout.size) - 1;
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
 
-    // One record per draw list, channel and frame; another list, channel or frame gets it
-    // again.
-    const int listA = 0;
-    const int listB = 0;
-    const std::span<const std::uint8_t> first = atlas.PendingUpload(key, &listA, 0, 7);
-    REQUIRE(first.size() > sizeof(fi::ShadowUploadHeader));
-    const std::vector<std::uint8_t> record(first.begin(), first.end());
-    CHECK(atlas.PendingUpload(key, &listA, 0, 7).empty());
-    CHECK_FALSE(atlas.PendingUpload(key, &listB, 0, 7).empty());
-    CHECK_FALSE(atlas.PendingUpload(key, &listA, 0, 8).empty());
-    CHECK_FALSE(atlas.PendingUpload(key, &listA, 1, 8).empty());
-    CHECK(atlas.PendingUpload(key, &listA, 1, 8).empty());
+    // Every query of a pending tile gives the same record, as often as it is asked.
+    fi::ShadowUploadRecord record;
+    REQUIRE(atlas.PendingUpload(key, record));
+    CHECK(record.id != 0);
+    fi::ShadowUploadRecord again;
+    REQUIRE(atlas.PendingUpload(key, again));
+    CHECK(again.id == record.id);
     // Recording alone has not touched the page.
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) == 0);
 
-    // A truncated record is ignored and does not count as done.
-    fi::ShadowAtlas::RunUpload(warp.context.Get(), record.data(), record.size() - 1);
+    // A record of an upload the atlas does not know is ignored.
+    fi::ShadowUploadRecord unknown;
+    unknown.id = record.id + 100;
+    atlas.RunUpload(warp.context.Get(), unknown);
     CHECK(atlas.PendingCount() == 1);
 
-    fi::ShadowAtlas::RunUpload(warp.context.Get(), record.data(), record.size());
+    atlas.RunUpload(warp.context.Get(), record);
     CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) > 200);
     CHECK(atlas.PendingCount() == 0);
-    CHECK(atlas.PendingUpload(key, &listB, 0, 9).empty());
+    fi::ShadowUploadRecord after;
+    CHECK_FALSE(atlas.PendingUpload(key, after));
+    // Running the same record again does nothing.
+    atlas.RunUpload(warp.context.Get(), record);
+    CHECK(atlas.PendingCount() == 0);
+    CHECK(ReadAlpha(warp.device.Get(), warp.context.Get(), page.Get(), x, y) > 200);
+
+    // A record that outlives its tile does nothing, even when a new tile takes the slot.
+    const fi::ShadowKey other = fi::MakeShadowKey(6.0f, 3.0f, true);
+    REQUIRE(atlas.Acquire(other) != nullptr);
+    fi::ShadowUploadRecord stale;
+    REQUIRE(atlas.PendingUpload(other, stale));
+    atlas.Clear();
+    atlas.RunUpload(warp.context.Get(), stale);
+    CHECK(atlas.PendingCount() == 0);
+    REQUIRE(atlas.Acquire(other) != nullptr);
+    fi::ShadowUploadRecord fresh;
+    REQUIRE(atlas.PendingUpload(other, fresh));
+    CHECK(fresh.id != stale.id);
+    atlas.RunUpload(warp.context.Get(), stale);
+    CHECK(atlas.PendingCount() == 1);
+    atlas.ReleaseDevice();
+    atlas.RunUpload(warp.context.Get(), fresh);
+    CHECK(atlas.PendingCount() == 0);
 }
 
 TEST_CASE("A shadow queues its tile upload in front of its first draw")
@@ -1005,18 +1025,25 @@ TEST_CASE("A shadow queues its tile upload in front of its first draw")
         drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
         facet::DrawShadow(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 5.0f, spec);
         facet::DrawShadow(&drawList, ImVec2(20.0f, 20.0f), ImVec2(52.0f, 52.0f), 5.0f, spec);
-        // One upload for both shadows, recorded before any of their geometry.
-        CHECK(CountCallbacks(drawList) == 1);
+        // Each draw of the pending tile has an upload in front of it, so the first command
+        // holds no geometry.
+        CHECK(CountCallbacks(drawList) == 2);
         REQUIRE(drawList.CmdBuffer.Size > 0);
         ImDrawCmd& command = drawList.CmdBuffer[0];
         REQUIRE(command.UserCallback != nullptr);
         CHECK(command.ElemCount == 0);
         CHECK(drawList.VtxBuffer.Size > 0);
 
-        // Run the callback the way the renderer would, with the copied record resolved.
-        REQUIRE(command.UserCallbackDataOffset >= 0);
-        command.UserCallbackData = drawList._CallbacksDataBuf.Data + command.UserCallbackDataOffset;
-        command.UserCallback(&drawList, &command);
+        // Run the callbacks the way the renderer would, with the copied records resolved.
+        // The first one uploads, the second finds the upload done.
+        for (ImDrawCmd& queued : drawList.CmdBuffer)
+        {
+            if (queued.UserCallback == nullptr)
+                continue;
+            REQUIRE(queued.UserCallbackDataOffset >= 0);
+            queued.UserCallbackData = drawList._CallbacksDataBuf.Data + queued.UserCallbackDataOffset;
+            queued.UserCallback(&drawList, &queued);
+        }
 
         // Once the upload ran, other draw lists use the tile without another upload.
         ImDrawList later(ImGui::GetDrawListSharedData());
@@ -1074,7 +1101,7 @@ TEST_CASE("A glass panel with a small radius builds its corners as geometry")
     shared->TexUvCorners = savedCorners;
 }
 
-TEST_CASE("Each split channel queues its own tile upload")
+TEST_CASE("Each draw of a pending tile on a split channel queues its upload")
 {
     Warp warp;
     REQUIRE(warp.device);
@@ -1087,8 +1114,8 @@ TEST_CASE("Each split channel queues its own tile upload")
     ImDrawList drawList(ImGui::GetDrawListSharedData());
     drawList._ResetForNewFrame();
     drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
-    // Channel 1 records first, but channel 0 comes first after the merge: both need the
-    // upload in front of their own draw.
+    // Channel 1 records first, but channel 0 comes first after the merge: every draw needs
+    // the upload in front of it.
     drawList.ChannelsSplit(2);
     drawList.ChannelsSetCurrent(1);
     facet::DrawShadow(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 7.0f, spec);
@@ -1096,7 +1123,7 @@ TEST_CASE("Each split channel queues its own tile upload")
     facet::DrawShadow(&drawList, ImVec2(20.0f, 20.0f), ImVec2(52.0f, 52.0f), 7.0f, spec);
     facet::DrawShadow(&drawList, ImVec2(18.0f, 18.0f), ImVec2(50.0f, 50.0f), 7.0f, spec);
     drawList.ChannelsMerge();
-    CHECK(CountCallbacks(drawList) == 2);
+    CHECK(CountCallbacks(drawList) == 3);
     // After the merge, the first command with geometry follows an upload.
     bool uploadSeen = false;
     for (const ImDrawCmd& command : drawList.CmdBuffer)
@@ -1109,6 +1136,154 @@ TEST_CASE("Each split channel queues its own tile upload")
             break;
         }
     }
+}
+
+namespace
+{
+
+// Largest alpha on a shadow atlas page, read back through a staging copy. -1 on failure.
+int MaxPageAlpha(ID3D11Device* device, ID3D11DeviceContext* context, ImTextureID pageView)
+{
+    ComPtr<ID3D11Resource> resource;
+    reinterpret_cast<ID3D11ShaderResourceView*>(static_cast<std::uintptr_t>(pageView))->GetResource(resource.GetAddressOf());
+    ComPtr<ID3D11Texture2D> page;
+    if (FAILED(resource.As(&page)))
+        return -1;
+    D3D11_TEXTURE2D_DESC desc = {};
+    page->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> staging;
+    if (FAILED(device->CreateTexture2D(&desc, nullptr, staging.GetAddressOf())))
+        return -1;
+    context->CopyResource(staging.Get(), page.Get());
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        return -1;
+    int alpha = 0;
+    for (UINT y = 0; y < desc.Height; ++y)
+    {
+        const auto* row = static_cast<const std::uint8_t*>(mapped.pData) + static_cast<size_t>(y) * mapped.RowPitch;
+        for (UINT x = 0; x < desc.Width; ++x)
+            alpha = (std::max)(alpha, static_cast<int>(row[static_cast<size_t>(x) * 4 + 3]));
+    }
+    context->Unmap(staging.Get(), 0);
+    return alpha;
+}
+
+enum class FirstShadowDraw
+{
+    Missing,      // no command samples a shadow page
+    PageEmpty,    // the first one would sample a page no upload has written yet
+    PageWritten,  // an upload ran before it
+};
+
+// Replays draw lists in order the way a renderer would, running each callback, and reports
+// what the first draw that samples a shadow atlas page would read. Shadow pages are the only
+// textures here given as a plain texture id; Dear ImGui's own textures carry texture data.
+FirstShadowDraw ReplayToFirstShadowDraw(ID3D11Device* device, ID3D11DeviceContext* context,
+                                        const std::vector<ImDrawList*>& lists)
+{
+    for (ImDrawList* list : lists)
+    {
+        for (ImDrawCmd& command : list->CmdBuffer)
+        {
+            if (command.UserCallback != nullptr)
+            {
+                if (command.UserCallbackDataOffset >= 0 && command.UserCallbackDataSize > 0)
+                    command.UserCallbackData = list->_CallbacksDataBuf.Data + command.UserCallbackDataOffset;
+                command.UserCallback(list, &command);
+                continue;
+            }
+            if (command.ElemCount == 0 || command.TexRef._TexData != nullptr || command.TexRef._TexID == ImTextureID_Invalid)
+                continue;
+            return MaxPageAlpha(device, context, command.TexRef._TexID) > 0 ? FirstShadowDraw::PageWritten
+                                                                            : FirstShadowDraw::PageEmpty;
+        }
+    }
+    return FirstShadowDraw::Missing;
+}
+
+} // namespace
+
+TEST_CASE("A tile shared by table columns is uploaded before the first column that draws it")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    io.DisplaySize = ImVec2(480.0f, 240.0f);
+    io.DeltaTime = 1.0f / 60.0f;
+    facet::ShadowSpec spec;
+    spec.blur = 6.0f;
+    spec.color = IM_COL32(0, 0, 0, 80);
+
+    ImGui::NewFrame();
+    facet::NewFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(io.DisplaySize);
+    ImGui::Begin("table host", nullptr, ImGuiWindowFlags_NoDecoration);
+    const ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit;
+    if (ImGui::BeginTable("columns", 2, flags))
+    {
+        ImGui::TableSetupColumn("first", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn("second", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableNextRow();
+        // The first column records the tile first, and its content runs past its clip rect,
+        // so the table does not merge it: it moves behind the second column's channel.
+        ImGui::TableNextColumn();
+        ImVec2 at = ImGui::GetCursorScreenPos();
+        facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
+                          ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
+        ImGui::Dummy(ImVec2(300.0f, 72.0f));
+        // The second column fits and is merged into the leading group.
+        ImGui::TableNextColumn();
+        at = ImGui::GetCursorScreenPos();
+        facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
+                          ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
+        ImGui::Dummy(ImVec2(72.0f, 72.0f));
+        ImGui::EndTable();
+    }
+    ImGui::End();
+    facet::EndFrame();
+    ImGui::Render();
+
+    const ImDrawData* data = ImGui::GetDrawData();
+    REQUIRE(data != nullptr);
+    const std::vector<ImDrawList*> lists(data->CmdLists.begin(), data->CmdLists.end());
+    CHECK(ReplayToFirstShadowDraw(warp.device.Get(), warp.context.Get(), lists) == FirstShadowDraw::PageWritten);
+}
+
+TEST_CASE("A tile drawn through a user splitter is uploaded before its first merged draw")
+{
+    Warp warp;
+    REQUIRE(warp.device);
+    EffectsContext effects(warp);
+    REQUIRE(effects.ready);
+    facet::ShadowSpec spec;
+    spec.blur = 13.0f;
+    spec.color = IM_COL32(0, 0, 0, 80);
+
+    ImDrawList drawList(ImGui::GetDrawListSharedData());
+    drawList._ResetForNewFrame();
+    drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(64.0f, 64.0f));
+    // The splitter belongs to the caller, not to the draw list, and channel 1 records the
+    // tile first while channel 0 comes first after the merge.
+    ImDrawListSplitter splitter;
+    splitter.Split(&drawList, 2);
+    splitter.SetCurrentChannel(&drawList, 1);
+    facet::DrawShadow(&drawList, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 7.0f, spec);
+    splitter.SetCurrentChannel(&drawList, 0);
+    facet::DrawShadow(&drawList, ImVec2(20.0f, 20.0f), ImVec2(52.0f, 52.0f), 7.0f, spec);
+    splitter.Merge(&drawList);
+    splitter.ClearFreeMemory();
+
+    CHECK(ReplayToFirstShadowDraw(warp.device.Get(), warp.context.Get(), {&drawList}) == FirstShadowDraw::PageWritten);
 }
 
 TEST_CASE("Effects outside the clip rect record nothing")

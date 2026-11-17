@@ -29,12 +29,7 @@ constexpr float kRefillThreshold = 0.75f;
 
 } // namespace
 
-ShadowAtlas::ShadowAtlas()
-    : confirmations(std::make_unique<std::atomic<std::uint64_t>[]>(kConfirmationCount))
-{
-    for (std::uint32_t i = 0; i < kConfirmationCount; ++i)
-        confirmations[i].store(0, std::memory_order_relaxed);
-}
+ShadowAtlas::ShadowAtlas() = default;
 
 ShadowAtlas::~ShadowAtlas()
 {
@@ -51,6 +46,7 @@ void ShadowAtlas::SetDevice(ID3D11Device* newDevice, ID3D11DeviceContext* newCon
 
 void ShadowAtlas::ReleaseDevice()
 {
+    pending.clear();
     tiles.clear();
     pages.clear();
     context.Reset();
@@ -59,6 +55,7 @@ void ShadowAtlas::ReleaseDevice()
 
 void ShadowAtlas::Clear()
 {
+    pending.clear();
     tiles.clear();
     for (Page& page : pages)
         page.packer.Reset(kShadowAtlasPageSize, kShadowAtlasPageSize);
@@ -102,14 +99,15 @@ bool ShadowAtlas::AddPage()
     return true;
 }
 
-void ShadowAtlas::BuildRecord(Entry& entry, const Page& page, int slotX, int slotY, const ShadowTileLayout& layout)
+void ShadowAtlas::BuildTexels(Entry& entry, const ShadowTileLayout& layout)
 {
     // Slot = transparent texel, tile, copy of the tile's last row or column.
     const int size = layout.size;
     const int slot = size + 2;
     const size_t texels = static_cast<size_t>(slot) * static_cast<size_t>(slot);
-    entry.record.assign(sizeof(ShadowUploadHeader) + texels * 4, 0);
-    std::uint8_t* pixels = entry.record.data() + sizeof(ShadowUploadHeader);
+    entry.texels.assign(texels * 4, 0);
+    entry.size = static_cast<std::uint32_t>(slot);
+    std::uint8_t* pixels = entry.texels.data();
     for (int y = 1; y < slot; ++y)
     {
         const int ty = std::min(y - 1, size - 1);
@@ -122,89 +120,59 @@ void ShadowAtlas::BuildRecord(Entry& entry, const Page& page, int slotX, int slo
             texel[3] = static_cast<std::uint8_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
         }
     }
-    ShadowUploadHeader header;
-    header.texture = page.texture.Get();
-    header.confirmations = confirmations.get();
-    header.id = nextUploadId++;
-    header.confirmationCount = kConfirmationCount;
-    header.left = static_cast<std::uint32_t>(slotX);
-    header.top = static_cast<std::uint32_t>(slotY);
-    header.size = static_cast<std::uint32_t>(slot);
-    std::memcpy(entry.record.data(), &header, sizeof(header));
-    entry.uploadId = header.id;
-    entry.queuedList = nullptr;
-    entry.queuedFrame = 0;
 }
 
-bool ShadowAtlas::UploadDone(const Entry& entry) const
+void ShadowAtlas::Upload(ID3D11DeviceContext* target, Entry& entry)
 {
-    return entry.record.empty() ||
-           confirmations[entry.uploadId % kConfirmationCount].load(std::memory_order_acquire) == entry.uploadId;
-}
-
-void ShadowAtlas::RunUpload(ID3D11DeviceContext* target, const std::uint8_t* record, size_t size)
-{
-    if (target == nullptr || record == nullptr || size < sizeof(ShadowUploadHeader))
-        return;
-    // The record may sit at any alignment inside a draw list's callback buffer.
-    ShadowUploadHeader header;
-    std::memcpy(&header, record, sizeof(header));
-    const size_t texels = static_cast<size_t>(header.size) * static_cast<size_t>(header.size);
-    if (header.texture == nullptr || header.size == 0 || size != sizeof(header) + texels * 4)
-        return;
+    ID3D11Texture2D* page = pages[static_cast<size_t>(entry.page)].texture.Get();
     D3D11_BOX box = {};
-    box.left = header.left;
-    box.top = header.top;
-    box.right = header.left + header.size;
-    box.bottom = header.top + header.size;
+    box.left = entry.left;
+    box.top = entry.top;
+    box.right = entry.left + entry.size;
+    box.bottom = entry.top + entry.size;
     box.front = 0;
     box.back = 1;
-    target->UpdateSubresource(header.texture, 0, &box, record + sizeof(header), header.size * 4, 0);
-    if (header.confirmations != nullptr && header.confirmationCount > 0)
-        header.confirmations[header.id % header.confirmationCount].store(header.id, std::memory_order_release);
+    target->UpdateSubresource(page, 0, &box, entry.texels.data(), entry.size * 4, 0);
+    // The texels are on the page now; a tile is baked once per atlas fill, so they are
+    // never needed again.
+    std::vector<std::uint8_t>().swap(entry.texels);
+    entry.uploadId = 0;
 }
 
-std::span<const std::uint8_t> ShadowAtlas::PendingUpload(const ShadowKey& key, const void* drawList, int channel,
-                                                         std::uint64_t frame)
+bool ShadowAtlas::PendingUpload(const ShadowKey& key, ShadowUploadRecord& record) const
 {
     const auto found = tiles.find(key.Packed());
-    if (found == tiles.end())
-        return {};
-    Entry& entry = found->second;
-    if (UploadDone(entry))
-    {
-        if (!entry.record.empty())
-            std::vector<std::uint8_t>().swap(entry.record);
-        return {};
-    }
-    if (entry.queuedList == drawList && entry.queuedChannel == channel && entry.queuedFrame == frame)
-        return {};
-    entry.queuedList = drawList;
-    entry.queuedChannel = channel;
-    entry.queuedFrame = frame;
-    return std::span<const std::uint8_t>(entry.record.data(), entry.record.size());
+    if (found == tiles.end() || found->second.uploadId == 0)
+        return false;
+    record.id = found->second.uploadId;
+    return true;
+}
+
+void ShadowAtlas::RunUpload(ID3D11DeviceContext* target, const ShadowUploadRecord& record)
+{
+    if (target == nullptr)
+        return;
+    const auto waiting = pending.find(record.id);
+    if (waiting == pending.end())
+        return;
+    const auto found = tiles.find(waiting->second);
+    pending.erase(waiting);
+    if (found == tiles.end() || found->second.uploadId != record.id)
+        return;
+    Upload(target, found->second);
 }
 
 void ShadowAtlas::FlushUploads()
 {
-    for (auto& [packed, entry] : tiles)
+    if (!context)
+        return;
+    for (const auto& [id, packed] : pending)
     {
-        if (UploadDone(entry))
-            continue;
-        RunUpload(context.Get(), entry.record.data(), entry.record.size());
-        std::vector<std::uint8_t>().swap(entry.record);
+        const auto found = tiles.find(packed);
+        if (found != tiles.end() && found->second.uploadId == id)
+            Upload(context.Get(), found->second);
     }
-}
-
-int ShadowAtlas::PendingCount() const
-{
-    int count = 0;
-    for (const auto& [packed, entry] : tiles)
-    {
-        if (!UploadDone(entry))
-            ++count;
-    }
-    return count;
+    pending.clear();
 }
 
 const ShadowTile* ShadowAtlas::Acquire(const ShadowKey& key)
@@ -239,7 +207,12 @@ const ShadowTile* ShadowAtlas::Acquire(const ShadowKey& key)
     ++bakes;
     const Page& page = pages[static_cast<size_t>(pageIndex)];
     Entry entry;
-    BuildRecord(entry, page, slotX, slotY, layout);
+    BuildTexels(entry, layout);
+    entry.page = pageIndex;
+    entry.left = static_cast<std::uint32_t>(slotX);
+    entry.top = static_cast<std::uint32_t>(slotY);
+    entry.uploadId = nextUploadId++;
+    pending.emplace(entry.uploadId, packed);
 
     ShadowTile& tile = entry.tile;
     tile.texture = static_cast<ImTextureID>(reinterpret_cast<std::uintptr_t>(page.view.Get()));
@@ -296,14 +269,17 @@ void ShadowScaleChanged(float)
     State().clearPending = true;
 }
 
-// Uploads a tile while the frame renders. UpdateSubresource binds nothing, so the renderer's
-// state needs no reset afterwards.
+// Uploads a tile while the frame renders, unless an earlier callback for the same upload
+// already did. UpdateSubresource binds nothing, so the renderer's state needs no reset.
 void ShadowUploadCallback(const ImDrawList*, const ImDrawCmd* command)
 {
-    if (command == nullptr || command->UserCallbackData == nullptr || command->UserCallbackDataSize <= 0)
+    if (command == nullptr || command->UserCallbackData == nullptr ||
+        command->UserCallbackDataSize != static_cast<int>(sizeof(ShadowUploadRecord)))
         return;
-    ShadowAtlas::RunUpload(DeviceContext(), static_cast<const std::uint8_t*>(command->UserCallbackData),
-                           static_cast<size_t>(command->UserCallbackDataSize));
+    // The record may sit at any alignment inside a draw list's callback buffer.
+    ShadowUploadRecord record;
+    std::memcpy(&record, command->UserCallbackData, sizeof(record));
+    State().atlas.RunUpload(DeviceContext(), record);
 }
 
 void DrawNineSlice(ImDrawList* drawList, const NineSlice& grid, ImTextureID texture, ImU32 color, bool skipCenter)
@@ -360,12 +336,14 @@ void DrawBlurredShape(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radi
     const ShadowTile* tile = state.atlas.Acquire(key);
     if (tile == nullptr)
         return;
-    // A tile that is not on its page yet is uploaded by a callback in front of its draw, on
-    // the same split channel (ImDrawListSplitter, tables), since channels merge in index order.
-    const int channel = drawList->_Splitter._Count > 1 ? drawList->_Splitter._Current : 0;
-    const std::span<const std::uint8_t> upload = state.atlas.PendingUpload(key, drawList, channel, FrameIndex());
-    if (!upload.empty())
-        drawList->AddCallback(&ShadowUploadCallback, const_cast<std::uint8_t*>(upload.data()), upload.size());
+    // While the tile is not on its page, every draw of it gets an upload callback right in
+    // front of it, in the same command stream. A splitter (the list's own, a table's, or one
+    // the caller owns) moves the callback together with its draw, so whatever order the
+    // channels are merged in, the first draw that samples the tile follows an upload. The
+    // first callback to run uploads; the others find it done. Once uploaded, none is added.
+    ShadowUploadRecord record;
+    if (state.atlas.PendingUpload(key, record))
+        drawList->AddCallback(&ShadowUploadCallback, &record, sizeof(record));
     const NineSlice grid = ShadowNineSlice(pMin, pMax, tile->layout, tile->uv, tile->texelUv);
     DrawNineSlice(drawList, grid, tile->texture, color, outsideOnly);
 }

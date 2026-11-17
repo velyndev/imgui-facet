@@ -40,8 +40,12 @@ ShadowSpec ElevationShadow(int level);
 // Blur is limited to 128 pixels and the radius to 128 pixels; the shape's radius and the
 // blur are rounded to whole and half pixels so similar shadows share one baked tile.
 // A shadow wholly outside the draw list's clip rect records nothing. A tile is baked on the
-// CPU while recording; its texels are uploaded by a draw callback in front of the shadow,
-// so the device context is only used while the draw data is rendered.
+// CPU while recording, and until its texels are on the atlas page every shadow that uses it
+// gets a small upload callback right in front of its geometry. The first of those callbacks
+// the renderer runs does the upload, so the tile is in place before its first draw even
+// when the draw list's channels are split and merged in another order (tables, or any
+// ImDrawListSplitter); the device context is only used while the draw data is rendered.
+// Once uploaded, a tile adds no callback.
 void DrawShadow(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, const ShadowSpec& spec);
 
 // DrawShadow with ElevationShadow(level). Level 0 draws nothing.

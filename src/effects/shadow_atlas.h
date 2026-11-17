@@ -8,19 +8,19 @@
 // slot with one transparent texel on its top and left side and one copy of its last row and
 // column on the other side, so bilinear filtering at the 9-slice seams reads the edge profile.
 //
-// Recording a frame never touches the device context: a new tile is baked into an upload
-// record, and the caller queues that record as a draw callback in front of the draw that
-// samples the tile. The texels therefore reach the page while the frame is rendered, through
-// the immediate context given to facet::Init, in the same order as the draws that read them.
-// Rendering happens on the frame thread (see context.h); the done list is atomic only so a
-// confirmation is never read half written, not to support another render thread. A tile stays
-// pending until a callback reports its upload as done, so a draw list that is recorded but
-// never rendered (a window hidden for its first frame) cannot leave a tile empty.
+// Recording a frame never touches the device context. A new tile's texels stay in the atlas
+// until they are uploaded, and the caller puts a small upload record (the upload id) as a
+// draw callback in front of every draw of a tile that is still pending. Whichever of those
+// callbacks the renderer reaches first writes the texels to the page, so the upload precedes
+// the first draw that samples the tile however the draw list's channels were split and
+// merged afterwards. Every later callback for the same id finds the upload done and returns.
+// The record holds no pointer into the atlas: it is looked up by id, so a record that
+// outlives its tile (the atlas was cleared or released its device) does nothing. Rendering
+// happens on the frame thread (see context.h). A tile stays pending until a callback runs
+// its upload, so a draw list that is recorded but never rendered (a window hidden for its
+// first frame) cannot leave a tile empty: the next draw queues the upload again.
 
-#include <atomic>
 #include <cstdint>
-#include <memory>
-#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -47,16 +47,10 @@ struct ShadowTile
     ShadowTileLayout layout;
 };
 
-// The start of an upload record. The slot's RGBA8 texels (size * size * 4 bytes) follow it.
-struct ShadowUploadHeader
+// What an upload callback carries in the draw list: the id of a pending upload.
+struct ShadowUploadRecord
 {
-    ID3D11Texture2D* texture = nullptr;                  // the page; owned by the atlas
-    std::atomic<std::uint64_t>* confirmations = nullptr; // the atlas's done list
     std::uint64_t id = 0;
-    std::uint32_t confirmationCount = 0;
-    std::uint32_t left = 0;
-    std::uint32_t top = 0;
-    std::uint32_t size = 0;  // slot width and height in texels
 };
 
 class ShadowAtlas
@@ -72,27 +66,25 @@ public:
     // Releases every page and forgets every tile (device lost or shutdown).
     void ReleaseDevice();
 
-    // The tile of `key`, baked into an upload record on first use. Returns nullptr when no
-    // device is set, the tile does not fit, every page is full, or a page could not be created.
+    // The tile of `key`, baked on first use and pending until its upload runs. Returns
+    // nullptr when no device is set, the tile does not fit, every page is full, or a page
+    // could not be created.
     const ShadowTile* Acquire(const ShadowKey& key);
 
-    // The upload record the caller must queue before its first draw with the tile of `key`,
-    // or an empty span when the upload is done or `drawList` already queued it in `frame`
-    // on the same `channel`. The channel is the draw list's split channel: channels are
-    // merged in index order, not in recording order, so a record queued on one channel does
-    // not run before the draws of another. The span stays valid until the next call on the
-    // atlas.
-    std::span<const std::uint8_t> PendingUpload(const ShadowKey& key, const void* drawList, int channel,
-                                                std::uint64_t frame);
+    // Fills `record` and returns true while the tile of `key` waits for its upload. The
+    // caller queues the record in front of each draw of the tile; there is no deduplication,
+    // because a draw list's channels may be merged in any order.
+    bool PendingUpload(const ShadowKey& key, ShadowUploadRecord& record) const;
 
-    // Runs an upload record on `context` and marks it done. Called from the draw callback.
-    static void RunUpload(ID3D11DeviceContext* context, const std::uint8_t* record, size_t size);
+    // Writes the texels of `record`'s upload to its page on `context` and frees them. Does
+    // nothing when the upload already ran or its tile is gone. Called from the draw callback.
+    void RunUpload(ID3D11DeviceContext* context, const ShadowUploadRecord& record);
 
     // Uploads every pending tile at once through the atlas's own context.
     void FlushUploads();
 
-    // Tiles whose upload has not been reported done yet.
-    int PendingCount() const;
+    // Tiles whose upload has not run yet.
+    int PendingCount() const { return static_cast<int>(pending.size()); }
 
     // Forgets every tile and empties the pages without releasing them. Call at the start of
     // a frame, never between recording and rendering one (recorded draws read the pages).
@@ -115,27 +107,24 @@ private:
     struct Entry
     {
         ShadowTile tile;
-        std::uint64_t uploadId = 0;
-        std::vector<std::uint8_t> record;  // empty once the upload is done
-        const void* queuedList = nullptr;
-        int queuedChannel = 0;
-        std::uint64_t queuedFrame = 0;
+        std::vector<std::uint8_t> texels;  // the slot's RGBA8 texels; empty once uploaded
+        std::uint64_t uploadId = 0;        // the pending upload; 0 once uploaded
+        int page = 0;
+        std::uint32_t left = 0;
+        std::uint32_t top = 0;
+        std::uint32_t size = 0;  // slot width and height in texels
     };
 
-    // Done uploads, stored by id modulo the count. An id pushed out by a later one only
-    // makes its tile upload again.
-    static constexpr std::uint32_t kConfirmationCount = 64;
-
     bool AddPage();
-    void BuildRecord(Entry& entry, const Page& page, int slotX, int slotY, const ShadowTileLayout& layout);
-    bool UploadDone(const Entry& entry) const;
+    void BuildTexels(Entry& entry, const ShadowTileLayout& layout);
+    void Upload(ID3D11DeviceContext* target, Entry& entry);
 
     Microsoft::WRL::ComPtr<ID3D11Device> device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
     std::vector<Page> pages;
-    std::unordered_map<std::uint64_t, Entry> tiles;
+    std::unordered_map<std::uint64_t, Entry> tiles;            // by packed key
+    std::unordered_map<std::uint64_t, std::uint64_t> pending;  // upload id to packed key
     std::vector<float> tileScratch;
-    std::unique_ptr<std::atomic<std::uint64_t>[]> confirmations;
     std::uint64_t nextUploadId = 1;
     std::uint64_t bakes = 0;
     bool failed = false;  // page creation failed; stays off until the next SetDevice
