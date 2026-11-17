@@ -11,7 +11,8 @@
 // How layers open and how results come back (rule 8):
 //   - Layers the caller opens (BeginModal, ConfirmDialog, BeginPopover, BeginDrawer,
 //     CommandPalette) take `bool* open`. The caller writes true to open; Facet writes false when
-//     the layer is dismissed. The call is made every frame, open or not.
+//     the layer is dismissed. The call is made every frame, open or not. A null `open` shows
+//     nothing and returns the closed result (false or None).
 //   - Layers opened by input (BeginContextMenu, tooltips) open themselves over the last item.
 //   - Results are read from return values (DialogResult, a written index) or from query
 //     functions on the same or the next frame; there are no callbacks.
@@ -36,15 +37,15 @@ namespace facet
 struct ModalOptions
 {
     bool dismissible = true;           // Escape and a click on the scrim close it
-    bool closeButton = true;
+    bool closeButton = true;           // a close button at the trailing end of the title row
     float width = 0.0f;                // units; 0 for the token default
 };
 
 // A modal dialog over a scrim, shown while *open is true; the visible label part is the title.
 // It scales in when opened, traps the keyboard focus inside and gives it back to the item that
 // had it when it closes; modals opened from inside a modal stack above it. Writes *open = false
-// when dismissed. Returns false while closed; call EndModal only after true. Its content keeps
-// ids under the dialog window.
+// when dismissed. Returns false while closed and when `open` is null; call EndModal only after
+// true. Its content keeps ids under the dialog window.
 [[nodiscard]] bool BeginModal(const char* label, bool* open, const ModalOptions& options = {});
 void EndModal();
 
@@ -78,7 +79,8 @@ struct ConfirmDialogOptions
 
 // A compact modal with `message` (read during the call) and two buttons; the visible label part
 // is the title. Returns Confirmed or Canceled on the deciding frame and writes *open = false;
-// None otherwise. Escape and a click on the scrim cancel; Enter confirms unless destructive.
+// None otherwise, and always when `open` is null (nothing is shown then). Escape and a click on
+// the scrim cancel; Enter confirms unless destructive.
 DialogResult ConfirmDialog(const char* label, bool* open, const char* message,
                            const ConfirmDialogOptions& options = {});
 
@@ -104,18 +106,20 @@ enum class PopoverAnchor
 
 struct PopoverOptions
 {
-    PopoverPlacement placement = PopoverPlacement::Auto;
-    PopoverAnchor anchor = PopoverAnchor::LastItem;
+    PopoverPlacement placement = PopoverPlacement::Auto;  // the preferred side; Auto takes the side with the most room
+    PopoverAnchor anchor = PopoverAnchor::LastItem;       // what it points at; the anchor's rect is taken when it opens
     bool arrow = true;                 // a pointer toward the anchor
     bool openOnHover = false;          // Facet writes *open = true while the anchor is hovered, false when the pointer leaves both
-    bool dismissible = true;           // Escape and a click outside close it
+    bool dismissible = true;           // Escape and a click outside both the popover and its anchor item close it
     float width = 0.0f;                // units; 0 fits the content
 };
 
 // A floating card anchored to the last item, with a shadow and backdrop blur, shown while *open
-// is true. Writes *open = false when dismissed. Returns false while closed; call EndPopover only
-// after true. Keyboard focus moves into it when it opens and returns to the anchor when it
-// closes. Its content keeps ids under the popover window.
+// is true. Writes *open = false when dismissed. A click on the anchor item (LastItem) does not
+// count as outside, so an anchor button may toggle the flag itself (`open = !open`) and a second
+// click closes the popover instead of reopening it. Returns false while closed and when `open`
+// is null; call EndPopover only after true. Keyboard focus moves into it when it opens and
+// returns to the anchor when it closes. Its content keeps ids under the popover window.
 [[nodiscard]] bool BeginPopover(const char* id, bool* open, const PopoverOptions& options = {});
 void EndPopover();
 
@@ -142,7 +146,7 @@ enum class ContextTarget
 
 struct ContextMenuOptions
 {
-    ContextTarget target = ContextTarget::LastItem;
+    ContextTarget target = ContextTarget::LastItem;  // where a right click opens the menu
 };
 
 // A menu that opens on right click, the Menu key or Shift+F10 over the target, at the pointer
@@ -207,7 +211,7 @@ struct ToastId
 
 struct ToastOptions
 {
-    Tone tone = Tone::Neutral;
+    Tone tone = Tone::Neutral;         // colors the icon; Neutral has no status color
     Icon icon;                         // none: the tone's icon
     const char* detail = nullptr;      // second line; null for none
     const char* actionLabel = nullptr; // one action button; null for none
@@ -228,7 +232,8 @@ bool ToastActionPressed(ToastId toast);
 bool IsToastVisible(ToastId toast);
 void DismissToast(ToastId toast);
 
-// A corner of the display.
+// A corner of the display. ShellPlacement (containers.h) lists the corners in the same order
+// after its Center member.
 enum class ScreenCorner
 {
     BottomRight,
@@ -253,7 +258,7 @@ enum class DrawerSide
 
 struct DrawerOptions
 {
-    DrawerSide side = DrawerSide::End;
+    DrawerSide side = DrawerSide::End; // the edge it slides in from
     float extent = 0.0f;               // units; width for End and Start, height for Bottom and Top; 0 for the token default
     bool modal = true;                 // a scrim behind it, and focus stays inside
     bool resizable = false;            // the inner edge drags to resize
@@ -261,8 +266,9 @@ struct DrawerOptions
 };
 
 // A panel that slides in from an edge of the display, shown while *open is true; the visible
-// label part is its title. Writes *open = false when dismissed. Returns false while closed; call
-// EndDrawer only after true. Its content keeps ids under the drawer window.
+// label part is its title. Writes *open = false when dismissed. Returns false while closed and
+// when `open` is null; call EndDrawer only after true. Its content keeps ids under the drawer
+// window.
 [[nodiscard]] bool BeginDrawer(const char* label, bool* open, const DrawerOptions& options = {});
 void EndDrawer();
 
@@ -342,7 +348,7 @@ struct WatermarkField
 
 struct WatermarkOptions
 {
-    ScreenCorner corner = ScreenCorner::TopLeft;
+    ScreenCorner corner = ScreenCorner::TopLeft;  // the display corner of the strip, until moved
     bool movable = false;              // dragged while the overlay menu is visible, snapping to the corners
 };
 

@@ -27,21 +27,22 @@ namespace facet
 
 // --- Shell -----------------------------------------------------------------------------------
 
-// Where a shell first appears in the display, until a saved position exists.
+// Where a shell first appears in the display, until a saved position exists. The corners are in
+// the order of ScreenCorner (overlays.h).
 enum class ShellPlacement
 {
     Center,
-    TopLeft,
-    TopRight,
-    BottomLeft,
     BottomRight,
+    BottomLeft,
+    TopRight,
+    TopLeft,
 };
 
 struct ShellOptions
 {
     Icon icon;                         // before the title; none by default
     ImVec2 initialSize = {0.0f, 0.0f}; // units; used until a saved size exists; 0 for the token default
-    ShellPlacement placement = ShellPlacement::Center;
+    ShellPlacement placement = ShellPlacement::Center;  // first position in the display; Center by default
     ImVec2 minSize = {0.0f, 0.0f};     // units; 0 keeps the title bar and one control row
     ImVec2 maxSize = {0.0f, 0.0f};     // units; 0 for the display size
     bool resizable = true;             // every edge and corner resizes
@@ -277,9 +278,10 @@ struct MiniWindowOptions
 
 // A compact, auto-sized panel with a title and a pin button. It shows while the overlay menu is
 // visible, and while *pinned is true also when the menu is hidden, then without its title bar
-// and (with clickThrough) without taking input. The pin button writes *pinned. Dragged by its
-// title like a shell; position kept in units. Returns false while hidden; call EndMiniWindow
-// only after true. Call it outside any window and outside BeginOverlay.
+// and (with clickThrough) without taking input. The pin button writes *pinned; a null `pinned`
+// means never pinned and no pin button. Dragged by its title like a shell; position kept in
+// units. Returns false while hidden; call EndMiniWindow only after true. Call it outside any
+// window and outside BeginOverlay.
 [[nodiscard]] bool BeginMiniWindow(const char* label, bool* pinned, const MiniWindowOptions& options = {});
 void EndMiniWindow();
 
@@ -426,7 +428,7 @@ enum class DisclosureStyle
 
 struct DisclosureOptions
 {
-    DisclosureStyle style = DisclosureStyle::Row;
+    DisclosureStyle style = DisclosureStyle::Row;  // how the toggle looks
     const char* summary = nullptr;     // shown after the label while closed; null for none
     bool defaultOpen = false;          // used when `open` is null, the first time it appears
 };

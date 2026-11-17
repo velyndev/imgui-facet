@@ -55,7 +55,7 @@ struct SidebarItemOptions
 {
     bool selected = false;             // the item the selection pill marks; the caller sets it from its own state
     int badge = 0;                     // count shown at the end; 0 for none
-    Tone badgeTone = Tone::Neutral;
+    Tone badgeTone = Tone::Neutral;    // color of the badge; Neutral is the gray fill
 };
 
 // A navigation entry with an icon and the visible label part (a tooltip in rail mode). Returns
@@ -109,7 +109,7 @@ enum class TabStyle
 
 struct TabBarOptions
 {
-    TabStyle style = TabStyle::Pill;
+    TabStyle style = TabStyle::Pill;   // how the selected tab is marked
     bool closable = false;             // a close button per tab; read TabBarClosedTab
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills; tabs that do not fit move into a "more" menu
@@ -118,8 +118,8 @@ struct TabBarOptions
 // The tab strip; the caller draws the content of the tab *index below it. Tabs show the item
 // icon, label and detail (as a badge). Left and Right move between tabs; Ctrl+Page Down and
 // Ctrl+Page Up switch to the next and previous tab while focus is inside the window (Ctrl+Tab
-// stays with Dear ImGui's window switcher, which always claims it). Writes *index and returns true when
-// another tab is chosen. A closed tab is reported by TabBarClosedTab; the caller removes it.
+// stays with Dear ImGui's window switcher, which always claims it). Writes *index and returns
+// true when another tab is chosen. A closed tab is reported by TabBarClosedTab; the caller removes it.
 // Default width: the available width. Tab widths of the last frame are kept under the id.
 bool TabBar(const char* id, int* index, std::span<const ChoiceItem> tabs, const TabBarOptions& options = {});
 bool TabBar(const char* id, int* index, std::span<const char* const> tabs, const TabBarOptions& options = {});
@@ -266,7 +266,7 @@ enum class WizardAction
 struct WizardFooterOptions
 {
     bool canAdvance = true;            // Next and Finish are enabled
-    bool cancelButton = false;
+    bool cancelButton = false;         // adds a Cancel button, whose activation returns Cancel
     const char* finishLabel = nullptr; // null uses Strings::finish
 };
 
@@ -300,7 +300,8 @@ struct ShortcutSheetOptions
 
 // A modal sheet listing the registered shortcuts (core/input.h) by group, with their chords as
 // key caps. Shown while *open is true; Escape, the close button or a click on the scrim write
-// *open = false. The visible label part is the title. Disabled shortcuts are listed dimmed.
+// *open = false. A null `open` shows nothing. The visible label part is the title. Disabled
+// shortcuts are listed dimmed.
 void ShortcutSheet(const char* label, bool* open, const ShortcutSheetOptions& options = {});
 
 } // namespace facet

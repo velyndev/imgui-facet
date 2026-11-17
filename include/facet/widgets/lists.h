@@ -85,8 +85,8 @@ enum class MultiDropdownSummary
 struct MultiDropdownOptions
 {
     const char* placeholder = nullptr; // shown while nothing is checked; null uses Strings::select
-    MultiDropdownSummary summary = MultiDropdownSummary::List;
-    bool searchable = false;
+    MultiDropdownSummary summary = MultiDropdownSummary::List;  // what the closed field shows
+    bool searchable = false;           // filter field at the top of the list, fuzzy matched
     bool selectAllRow = false;         // a first row that checks or clears every enabled item
     int maxVisibleItems = 0;           // list height in rows; 0 for the token default
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults

@@ -52,9 +52,9 @@ enum class LayoutAlign
 
 struct StackOptions
 {
-    Orientation orientation = Orientation::Vertical;
-    Gap gap = Gap::Item;
-    LayoutAlign align = LayoutAlign::Start;
+    Orientation orientation = Orientation::Vertical;  // Vertical: a column; Horizontal: a row
+    Gap gap = Gap::Item;               // between neighbouring items
+    LayoutAlign align = LayoutAlign::Start;   // on the cross axis
     float width = 0.0f;                // units; 0 fills (vertical) or fits the items (horizontal)
     float height = 0.0f;               // units; 0 fits the items
 };
@@ -325,7 +325,7 @@ enum class DependentMode
 
 struct DependentGroupOptions
 {
-    DependentMode mode = DependentMode::Disable;
+    DependentMode mode = DependentMode::Disable;  // what happens while the parent is off
     bool indent = true;                // the content is indented by spacing.lg
 };
 
@@ -375,7 +375,7 @@ struct ItemGridOptions
 {
     float minTileWidth = 0.0f;         // units; tiles are at least this wide; 0 for layout.minRowControl
     float tileAspect = 1.0f;           // tile height / tile width
-    Gap gap = Gap::Item;
+    Gap gap = Gap::Item;               // between tiles, in both directions
     bool boxSelect = true;             // a drag that starts between tiles selects the tiles it covers
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // null uses Strings::empty

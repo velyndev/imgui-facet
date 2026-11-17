@@ -16,7 +16,8 @@ How layers open and how results come back:
 
 - Layers the caller opens (`BeginModal`, `ConfirmDialog`, `BeginPopover`, `BeginDrawer`,
   `CommandPalette`) take `bool* open`. The caller writes true to open; Facet writes false when the
-  layer is dismissed. The call is made every frame, open or not.
+  layer is dismissed. The call is made every frame, open or not. A null `open` shows nothing and
+  returns the closed result.
 - Layers opened by input (`BeginContextMenu`, tooltips) open themselves over the last item.
 - Results come back as return values (`DialogResult`, a written index) or from query functions; there
   are no callbacks.
@@ -164,7 +165,9 @@ A bar that slides in while settings have unsaved changes and returns Apply or Re
 
 ## Usage examples
 
-A popover anchored to the button that opens it:
+A popover anchored to the button that opens it. A click on the anchor item does not count as a
+click outside, so the button may toggle the flag: the first click opens the popover and the second
+closes it, instead of the press closing it and the release opening it again.
 
 ```cpp
 static bool filtersOpen = false;
