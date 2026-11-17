@@ -609,6 +609,22 @@ TEST_CASE("Controls stubs take their width in the order of the conventions")
     CHECK(session.ItemRect("button").GetWidth() < available / 2.0f);
 }
 
+TEST_CASE("The buffer form of InlineRename reads no further than the buffer size")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    // The first three bytes are the buffer; the bytes after them belong to someone else.
+    char memory[16] = "abcdefghijklmno";
+    float expected = 0.0f;
+    session.SetUi([&] {
+        expected = facet::MeasureText(facet::TextStyle::Body, "abc").x + 2.0f * facet::Px(facet::T().spacing.sm);
+        facet::InlineRename("rename", memory, 3, nullptr);
+        session.Track("rename");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("rename").GetWidth() == doctest::Approx(expected));
+}
+
 TEST_CASE("Controls that narrow themselves never outgrow a short row")
 {
     facet::test::Session session;

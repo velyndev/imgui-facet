@@ -112,6 +112,18 @@ inline float StubLabelWidth(const char* text, ControlSize size)
     return MeasureText(ControlTextStyle(size), text, end).x + Px(T().spacing.sm);
 }
 
+// Width of caller text (not a label: "##" is drawn as it is) in the label style of `size`,
+// reading at most `size` bytes up to the first zero, so an unterminated buffer is never read
+// past its end.
+inline float StubTextWidth(const char* text, std::size_t byteCount, ControlSize size)
+{
+    if (text == nullptr || byteCount == 0 || !StubCanDraw())
+        return 0.0f;
+    const void* zero = std::memchr(text, 0, byteCount);
+    const char* end = zero != nullptr ? static_cast<const char*>(zero) : text + byteCount;
+    return MeasureText(ControlTextStyle(size), text, end).x;
+}
+
 // Height of one line of the label text above a group (RadioGroup, CheckboxGroup), plus
 // spacing.xs; 0 for an empty visible part.
 inline float StubLabelLine(const char* text)
