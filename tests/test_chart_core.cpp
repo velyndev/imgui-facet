@@ -482,6 +482,22 @@ TEST_CASE("Decimation of an unsorted series reaches its last sample and every ex
     }
 }
 
+TEST_CASE("A plot rectangle snaps inward to whole pixels")
+{
+    // The chart page at scale 0.75: the left edge follows a label width such as 31.83 pixels.
+    const ImRect plot = SnapPlotRect(ImRect(52.83f, 10.25f, 400.6f, 211.9f));
+    CHECK(plot.Min.x == 53.0f);
+    CHECK(plot.Min.y == 11.0f);
+    CHECK(plot.Max.x == 400.0f);
+    CHECK(plot.Max.y == 211.0f);
+    // A mouse at the left or top edge, floored by Dear ImGui, lies inside.
+    CHECK(plot.Contains(ImFloor(plot.Min)));
+    // A rectangle narrower than a pixel collapses instead of turning inside out.
+    const ImRect thin = SnapPlotRect(ImRect(5.2f, 5.2f, 5.8f, 5.8f));
+    CHECK(thin.GetWidth() == 0.0f);
+    CHECK(thin.GetHeight() == 0.0f);
+}
+
 TEST_CASE("Long polylines, areas and grid lines draw into a draw list")
 {
     facet::test::Session session;

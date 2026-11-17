@@ -626,6 +626,14 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
 
 // --- Drawing ---------------------------------------------------------------------------------
 
+ImRect SnapPlotRect(const ImRect& rect)
+{
+    ImRect snapped(std::ceil(rect.Min.x), std::ceil(rect.Min.y), std::floor(rect.Max.x), std::floor(rect.Max.y));
+    snapped.Max.x = std::max(snapped.Max.x, snapped.Min.x);
+    snapped.Max.y = std::max(snapped.Max.y, snapped.Min.y);
+    return snapped;
+}
+
 void DrawPolyline(ImDrawList* drawList, std::span<const ImVec2> points, ImU32 color, float thickness,
                   const ImRect& clip)
 {

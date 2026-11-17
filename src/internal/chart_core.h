@@ -200,6 +200,11 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
 
 // --- Drawing ---------------------------------------------------------------------------------
 
+// The plot rectangle moved inward to whole pixels (Min rounded up, Max down). Layout sizes
+// are fractional at most scales; on whole pixels the clip edges stay crisp, and a mouse at the
+// plot's left or top edge, which Dear ImGui floors to a whole pixel, still lies inside it.
+ImRect SnapPlotRect(const ImRect& rect);
+
 // A polyline clipped to `clip`, drawn in chunks so any length stays within one draw command's
 // index range.
 void DrawPolyline(ImDrawList* drawList, std::span<const ImVec2> points, ImU32 color, float thickness,
