@@ -19,6 +19,13 @@ float SegmentWidth(const char* text, const SegmentedControlOptions& options)
     return internal::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
 }
 
+void Stub(const char* label, float content, const SegmentedControlOptions& options)
+{
+    // Labels collapse to icons when the row is short, so the control never outgrows it.
+    internal::ControlStub("SegmentedControl", label, internal::StubFittedWidth(options.width, content),
+                          ControlHeight(options.size));
+}
+
 } // namespace
 
 bool SegmentedControl(const char* label, int*, std::span<const ChoiceItem> items, const SegmentedControlOptions& options)
@@ -26,8 +33,7 @@ bool SegmentedControl(const char* label, int*, std::span<const ChoiceItem> items
     float content = 0.0f;
     for (const ChoiceItem& item : items)
         content += SegmentWidth(item.label, options);
-    internal::ControlStub("SegmentedControl", label, internal::StubWidth(options.width, content),
-                          ControlHeight(options.size));
+    Stub(label, content, options);
     return false;
 }
 
@@ -37,8 +43,7 @@ bool SegmentedControl(const char* label, int*, std::span<const char* const> item
     float content = 0.0f;
     for (const char* item : items)
         content += SegmentWidth(item, options);
-    internal::ControlStub("SegmentedControl", label, internal::StubWidth(options.width, content),
-                          ControlHeight(options.size));
+    Stub(label, content, options);
     return false;
 }
 

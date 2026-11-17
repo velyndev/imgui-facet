@@ -74,6 +74,17 @@ inline float StubWidth(float optionWidth, float defaultWidth)
     return width < 1.0f ? 1.0f : width;
 }
 
+// StubWidth for a content-sized control that narrows itself when the row is short (labels
+// collapse to icons, buttons move into a menu): the family default is `content` (pixels), but
+// at most the available width. A width the caller asked for is kept as it is.
+inline float StubFittedWidth(float optionWidth, float content)
+{
+    if (!StubCanDraw())
+        return 0.0f;
+    const float available = ImGui::GetContentRegionAvail().x;
+    return StubWidth(optionWidth, content < available ? content : (available > 1.0f ? available : 1.0f));
+}
+
 // Height of the message line under a control (spacing.xs and one Footnote line) when the widget
 // shows an error or a help text; 0 otherwise.
 inline float StubMessageHeight(const char* error, const char* helpText)

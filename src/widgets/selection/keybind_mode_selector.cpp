@@ -21,7 +21,8 @@ bool KeybindModeSelector(const char* label, BindMode*, const KeybindModeSelector
         if (mode != nullptr)
             content += internal::StubLabelWidth(mode, options.size) + 2.0f * Px(T().spacing.sm);
     }
-    internal::ControlStub("KeybindModeSelector", label, internal::StubWidth(options.width, content),
+    // Too narrow for the segments it becomes a dropdown, so it never outgrows the row.
+    internal::ControlStub("KeybindModeSelector", label, internal::StubFittedWidth(options.width, content),
                           internal::StubHeight(options.size, options.error, options.helpText));
     return false;
 }

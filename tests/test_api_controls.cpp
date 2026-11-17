@@ -609,6 +609,42 @@ TEST_CASE("Controls stubs take their width in the order of the conventions")
     CHECK(session.ItemRect("button").GetWidth() < available / 2.0f);
 }
 
+TEST_CASE("Controls that narrow themselves never outgrow a short row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::BindMode mode = facet::BindMode::Hold;
+    int index = 0;
+    float available = 0.0f;
+    float wideSegments = 0.0f;
+    session.SetUi([&] {
+        // In a wide row the controls keep their content width.
+        facet::SegmentedControl("Segments##wide", &index, kLabels);
+        wideSegments = GImGui->LastItemData.Rect.GetWidth();
+        // A row far narrower than the segments, the mode names or the buttons.
+        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(200.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::SegmentedControl("Segments", &index, kLabels);
+        session.Track("segments");
+        facet::KeybindModeSelector("Mode", &mode);
+        session.Track("mode");
+        facet::ToggleButtonGroup("Toggles", &index, kChoices, {.iconOnly = false});
+        session.Track("toggles");
+        // A width the caller asks for is kept.
+        facet::SegmentedControl("Segments##asked", &index, kLabels, {.width = 300.0f});
+        session.Track("asked");
+        ImGui::EndChild();
+    });
+    session.Frame();
+
+    REQUIRE(available > 1.0f);
+    CHECK(wideSegments > available);
+    CHECK(session.ItemRect("segments").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("mode").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("toggles").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
+}
+
 TEST_CASE("The placeholder text drops the label, then shortens with an ellipsis")
 {
     facet::test::Session session;

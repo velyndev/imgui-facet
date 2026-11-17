@@ -44,10 +44,19 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10)
     SectionHeader("Actions");
     Paragraph("One primary action per view, secondary and plain actions beside it, and a destructive one.");
     LabeledRow("Button");
+    // Side by side in a regular row; stacked in the control column when the row is compact.
+    const bool stack = facet::AvailableWidthClass() == facet::WidthClass::Compact;
+    const float column = ImGui::GetCursorPosX();
+    const auto next = [&] {
+        if (stack)
+            ImGui::SetCursorPosX(column);
+        else
+            ImGui::SameLine();
+    };
     facet::Button("Option 1", {.variant = facet::ButtonVariant::Primary});
-    ImGui::SameLine();
+    next();
     facet::Button("Option 2", {.icon = facet::Icon("refresh")});
-    ImGui::SameLine();
+    next();
     facet::Button("Option 3", {.variant = facet::ButtonVariant::Destructive});
     LabeledRow("Icon button");
     facet::IconButton("Pin", facet::Icon("pin"), {.selected = ui.pinned});

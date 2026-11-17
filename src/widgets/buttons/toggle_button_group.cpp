@@ -21,7 +21,8 @@ void Stub(const char* label, std::span<const ChoiceItem> items, const ToggleButt
         content += options.iconOnly ? height
                                     : internal::StubLabelWidth(item.label, options.size) + 2.0f * Px(T().spacing.sm);
     }
-    internal::ControlStub("ToggleButtonGroup", label, internal::StubWidth(options.width, content), height);
+    // Buttons that do not fit move into a "more" menu, so the group never outgrows the row.
+    internal::ControlStub("ToggleButtonGroup", label, internal::StubFittedWidth(options.width, content), height);
 }
 
 } // namespace
