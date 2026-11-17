@@ -492,30 +492,20 @@ int DecimatedCapacity(float pixelWidth)
     return 4 * static_cast<int>(columns) + 2;
 }
 
-int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
-                     bool sortedByX)
+namespace
 {
-    if (series.count <= 0 || series.y == nullptr || out.empty())
-        return 0;
+
+// Merges every run of consecutive samples in samples [begin, end) that falls into one column
+// (columns `columnWidth` pixels wide, counted from `origin`) into its first, lowest, highest
+// and last sample, in sample order. Returns the points written; `overflow` tells whether
+// `out` was too small (then the points written cover the series only up to there).
+int MergeColumnRuns(const SeriesView& series, const Scale& xScale, const Scale& yScale, int begin, int end,
+                    float origin, float columnWidth, std::span<ImVec2> out, bool& overflow)
+{
     const int capacity = static_cast<int>(out.size());
     int written = 0;
+    overflow = false;
     const auto point = [&](int i) { return ImVec2(xScale.ToPixel(series.X(i)), yScale.ToPixel(series.Y(i))); };
-
-    if (!sortedByX)
-    {
-        for (int i = 0; i < series.count && written < capacity; ++i)
-        {
-            if (Usable(series, i))
-                out[static_cast<std::size_t>(written++)] = point(i);
-        }
-        return written;
-    }
-
-    // Only the samples inside the x domain, plus one on each side so lines enter the plot.
-    const double domainLo = std::min(xScale.domainMin, xScale.domainMax);
-    const double domainHi = std::max(xScale.domainMin, xScale.domainMax);
-    const int begin = std::max(0, LowerBoundX(series, domainLo) - 1);
-    const int end = std::min(series.count, UpperBoundX(series, domainHi) + 1);
 
     // The current column: its first, last, lowest and highest sample.
     bool open = false;
@@ -527,17 +517,22 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
         int previous = -1;
         for (const int index : order)
         {
-            if (index == previous || written >= capacity)
+            if (index == previous)
                 continue;
+            if (written >= capacity)
+            {
+                overflow = true;
+                return;
+            }
             out[static_cast<std::size_t>(written++)] = point(index);
             previous = index;
         }
     };
-    for (int i = begin; i < end; ++i)
+    for (int i = begin; i < end && !overflow; ++i)
     {
-        if (std::isnan(series.Y(i)))
+        if (!Usable(series, i))
             continue;
-        const float c = std::floor(xScale.ToPixel(series.X(i)));
+        const float c = std::floor((xScale.ToPixel(series.X(i)) - origin) / columnWidth);
         if (!open || c != column)
         {
             if (open)
@@ -553,9 +548,59 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
         if (series.Y(i) > series.Y(high))
             high = i;
     }
-    if (open)
+    if (open && !overflow)
         flush();
     return written;
+}
+
+} // namespace
+
+int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
+                     bool sortedByX)
+{
+    if (series.count <= 0 || series.y == nullptr || out.empty())
+        return 0;
+
+    if (sortedByX)
+    {
+        // Only the samples inside the x domain, plus one on each side so lines enter the plot.
+        // They span at most the plot's columns plus two, which DecimatedCapacity holds.
+        const double domainLo = std::min(xScale.domainMin, xScale.domainMax);
+        const double domainHi = std::max(xScale.domainMin, xScale.domainMax);
+        const int begin = std::max(0, LowerBoundX(series, domainLo) - 1);
+        const int end = std::min(series.count, UpperBoundX(series, domainHi) + 1);
+        bool overflow = false;
+        return MergeColumnRuns(series, xScale, yScale, begin, end, 0.0f, 1.0f, out, overflow);
+    }
+
+    // Unsorted (a parametric curve, a curve that turns back): every sample is visited. Runs in
+    // one-pixel columns come first; when they do not fit, the columns double in width until
+    // they do. A column wider than all samples holds one run of at most four points, so the
+    // polyline always spans the whole series once `out` holds four points.
+    float lo = 0.0f, hi = 0.0f;
+    bool any = false;
+    for (int i = 0; i < series.count; ++i)
+    {
+        const float x = Usable(series, i) ? xScale.ToPixel(series.X(i)) : NAN;
+        if (!std::isfinite(x))
+            continue;
+        lo = any ? std::min(lo, x) : x;
+        hi = any ? std::max(hi, x) : x;
+        any = true;
+    }
+    if (!any)
+        return 0;
+    const float span = std::max(hi - lo, 1.0f);
+    int written = 0;
+    for (float width = 1.0f;; width *= 2.0f)
+    {
+        const bool last = width > span;
+        bool overflow = false;
+        written = MergeColumnRuns(series, xScale, yScale, 0, series.count, lo, last ? 2.0f * span + 1.0f : width,
+                                  out, overflow);
+        if (!overflow || last)
+            return written;
+    }
 }
 
 // --- Drawing ---------------------------------------------------------------------------------

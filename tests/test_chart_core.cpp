@@ -378,7 +378,7 @@ TEST_CASE("Decimation keeps every pixel column's extremes with at most four poin
         CHECK(points[static_cast<std::size_t>(i)].x >= points[static_cast<std::size_t>(i - 1)].x);
 }
 
-TEST_CASE("Decimation visits only the visible samples and copies unsorted series")
+TEST_CASE("Decimation visits only the visible samples and keeps short unsorted series")
 {
     const int count = 100000;
     const std::vector<float> ys = RandomWalk(count, 99u);
@@ -398,13 +398,67 @@ TEST_CASE("Decimation visits only the visible samples and copies unsorted series
     const Scale wide = MakeScale(ScaleKind::Linear, 0.0, 9.0, 0.0f, 900.0f);
     CHECK(DecimatePolyline(withHoles, wide, yScale, points, true) == 9);
 
-    // An unsorted series is copied in order, as far as the storage holds.
+    // An unsorted series that fits is kept sample by sample; storage too small for its runs
+    // still gets its first and last sample.
     const float ux[] = {3.0f, 1.0f, 2.0f};
     const float uy[] = {1.0f, 2.0f, 3.0f};
     const SeriesView unsorted{.x = ux, .y = uy, .count = 3};
+    ImVec2 three[3];
+    CHECK(DecimatePolyline(unsorted, wide, yScale, three, false) == 3);
+    CHECK(three[1].x == doctest::Approx(100.0f));
     ImVec2 two[2];
     CHECK(DecimatePolyline(unsorted, wide, yScale, two, false) == 2);
     CHECK(two[0].x == doctest::Approx(300.0f));
+    CHECK(two[1].x == doctest::Approx(200.0f));
+}
+
+TEST_CASE("Decimation of an unsorted series reaches its last sample and every extreme")
+{
+    // Parametric curves x = cos(turns * t), y = sin(3t) with 100000 samples, x turning back and
+    // forth. One turn passes every column twice, which fits one-pixel columns; five turns pass
+    // it ten times, more runs than one-pixel columns can hold, so the columns widen.
+    const float width = 400.0f;
+    const Scale xScale = MakeScale(ScaleKind::Linear, -1.0, 1.0, 0.0f, width);
+    const Scale yScale = MakeScale(ScaleKind::Linear, -1.0, 1.0, 300.0f, 0.0f);
+    std::vector<ImVec2> points(static_cast<std::size_t>(DecimatedCapacity(width)));
+    for (const int turns : {1, 5})
+    {
+        INFO("turns ", turns);
+        const int count = 100000;
+        std::vector<float> xs(count), ys(count);
+        for (int i = 0; i < count; ++i)
+        {
+            const double t = 6.283185307179586 * i / (count - 1);
+            xs[static_cast<std::size_t>(i)] = static_cast<float>(std::cos(turns * t));
+            ys[static_cast<std::size_t>(i)] = static_cast<float>(std::sin(3.0 * t));
+        }
+        const SeriesView series{.x = xs.data(), .y = ys.data(), .count = count};
+        REQUIRE_FALSE(IsSortedByX(series));
+        const int written = DecimatePolyline(series, xScale, yScale, points, false);
+        REQUIRE(written > 2);
+        CHECK(written <= DecimatedCapacity(width));
+        // The polyline starts and ends where the series does, not where the storage ran out.
+        CHECK(points[0].x == xScale.ToPixel(xs.front()));
+        CHECK(points[0].y == yScale.ToPixel(ys.front()));
+        CHECK(points[static_cast<std::size_t>(written - 1)].x == xScale.ToPixel(xs.back()));
+        CHECK(points[static_cast<std::size_t>(written - 1)].y == yScale.ToPixel(ys.back()));
+        // The lowest and highest y of the whole curve are drawn exactly. In x the polyline
+        // reaches into the outermost columns, which are wider once the runs had to widen:
+        // 1 pixel for one turn, at most 16 for five.
+        float top = points[0].y, bottom = points[0].y, left = points[0].x, right = points[0].x;
+        for (int i = 0; i < written; ++i)
+        {
+            top = std::min(top, points[static_cast<std::size_t>(i)].y);
+            bottom = std::max(bottom, points[static_cast<std::size_t>(i)].y);
+            left = std::min(left, points[static_cast<std::size_t>(i)].x);
+            right = std::max(right, points[static_cast<std::size_t>(i)].x);
+        }
+        const float column = turns == 1 ? 1.0f : 16.0f;
+        CHECK(top == doctest::Approx(0.0f).epsilon(0.001));
+        CHECK(bottom == doctest::Approx(300.0f).epsilon(0.001));
+        CHECK(left < column);
+        CHECK(right > width - column);
+    }
 }
 
 TEST_CASE("Long polylines, areas and grid lines draw into a draw list")

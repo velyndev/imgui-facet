@@ -183,11 +183,14 @@ int DecimatedCapacity(float pixelWidth);
 
 // Writes a polyline that covers the same pixels as the whole series but has at most four
 // points per pixel column: for every column the first and last sample, and the lowest and the
-// highest one, in sample order, each at its own exact position. Samples with a NaN y are
-// skipped. A series sorted by x (`sortedByX`, from IsSortedByX, which the caller keeps while
-// the data does not change) is decimated, and only the samples within the x domain (and one on
-// each side) are visited, so the cost follows the visible samples. An unsorted series is copied
-// point by point, as far as `out` holds. Returns the number of points written.
+// highest one, in sample order, each at its own exact position. Samples with a NaN x or y are
+// skipped. For a series sorted by x (`sortedByX`, from IsSortedByX, which the caller keeps
+// while the data does not change) only the samples within the x domain (and one on each side)
+// are visited, so the cost follows the visible samples. An unsorted series (a parametric
+// curve) is merged the same way over all its samples, run by run of consecutive samples in one
+// column; when those runs do not fit `out`, the columns double in width (2, 4, 8 ... pixels)
+// until they do, so the polyline always reaches the last sample. Returns the number of points
+// written.
 int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
                      bool sortedByX);
 
