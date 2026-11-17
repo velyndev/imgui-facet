@@ -211,9 +211,11 @@ ChartOutcome DrawChart(const ChartSpec& spec, ChartCursor& cursor, const facet::
     const ImRect plot(ImVec2(card.Min.x + padding + labelWidth + gap, plotTop),
                       ImVec2(card.Max.x - padding, plotBottom));
 
-    // The plot is one item: hover and keyboard focus read samples.
+    // The plot is one item: hover and keyboard focus read samples. EnableNav makes it a Tab
+    // stop; an invisible button is left out of keyboard navigation without it.
     ImGui::SetCursorScreenPos(plot.Min);
-    ImGui::InvisibleButton(spec.id, ImVec2(std::max(plot.GetWidth(), 1.0f), std::max(plot.GetHeight(), 1.0f)));
+    ImGui::InvisibleButton(spec.id, ImVec2(std::max(plot.GetWidth(), 1.0f), std::max(plot.GetHeight(), 1.0f)),
+                           ImGuiButtonFlags_EnableNav);
     const ImGuiID plotId = ImGui::GetItemID();
     const bool hovered = ImGui::IsItemHovered();
     ctx.Probe(probe);
@@ -510,20 +512,28 @@ FACET_DEMO_SELFTEST("chart-core")
     test.Expect("a quarter of the way snaps to a sample about a quarter in",
                 [] { return std::abs(waveCrosshair.index - (kWaveSamples - 1) / 4) <= 2; });
 
-    // The arrow keys step through the samples while the plot has the focus.
-    test.Click("chart.wave");
-    test.Do([] { page.wave.index = 10; page.wave.keyboard = true; });
-    test.Wait(1);
+    // Tab reaches the plot from the checkbox before it (clicked twice, so it has the focus and
+    // the chart stays shown), and the arrow keys step through the samples there. After mouse
+    // input the first Tab only shows the keyboard cursor on the focused checkbox.
+    test.Click("chart.empty");
+    test.Click("chart.empty");
+    test.Expect("the checkbox clicked twice leaves the chart shown", [] { return !page.showEmpty; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("chart.empty");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("chart.wave");
+    test.KeyPress(ImGuiKey_Home);
+    test.ExpectNear("Home goes to the first sample", [] { return waveCrosshair.index; }, 0.0, 0.0);
     test.KeyPress(ImGuiKey_RightArrow);
-    test.ExpectNear("Right moves the crosshair one sample on", [] { return waveCrosshair.index; }, 11.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right twice moves the crosshair two samples on", [] { return waveCrosshair.index; }, 2.0, 0.0);
     test.ExpectFocused("chart.wave");
     test.KeyPress(ImGuiKey_LeftArrow);
-    test.KeyPress(ImGuiKey_LeftArrow);
-    test.ExpectNear("Left moves it back", [] { return waveCrosshair.index; }, 9.0, 0.0);
+    test.ExpectNear("Left moves it back", [] { return waveCrosshair.index; }, 1.0, 0.0);
     test.KeyPress(ImGuiKey_End);
     test.ExpectNear("End goes to the last sample", [] { return waveCrosshair.index; }, kWaveSamples - 1.0, 0.0);
     test.KeyPress(ImGuiKey_Home);
-    test.ExpectNear("Home goes to the first sample", [] { return waveCrosshair.index; }, 0.0, 0.0);
+    test.ExpectNear("Home goes back to the first sample", [] { return waveCrosshair.index; }, 0.0, 0.0);
 
     // The axis switch.
     test.Click("chart.linear");
