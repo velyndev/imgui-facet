@@ -166,6 +166,19 @@ TEST_CASE("Fuzzy ranking over setting names: words, camelCase and initials")
     CheckRanksAbove("mv", settings, "Master volume", "Mouse sensitivity");
 }
 
+TEST_CASE("The exact name ranks above a longer name listed before it")
+{
+    // Without the exact bonus both names score the same placement and the list order would
+    // decide, so these lists put the longer name first.
+    const std::vector<const char*> themes = {"Theme color", "Theme"};
+    CheckRanksAbove("theme", themes, "Theme", "Theme color");
+    const std::vector<const char*> keys = {"renderScale", "render"};
+    CheckRanksAbove("render", keys, "render", "renderScale");
+    // Case and diacritics do not stop a name from being exact.
+    const std::vector<const char*> accents = {"Caf\xC3\xA9 menu", "Caf\xC3\xA9"};
+    CheckRanksAbove("cafe", accents, "Caf\xC3\xA9", "Caf\xC3\xA9 menu");
+}
+
 TEST_CASE("Shorter gaps and earlier matches score higher")
 {
     CHECK(FuzzyScore("ab", "axb").score > FuzzyScore("ab", "axxxb").score);
