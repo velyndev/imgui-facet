@@ -22,6 +22,8 @@ bool SameColors(const facet::Colors& a, const facet::Colors& b)
                 SameColor(a.separator, b.separator) && SameColor(a.focusRing, b.focusRing);
     for (int i = 0; i < 4; ++i)
         same = same && SameColor(a.fill[i], b.fill[i]);
+    for (int i = 0; i < 3; ++i)
+        same = same && SameColor(a.bgElevatedLevels[i], b.bgElevatedLevels[i]);
     return same;
 }
 
@@ -39,6 +41,22 @@ struct ThemeGuard
 };
 
 } // namespace
+
+TEST_CASE("Elevated surfaces get lighter with the level in dark and stay white in light")
+{
+    const facet::Colors dark = facet::Theme::Dark().colors;
+    CHECK(SameColor(dark.ElevatedSurface(2), dark.bgElevated));
+    CHECK(facet::RelativeLuminance(dark.ElevatedSurface(1)) > facet::RelativeLuminance(dark.bgSecondary));
+    CHECK(facet::RelativeLuminance(dark.ElevatedSurface(2)) > facet::RelativeLuminance(dark.ElevatedSurface(1)));
+    CHECK(facet::RelativeLuminance(dark.ElevatedSurface(3)) > facet::RelativeLuminance(dark.ElevatedSurface(2)));
+    // Out-of-range levels clamp.
+    CHECK(SameColor(dark.ElevatedSurface(0), dark.ElevatedSurface(1)));
+    CHECK(SameColor(dark.ElevatedSurface(7), dark.ElevatedSurface(3)));
+
+    const facet::Colors light = facet::Theme::Light().colors;
+    for (int level = 1; level <= 3; ++level)
+        CHECK(SameColor(light.ElevatedSurface(level), light.bgElevated));
+}
 
 TEST_CASE("The token groups hold the documented starting values")
 {

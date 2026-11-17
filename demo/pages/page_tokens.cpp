@@ -354,7 +354,7 @@ void DrawElevationLevels()
         const ImVec2 b = ImGui::GetItemRectMax();
         const float radius = facet::Px(theme.radii.card);
         facet::DrawElevation(drawList, a, b, radius, level);
-        facet::FillRect(drawList, a, b, U32(theme.colors.bgElevated), radius);
+        facet::FillRect(drawList, a, b, U32(theme.colors.ElevatedSurface(level)), radius);
         facet::StrokeRect(drawList, a, b, U32(theme.colors.separator), radius, facet::HairlineThickness());
         Note("level %d: offset %.0f, blur %.0f, opacity %.2f", level, static_cast<double>(shadow.offset.y),
              static_cast<double>(shadow.blur), static_cast<double>(shadow.opacity));
@@ -404,7 +404,8 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent")
 
     SectionHeader("Elevation");
     DrawElevationLevels();
-    Paragraph("Shadows come from the effects module and appear only on floating layers.");
+    Paragraph("Shadows come from the effects module and appear only on floating layers. In the dark theme a "
+              "black shadow cannot darken the black background, so each level also gets a lighter surface.");
 }
 
 FACET_DEMO_SELFTEST("tokens")

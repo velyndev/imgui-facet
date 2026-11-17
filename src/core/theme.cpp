@@ -57,7 +57,13 @@ constexpr wchar_t kAppsUseLightTheme[] = L"AppsUseLightTheme";
 // The lowest contrast of `text` on the four surfaces.
 float MinSurfaceContrast(const Colors& c, const ImVec4& text)
 {
-    const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary, c.bgElevated};
+    const ImVec4 surfaces[] = {c.bg,
+                               c.bgSecondary,
+                               c.bgTertiary,
+                               c.bgElevated,
+                               c.bgElevatedLevels[0],
+                               c.bgElevatedLevels[1],
+                               c.bgElevatedLevels[2]};
     float lowest = ContrastRatio(text, surfaces[0]);
     for (const ImVec4& surface : surfaces)
         lowest = std::min(lowest, ContrastRatio(text, surface));
@@ -120,6 +126,8 @@ Colors MixColors(const Colors& a, const Colors& b, float t)
     out.bgSecondary = Mix(a.bgSecondary, b.bgSecondary, t);
     out.bgTertiary = Mix(a.bgTertiary, b.bgTertiary, t);
     out.bgElevated = Mix(a.bgElevated, b.bgElevated, t);
+    for (int i = 0; i < 3; ++i)
+        out.bgElevatedLevels[i] = Mix(a.bgElevatedLevels[i], b.bgElevatedLevels[i], t);
     for (int i = 0; i < 4; ++i)
         out.fill[i] = Mix(a.fill[i], b.fill[i], t);
     out.label = Mix(a.label, b.label, t);
@@ -329,6 +337,9 @@ Theme Theme::Light()
     c.bgSecondary = Rgb(0xF2F2F7);
     c.bgTertiary = Rgb(0xE5E5EA);
     c.bgElevated = Rgb(0xFFFFFF);
+    c.bgElevatedLevels[0] = Rgb(0xFFFFFF);
+    c.bgElevatedLevels[1] = c.bgElevated;
+    c.bgElevatedLevels[2] = Rgb(0xFFFFFF);
     c.fill[0] = Rgb(0x787880, 0.20f);
     c.fill[1] = Rgb(0x787880, 0.16f);
     c.fill[2] = Rgb(0x787880, 0.12f);
@@ -359,6 +370,10 @@ Theme Theme::Dark()
     c.bgSecondary = Rgb(0x1C1C1E);
     c.bgTertiary = Rgb(0x2C2C2E);
     c.bgElevated = Rgb(0x3A3A3C);
+    // A black shadow cannot darken the black background, so height shows as a lighter surface.
+    c.bgElevatedLevels[0] = Rgb(0x2C2C2E);
+    c.bgElevatedLevels[1] = c.bgElevated;
+    c.bgElevatedLevels[2] = Rgb(0x444446);
     c.fill[0] = Rgb(0x787880, 0.36f);
     c.fill[1] = Rgb(0x787880, 0.32f);
     c.fill[2] = Rgb(0x787880, 0.24f);

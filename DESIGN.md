@@ -57,6 +57,7 @@ cursor, disabled ones the not-allowed cursor.
 | Token | Light | Dark | Reason |
 |---|---|---|---|
 | Surfaces bg, bgSecondary, bgTertiary, bgElevated | #FFFFFF, #F2F2F7, #E5E5EA, #FFFFFF | #000000, #1C1C1E, #2C2C2E, #3A3A3C | White and black bases with grey steps for grouping and depth |
+| bgElevatedLevels 1 / 2 / 3 | #FFFFFF for all three | #2C2C2E, #3A3A3C, #444446 | A black shadow cannot darken black, so in dark a higher layer is a lighter surface; level 2 is bgElevated |
 | label, labelSecondary, labelTertiary, labelQuaternary | black at 100 / 60 / 30 / 16 % | white at 100 / 60 / 30 / 16 % | One text color in four strengths keeps every surface consistent |
 | fill[0] to fill[3] | #787880 at 20 / 16 / 12 / 8 % | #787880 at 36 / 32 / 24 / 18 % | Translucent control fills work on every surface |
 | Accent | #0066CC | #1F6FEB | One blue, dark enough in each theme for white text on it |

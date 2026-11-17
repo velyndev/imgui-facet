@@ -22,7 +22,13 @@ struct Named
 
 std::vector<Named> Surfaces(const facet::Colors& c)
 {
-    return {{"bg", c.bg}, {"bgSecondary", c.bgSecondary}, {"bgTertiary", c.bgTertiary}, {"bgElevated", c.bgElevated}};
+    return {{"bg", c.bg},
+            {"bgSecondary", c.bgSecondary},
+            {"bgTertiary", c.bgTertiary},
+            {"bgElevated", c.bgElevated},
+            {"bgElevatedLevels[0]", c.bgElevatedLevels[0]},
+            {"bgElevatedLevels[1]", c.bgElevatedLevels[1]},
+            {"bgElevatedLevels[2]", c.bgElevatedLevels[2]}};
 }
 
 std::vector<Named> ContentSurfaces(const facet::Colors& c)

@@ -125,6 +125,10 @@ void DrawShadows()
     ImGui::Dummy(ImVec2(available, areaHeight));
     const ImVec2 area = ImGui::GetItemRectMin();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
+    // The cards float over a grouped surface, as popovers float over content. A black shadow
+    // can darken it in both themes, which it cannot do on the black dark background.
+    facet::FillRect(drawList, area, ImGui::GetItemRectMax(), facet::ToU32(c.bgSecondary), radius);
+    const float hairline = facet::HairlineThickness();
     for (int level = 1; level <= 3; ++level)
     {
         const float step = static_cast<float>(level - 1);
@@ -135,7 +139,8 @@ void DrawShadows()
         if (level == 2)
             effects.drawnShadowColor = spec.color;
         facet::DrawShadow(drawList, min, max, radius, spec);
-        facet::FillRect(drawList, min, max, facet::ToU32(c.bgElevated), radius);
+        facet::FillRect(drawList, min, max, facet::ToU32(c.ElevatedSurface(level)), radius);
+        facet::StrokeRect(drawList, min, max, facet::ToU32(c.separator), radius, hairline);
 
         char title[32];
         std::snprintf(title, sizeof(title), "Elevation %d", level);

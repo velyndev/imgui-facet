@@ -48,6 +48,11 @@ struct Colors
     ImVec4 bgSecondary;  // grouped content, sidebars, cards on bg
     ImVec4 bgTertiary;   // content nested inside bgSecondary
     ImVec4 bgElevated;   // popovers, menus, dialogs and other floating layers
+    // The surface of a floating layer at elevation level 1, 2 and 3 (see Elevation), lighter
+    // the higher it floats in the dark theme, where a black shadow cannot darken the black
+    // background; all white in the light theme, where the shadow shows the height. Level 2
+    // equals bgElevated. Read it with ElevatedSurface(level).
+    ImVec4 bgElevatedLevels[3];
 
     // Translucent grey fills for control backgrounds, strongest first: fill[0] for pressed
     // or large thumbs, fill[1] default control background, fill[2] hovered rows, fill[3]
@@ -74,7 +79,8 @@ struct Colors
     ImVec4 accentSubtle;  // translucent selection background
     ImVec4 onAccent;      // text and glyphs drawn on accent fills
     // Accent-colored text and links on the surfaces: the accent hue with its lightness
-    // moved until it reaches 4.5:1 on bg, bgSecondary, bgTertiary and bgElevated.
+    // moved until it reaches 4.5:1 on bg, bgSecondary, bgTertiary, bgElevated and every
+    // bgElevatedLevels surface.
     ImVec4 accentText;
 
     // Status colors, readable as text on bg, bgSecondary and bgTertiary.
@@ -87,6 +93,13 @@ struct Colors
     ImVec4 shadow;     // shadow color; its strength comes from the Elevation tokens
     ImVec4 glassTint;  // tint of blurred panels; its strength comes from Glass::tintOpacity
     ImVec4 scrim;      // dims the content behind modal layers
+
+    // The surface of elevation level 1 to 3; the level is clamped into that range.
+    const ImVec4& ElevatedSurface(int level) const
+    {
+        const int index = level < 1 ? 0 : (level > 3 ? 2 : level - 1);
+        return bgElevatedLevels[index];
+    }
 };
 
 // The 4 px spacing grid.
