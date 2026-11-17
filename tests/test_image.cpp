@@ -24,6 +24,7 @@
 #include "image/image_internal.h"
 #include "internal/alloc_guard.h"
 #include "internal/image_io.h"
+#include "support/session.h"
 
 #pragma comment(lib, "d3d11.lib")
 
@@ -144,34 +145,7 @@ std::vector<unsigned char> MakeGreyPng(std::uint32_t width, std::uint32_t height
 }
 
 // An ImGui context, a WARP device and an initialized Facet for the lifetime of the object.
-struct Session
-{
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    bool ok = false;
-
-    Session()
-    {
-        ImGui::CreateContext();
-        ImGui::GetIO().DisplaySize = ImVec2(800.0f, 600.0f);
-        const HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0,
-                                             D3D11_SDK_VERSION, &device, nullptr, &context);
-        if (SUCCEEDED(hr))
-        {
-            facet::InitDesc desc;
-            desc.device = device.Get();
-            desc.context = context.Get();
-            ok = facet::Init(desc);
-        }
-    }
-    ~Session()
-    {
-        facet::Shutdown();
-        ImGui::DestroyContext();
-    }
-    Session(const Session&) = delete;
-    Session& operator=(const Session&) = delete;
-};
+using Session = facet::test::Session;
 
 void CheckNear(ImVec2 a, ImVec2 b)
 {
@@ -326,7 +300,7 @@ TEST_CASE("Loads before Init return invalid handles")
 TEST_CASE("Handles carry a generation; released slots are reused with a new one")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const auto pixels = SolidPixels(4, 3);
 
     const facet::ImageHandle first = facet::CreateImageRGBA(pixels.data(), 4, 3);
@@ -367,13 +341,13 @@ TEST_CASE("Handles do not survive Shutdown")
     facet::ImageHandle old;
     {
         Session session;
-        REQUIRE(session.ok);
+        REQUIRE(session.Ready());
         const auto pixels = SolidPixels(2, 2);
         old = facet::CreateImageRGBA(pixels.data(), 2, 2);
         REQUIRE(facet::IsImageReady(old));
     }
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const auto pixels = SolidPixels(2, 2);
     const facet::ImageHandle fresh = facet::CreateImageRGBA(pixels.data(), 2, 2);
     CHECK(fresh.index == old.index);
@@ -384,7 +358,7 @@ TEST_CASE("Handles do not survive Shutdown")
 TEST_CASE("Encoded images load synchronously from memory and from a file")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
 
     const facet::ImageHandle png = facet::LoadImageMemory(kPng, sizeof(kPng));
     REQUIRE(facet::IsImageReady(png));
@@ -409,7 +383,7 @@ TEST_CASE("Encoded images load synchronously from memory and from a file")
 TEST_CASE("Asynchronous loads decode on workers and upload on the main thread")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
 
     const facet::ImageHandle png = facet::LoadImageMemoryAsync(kPng, sizeof(kPng));
     REQUIRE(png.IsValid());
@@ -465,12 +439,12 @@ TEST_CASE("Shutdown with decodes in flight stops cleanly")
     // Many requests, so several decodes are still queued or running at Shutdown.
     {
         Session session;
-        REQUIRE(session.ok);
+        REQUIRE(session.Ready());
         for (int i = 0; i < 32; ++i)
             CHECK(facet::LoadImageMemoryAsync(kJpeg, sizeof(kJpeg)).IsValid());
     }
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const facet::ImageHandle after = facet::LoadImageMemoryAsync(kPng, sizeof(kPng));
     CHECK(facet::WaitForImage(after, 10.0f));
 }
@@ -478,7 +452,7 @@ TEST_CASE("Shutdown with decodes in flight stops cleanly")
 TEST_CASE("Device objects: SVG and file images come back, pixel images are lost")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const auto pixels = SolidPixels(2, 2);
     const facet::ImageHandle rgba = facet::CreateImageRGBA(pixels.data(), 2, 2);
     const facet::ImageHandle svg = facet::LoadSvgMemory(kSvg24);
@@ -512,7 +486,7 @@ TEST_CASE("Device objects: SVG and file images come back, pixel images are lost"
 TEST_CASE("SVG rasterizes at its design size times the scale")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     facet::SetUiScale(1.0f);
     facet::NewFrame();
     facet::EndFrame();
@@ -579,7 +553,7 @@ TEST_CASE("The decoder accepts only the documented formats")
 TEST_CASE("Loads refuse files and memory beyond the size limit")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const std::size_t tooLarge = facet::internal::kMaxEncodedImageBytes + 1;
     // Refused before the bytes are read or copied: the buffer is far shorter than the size.
     CHECK_FALSE(facet::LoadImageMemory(kPng, tooLarge).IsValid());
@@ -603,7 +577,7 @@ TEST_CASE("Loads refuse files and memory beyond the size limit")
 TEST_CASE("WaitForImage with an unlimited timeout waits for the decode")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     for (const float timeout : {INFINITY, 1e30f, 1e10f})
     {
         CAPTURE(timeout);
@@ -616,7 +590,7 @@ TEST_CASE("WaitForImage with an unlimited timeout waits for the decode")
 TEST_CASE("An SVG raster beyond the texel budget or the side limit fails")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     // Within both limits.
     CHECK(facet::LoadSvgMemory(kSvg24, 0, ImVec2(2000.0f, 1.0f)).IsValid());
     // 25 M pixels: above the 16 M budget.
@@ -627,7 +601,7 @@ TEST_CASE("An SVG raster beyond the texel budget or the side limit fails")
 TEST_CASE("The icon atlas stays within its page budget and refills after a frame start")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     ImDrawList drawList(ImGui::GetDrawListSharedData());
     drawList._ResetForNewFrame();
     drawList.PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(800.0f, 600.0f));
@@ -703,7 +677,7 @@ std::string WriteTempFile(const char* name, const void* data, std::size_t size)
 TEST_CASE("Image loads return an invalid handle when an allocation fails")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const std::string png = WriteTempFile("facet_test_alloc.png", kPng, sizeof(kPng));
     const std::string svg = WriteTempFile("facet_test_alloc.svg", kSvg24, sizeof(kSvg24) - 1);
     const auto pixels = SolidPixels(2, 2);
@@ -743,7 +717,7 @@ TEST_CASE("Image loads return an invalid handle when an allocation fails")
 TEST_CASE("Releasing images after failed loads needs no allocation")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     // Slots handed out before a failure are still released cleanly, and their textures go
     // through the release queue whose room was reserved when the slots were taken.
     std::vector<facet::ImageHandle> handles;
@@ -767,7 +741,7 @@ TEST_CASE("Releasing images after failed loads needs no allocation")
 TEST_CASE("Icon registration and drawing survive failed allocations")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     const char* name = "facet-test-allocation-icon";
     const int count = facet::IconCount();
     REQUIRE_FALSE(facet::FindIcon(name).IsValid());
@@ -832,7 +806,7 @@ TEST_CASE("Icon registration and drawing survive failed allocations")
 TEST_CASE("A glyph whose allocation fails takes no room in the icon atlas")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     REQUIRE(facet::internal::IconAtlasPageCount() == 0);
     ImDrawList drawList(ImGui::GetDrawListSharedData());
     drawList._ResetForNewFrame();
@@ -886,7 +860,7 @@ TEST_CASE("A glyph whose allocation fails takes no room in the icon atlas")
 TEST_CASE("Each allocation on the way to an icon glyph can fail without breaking the icon")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     facet::EndFrame();
     ImDrawList drawList(ImGui::GetDrawListSharedData());
     drawList._ResetForNewFrame();
@@ -935,7 +909,7 @@ TEST_CASE("Each allocation on the way to an icon glyph can fail without breaking
 TEST_CASE("Resetting the icon registry also drops the glyphs of icons that are gone")
 {
     Session session;
-    REQUIRE(session.ok);
+    REQUIRE(session.Ready());
     facet::EndFrame();
     ImDrawList drawList(ImGui::GetDrawListSharedData());
     drawList._ResetForNewFrame();

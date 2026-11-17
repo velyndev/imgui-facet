@@ -8,15 +8,14 @@
 #include <filesystem>
 #include <string>
 
-#include <d3d11.h>
 #include <doctest/doctest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <wrl/client.h>
 
 #include <facet/facet.h>
 
 #include "internal/state_storage.h"
+#include "support/session.h"
 
 namespace
 {
@@ -184,10 +183,8 @@ TEST_CASE("Ini text feeds only the records of the named handler")
 
 TEST_CASE("Init after the first frame still loads saved widget state")
 {
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    REQUIRE(SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION,
-                                        device.GetAddressOf(), nullptr, context.GetAddressOf())));
+    facet::test::Session session({.initFacet = false});
+    REQUIRE(session.Ready());
     const std::string path = (std::filesystem::temp_directory_path() / "facet_state_late_init.ini").string();
     {
         std::FILE* file = nullptr;
@@ -196,20 +193,15 @@ TEST_CASE("Init after the first frame still loads saved widget state")
         std::fclose(file);
     }
 
-    ImGui::CreateContext();
     ImGui::GetIO().IniFilename = path.c_str();
     // What the first ImGui::NewFrame does: read the file once, before Facet's handler exists.
     ImGui::LoadIniSettingsFromDisk(path.c_str());
     GImGui->SettingsLoaded = true;
 
-    facet::InitDesc desc;
-    desc.device = device.Get();
-    desc.context = context.Get();
-    REQUIRE(facet::Init(desc));
+    REQUIRE(session.InitFacet());
     auto& saved = facet::internal::GetPersistentState<SavedState>(0xBEEFu);
     CHECK(saved.value == 9);
     facet::Shutdown();
     ImGui::GetIO().IniFilename = nullptr;
-    ImGui::DestroyContext();
     std::filesystem::remove(path);
 }

@@ -22,6 +22,7 @@
 #include "effects/d3d11_state.h"
 #include "effects/shadow_atlas.h"
 #include "effects/shadow_math.h"
+#include "support/session.h"
 
 using Microsoft::WRL::ComPtr;
 namespace fi = facet::internal;
@@ -46,6 +47,10 @@ struct Warp
                           device.GetAddressOf(), &level, context.GetAddressOf());
     }
 };
+
+// The shared session for draw list tests: a 64 x 64 display, which also sizes the main
+// viewport, so the blur output and the clip rects match it.
+const facet::test::SessionOptions kEffectsSession = {.displaySize = ImVec2(64.0f, 64.0f)};
 
 struct RenderTarget
 {
@@ -809,13 +814,8 @@ TEST_CASE("Backdrop blur and shadow atlas raise no debug layer messages")
 
 TEST_CASE("Glass follows device invalidation and recreation")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    ImGui::CreateContext();
-    facet::InitDesc desc;
-    desc.device = warp.device.Get();
-    desc.context = warp.context.Get();
-    REQUIRE(facet::Init(desc));
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     CHECK(facet::GlassAvailable());
 
     facet::InvalidateDeviceObjects();
@@ -828,23 +828,15 @@ TEST_CASE("Glass follows device invalidation and recreation")
     CHECK(facet::GlassAvailable());
     facet::Shutdown();
     CHECK_FALSE(facet::GlassAvailable());
-    ImGui::DestroyContext();
 }
 
 TEST_CASE("Glass records its shadow after the backdrop capture")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    ImGui::CreateContext();
-    facet::InitDesc desc;
-    desc.device = warp.device.Get();
-    desc.context = warp.context.Get();
-    REQUIRE(facet::Init(desc));
+    // The session sizes the main viewport (the blur output follows it) and sets up the
+    // tessellation tables for rounded shapes, as a frame start would.
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     REQUIRE(facet::GlassAvailable());
-    // The output is sized from the main viewport, which only a frame would set.
-    ImGui::GetMainViewport()->Size = ImVec2(64.0f, 64.0f);
-    // Rounded shapes need the tessellation tables, which a frame start would also set up.
-    ImGui::GetDrawListSharedData()->SetCircleTessellationMaxError(ImGui::GetStyle().CircleTessellationMaxError);
 
     // Draw lists live in this block, so they are gone before the context is destroyed.
     {
@@ -876,9 +868,6 @@ TEST_CASE("Glass records its shadow after the backdrop capture")
         facet::DrawGlass(&plain, ImVec2(16.0f, 16.0f), ImVec2(48.0f, 48.0f), 4.0f);
         CHECK(drawList.VtxBuffer.Size > plain.VtxBuffer.Size);
     }
-
-    facet::Shutdown();
-    ImGui::DestroyContext();
 }
 
 namespace
@@ -917,29 +906,6 @@ int CountCallbacks(const ImDrawList& drawList)
     return count;
 }
 
-// Sets up an ImGui context and facet on a WARP device for draw list tests.
-struct EffectsContext
-{
-    explicit EffectsContext(const Warp& warp)
-    {
-        ImGui::CreateContext();
-        facet::InitDesc desc;
-        desc.device = warp.device.Get();
-        desc.context = warp.context.Get();
-        ready = facet::Init(desc);
-        ImGui::GetMainViewport()->Size = ImVec2(64.0f, 64.0f);
-        ImGui::GetDrawListSharedData()->SetCircleTessellationMaxError(ImGui::GetStyle().CircleTessellationMaxError);
-    }
-    ~EffectsContext()
-    {
-        facet::Shutdown();
-        ImGui::DestroyContext();
-    }
-    EffectsContext(const EffectsContext&) = delete;
-    EffectsContext& operator=(const EffectsContext&) = delete;
-
-    bool ready = false;
-};
 
 } // namespace
 
@@ -1010,10 +976,8 @@ TEST_CASE("Shadow tiles reach the page only when their upload runs")
 
 TEST_CASE("A shadow queues its tile upload in front of its first draw")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     facet::ShadowSpec spec;
     spec.offset = ImVec2(0.0f, 2.0f);
     spec.blur = 9.0f;
@@ -1057,10 +1021,8 @@ TEST_CASE("A shadow queues its tile upload in front of its first draw")
 
 TEST_CASE("A glass panel with a small radius builds its corners as geometry")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     REQUIRE(facet::GlassAvailable());
     // The flags a frame starts with when the atlas has baked round corners.
     // The atlas is not built here, so the corner UV table is a stand-in.
@@ -1103,10 +1065,8 @@ TEST_CASE("A glass panel with a small radius builds its corners as geometry")
 
 TEST_CASE("Each draw of a pending tile on a split channel queues its upload")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     facet::ShadowSpec spec;
     spec.blur = 11.0f;
     spec.color = IM_COL32(0, 0, 0, 80);
@@ -1210,61 +1170,51 @@ FirstShadowDraw ReplayToFirstShadowDraw(ID3D11Device* device, ID3D11DeviceContex
 
 TEST_CASE("A tile shared by table columns is uploaded before the first column that draws it")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
-    ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = nullptr;
-    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
-    io.DisplaySize = ImVec2(480.0f, 240.0f);
-    io.DeltaTime = 1.0f / 60.0f;
+    facet::test::Session session({.displaySize = ImVec2(480.0f, 240.0f), .window = false});
+    REQUIRE(session.Ready());
     facet::ShadowSpec spec;
     spec.blur = 6.0f;
     spec.color = IM_COL32(0, 0, 0, 80);
 
-    ImGui::NewFrame();
-    facet::NewFrame();
-    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::Begin("table host", nullptr, ImGuiWindowFlags_NoDecoration);
-    const ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit;
-    if (ImGui::BeginTable("columns", 2, flags))
-    {
-        ImGui::TableSetupColumn("first", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableSetupColumn("second", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableNextRow();
-        // The first column records the tile first, and its content runs past its clip rect,
-        // so the table does not merge it: it moves behind the second column's channel.
-        ImGui::TableNextColumn();
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
-                          ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
-        ImGui::Dummy(ImVec2(300.0f, 72.0f));
-        // The second column fits and is merged into the leading group.
-        ImGui::TableNextColumn();
-        at = ImGui::GetCursorScreenPos();
-        facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
-                          ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
-        ImGui::Dummy(ImVec2(72.0f, 72.0f));
-        ImGui::EndTable();
-    }
-    ImGui::End();
-    facet::EndFrame();
-    ImGui::Render();
+    session.SetUi([&] {
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+        ImGui::Begin("table host", nullptr, ImGuiWindowFlags_NoDecoration);
+        const ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit;
+        if (ImGui::BeginTable("columns", 2, flags))
+        {
+            ImGui::TableSetupColumn("first", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+            ImGui::TableSetupColumn("second", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+            ImGui::TableNextRow();
+            // The first column records the tile first, and its content runs past its clip
+            // rect, so the table does not merge it: it moves behind the second column's channel.
+            ImGui::TableNextColumn();
+            ImVec2 at = ImGui::GetCursorScreenPos();
+            facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
+                              ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
+            ImGui::Dummy(ImVec2(300.0f, 72.0f));
+            // The second column fits and is merged into the leading group.
+            ImGui::TableNextColumn();
+            at = ImGui::GetCursorScreenPos();
+            facet::DrawShadow(ImGui::GetWindowDrawList(), ImVec2(at.x + 12.0f, at.y + 12.0f),
+                              ImVec2(at.x + 60.0f, at.y + 60.0f), 6.0f, spec);
+            ImGui::Dummy(ImVec2(72.0f, 72.0f));
+            ImGui::EndTable();
+        }
+        ImGui::End();
+    });
+    session.Frame();
 
     const ImDrawData* data = ImGui::GetDrawData();
     REQUIRE(data != nullptr);
     const std::vector<ImDrawList*> lists(data->CmdLists.begin(), data->CmdLists.end());
-    CHECK(ReplayToFirstShadowDraw(warp.device.Get(), warp.context.Get(), lists) == FirstShadowDraw::PageWritten);
+    CHECK(ReplayToFirstShadowDraw(session.Device(), session.DeviceContext(), lists) == FirstShadowDraw::PageWritten);
 }
 
 TEST_CASE("A tile drawn through a user splitter is uploaded before its first merged draw")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     facet::ShadowSpec spec;
     spec.blur = 13.0f;
     spec.color = IM_COL32(0, 0, 0, 80);
@@ -1283,15 +1233,13 @@ TEST_CASE("A tile drawn through a user splitter is uploaded before its first mer
     splitter.Merge(&drawList);
     splitter.ClearFreeMemory();
 
-    CHECK(ReplayToFirstShadowDraw(warp.device.Get(), warp.context.Get(), {&drawList}) == FirstShadowDraw::PageWritten);
+    CHECK(ReplayToFirstShadowDraw(session.Device(), session.DeviceContext(), {&drawList}) == FirstShadowDraw::PageWritten);
 }
 
 TEST_CASE("Effects outside the clip rect record nothing")
 {
-    Warp warp;
-    REQUIRE(warp.device);
-    EffectsContext effects(warp);
-    REQUIRE(effects.ready);
+    const facet::test::Session session(kEffectsSession);
+    REQUIRE(session.Ready());
     REQUIRE(facet::GlassAvailable());
 
     {
