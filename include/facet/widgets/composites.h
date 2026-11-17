@@ -10,7 +10,9 @@
 // read during the call. Where a widget edits per-item state, the items come as a non-const
 // span and the widget writes only the members documented as written. Where a user action
 // would rearrange the caller's data (moving an inventory item, reordering layers), the widget
-// reports the action as a result and the caller applies it.
+// reports the action as a result and the caller applies it. Entries get ids under the widget
+// id: the item's `id` member when it is non-zero, the index otherwise, so a caller that
+// reorders its items sets `id` and the per-entry state (hover, animations) follows the item.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families, and this header includes the family headers whose types it takes.
@@ -237,6 +239,7 @@ struct FilterChip
     const char* label = nullptr;
     Icon icon;                             // none by default
     bool active = false;                   // written when the chip is toggled
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 struct SearchFilterBarOptions
@@ -308,6 +311,7 @@ struct KeybindListItem
     const char* group = nullptr;           // null: no group
     Keybind bind;                          // written when the user rebinds or resets the row
     Keybind defaultBind;                   // the reset target
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 // The same table over the caller's binds instead of the registry; conflicts are searched among
@@ -320,6 +324,7 @@ struct PresetItem
     const char* label = nullptr;
     bool modified = false;                 // unsaved changes marker
     bool builtIn = false;                  // cannot be renamed or deleted
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 enum class PresetAction
@@ -370,6 +375,8 @@ struct InventoryItem
     ImU32 tint = 0;                        // category color (data) as a bar at the bottom; 0 none
     bool locked = false;                   // shown with a lock; cannot be dragged or dropped on
     float cooldown = 0.0f;                 // 0 to 1: remaining part of a cooldown, drawn as a sweep
+    ImGuiID id = 0;                        // stable id of the item's state (cooldown, count animation) when it
+                                           // moves between slots; 0 uses the slot index
 };
 
 // The drag and drop payload of inventory widgets, so custom widgets can accept their items.
@@ -590,6 +597,7 @@ struct LayerItem
     int depth = 0;                         // indentation level for grouped layers
     bool visible = true;                   // written
     bool locked = false;                   // written
+    ImGuiID id = 0;                        // stable id of the row's state when layers are reordered; 0 uses the index
 };
 
 enum class LayerAction

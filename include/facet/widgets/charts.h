@@ -227,6 +227,7 @@ struct LegendItem
     const char* label = nullptr;
     ImU32 color = 0;                       // 0: palette color of the entry index
     bool hidden = false;                   // written: copy it into ChartSeries::hidden
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 struct LegendOptions
@@ -239,7 +240,7 @@ struct LegendOptions
 
 // Color swatches with labels. With toggle, a click, Enter or Space flips the entry's hidden
 // member; Alt with any of them hides all others (again: shows all). Returns true when any
-// hidden member was written. Entries get ids under the id by index.
+// hidden member was written. Entries get ids under the id: item.id when non-zero, else the index.
 bool Legend(const char* id, std::span<LegendItem> items, const LegendOptions& options = {});
 
 struct ChartRangeBrushOptions

@@ -78,6 +78,7 @@ struct AvatarItem
     const char* label = nullptr;           // name: initials, tooltip and accessible name
     ImageHandle image;                     // invalid: initials
     const char* detail = nullptr;          // second line where the widget has room; null for none
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 struct AvatarGroupOptions
@@ -100,6 +101,7 @@ struct ImageItem
 {
     const char* label = nullptr;           // alt text and caption
     ImageHandle image;
+    ImGuiID id = 0;                        // stable id of the entry's state when entries change order; 0 uses the index
 };
 
 // Fills `out` for item `index` and returns true, or false to skip it. Called during the call

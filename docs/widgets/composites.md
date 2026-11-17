@@ -27,6 +27,9 @@ Item data always belongs to the caller and is read during the call.
 - **Rearranging the caller's data** (moving an inventory item, reordering layers, renaming a
   preset) is reported as a result struct, and the caller applies it: `InventoryResult`,
   `LayerListResult`, `PresetListResult`.
+- **Entry ids**: every item struct has an `ImGuiID id` member. Entries get ids under the widget
+  id, `item.id` when it is non-zero and the index otherwise, so a caller that reorders its items
+  sets `id` and the state of each entry (hover, animations) follows the item, not the position.
 
 ## Widgets
 

@@ -59,6 +59,19 @@ TEST_CASE("Values that mean none default to NaN, outside every value range")
     CHECK(std::isnan(facet::LogEntry{}.time));
 }
 
+// Entries that can change order carry a stable id (rule 2 of the conventions).
+template <class T>
+concept HasEntryId = requires { requires std::is_same_v<decltype(T::id), ImGuiID>; };
+static_assert(!HasEntryId<facet::LogEntry>);  // the check itself works
+static_assert(HasEntryId<facet::LegendItem>);
+static_assert(HasEntryId<facet::AvatarItem>);
+static_assert(HasEntryId<facet::ImageItem>);
+static_assert(HasEntryId<facet::FilterChip>);
+static_assert(HasEntryId<facet::KeybindListItem>);
+static_assert(HasEntryId<facet::PresetItem>);
+static_assert(HasEntryId<facet::InventoryItem>);
+static_assert(HasEntryId<facet::LayerItem>);
+
 // One alignment enum for styled text and table columns.
 static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);
 static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::ColumnAlign>);
