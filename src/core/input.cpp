@@ -126,6 +126,7 @@ struct Entry
     ImGuiID windowId = 0;         // window of the last ShortcutPressed
     ImGuiID itemId = 0;           // item before the last ShortcutPressed (FocusedItem)
     bool itemFocused = false;     // that item had keyboard focus then (FocusedItem)
+    int createdFrame = -2;        // ImGui frame in which the entry was registered
 };
 
 struct Registry
@@ -580,6 +581,7 @@ ShortcutId RegisterShortcut(const char* name, ImGuiKeyChord chord, const Shortcu
             return existing->id;
         }
         entry.id = ShortcutId{registry.nextId};
+        entry.createdFrame = GImGui != nullptr ? GImGui->FrameCount : -2;
         auto created = std::make_unique<Entry>(std::move(entry));
         registry.entries.push_back(std::move(created));
         ++registry.nextId;
@@ -729,18 +731,24 @@ void InputEndFrame()
     if (GImGui != nullptr && GImGui->WithinFrameScope)
     {
         // Global shortcuts with a callback fire without a ShortcutPressed call of the app.
+        // A callback may add or remove entries, which moves the others in the vector, so the
+        // scan starts over after each callback. PollEntry marks an entry as asked for this
+        // frame, so no entry is polled twice and the scan ends. Entries registered in this
+        // frame are left out: their routes are granted from the next frame anyway, and a name
+        // unregistered and registered again by a callback must not fire twice.
         const int frame = GImGui->FrameCount;
         for (std::size_t i = 0; i < registry.entries.size(); ++i)
         {
             Entry& entry = *registry.entries[i];
             if (entry.callback == nullptr || !entry.enabled || entry.scope != ShortcutScope::Global ||
-                entry.queryFrame == frame)
+                entry.queryFrame == frame || entry.createdFrame == frame)
                 continue;
             if (PollEntry(entry))
             {
                 const auto callback = entry.callback;
                 void* user = entry.user;
                 callback(entry.id, user);
+                i = static_cast<std::size_t>(-1);  // ++i makes it 0
             }
         }
     }

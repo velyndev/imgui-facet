@@ -153,7 +153,8 @@ struct ShortcutOptions
     // Called with the shortcut's id and `user` on the frame it fires, from ShortcutPressed, or
     // from facet::EndFrame for a Global shortcut that ShortcutPressed was not called for in
     // that frame. Window and FocusedItem shortcuts need their ShortcutPressed call, which
-    // tells Facet where they belong. Null: no callback.
+    // tells Facet where they belong. A callback may register, replace or unregister
+    // shortcuts, its own included. Null: no callback.
     void (*callback)(ShortcutId id, void* user) = nullptr;
     void* user = nullptr;
 };

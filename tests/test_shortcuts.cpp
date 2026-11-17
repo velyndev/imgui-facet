@@ -425,6 +425,64 @@ TEST_CASE("Shortcuts do not fire inside a disabled block")
     CHECK(calls == 0);
 }
 
+TEST_CASE("A callback that unregisters shortcuts does not cost another one its callback")
+{
+    RegistryGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    struct Calls
+    {
+        facet::ShortcutId self;
+        int count = 0;
+    };
+    Calls first, second;
+    const auto removeSelf = [](facet::ShortcutId id, void* user) {
+        ++static_cast<Calls*>(user)->count;
+        facet::UnregisterShortcut(id);
+    };
+    const auto count = [](facet::ShortcutId, void* user) { ++static_cast<Calls*>(user)->count; };
+    first.self = facet::RegisterShortcut("cb.first", ImGuiKey_F8, {.callback = removeSelf, .user = &first});
+    second.self = facet::RegisterShortcut("cb.second", ImGuiKey_F9, {.callback = count, .user = &second});
+    session.SetUi([] {});
+    session.Frame();
+
+    // Nobody asks for them, so facet::EndFrame does, in registration order.
+    facet::TriggerShortcut(first.self);
+    facet::TriggerShortcut(second.self);
+    session.Frame();
+    CHECK(first.count == 1);
+    CHECK_FALSE(facet::FindShortcut("cb.first").IsValid());
+    CHECK(second.count == 1);  // moved into the first one's slot, still polled
+    session.Frame();
+    CHECK(second.count == 1);
+}
+
+TEST_CASE("A name registered again by a callback does not fire twice in one frame")
+{
+    RegistryGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static int fired = 0;
+    fired = 0;
+    const auto again = [](facet::ShortcutId id, void*) {
+        ++fired;
+        facet::ShortcutInfo info;
+        if (!facet::GetShortcut(id, &info))
+            return;
+        const std::string name = info.name;
+        facet::UnregisterShortcut(id);
+        facet::RegisterShortcut(name.c_str(), ImGuiKey_F11, {.callback = +[](facet::ShortcutId, void*) { ++fired; }});
+    };
+    facet::RegisterShortcut("cb.again", ImGuiKey_F11, {.callback = again});
+    session.SetUi([] {});
+    session.Frame();
+    session.KeyDown(ImGuiKey_F11);
+    CHECK(fired == 1);
+    session.KeyUp(ImGuiKey_F11);
+    session.Frames(2);
+    CHECK(fired == 1);
+}
+
 TEST_CASE("Conflicts: the same chord in overlapping scopes")
 {
     RegistryGuard guard;
