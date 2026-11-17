@@ -126,15 +126,17 @@ void DrawControls(facet::demo::PageCtx& ctx)
          facet::FollowsSystemMotion() ? "follows" : "ignores (capture and selftest runs)");
 }
 
-// The three tracks: a rail with a knob at the current value.
+// The three tracks: a progress bar filled up to the current value, with a small marker at the
+// value that also shows the spring's overshoot. They are read-only, so they do not use the
+// slider look (knob token, accent knob) of a control that can be dragged.
 void DrawTracks(const float* values)
 {
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float labelWidth = facet::Px(theme.spacing.xxxl * 2.5f);
-    const float knob = facet::Px(theme.metrics.sliderKnobSize);
     const float rail = facet::Px(theme.metrics.sliderTrackHeight);
+    const float knob = rail * 2.0f;  // marker diameter
     const float rowHeight = facet::Px(theme.metrics.controlHeightLarge);
     for (int kind = 0; kind < kKinds; ++kind)
     {
@@ -151,7 +153,11 @@ void DrawTracks(const float* values)
         facet::FillRect(drawList, ImVec2(left, centerY - rail * 0.5f), ImVec2(right, centerY + rail * 0.5f),
                         U32(c.fill[1]), rail * 0.5f);
         const float x = left + (right - left) * values[kind];
-        drawList->AddCircleFilled(ImVec2(x, centerY), knob * 0.5f, U32(c.accent));
+        const float filled = std::clamp(x, left, right);
+        if (filled > left)
+            facet::FillRect(drawList, ImVec2(left, centerY - rail * 0.5f), ImVec2(filled, centerY + rail * 0.5f),
+                            U32(c.accent), rail * 0.5f);
+        drawList->AddCircleFilled(ImVec2(x, centerY), knob * 0.5f, U32(c.labelSecondary));
 
         char text[16];
         std::snprintf(text, sizeof(text), "%.3f", static_cast<double>(values[kind]));

@@ -304,19 +304,16 @@ void DrawGlowSection()
     drawList->AddText(ImVec2(focusMin.x, focusMax.y + room * 0.5f), facet::ToU32(c.labelSecondary),
                       "Focus ring halo");
 
-    // The opt-in accent glow around an accent pill.
+    // The opt-in accent glow around an accent shape. The shape has no text and the caption
+    // names it a sample, so it does not read as a button that can be pressed.
     const ImVec2 accentMin = row ? ImVec2(focusMax.x + room * 2.0f, focusMin.y) : ImVec2(focusMin.x, focusMin.y + sampleHeight);
     const ImVec2 accentMax(accentMin.x + width, accentMin.y + height);
     const float pill = height * 0.5f;
     if (effects.accentGlow)
         facet::DrawGlow(drawList, accentMin, accentMax, pill, facet::ToU32(c.accent), facet::Px(theme.spacing.xl));
     facet::FillRect(drawList, accentMin, accentMax, facet::ToU32(c.accent), pill);
-    const char* label = "Accent sample";
-    const ImVec2 labelSize = ImGui::CalcTextSize(label);
-    drawList->AddText(ImVec2((accentMin.x + accentMax.x - labelSize.x) * 0.5f, (accentMin.y + accentMax.y - labelSize.y) * 0.5f),
-                      facet::ToU32(c.onAccent), label);
     drawList->AddText(ImVec2(accentMin.x, accentMax.y + room * 0.5f), facet::ToU32(c.labelSecondary),
-                      effects.accentGlow ? "Accent glow on" : "Accent glow off");
+                      effects.accentGlow ? "Accent glow on a sample shape" : "Sample shape, accent glow off");
 }
 
 } // namespace
