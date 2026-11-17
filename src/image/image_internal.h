@@ -34,6 +34,22 @@ struct RgbaImage
 // thread (texture_cache.cpp).
 bool ReadFileBytes(const char* path, std::vector<std::uint8_t>& out);
 
+// The texture cache's bookkeeping, for tests: slots in the vector, slots in use, slots
+// waiting for a decode, and jobs no worker has taken yet (texture_cache.cpp).
+struct ImageCacheCounts
+{
+    int slots = 0;
+    int inUse = 0;
+    int loading = 0;
+    int queuedJobs = 0;
+};
+ImageCacheCounts GetImageCacheCounts();
+
+// Parses an SVG document (the source is copied). Returns nullptr when it does not parse.
+// A failed allocation throws std::bad_alloc instead, so a caller can tell running out of
+// memory apart from a broken source (svg_raster.cpp).
+std::unique_ptr<lunasvg::Document> ParseSvgDocument(const char* data, std::size_t length);
+
 // Where an image of `imageSize` pixels lands inside the box [boxMin, boxMax] and which part
 // of the texture it shows. Contain shrinks the destination to the image aspect and centers
 // it (full UV range); Cover keeps the whole box and crops the UV range around the center;
@@ -57,7 +73,9 @@ void PremultipliedBgraToStraightRgba(const std::uint8_t* src, int srcStride, int
                                      std::uint8_t* dst, bool mask = false);
 
 // Rasterizes a parsed document into `width` x `height` pixels (its view box stretched to
-// that size). Returns false when the size is not positive or rendering fails.
+// that size). Returns false when the size is not positive or rendering fails. A failed
+// allocation throws std::bad_alloc, here and in RasterizeSvgSource and RasterizeIcon, which
+// call this; the texture cache catches it.
 bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int height, bool mask,
                           RgbaImage& out);
 

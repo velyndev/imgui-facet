@@ -22,6 +22,7 @@
 #include <facet/facet.h>
 
 #include "image/image_internal.h"
+#include "internal/alloc_guard.h"
 #include "internal/image_io.h"
 
 #pragma comment(lib, "d3d11.lib")
@@ -643,4 +644,122 @@ TEST_CASE("The icon atlas stays within its page budget and refills after a frame
     CHECK(facet::internal::IconAtlasPageCount() == 1);
     // A textured quad, not the crossed placeholder box.
     CHECK(drawList.VtxBuffer.Size - vertices == 4);
+}
+
+namespace
+{
+
+// For n = 1, 2, ... makes the n-th guarded allocation of `load` throw std::bad_alloc, until
+// a call gets through without reaching it. Every call that hit the failure must return an
+// invalid handle and leave no slot in use, no slot loading and no queued job behind. The call
+// that gets through must load, reusing the slots the failed calls gave back.
+template <typename Load>
+void CheckLoadSurvivesFailedAllocations(Load load, bool async)
+{
+    const facet::internal::ImageCacheCounts before = facet::internal::GetImageCacheCounts();
+    int failures = 0;
+    for (int n = 1; n <= 16; ++n)
+    {
+        CAPTURE(n);
+        facet::internal::FailGuardedAllocation(n);
+        facet::ImageHandle handle;
+        CHECK_NOTHROW(handle = load());
+        const bool failed = facet::internal::GuardedAllocationFailed();
+        facet::internal::FailGuardedAllocation(0);
+        const facet::internal::ImageCacheCounts after = facet::internal::GetImageCacheCounts();
+        if (failed)
+        {
+            ++failures;
+            CHECK_FALSE(handle.IsValid());
+            CHECK(after.inUse == before.inUse);
+            CHECK(after.loading == before.loading);
+            CHECK(after.queuedJobs == before.queuedJobs);
+            continue;
+        }
+        REQUIRE(handle.IsValid());
+        CHECK(after.slots <= before.slots + 1);
+        if (async)
+            CHECK(facet::WaitForImage(handle, 10.0f));
+        CHECK(facet::IsImageReady(handle));
+        facet::ReleaseImage(handle);
+        CHECK(failures > 0);
+        return;
+    }
+    FAIL("the load never got past its guarded allocations");
+}
+
+std::string WriteTempFile(const char* name, const void* data, std::size_t size)
+{
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / name;
+    {
+        std::ofstream file(path, std::ios::binary);
+        file.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+    }
+    return reinterpret_cast<const char*>(path.u8string().c_str());
+}
+
+} // namespace
+
+TEST_CASE("Image loads return an invalid handle when an allocation fails")
+{
+    Session session;
+    REQUIRE(session.ok);
+    const std::string png = WriteTempFile("facet_test_alloc.png", kPng, sizeof(kPng));
+    const std::string svg = WriteTempFile("facet_test_alloc.svg", kSvg24, sizeof(kSvg24) - 1);
+    const auto pixels = SolidPixels(2, 2);
+
+    SUBCASE("LoadImageFile")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadImageFile(png.c_str()); }, false);
+    }
+    SUBCASE("LoadImageMemory")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadImageMemory(kPng, sizeof(kPng)); }, false);
+    }
+    SUBCASE("LoadImageFileAsync")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadImageFileAsync(png.c_str()); }, true);
+    }
+    SUBCASE("LoadImageMemoryAsync")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadImageMemoryAsync(kPng, sizeof(kPng)); }, true);
+    }
+    SUBCASE("CreateImageRGBA")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::CreateImageRGBA(pixels.data(), 2, 2); }, false);
+    }
+    SUBCASE("LoadSvgFile")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadSvgFile(svg.c_str()); }, false);
+    }
+    SUBCASE("LoadSvgMemory")
+    {
+        CheckLoadSurvivesFailedAllocations([&] { return facet::LoadSvgMemory(kSvg24); }, false);
+    }
+    std::filesystem::remove(png);
+    std::filesystem::remove(svg);
+}
+
+TEST_CASE("Releasing images after failed loads needs no allocation")
+{
+    Session session;
+    REQUIRE(session.ok);
+    // Slots handed out before a failure are still released cleanly, and their textures go
+    // through the release queue whose room was reserved when the slots were taken.
+    std::vector<facet::ImageHandle> handles;
+    for (int i = 0; i < 8; ++i)
+        handles.push_back(facet::LoadImageMemory(kPng, sizeof(kPng)));
+    facet::internal::FailGuardedAllocation(1);
+    CHECK_FALSE(facet::LoadImageMemory(kPng, sizeof(kPng)).IsValid());
+    CHECK(facet::internal::GuardedAllocationFailed());
+    facet::internal::FailGuardedAllocation(0);
+    for (const facet::ImageHandle handle : handles)
+    {
+        CHECK(facet::IsImageReady(handle));
+        CHECK_NOTHROW(facet::ReleaseImage(handle));
+    }
+    CHECK(facet::internal::GetImageCacheCounts().inUse == 0);
+    facet::NewFrame();
+    facet::EndFrame();
+    CHECK(facet::IsImageReady(facet::LoadImageMemory(kPng, sizeof(kPng))));
 }

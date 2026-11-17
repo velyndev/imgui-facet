@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,7 @@
 
 #include "facet/core/image.h"
 #include "image/image_internal.h"
+#include "internal/alloc_guard.h"
 
 namespace facet
 {
@@ -68,11 +70,18 @@ void PremultipliedBgraToStraightRgba(const std::uint8_t* src, int srcStride, int
     }
 }
 
+std::unique_ptr<lunasvg::Document> ParseSvgDocument(const char* data, std::size_t length)
+{
+    CheckAllocation();
+    return lunasvg::Document::loadFromData(data, length);
+}
+
 bool RasterizeSvgDocument(const lunasvg::Document& document, int width, int height, bool mask, RgbaImage& out)
 {
     out = RgbaImage{};
     if (width <= 0 || height <= 0)
         return false;
+    CheckAllocation();
     const lunasvg::Bitmap bitmap = document.renderToBitmap(width, height);
     if (bitmap.isNull() || bitmap.width() != width || bitmap.height() != height)
         return false;
@@ -130,8 +139,30 @@ ImageHandle CreateFromDocument(std::unique_ptr<lunasvg::Document> document, ImVe
     if (!(design.x > 0.0f) || !(design.y > 0.0f) || !std::isfinite(design.x) || !std::isfinite(design.y))
         return {};
 
-    internal::SvgSourcePtr source(new internal::SvgSource{std::move(document), design});
+    internal::SvgSourcePtr source;
+    try
+    {
+        internal::CheckAllocation();
+        source.reset(new internal::SvgSource{std::move(document), design});
+    }
+    catch (const std::bad_alloc&)
+    {
+        return {};
+    }
     return internal::CreateSvgImage(std::move(source));
+}
+
+// The parsed document, or nullptr when it does not parse or memory runs out.
+std::unique_ptr<lunasvg::Document> TryParse(const char* data, std::size_t length)
+{
+    try
+    {
+        return internal::ParseSvgDocument(data, length);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return nullptr;
+    }
 }
 
 } // namespace
@@ -141,8 +172,7 @@ ImageHandle LoadSvgFile(const char* path, ImVec2 size)
     std::vector<std::uint8_t> bytes;
     if (path == nullptr || !internal::ReadFileBytes(path, bytes))
         return {};
-    return CreateFromDocument(
-        lunasvg::Document::loadFromData(reinterpret_cast<const char*>(bytes.data()), bytes.size()), size);
+    return CreateFromDocument(TryParse(reinterpret_cast<const char*>(bytes.data()), bytes.size()), size);
 }
 
 ImageHandle LoadSvgMemory(const char* svg, std::size_t length, ImVec2 size)
@@ -153,7 +183,7 @@ ImageHandle LoadSvgMemory(const char* svg, std::size_t length, ImVec2 size)
         length = std::strlen(svg);
     if (length == 0)
         return {};
-    return CreateFromDocument(lunasvg::Document::loadFromData(svg, length), size);
+    return CreateFromDocument(TryParse(svg, length), size);
 }
 
 } // namespace facet

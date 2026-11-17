@@ -7,6 +7,13 @@
 // Asynchronous loads: a small pool of worker threads (started on the first asynchronous
 // request) reads and decodes; the main thread uploads finished results in newFrame or in
 // WaitForImage. Results whose slot was released or reused in the meantime are dropped.
+//
+// Running out of memory: every allocation a public function makes sits in a narrow try
+// block that turns std::bad_alloc into the function's failure value (alloc_guard.h). The
+// bookkeeping that undoes a half-finished load never allocates: Allocate reserves room in
+// freeSlots and releaseQueue for every slot it hands out, and an asynchronous load is one
+// Task the frame thread allocates up front, which a worker hands back by linking it into the
+// result list.
 
 #include "facet/core/image.h"
 
@@ -17,8 +24,12 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <exception>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -35,6 +46,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "image/image_internal.h"
+#include "internal/alloc_guard.h"
 #include "internal/device.h"
 #include "internal/image_io.h"
 #include "internal/subsystem.h"
@@ -73,40 +85,49 @@ struct Slot
     internal::SvgSourcePtr svg;
 };
 
-struct Job
+// One asynchronous load: queued as a job, decoded by a worker, then linked into the result
+// list. The frame thread allocates it, so a worker never allocates to report a result.
+struct Task
 {
     std::uint32_t index = 0;
     std::uint32_t generation = 0;
     std::string path;                  // read from this file when not empty
     std::vector<std::uint8_t> data;    // otherwise decode these bytes
+    internal::DecodedImage image;      // empty when reading or decoding failed
+    std::unique_ptr<Task> next;        // the next finished task in the result list
+
+    Task() = default;
+    Task(const Task&) = delete;
+    Task& operator=(const Task&) = delete;
+    ~Task() { internal::FreeImage(image); }
 };
 
-struct Result
+// Frees a result list one task at a time, so a long list cannot nest destructor calls.
+void FreeTasks(std::unique_ptr<Task> head)
 {
-    std::uint32_t index = 0;
-    std::uint32_t generation = 0;
-    internal::DecodedImage image;      // empty when reading or decoding failed
-};
+    while (head != nullptr)
+        head = std::move(head->next);
+}
 
 struct Cache
 {
     std::vector<Slot> slots;
-    std::vector<std::uint32_t> freeSlots;
+    std::vector<std::uint32_t> freeSlots;  // capacity covers every slot (see Allocate)
     std::uint32_t nextGeneration = 1;
     bool initialized = false;
     bool deviceValid = false;
     bool svgScaleDirty = false;
 
-    // Views dropped during the frame; released in the next newFrame.
+    // Views dropped during the frame; released in the next newFrame. Its spare capacity
+    // covers every slot that can still drop a view (see Allocate).
     std::vector<ComPtr<ID3D11ShaderResourceView>> releaseQueue;
 
     // Worker pool. `mutex` guards jobs, results and stop.
     std::mutex mutex;
     std::condition_variable jobReady;
     std::condition_variable resultReady;
-    std::deque<Job> jobs;
-    std::vector<Result> results;
-    std::vector<Result> processing;  // main thread only; keeps its capacity between frames
+    std::deque<std::unique_ptr<Task>> jobs;
+    std::unique_ptr<Task> results;  // finished tasks, newest first
     std::vector<std::thread> workers;
     bool stop = false;
 };
@@ -134,19 +155,35 @@ Slot* Resolve(ImageHandle handle)
     return slot.generation == handle.generation ? &slot : nullptr;
 }
 
-// Takes a free slot and gives it a new generation.
+// Takes a free slot and gives it a new generation, or returns an invalid handle when the
+// bookkeeping cannot grow. Before handing out a slot it reserves what Free needs, so Free
+// never allocates: freeSlots holds room for every slot, and releaseQueue has room for one
+// more view per slot (no more slots than that can hold a view at once).
 ImageHandle Allocate(Cache& cache, SourceKind kind)
 {
+    const bool grow = cache.freeSlots.empty();
+    const std::size_t slotCount = cache.slots.size() + (grow ? 1u : 0u);
+    try
+    {
+        internal::CheckAllocation();
+        cache.freeSlots.reserve(slotCount);
+        cache.releaseQueue.reserve(cache.releaseQueue.size() + slotCount);
+        if (grow)
+            cache.slots.emplace_back();
+    }
+    catch (const std::bad_alloc&)
+    {
+        return {};
+    }
     std::uint32_t index = 0;
-    if (!cache.freeSlots.empty())
+    if (!grow)
     {
         index = cache.freeSlots.back();
         cache.freeSlots.pop_back();
     }
     else
     {
-        index = static_cast<std::uint32_t>(cache.slots.size());
-        cache.slots.emplace_back();
+        index = static_cast<std::uint32_t>(cache.slots.size() - 1);
     }
     Slot& slot = cache.slots[index];
     slot = Slot{};
@@ -155,6 +192,7 @@ ImageHandle Allocate(Cache& cache, SourceKind kind)
     return ImageHandle{index, slot.generation};
 }
 
+// Never allocates: the room it pushes into was reserved by Allocate.
 void Free(Cache& cache, std::uint32_t index)
 {
     Slot& slot = cache.slots[index];
@@ -164,8 +202,9 @@ void Free(Cache& cache, std::uint32_t index)
         // decode already running finishes and its result is dropped in ProcessResults.
         const std::uint32_t generation = slot.generation;
         std::lock_guard lock(cache.mutex);
-        std::erase_if(cache.jobs,
-                      [&](const Job& job) { return job.index == index && job.generation == generation; });
+        std::erase_if(cache.jobs, [&](const std::unique_ptr<Task>& job) {
+            return job->index == index && job->generation == generation;
+        });
     }
     if (slot.view)
         cache.releaseQueue.push_back(std::move(slot.view));
@@ -227,7 +266,16 @@ void Upload(Slot& slot, const void* pixels, int width, int height, int stride)
 bool RasterizeSlot(Slot& slot)
 {
     internal::RgbaImage raster;
-    if (slot.svg == nullptr || !internal::RasterizeSvgSource(*slot.svg, Scale(), raster))
+    bool rasterized = false;
+    try
+    {
+        rasterized = slot.svg != nullptr && internal::RasterizeSvgSource(*slot.svg, Scale(), raster);
+    }
+    catch (const std::bad_alloc&)
+    {
+        rasterized = false;
+    }
+    if (!rasterized)
     {
         slot.status = ImageStatus::Failed;
         return false;
@@ -238,7 +286,8 @@ bool RasterizeSlot(Slot& slot)
 
 // --- File reading -------------------------------------------------------------
 
-bool ReadFile(const std::string& path, std::vector<std::uint8_t>& out)
+// Returns false (with `out` empty) instead of throwing when a buffer cannot be allocated.
+bool ReadFile(std::string_view path, std::vector<std::uint8_t>& out)
 {
     out.clear();
     if (path.empty() || path.size() > static_cast<std::size_t>(INT_MAX))
@@ -247,7 +296,16 @@ bool ReadFile(const std::string& path, std::vector<std::uint8_t>& out)
                                                static_cast<int>(path.size()), nullptr, 0);
     if (wideLength <= 0)
         return false;
-    std::wstring widePath(static_cast<std::size_t>(wideLength), L'\0');
+    std::wstring widePath;
+    try
+    {
+        internal::CheckAllocation();
+        widePath.resize(static_cast<std::size_t>(wideLength));
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.data(), static_cast<int>(path.size()),
                         widePath.data(), wideLength);
 
@@ -262,8 +320,18 @@ bool ReadFile(const std::string& path, std::vector<std::uint8_t>& out)
         if (length > 0 && static_cast<unsigned long long>(length) <= internal::kMaxEncodedImageBytes &&
             _fseeki64(file, 0, SEEK_SET) == 0)
         {
-            out.resize(static_cast<std::size_t>(length));
-            ok = std::fread(out.data(), 1, out.size(), file) == out.size();
+            bool sized = false;
+            try
+            {
+                internal::CheckAllocation();
+                out.resize(static_cast<std::size_t>(length));
+                sized = true;
+            }
+            catch (const std::bad_alloc&)
+            {
+                sized = false;
+            }
+            ok = sized && std::fread(out.data(), 1, out.size(), file) == out.size();
         }
     }
     std::fclose(file);
@@ -280,52 +348,47 @@ void WorkerMain()
     std::vector<std::uint8_t> fileBytes;
     for (;;)
     {
-        Job job;
+        std::unique_ptr<Task> task;
         {
             std::unique_lock lock(cache.mutex);
             cache.jobReady.wait(lock, [&] { return cache.stop || !cache.jobs.empty(); });
             if (cache.stop)
                 return;
-            job = std::move(cache.jobs.front());
+            task = std::move(cache.jobs.front());
             cache.jobs.pop_front();
         }
 
-        Result result;
-        result.index = job.index;
-        result.generation = job.generation;
         // An exception leaving a worker would end the host process. A failed allocation (or
         // any other throw) turns into an empty image, so the slot still resolves to Failed.
         try
         {
-            if (!job.path.empty())
+            if (!task->path.empty())
             {
-                if (ReadFile(job.path, fileBytes))
-                    internal::DecodeImage(fileBytes.data(), fileBytes.size(), result.image);
+                if (ReadFile(task->path, fileBytes))
+                    internal::DecodeImage(fileBytes.data(), fileBytes.size(), task->image);
             }
             else
             {
-                internal::DecodeImage(job.data.data(), job.data.size(), result.image);
+                internal::DecodeImage(task->data.data(), task->data.size(), task->image);
             }
         }
         catch (...)
         {
-            internal::FreeImage(result.image);
+            internal::FreeImage(task->image);
         }
+        // The encoded copy is not needed any more.
+        std::vector<std::uint8_t>().swap(task->data);
         // Do not keep the buffer of an unusually large file for the rest of the run.
         if (fileBytes.capacity() > kKeptReadBufferBytes)
-        {
-            fileBytes.clear();
-            fileBytes.shrink_to_fit();
-        }
+            std::vector<std::uint8_t>().swap(fileBytes);
 
         {
             std::lock_guard lock(cache.mutex);
             if (cache.stop)
-            {
-                internal::FreeImage(result.image);
-                return;
-            }
-            cache.results.push_back(std::move(result));
+                return;  // the task and its pixels are freed with `task`
+            // Linking the task in allocates nothing, so a worker cannot fail here.
+            task->next = std::move(cache.results);
+            cache.results = std::move(task);
         }
         cache.resultReady.notify_all();
     }
@@ -360,21 +423,34 @@ void StopWorkers(Cache& cache)
         worker.join();
     cache.workers.clear();
 
-    std::lock_guard lock(cache.mutex);
-    for (Result& result : cache.results)
-        internal::FreeImage(result.image);
-    cache.results.clear();
-    cache.stop = false;
-}
-
-void Enqueue(Cache& cache, Job job)
-{
-    StartWorkers(cache);
+    std::unique_ptr<Task> finished;
     {
         std::lock_guard lock(cache.mutex);
-        cache.jobs.push_back(std::move(job));
+        finished = std::move(cache.results);
+        cache.stop = false;
+    }
+    FreeTasks(std::move(finished));
+}
+
+// Queues `task`, starting the workers first if needed. Returns false and leaves `task` with
+// the caller when the queue cannot grow or no worker can be started.
+bool Enqueue(Cache& cache, std::unique_ptr<Task>& task)
+{
+    try
+    {
+        internal::CheckAllocation();
+        StartWorkers(cache);
+        std::lock_guard lock(cache.mutex);
+        // Adding at the end of a deque has no effect when it throws, so the task stays ours.
+        cache.jobs.push_back(std::move(task));
+    }
+    catch (const std::exception&)
+    {
+        // std::bad_alloc from the queue, std::system_error when a thread cannot start.
+        return false;
     }
     cache.jobReady.notify_one();
+    return true;
 }
 
 // Uploads every finished decode whose slot still waits for it.
@@ -382,42 +458,81 @@ void ProcessResults(Cache& cache)
 {
     if (!cache.deviceValid)
         return;
+    std::unique_ptr<Task> finished;
     {
         std::lock_guard lock(cache.mutex);
-        if (cache.results.empty())
+        if (cache.results == nullptr)
             return;
-        cache.processing.swap(cache.results);
+        finished = std::move(cache.results);
     }
-    for (Result& result : cache.processing)
+    for (Task* task = finished.get(); task != nullptr; task = task->next.get())
     {
-        Slot* slot = Resolve(ImageHandle{result.index, result.generation});
+        Slot* slot = Resolve(ImageHandle{task->index, task->generation});
         if (slot != nullptr && slot->status == ImageStatus::Loading)
         {
-            if (result.image.pixels != nullptr)
-                Upload(*slot, result.image.pixels, result.image.width, result.image.height,
-                       result.image.width * 4);
+            if (task->image.pixels != nullptr)
+                Upload(*slot, task->image.pixels, task->image.width, task->image.height, task->image.width * 4);
             else
                 slot->status = ImageStatus::Failed;
         }
-        internal::FreeImage(result.image);
+        internal::FreeImage(task->image);
     }
-    cache.processing.clear();
+    FreeTasks(std::move(finished));
 }
 
-ImageHandle StartAsync(Job job, SourceKind kind)
+// Gives `task` a slot and queues it. On failure nothing is left behind: no slot, no job.
+ImageHandle StartAsync(std::unique_ptr<Task> task, SourceKind kind)
 {
     Cache& cache = State();
     if (!cache.initialized)
         return {};
     const ImageHandle handle = Allocate(cache, kind);
+    if (!handle.IsValid())
+        return {};
     Slot& slot = cache.slots[handle.index];
     slot.status = ImageStatus::Loading;
     if (kind == SourceKind::File)
-        slot.path = job.path;
-    job.index = handle.index;
-    job.generation = handle.generation;
-    Enqueue(cache, std::move(job));
+    {
+        try
+        {
+            internal::CheckAllocation();
+            slot.path = task->path;
+        }
+        catch (const std::bad_alloc&)
+        {
+            Free(cache, handle.index);
+            return {};
+        }
+    }
+    task->index = handle.index;
+    task->generation = handle.generation;
+    if (!Enqueue(cache, task))
+    {
+        Free(cache, handle.index);
+        return {};
+    }
     return handle;
+}
+
+// A task for an asynchronous load; nullptr when it cannot be allocated.
+std::unique_ptr<Task> NewTask(std::string_view path, const void* data, std::size_t size)
+{
+    try
+    {
+        internal::CheckAllocation();
+        auto task = std::make_unique<Task>();
+        task->path = path;
+        if (data != nullptr)
+        {
+            const auto* bytes = static_cast<const std::uint8_t*>(data);
+            task->data.assign(bytes, bytes + size);
+        }
+        return task;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return nullptr;
+    }
 }
 
 // --- Subsystem hooks ------------------------------------------------------------
@@ -438,7 +553,6 @@ void ShutdownHook()
     cache.slots.clear();
     cache.freeSlots.clear();
     cache.releaseQueue.clear();
-    cache.processing.clear();
     cache.initialized = false;
     cache.deviceValid = false;
     cache.svgScaleDirty = false;
@@ -474,12 +588,14 @@ bool CreateHook()
         }
         else if (slot.kind == SourceKind::File)
         {
-            slot.status = ImageStatus::Loading;
-            Job job;
-            job.index = index;
-            job.generation = slot.generation;
-            job.path = slot.path;
-            Enqueue(cache, std::move(job));
+            std::unique_ptr<Task> task = NewTask(slot.path, nullptr, 0);
+            if (task != nullptr)
+            {
+                task->index = index;
+                task->generation = slot.generation;
+            }
+            // Without memory for the reload the image fails like an unreadable file.
+            slot.status = task != nullptr && Enqueue(cache, task) ? ImageStatus::Loading : ImageStatus::Failed;
         }
     }
     cache.svgScaleDirty = false;
@@ -494,6 +610,17 @@ void NewFrameHook()
 
     if (cache.svgScaleDirty && cache.deviceValid)
     {
+        // Every replaced raster drops a view, and each slot may drop one more later in the
+        // frame (see Allocate). Without room for both the rasters wait for a later frame.
+        try
+        {
+            cache.releaseQueue.reserve(cache.slots.size() * 2);
+        }
+        catch (const std::bad_alloc&)
+        {
+            ProcessResults(cache);
+            return;
+        }
         cache.svgScaleDirty = false;
         for (Slot& slot : cache.slots)
         {
@@ -602,10 +729,16 @@ ImageHandle LoadImageMemory(const void* data, std::size_t size)
     Cache& cache = State();
     if (!cache.initialized || !cache.deviceValid)
         return {};
+    // The decoder allocates with malloc and reports a failed allocation as undecodable data.
     internal::DecodedImage decoded;
     if (!internal::DecodeImage(data, size, decoded))
         return {};
     const ImageHandle handle = Allocate(cache, SourceKind::Memory);
+    if (!handle.IsValid())
+    {
+        internal::FreeImage(decoded);
+        return {};
+    }
     Slot& slot = cache.slots[handle.index];
     Upload(slot, decoded.pixels, decoded.width, decoded.height, decoded.width * 4);
     internal::FreeImage(decoded);
@@ -626,35 +759,42 @@ ImageHandle LoadImageFile(const char* path)
     if (!ReadFile(path, bytes))
         return {};
     const ImageHandle handle = LoadImageMemory(bytes.data(), bytes.size());
-    if (handle.IsValid())
+    if (!handle.IsValid())
+        return {};
+    Slot& slot = cache.slots[handle.index];
+    try
     {
-        Slot& slot = cache.slots[handle.index];
-        slot.kind = SourceKind::File;
+        internal::CheckAllocation();
         slot.path = path;
     }
+    catch (const std::bad_alloc&)
+    {
+        Free(cache, handle.index);
+        return {};
+    }
+    slot.kind = SourceKind::File;
     return handle;
 }
 
 ImageHandle LoadImageFileAsync(const char* path)
 {
-    if (path == nullptr)
+    if (path == nullptr || path[0] == '\0' || !State().initialized)
         return {};
-    Job job;
-    job.path = path;
-    if (job.path.empty())
+    std::unique_ptr<Task> task = NewTask(path, nullptr, 0);
+    if (task == nullptr)
         return {};
-    return StartAsync(std::move(job), SourceKind::File);
+    return StartAsync(std::move(task), SourceKind::File);
 }
 
 ImageHandle LoadImageMemoryAsync(const void* data, std::size_t size)
 {
     // Larger data would be rejected by the decoder; refuse it before copying it.
-    if (data == nullptr || size == 0 || size > internal::kMaxEncodedImageBytes)
+    if (data == nullptr || size == 0 || size > internal::kMaxEncodedImageBytes || !State().initialized)
         return {};
-    Job job;
-    const auto* bytes = static_cast<const std::uint8_t*>(data);
-    job.data.assign(bytes, bytes + size);
-    return StartAsync(std::move(job), SourceKind::Memory);
+    std::unique_ptr<Task> task = NewTask({}, data, size);
+    if (task == nullptr)
+        return {};
+    return StartAsync(std::move(task), SourceKind::Memory);
 }
 
 ImageHandle CreateImageRGBA(const void* pixels, int width, int height, int stride)
@@ -668,6 +808,8 @@ ImageHandle CreateImageRGBA(const void* pixels, int width, int height, int strid
     if (stride < width * 4)
         return {};
     const ImageHandle handle = Allocate(cache, SourceKind::Pixels);
+    if (!handle.IsValid())
+        return {};
     Slot& slot = cache.slots[handle.index];
     Upload(slot, pixels, width, height, stride);
     if (slot.status != ImageStatus::Ready)
@@ -727,7 +869,7 @@ bool WaitForImage(ImageHandle image, float timeoutSeconds)
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                               std::chrono::duration<float>(seconds));
-    const auto hasResult = [&] { return !cache.results.empty(); };
+    const auto hasResult = [&] { return cache.results != nullptr; };
     for (;;)
     {
         ProcessResults(cache);
@@ -735,7 +877,7 @@ bool WaitForImage(ImageHandle image, float timeoutSeconds)
         if (status != ImageStatus::Loading || !cache.deviceValid)
             return status == ImageStatus::Ready;
         std::unique_lock lock(cache.mutex);
-        if (!cache.results.empty())
+        if (cache.results != nullptr)
             continue;
         if (unlimited)
         {
@@ -815,12 +957,31 @@ bool ReadFileBytes(const char* path, std::vector<std::uint8_t>& out)
     return path != nullptr && ReadFile(path, out);
 }
 
+ImageCacheCounts GetImageCacheCounts()
+{
+    Cache& cache = State();
+    ImageCacheCounts counts;
+    counts.slots = static_cast<int>(cache.slots.size());
+    for (const Slot& slot : cache.slots)
+    {
+        if (slot.generation != 0)
+            ++counts.inUse;
+        if (slot.generation != 0 && slot.status == ImageStatus::Loading)
+            ++counts.loading;
+    }
+    std::lock_guard lock(cache.mutex);
+    counts.queuedJobs = static_cast<int>(cache.jobs.size());
+    return counts;
+}
+
 ImageHandle CreateSvgImage(SvgSourcePtr source)
 {
     Cache& cache = State();
     if (source == nullptr || !cache.initialized || !cache.deviceValid)
         return {};
     const ImageHandle handle = Allocate(cache, SourceKind::Svg);
+    if (!handle.IsValid())
+        return {};
     Slot& slot = cache.slots[handle.index];
     slot.svg = std::move(source);
     if (!RasterizeSlot(slot))

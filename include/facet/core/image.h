@@ -7,6 +7,9 @@
 // instead of showing another image. Loading needs Facet to be initialized; before Init
 // every load returns an invalid handle, and handles do not survive Shutdown.
 //
+// No function here throws: when memory runs out, a load returns an invalid handle and
+// leaves no slot, pending job or partial image behind.
+//
 // Every function here is for the thread that runs the Dear ImGui frame. Asynchronous loads
 // decode on worker threads owned by Facet and upload in a later facet::NewFrame.
 //
