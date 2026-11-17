@@ -506,7 +506,11 @@ struct DataTableOptions
 // A Dear ImGui table with Facet headers, a header row that stays in view, virtualized rows and
 // optional selection. `columns` (1 to 512) are read during the call; `rowCount` rows exist.
 // `selection`: null for rows that are not selectable; otherwise Ctrl, Shift and box select run
-// through ImGui::BeginMultiSelect and the storage, keyed by row index. Returns false while the
+// through ImGui::BeginMultiSelect and the storage. The storage keys each row by
+// selection->AdapterIndexToStorageId(selection, rowIndex), whose default returns the row index
+// itself; when the caller sorts, filters or inserts rows, it sets AdapterIndexToStorageId (and
+// UserData) to return a stable id of the item shown in that row, so the selection stays on the
+// items and not on the positions. Returns false while the
 // table is hidden, not Ready, or empty (the state is drawn instead); call EndDataTable only
 // after true. Between Begin and End loop NextVisibleRows, start each row with DataTableRow and
 // each cell with ImGui::TableNextColumn. Column widths, order, visibility and sort are kept by

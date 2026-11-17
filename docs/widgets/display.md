@@ -80,37 +80,48 @@ default: break;
 The table is a Dear ImGui table: sort specs, column flags and `TableNextColumn` are the stock
 calls. Rows come from `NextVisibleRows`, so only visible rows are submitted.
 
+The selection storage keys rows through `AdapterIndexToStorageId`, which by default returns the
+row index. A sorted table shows different items at the same index after each sort, so the
+example maps the row index to a stable item id; then the selection follows the items.
+
 ```cpp
 static ImGuiSelectionBasicStorage selection;
+selection.UserData = &order;               // order[row] is the item shown in that row
+selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int row) {
+    const auto& shown = *static_cast<const std::vector<int>*>(self->UserData);
+    return static_cast<ImGuiID>(itemIds[shown[row]]);   // the application's stable item ids
+};
 static const facet::DataTableColumn columns[] = {
     {"Name", 0.0f, facet::ColumnAlign::Start, true},           // editable
     {"Size", 80.0f, facet::ColumnAlign::End},
 };
+const int rowCount = static_cast<int>(order.size());
 if (facet::BeginDataTable("files", columns, rowCount, &selection, {.sortable = true, .frozenColumns = 1}))
 {
     if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty)
     {
-        SortRows(specs);                   // the application sorts its own data
+        SortOrder(specs, &order);          // the application reorders `order`, not its items
         specs->SpecsDirty = false;
     }
     facet::RowRange rows;
     while (facet::NextVisibleRows(&rows))
         for (int i = rows.first; i < rows.last; ++i)
         {
+            const int item = order[i];
             if (facet::DataTableRow(i))
-                OpenRow(i);
+                OpenItem(item);
             ImGui::TableNextColumn();
             if (facet::BeginDataTableCellEdit())
             {
-                facet::TextField("##edit", &names[i]);
+                facet::TextField("##edit", &names[item]);
                 if (facet::IsItemEditCommitted())
-                    SaveName(i);
+                    SaveName(item);
                 facet::EndDataTableCellEdit();
             }
             else
-                facet::StyledText(names[i].c_str());
+                facet::StyledText(names[item].c_str());
             ImGui::TableNextColumn();
-            ImGui::Text("%d KB", sizes[i]);
+            ImGui::Text("%d KB", sizes[item]);
         }
     facet::EndDataTable();
 }
