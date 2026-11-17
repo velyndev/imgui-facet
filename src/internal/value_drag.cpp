@@ -27,9 +27,49 @@ double Clamp01(double t)
     return t > 1.0 ? 1.0 : t;
 }
 
+// Pure logarithm: a range above zero.
 bool UsesLog(const ValueMapping& m)
 {
     return m.scale == ValueScale::Logarithmic && m.min > 0.0;
+}
+
+// Logarithm on both sides of zero with a linear zone around it: a range that reaches zero or
+// below, with logZero set.
+bool UsesSplitLog(const ValueMapping& m)
+{
+    return m.scale == ValueScale::Logarithmic && !(m.min > 0.0) && m.logZero > 0.0;
+}
+
+// The split logarithm: linear in -e..e (slope 1/e), then 1 + ln(|v| / e) outward, so it is
+// continuous with a continuous slope at +-e and odd around zero.
+double SplitLog(double value, double e)
+{
+    const double a = std::fabs(value);
+    const double y = a <= e ? a / e : 1.0 + std::log(a / e);
+    return std::copysign(y, value);
+}
+
+double SplitExp(double y, double e)
+{
+    const double a = std::fabs(y);
+    // Within a hair of the middle of the zero zone: exactly zero, so zero is reachable.
+    if (a < kGridEpsilon * kGridEpsilon)
+        return 0.0;
+    const double v = a <= 1.0 ? a * e : e * std::exp(a - 1.0);
+    return std::copysign(v, y);
+}
+
+// For a wrapping mapping: the grid index `target` brought back into 0 to `count` by whole
+// turns; max (count) stays max when it is reached from below.
+double WrapIndex(double target, double count)
+{
+    if (!(count > 0.0))
+        return 0.0;
+    if (target > count)
+        target -= count * std::floor(target / count);
+    else if (target < 0.0)
+        target += count * std::ceil(-target / count);
+    return target;
 }
 
 // The value of grid index `index` (min + index * step), with max as the stop after the last
@@ -62,7 +102,7 @@ double StepOnGrid(const ValueMapping& m, double value, int direction, double per
         target = std::floor(index + kGridEpsilon) + perStep * count;
     else
         target = std::ceil(index - kGridEpsilon) - perStep * count;
-    target = std::clamp(target, 0.0, maxIndex);
+    target = m.wrap ? WrapIndex(target, maxIndex) : std::clamp(target, 0.0, maxIndex);
     if (target >= maxIndex)
         return m.max;
     return GridValue(m, target);
@@ -145,8 +185,14 @@ ValueMapping NormalizeMapping(const ValueMapping& mapping)
         m.max = std::round(m.max);
         m.step = std::max(1.0, std::round(m.step));
     }
-    if (m.scale == ValueScale::Logarithmic && !(m.min > 0.0))
+    if (!(m.logZero > 0.0) || std::isinf(m.logZero))
+        m.logZero = 0.0;
+    if (m.scale == ValueScale::Logarithmic && !(m.min > 0.0) && m.logZero == 0.0)
         m.scale = ValueScale::Linear;
+    if (m.scale == ValueScale::Logarithmic && (std::isinf(m.min) || std::isinf(m.max)))
+        m.scale = ValueScale::Linear;
+    if (m.wrap && !(std::isfinite(m.min) && std::isfinite(m.max) && m.max > m.min))
+        m.wrap = false;
     return m;
 }
 
@@ -158,6 +204,11 @@ double ValueToFraction(const ValueMapping& mapping, double value)
     value = std::clamp(value, m.min, m.max);
     if (UsesLog(m))
         return Clamp01((std::log(value) - std::log(m.min)) / (std::log(m.max) - std::log(m.min)));
+    if (UsesSplitLog(m))
+    {
+        const double low = SplitLog(m.min, m.logZero);
+        return Clamp01((SplitLog(value, m.logZero) - low) / (SplitLog(m.max, m.logZero) - low));
+    }
     return Clamp01((value - m.min) / (m.max - m.min));
 }
 
@@ -171,10 +222,51 @@ double FractionToValue(const ValueMapping& mapping, double fraction)
         return m.max;
     double value = 0.0;
     if (UsesLog(m))
+    {
         value = std::exp(std::log(m.min) + (std::log(m.max) - std::log(m.min)) * t);
+    }
+    else if (UsesSplitLog(m))
+    {
+        const double low = SplitLog(m.min, m.logZero);
+        value = SplitExp(low + (SplitLog(m.max, m.logZero) - low) * t, m.logZero);
+    }
     else
+    {
         value = m.min + (m.max - m.min) * t;
+    }
     return SnapValue(m, value);
+}
+
+double WrapValue(const ValueMapping& mapping, double value)
+{
+    const ValueMapping m = NormalizeMapping(mapping);
+    if (!m.wrap || std::isnan(value))
+        return value;
+    const double range = m.max - m.min;
+    if (value > m.max)
+        value = m.min + std::fmod(value - m.min, range);
+    else if (value < m.min)
+        value = m.max - std::fmod(m.min - value, range);
+    return std::clamp(value, m.min, m.max);
+}
+
+double OffsetValue(const ValueMapping& mapping, double value, double offset)
+{
+    const ValueMapping m = NormalizeMapping(mapping);
+    if (std::isnan(value))
+        value = std::isfinite(m.min) ? m.min : (std::isfinite(m.max) ? m.max : 0.0);
+    double next = value + (std::isfinite(offset) ? offset : 0.0);
+    next = m.wrap ? WrapValue(m, next) : std::clamp(next, m.min, m.max);
+    if (m.step > 0.0)
+    {
+        // On the grid from min, or from zero when min is unbounded; the finite ends stay
+        // reachable.
+        const double origin = std::isfinite(m.min) ? m.min : 0.0;
+        next = origin + std::round((next - origin) / m.step) * m.step;
+    }
+    if (m.integer)
+        next = std::round(next);
+    return m.wrap ? WrapValue(m, next) : std::clamp(next, m.min, m.max);
 }
 
 double SnapValue(const ValueMapping& mapping, double value)
@@ -216,7 +308,7 @@ double KeyboardStep(const ValueMapping& mapping, double value, int direction, St
                                                    : kKeyboardGrid;
     const double index = ValueToFraction(m, value) * grid;
     double target = direction > 0 ? std::floor(index + kGridEpsilon) + count : std::ceil(index - kGridEpsilon) - count;
-    target = std::clamp(target, 0.0, grid);
+    target = m.wrap ? WrapIndex(target, grid) : std::clamp(target, 0.0, grid);
     return FractionToValue(m, target / grid);
 }
 
@@ -325,6 +417,24 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     const bool readOnly = options.readOnly || item.readOnly;
     const double trackLength = std::max(1.0f, vertical ? track.GetHeight() : track.GetWidth());
     const double dragLength = options.dragLength > 0.0f ? options.dragLength : trackLength;
+    const bool deltaMode = options.speed > 0.0 && std::isfinite(options.speed);
+    // Delta mode: the value units of one key step.
+    const double keyUnit = options.keyStep > 0.0 ? options.keyStep : (m.step > 0.0 ? m.step : options.speed);
+    // A key or wheel step of `count` presses in `direction`, in either mode.
+    const auto stepBy = [&](double from, int direction, StepSize size, int count) {
+        if (!deltaMode)
+            return KeyboardStep(m, from, direction, size, count);
+        const bool whole = m.step > 0.0 || m.integer;
+        const double factor = size == StepSize::Coarse ? kCoarseDeltaFactor
+                              : size == StepSize::Fine && !whole ? kFineDragFactor
+                                                                  : 1.0;
+        return OffsetValue(m, from, direction * count * keyUnit * factor);
+    };
+    const auto pageBy = [&](double from, int direction, int count) {
+        if (!deltaMode)
+            return PageStep(m, from, direction, count);
+        return OffsetValue(m, from, direction * count * keyUnit * kCoarseDeltaFactor);
+    };
 
     // A session of an item that stopped being active (released, focus moved) is over.
     if (session.id == id && g.ActiveId != id)
@@ -376,8 +486,8 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
             session.id = id;
             session.mouse = true;
             session.startValue = *value;
-            double start = ValueToFraction(m, *value);
-            if (options.grabRadius >= 0.0f)
+            double start = deltaMode ? 0.0 : ValueToFraction(m, *value);
+            if (options.grabRadius >= 0.0f && !deltaMode)
             {
                 const float knob = FractionToTrack(track, options.orientation, start);
                 const float along = vertical ? press.y : press.x;
@@ -387,7 +497,8 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
                     write(ApplySnapStops(m, FractionToValue(m, start), start, Px(T().spacing.sm) / trackLength));
                 }
             }
-            session.tracker.Begin(start, dragLength);
+            // In delta mode the tracker counts pixels (a length of one).
+            session.tracker.Begin(start, deltaMode ? 1.0 : dragLength);
             session.lastMouse = press;
             session.anchorValue = *value;
         }
@@ -406,10 +517,21 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         {
             const double delta = vertical ? -(mouse.y - session.lastMouse.y) : mouse.x - session.lastMouse.x;
             session.lastMouse = mouse;
-            session.tracker.Move(delta, io.KeyShift ? kFineDragFactor : 1.0);
-            if (delta != 0.0 || io.KeyCtrl)
+            const double factor = io.KeyShift ? kFineDragFactor : (deltaMode && io.KeyCtrl ? kCoarseDeltaFactor : 1.0);
+            session.tracker.Move(delta, factor);
+            if (deltaMode && delta != 0.0)
             {
-                double t = Clamp01(session.tracker.Fraction());
+                const double travel = session.tracker.Fraction();
+                write(travel == 0.0 ? session.anchorValue : OffsetValue(m, session.anchorValue, travel * options.speed));
+            }
+            else if (delta != 0.0 || io.KeyCtrl)
+            {
+                // Past an end the fraction stops there, or turns over to the other end when the
+                // mapping wraps.
+                const double raw = session.tracker.Fraction();
+                double t = Clamp01(raw);
+                if (m.wrap && (raw < 0.0 || raw > 1.0))
+                    t = raw - std::floor(raw);
                 double next = FractionToValue(m, t);
                 if (io.KeyCtrl)
                 {
@@ -473,15 +595,16 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         const int pageUp = PressCount(ImGuiKey_PageUp, id);
         const int pageDown = PressCount(ImGuiKey_PageDown, id);
         if (inc > 0)
-            next = KeyboardStep(m, next, 1, size, inc);
+            next = stepBy(next, 1, size, inc);
         if (dec > 0)
-            next = KeyboardStep(m, next, -1, size, dec);
+            next = stepBy(next, -1, size, dec);
         if (pageUp > 0)
-            next = PageStep(m, next, 1, pageUp);
+            next = pageBy(next, 1, pageUp);
         if (pageDown > 0)
-            next = PageStep(m, next, -1, pageDown);
-        const int home = PressCount(ImGuiKey_Home, id);
-        const int end = PressCount(ImGuiKey_End, id);
+            next = pageBy(next, -1, pageDown);
+        // The ends, where there are ends.
+        const int home = std::isfinite(m.min) ? PressCount(ImGuiKey_Home, id) : 0;
+        const int end = std::isfinite(m.max) ? PressCount(ImGuiKey_End, id) : 0;
         if (home > 0)
             next = m.min;
         if (end > 0)
@@ -516,7 +639,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         if (notches != 0)
         {
             const StepSize size = io.KeyCtrl ? StepSize::Coarse : (io.KeyShift ? StepSize::Fine : StepSize::Normal);
-            next = KeyboardStep(m, next, notches > 0 ? 1 : -1, size, std::abs(notches));
+            next = stepBy(next, notches > 0 ? 1 : -1, size, std::abs(notches));
             stepped = true;
         }
     }

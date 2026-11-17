@@ -25,7 +25,12 @@
 //    keeps its offset to the pointer); a press elsewhere on the track first moves the value
 //    under the pointer. While dragging, Shift moves ten times finer and Ctrl snaps to the
 //    coarse grid (a tenth of the range, or ten steps). Leaving the track keeps the drag; the
-//    pointer has to come back to the end before the value moves back from it.
+//    pointer has to come back to the end before the value moves back from it (a wrapping
+//    mapping goes on from the other end instead). While the pointer position is unknown the
+//    value stays, and the drag goes on from where the pointer comes back.
+//    Delta mode (ValueDragOptions::speed, drag fields and number inputs): no track; the value
+//    follows the pointer travel since the press times the speed, from the value at the press,
+//    over any range including an unbounded one.
 //    Keyboard, while the control has keyboard focus: the arrows along the track (Left and Right
 //    for horizontal, Down and Up for vertical) step, Shift finer, Ctrl coarser; Page Up and Page
 //    Down move a tenth of the range; Home and End go to the ends. Held keys repeat at the
@@ -47,9 +52,9 @@
 // write. facet::IsItemEditCommitted is true on the frame such a session ends with an edit,
 // facet::IsItemEditCanceled on the frame Escape ended it.
 //
-// Precision: a drag maps the pointer travel since the press onto a fraction of the track and
-// converts that fraction to a value each frame; nothing is accumulated in value units, so no
-// rounding drift builds up. Fraction 0 is exactly `min` and 1 exactly `max`; stepped and
+// Precision: a drag maps the pointer travel since the press onto a fraction of the track (in
+// delta mode, onto an offset from the value at the press) and converts it to a value each frame;
+// nothing is accumulated in value units, so no rounding drift builds up. Fraction 0 is exactly `min` and 1 exactly `max`; stepped and
 // integer values land exactly on min + n * step, and `max` is always reachable even when the
 // range is not a whole number of steps. Keyboard steps of continuous values move on a grid of
 // hundredths of the track, so a hundred presses from min end exactly on max.
@@ -72,17 +77,35 @@ struct ValueMapping
 {
     double min = 0.0;
     double max = 1.0;
-    ValueScale scale = ValueScale::Linear;  // Logarithmic needs min > 0; otherwise Linear is used
+    // Logarithmic over a range above zero is ln(value). A range that reaches zero or below is
+    // Linear (the fallback docs/api-conventions.md and common.h promise), unless logZero is set:
+    // then it is logarithmic on both sides of zero, mirrored, with a linear zone from -logZero to
+    // logZero joining them (continuous, with a continuous slope), and zero exactly reachable.
+    ValueScale scale = ValueScale::Linear;
     double step = 0.0;                      // > 0: values snap to min + n * step; 0: continuous
     bool integer = false;                   // whole numbers; the step is at least 1
     std::span<const double> stops = {};     // values a drag snaps to when the knob comes near
+    double logZero = 0.0;                   // > 0: the half width of the linear zone (see scale)
+    // The range is a circle (angles, hues): steps, wheel turns and drags past one end go on from
+    // the other end, min and max are the same point. Needs finite bounds.
+    bool wrap = false;
 };
 
 // The mapping with its invalid parts repaired, as every function below sees it: min > max
 // swapped, a NaN bound replaced by the other one (or 0), a negative or NaN step treated as 0,
-// an integer step rounded to a whole number and at least 1, Logarithmic with min <= 0 turned
-// into Linear.
+// an integer step rounded to a whole number and at least 1, Logarithmic with min <= 0 and no
+// logZero (or with an infinite bound) turned into Linear, wrap without a finite range turned off.
+// Infinite bounds are kept: only the delta mode (ValueDragOptions::speed) and OffsetValue
+// support them, the fraction functions need finite ones.
 ValueMapping NormalizeMapping(const ValueMapping& mapping);
+
+// For a wrapping mapping, the value brought into the range by whole turns (a value at max stays
+// max); otherwise unchanged.
+double WrapValue(const ValueMapping& mapping, double value);
+
+// `value + offset`, wrapped (wrap) or clamped to the range, on the step grid (from min, or from 0
+// when min is infinite) and whole for integer mappings. The math of the delta mode.
+double OffsetValue(const ValueMapping& mapping, double value, double offset);
 
 // The value as a fraction of the track, 0 at min and 1 at max, clamped. NaN gives 0.
 double ValueToFraction(const ValueMapping& mapping, double value);
@@ -160,6 +183,13 @@ struct ValueDragOptions
     float grabRadius = 0.0f;
     // Pixels of pointer travel per whole range for drag fields; 0 uses the track length.
     float dragLength = 0.0f;
+    // Delta mode, for drag fields and number inputs over any range, also an unbounded one: with
+    // speed > 0 (value units per pixel) a drag sets the value at the press plus the pointer
+    // travel since the press times speed (Shift a tenth, Ctrl ten times), through OffsetValue;
+    // there is no track and every press grabs. The keys and the wheel step by keyStep (Shift a
+    // tenth, Ctrl, Page Up and Page Down ten times); Home and End go to finite ends only.
+    double speed = 0.0;
+    double keyStep = 0.0;  // value units; 0: the mapping's step, else speed
     bool keyboard = true;   // arrows, Page Up and Down, Home and End while focused
     bool wheel = true;      // the mouse wheel as described at the top
     bool readOnly = false;  // shown and focusable, never written (also ImGuiItemFlags_ReadOnly)
@@ -169,6 +199,9 @@ struct ValueDragOptions
     double clampLow = -std::numeric_limits<double>::infinity();
     double clampHigh = std::numeric_limits<double>::infinity();
 };
+
+// Speed factor of a delta mode drag or step with Ctrl held (coarser), and of Page Up and Down.
+inline constexpr double kCoarseDeltaFactor = 10.0;
 
 struct ValueDragResult
 {

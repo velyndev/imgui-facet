@@ -156,6 +156,87 @@ TEST_CASE("Value mapping: logarithmic, and Linear when min is not above zero")
     CHECK(FractionToValue(negative, 0.5) == doctest::Approx(0.0));
 }
 
+TEST_CASE("Value mapping: logarithmic through zero and below it with a linear zone")
+{
+    // Symmetric around zero: equal fractions for v and -v, zero in the middle and reachable.
+    const ValueMapping both{.min = -1000.0, .max = 1000.0, .scale = facet::ValueScale::Logarithmic, .logZero = 1.0};
+    CHECK(NormalizeMapping(both).scale == facet::ValueScale::Logarithmic);
+    CHECK(ValueToFraction(both, 0.0) == doctest::Approx(0.5));
+    CHECK(FractionToValue(both, 0.5) == 0.0);
+    CHECK(ValueToFraction(both, 10.0) == doctest::Approx(1.0 - ValueToFraction(both, -10.0)));
+    CHECK(FractionToValue(both, 0.0) == -1000.0);
+    CHECK(FractionToValue(both, 1.0) == 1000.0);
+    // Round trips on both sides, in and beyond the linear zone.
+    for (const double v : {-999.0, -20.0, -1.0, -0.5, 0.25, 1.0, 3.0, 640.0})
+    {
+        INFO(v);
+        CHECK(FractionToValue(both, ValueToFraction(both, v)) == doctest::Approx(v));
+    }
+    // Monotonic, and without a jump where the zone meets the logarithm (at +-logZero).
+    double previous = -2000.0;
+    for (int i = 0; i <= 2000; ++i)
+    {
+        const double v = FractionToValue(both, i / 2000.0);
+        CHECK(v >= previous);
+        previous = v;
+    }
+    const double inside = ValueToFraction(both, 0.999) - ValueToFraction(both, 0.998);
+    const double outside = ValueToFraction(both, 1.002) - ValueToFraction(both, 1.001);
+    CHECK(outside == doctest::Approx(inside).epsilon(0.01));
+
+    // From zero: each decade above the zone takes the same share of the track.
+    const ValueMapping fromZero{.min = 0.0, .max = 20000.0, .scale = facet::ValueScale::Logarithmic, .logZero = 20.0};
+    const double d1 = ValueToFraction(fromZero, 2000.0) - ValueToFraction(fromZero, 200.0);
+    const double d2 = ValueToFraction(fromZero, 20000.0) - ValueToFraction(fromZero, 2000.0);
+    CHECK(d1 == doctest::Approx(d2));
+    CHECK(ValueToFraction(fromZero, 0.0) == 0.0);
+
+    // Entirely below zero: decades too, mirrored.
+    const ValueMapping negative{.min = -100.0, .max = -1.0, .scale = facet::ValueScale::Logarithmic, .logZero = 1.0};
+    CHECK(ValueToFraction(negative, -10.0) == doctest::Approx(0.5));
+
+    // Without logZero the documented fallback stays: Linear.
+    const ValueMapping plain{.min = -10.0, .max = 10.0, .scale = facet::ValueScale::Logarithmic};
+    CHECK(NormalizeMapping(plain).scale == facet::ValueScale::Linear);
+}
+
+TEST_CASE("Value mapping: a wrapping range turns over at its ends")
+{
+    const ValueMapping angle{.min = 0.0, .max = 360.0, .step = 15.0, .wrap = true};
+    CHECK(KeyboardStep(angle, 360.0, 1, StepSize::Normal) == 15.0);
+    CHECK(KeyboardStep(angle, 0.0, -1, StepSize::Normal) == 345.0);
+    CHECK(KeyboardStep(angle, 345.0, 1, StepSize::Normal) == 360.0);
+    CHECK(KeyboardStep(angle, 330.0, 1, StepSize::Coarse) == 120.0);
+    CHECK(PageStep(angle, 0.0, -1) == 330.0);  // a tenth of the turn, rounded to two steps
+    CHECK(facet::internal::WrapValue(angle, 370.0) == doctest::Approx(10.0));
+    CHECK(facet::internal::WrapValue(angle, -10.0) == doctest::Approx(350.0));
+    CHECK(facet::internal::WrapValue(angle, 360.0) == 360.0);
+    const ValueMapping turn{.wrap = true};
+    CHECK(KeyboardStep(turn, 1.0, 1, StepSize::Normal) == doctest::Approx(0.01));
+    // A range that is not finite cannot wrap.
+    CHECK_FALSE(NormalizeMapping({.min = 0.0, .max = std::numeric_limits<double>::infinity(), .wrap = true}).wrap);
+    // Without wrap the ends hold.
+    CHECK(KeyboardStep({.min = 0.0, .max = 360.0, .step = 15.0}, 360.0, 1, StepSize::Normal) == 360.0);
+}
+
+TEST_CASE("Value mapping: offsets for the delta mode, bounded or not")
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    const ValueMapping open{.min = -inf, .max = inf};
+    CHECK(facet::internal::OffsetValue(open, 1.5, 1e6) == 1e6 + 1.5);
+    CHECK(facet::internal::OffsetValue(open, kNaN, 2.0) == 2.0);
+    const ValueMapping steps{.min = -inf, .max = inf, .step = 0.25};
+    CHECK(facet::internal::OffsetValue(steps, 0.0, 0.6) == 0.5);  // on the grid from zero
+    const ValueMapping bounded{.min = 1.0, .max = 9.0, .step = 2.0};
+    CHECK(facet::internal::OffsetValue(bounded, 1.0, 3.1) == 5.0);  // from min
+    CHECK(facet::internal::OffsetValue(bounded, 1.0, 100.0) == 9.0);
+    const ValueMapping integer{.min = -inf, .max = 10.0, .integer = true};
+    CHECK(facet::internal::OffsetValue(integer, 0.0, -3.6) == -4.0);
+    CHECK(facet::internal::OffsetValue(integer, 0.0, 30.0) == 10.0);
+    const ValueMapping angle{.min = 0.0, .max = 360.0, .wrap = true};
+    CHECK(facet::internal::OffsetValue(angle, 350.0, 30.0) == doctest::Approx(20.0));
+}
+
 TEST_CASE("Value mapping: steps land exactly on the grid and max stays reachable")
 {
     const ValueMapping m{.min = 0.0, .max = 10.0, .step = 3.0};
@@ -481,6 +562,80 @@ TEST_CASE("Value drag: a pointer that is lost mid-drag keeps the value and the o
     CHECK(slider.value == doctest::Approx(0.7));
     session.MouseUp();
     CHECK(slider.commits == 1);
+}
+
+TEST_CASE("Value drag: delta mode over an unbounded range")
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.value = 100.0;
+    slider.options.mapping = {.min = -inf, .max = inf};
+    slider.options.speed = 0.5;
+    slider.options.keyStep = 1.0;
+    Install(session, slider);
+    // Every press grabs: no jump, wherever it lands.
+    const ImVec2 at = TestSlider::At(session, 0.1);
+    session.MouseMove(at);
+    session.MouseDown();
+    CHECK(slider.value == 100.0);
+    session.MouseMove(ImVec2(at.x + 40.0f, at.y));
+    CHECK(slider.value == 120.0);
+    session.KeyDown(ImGuiMod_Shift);
+    session.MouseMove(ImVec2(at.x + 60.0f, at.y));
+    CHECK(slider.value == doctest::Approx(121.0));
+    session.KeyUp(ImGuiMod_Shift);
+    session.MouseMove(ImVec2(at.x + 50.0f, at.y));
+    CHECK(slider.value == doctest::Approx(116.0));
+    session.MouseUp();
+    CHECK(slider.commits == 1);
+    // Far beyond any track: an unbounded range has no end.
+    session.Drag({at, ImVec2(at.x - 600.0f, at.y)});
+    CHECK(slider.value == doctest::Approx(-184.0));
+    // Keys step by keyStep; Ctrl and Page by ten; Home and End do nothing without ends.
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(slider.value == doctest::Approx(-183.0));
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    CHECK(slider.value == doctest::Approx(-173.0));
+    session.KeyPress(ImGuiKey_PageDown);
+    CHECK(slider.value == doctest::Approx(-183.0));
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Shift);
+    CHECK(slider.value == doctest::Approx(-182.9));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(slider.value == doctest::Approx(-182.9));
+}
+
+TEST_CASE("Value drag: delta mode returns exactly to the value at the press")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.value = 0.1;
+    slider.options.mapping = {.min = -10.0, .max = 10.0};
+    slider.options.speed = 0.013;
+    Install(session, slider);
+    const ImVec2 at = TestSlider::At(session, 0.5);
+    session.Drag({at, ImVec2(at.x + 37.0f, at.y), ImVec2(at.x - 61.0f, at.y), at}, 3);
+    CHECK(slider.value == 0.1);
+}
+
+TEST_CASE("Value drag: a wrapping track goes on from the other end")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.value = 350.0;
+    slider.options.mapping = {.min = 0.0, .max = 360.0, .wrap = true};
+    Install(session, slider);
+    const ImVec2 knob = TestSlider::At(session, 350.0 / 360.0);
+    // 200 pixels are a whole turn: 40 pixels on are 72 degrees, past 360 to 62.
+    session.Drag({knob, ImVec2(knob.x + 40.0f, knob.y)});
+    CHECK(slider.value == doctest::Approx(62.0));
+    // The keys too: from 0 down goes to the top of the turn.
+    session.KeyPress(ImGuiKey_Home);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(slider.value == doctest::Approx(356.4));
 }
 
 TEST_CASE("Value drag: fractions of a wheel notch add up to steps")
