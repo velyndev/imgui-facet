@@ -150,13 +150,54 @@ TEST_CASE("SetStrings copies the table and keeps English for null members")
     CHECK(std::strcmp(facet::GetStrings().cancel, "Cancel") == 0);
 }
 
-TEST_CASE("The queries of later blocks answer neutrally until those blocks exist")
+TEST_CASE("NextVisibleRows answers neutrally until the list core exists")
 {
     facet::RowRange rows{3, 9};
     CHECK_FALSE(facet::NextVisibleRows(&rows));
     CHECK(rows.first == 0);
     CHECK(rows.last == 0);
     CHECK_FALSE(facet::NextVisibleRows(nullptr));
+}
+
+TEST_CASE("The edit session queries answer false without a context or an edit")
+{
+    // No Dear ImGui context at all.
     CHECK_FALSE(facet::IsItemEditCommitted());
     CHECK_FALSE(facet::IsItemEditCanceled());
+    // A stock item that was clicked but not edited.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool committed = false;
+    bool canceled = false;
+    session.SetUi([&] {
+        ImGui::Button("button");
+        session.Track("button");
+        committed = committed || facet::IsItemEditCommitted();
+        canceled = canceled || facet::IsItemEditCanceled();
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("button"));
+    CHECK_FALSE(committed);
+    CHECK_FALSE(canceled);
+}
+
+TEST_CASE("IsItemEditCommitted follows a stock widget's edit session")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float value = 0.5f;
+    int commits = 0;
+    int canceled = 0;
+    session.SetUi([&] {
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::SliderFloat("value", &value, 0.0f, 1.0f);
+        session.Track("value");
+        commits += facet::IsItemEditCommitted() ? 1 : 0;
+        canceled += facet::IsItemEditCanceled() ? 1 : 0;
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("value");
+    session.Drag({ImVec2(r.Min.x + 50.0f, r.GetCenter().y), ImVec2(r.Min.x + 150.0f, r.GetCenter().y)});
+    CHECK(commits == 1);
+    CHECK(canceled == 0);
 }

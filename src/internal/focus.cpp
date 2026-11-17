@@ -13,6 +13,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "internal/subsystem.h"
+#include "internal/value_drag.h"
 
 namespace facet::internal
 {
@@ -79,6 +80,7 @@ void ResetInteraction()
 {
     Modality() = false;
     ClearForcedItemState();
+    ResetValueDragState();
 }
 
 bool FocusInit()

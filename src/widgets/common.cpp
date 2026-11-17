@@ -1,5 +1,5 @@
 // Behaviour behind widgets/common.h: the control size stack, the built-in strings, the edit
-// session queries and the visible row ranges.
+// session queries (fed by the item behaviour and the value drag core) and the visible row ranges.
 // Owner from Phase 1c part A on: the interaction blocks package.
 
 #include "facet/widgets/common.h"
@@ -12,6 +12,7 @@
 #include "core/core_internal.h"
 #include "facet/core/scale.h"
 #include "internal/subsystem.h"
+#include "internal/value_drag.h"
 
 namespace facet
 {
@@ -148,14 +149,18 @@ TextStyle ControlTextStyle(ControlSize size)
 
 bool IsItemEditCommitted()
 {
-    // Stub until the item behaviour and value drag blocks feed the edit sessions.
-    return false;
+    // The session of the last item ended with an edit (Dear ImGui's own deactivation query, fed
+    // by the item behaviour and the value drag core), and Escape did not end it.
+    if (ImGui::GetCurrentContext() == nullptr)
+        return false;
+    return ImGui::IsItemDeactivatedAfterEdit() && !IsItemEditCanceled();
 }
 
 bool IsItemEditCanceled()
 {
-    // Stub until the item behaviour and value drag blocks feed the edit sessions.
-    return false;
+    if (ImGui::GetCurrentContext() == nullptr)
+        return false;
+    return internal::WasEditCanceled(ImGui::GetItemID());
 }
 
 void SetStrings(const Strings& strings)
