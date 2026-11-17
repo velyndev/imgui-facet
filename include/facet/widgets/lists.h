@@ -173,9 +173,12 @@ struct ListBoxOptions
 // ChoiceItem::group adds group headers. The list is one Tab stop: arrows, Page Up and Down,
 // Home and End move the choice, typing jumps to the next matching label. Writes *index as soon
 // as the choice moves and returns true on that frame. *index -1 means none. Only the visible
-// rows are submitted, so the getter overload scales to long lists. The label's visible part is
-// drawn above the list, which is taller than a label line. Default width: the available width.
-// The scroll position and the typeahead text are kept under the id.
+// rows are submitted, so the getter overload scales to long lists. While `state` is Loading or
+// Error, or with no items, the frame keeps its height and shows the loading, error or empty
+// state instead of the rows and returns false. `helpText` sits under the list, and a non-null
+// `error` outlines the frame and replaces it (rule 7). The label's visible part is drawn above
+// the list, which is taller than a label line. Default width: the available width. The scroll
+// position and the typeahead text are kept under the id.
 bool ListBox(const char* label, int* index, std::span<const ChoiceItem> items, const ListBoxOptions& options = {});
 bool ListBox(const char* label, int* index, std::span<const char* const> items,
              const ListBoxOptions& options = {});
@@ -192,13 +195,16 @@ struct SelectableListOptions
     ControlSize size = ControlSize::Inherit;   // row height
     float width = 0.0f;                // units; 0 fills the available width
     bool readOnly = false;             // the selection is shown but cannot change
+    const char* error = nullptr;
+    const char* helpText = nullptr;
 };
 
 // A scrolling list with multiple selection through ImGui::BeginMultiSelect: a click selects,
 // Ctrl+click toggles, Shift+click and Shift+arrows extend, Ctrl+A selects all, Escape clears.
 // Writes `selection` (caller-owned and kept across frames; null shows the rows without
 // selection) and returns true on the frame it changed. The row activated by double click or
-// Enter is reported by SelectableListActivatedRow. Label, width and kept state as ListBox.
+// Enter is reported by SelectableListActivatedRow. Label, width, kept state, the not-Ready and
+// empty states, error and help text as ListBox.
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const ChoiceItem> items,
                     const SelectableListOptions& options = {});
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const char* const> items,
@@ -245,6 +251,9 @@ void ApplyReorderMove(Range&& items, const ReorderMove& move)
 struct ReorderableListOptions
 {
     bool handleOnly = false;           // only the grip starts a drag; the rest of the row stays clickable
+    DataState state = DataState::Ready;
+    const char* emptyText = nullptr;   // null uses Strings::empty
+    const char* errorText = nullptr;   // null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;   // row height
     float width = 0.0f;                // units; 0 fills the available width
     bool readOnly = false;             // no grips, no moves
@@ -255,7 +264,8 @@ struct ReorderableListOptions
 // row. Writes *move and returns true on the frame a row lands on a new place; *move is left
 // alone otherwise. A row keeps its animation state under ChoiceItem::id (the index when 0), so
 // give items stable ids when the caller moves its data; rows of the label overload are keyed
-// by index. Default width: the available width.
+// by index. While `state` is Loading or Error, or with no items, one row shows the loading,
+// error or empty state instead and nothing can move. Default width: the available width.
 bool ReorderableList(const char* id, ReorderMove* move, std::span<const ChoiceItem> items,
                      const ReorderableListOptions& options = {});
 bool ReorderableList(const char* id, ReorderMove* move, std::span<const char* const> items,
@@ -351,6 +361,9 @@ struct CheckboxTreeOptions
 {
     bool cascade = true;               // a parent sets all its children; children make the parent On, Off or Mixed
     bool defaultOpen = true;           // open state of parent nodes the first time they appear
+    DataState state = DataState::Ready;
+    const char* emptyText = nullptr;   // null uses Strings::empty
+    const char* errorText = nullptr;   // null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;   // row height
     float width = 0.0f;                // units; 0 fills the available width
     float height = 0.0f;               // units; 0 fits the rows, > 0 scrolls
@@ -361,8 +374,9 @@ struct CheckboxTreeOptions
 // entries count as Off and are never written. Space or a click toggles a node: Off and Mixed
 // become On, On becomes Off. With cascade, the new state goes down to every descendant and
 // every ancestor becomes On, Off or Mixed from its children. Returns true on the frame any
-// state was written. Arrows move and open or close as in a tree view. The open states are
-// kept under the id.
+// state was written. Arrows move and open or close as in a tree view. While `state` is Loading
+// or Error, or with no items, the tree area shows the loading, error or empty state instead and
+// no state is written. The open states are kept under the id.
 bool CheckboxTree(const char* id, std::span<CheckState> states, std::span<const CheckTreeItem> items,
                   const CheckboxTreeOptions& options = {});
 
@@ -374,6 +388,9 @@ struct TransferListOptions
     const char* targetTitle = nullptr; // heading of the target list; null for none
     bool searchable = true;            // a filter field above each list
     int visibleRows = 0;               // height of each list in rows; 0 for the token default
+    DataState state = DataState::Ready;
+    const char* emptyText = nullptr;   // shown by each list without rows; null uses Strings::empty
+    const char* errorText = nullptr;   // null uses Strings::loadFailed
     float width = 0.0f;                // units; 0 fills; in a Compact width the lists stack
     bool readOnly = false;
 };
@@ -381,8 +398,10 @@ struct TransferListOptions
 // Two lists with move buttons between them: items whose `inTarget` entry is false are in the
 // source list, the others in the target list. Selected rows move with the buttons, by double
 // click or Enter, or by dragging them across. Writes the moved entries of `inTarget` and
-// returns true on that frame. Missing entries count as false and are never written. The
-// selection and filter text of both lists are kept under the id.
+// returns true on that frame. Missing entries count as false and are never written. While
+// `state` is Loading or Error, both lists show that state and nothing moves; a list without rows
+// (no items, every item on the other side, or a filter that matches none) shows the empty
+// state. The selection and filter text of both lists are kept under the id.
 bool TransferList(const char* id, std::span<bool> inTarget, std::span<const ChoiceItem> items,
                   const TransferListOptions& options = {});
 bool TransferList(const char* id, std::span<bool> inTarget, std::span<const char* const> items,

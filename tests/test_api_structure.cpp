@@ -4,8 +4,10 @@
 // placeholder of src/widgets/structure_stub.h sizes, truncates and closes as documented.
 
 #include <array>
+#include <cstddef>
 #include <span>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <doctest/doctest.h>
@@ -96,6 +98,56 @@ static_assert(OptionsFollowConventions<facet::LoadingOverlayOptions>());
 static_assert(OptionsFollowConventions<facet::CommandPaletteOptions>());
 static_assert(OptionsFollowConventions<facet::WatermarkOptions>());
 static_assert(OptionsFollowConventions<facet::UnsavedChangesBarOptions>());
+
+// Rule 7 of the conventions: a data view carries the data block (`state`, `emptyText`,
+// `errorText`) in that order, after its own members and before the common block.
+template <class T>
+consteval bool HasDataBlock()
+{
+    if constexpr (!requires { &T::state; &T::emptyText; &T::errorText; })
+    {
+        return false;
+    }
+    else
+    {
+        bool ok = std::is_same_v<decltype(T::state), facet::DataState> &&
+                  std::is_same_v<decltype(T::emptyText), const char*> &&
+                  std::is_same_v<decltype(T::errorText), const char*> &&
+                  offsetof(T, state) < offsetof(T, emptyText) && offsetof(T, emptyText) < offsetof(T, errorText);
+        const std::size_t end = offsetof(T, errorText);
+        if constexpr (requires { &T::size; })
+            ok = ok && end < offsetof(T, size);
+        if constexpr (requires { &T::width; })
+            ok = ok && end < offsetof(T, width);
+        if constexpr (requires { &T::height; })
+            ok = ok && end < offsetof(T, height);
+        if constexpr (requires { &T::readOnly; })
+            ok = ok && end < offsetof(T, readOnly);
+        return ok;
+    }
+}
+
+// Every data view of the structure families: the lists that show caller data, the tree, the
+// virtualized containers and the item grid.
+static_assert(HasDataBlock<facet::ListBoxOptions>());
+static_assert(HasDataBlock<facet::SelectableListOptions>());
+static_assert(HasDataBlock<facet::ReorderableListOptions>());
+static_assert(HasDataBlock<facet::TreeViewOptions>());
+static_assert(HasDataBlock<facet::CheckboxTreeOptions>());
+static_assert(HasDataBlock<facet::TransferListOptions>());
+static_assert(HasDataBlock<facet::SearchableChecklistOptions>());
+static_assert(HasDataBlock<facet::VirtualListOptions>());
+static_assert(HasDataBlock<facet::ItemGridOptions>());
+
+// The framed lists that are fields of a form carry the validation members of rule 7.
+template <class T>
+consteval bool HasFieldMessages()
+{
+    return requires { &T::error; &T::helpText; };
+}
+static_assert(HasFieldMessages<facet::ListBoxOptions>());
+static_assert(HasFieldMessages<facet::SelectableListOptions>());
+static_assert(HasFieldMessages<facet::SearchableChecklistOptions>());
 
 // Every value a stub receives through a pointer or a writable span. The stubs must leave all
 // of it alone.

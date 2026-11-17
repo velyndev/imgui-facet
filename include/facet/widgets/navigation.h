@@ -301,7 +301,9 @@ struct ShortcutSheetOptions
 // A modal sheet listing the registered shortcuts (core/input.h) by group, with their chords as
 // key caps. Shown while *open is true; Escape, the close button or a click on the scrim write
 // *open = false. A null `open` shows nothing. The visible label part is the title. Disabled
-// shortcuts are listed dimmed.
+// shortcuts are listed dimmed. With no registered shortcuts in the group the sheet shows
+// Strings::empty, and with none matching the filter Strings::noResults; the registry is local,
+// so there is no loading or error state.
 void ShortcutSheet(const char* label, bool* open, const ShortcutSheetOptions& options = {});
 
 } // namespace facet
