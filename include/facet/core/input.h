@@ -47,18 +47,33 @@ bool IsChordDown(ImGuiKeyChord chord);
 bool IsChordPressed(ImGuiKeyChord chord, bool repeat = false);
 
 // The display name of one key, never null: "Ctrl", "Shift", "Alt", "Win", "A", "F5", "Space",
-// "Page Up", "Mouse 4", "Gamepad A". English; built-in strings, valid for the whole process.
+// "Page Up", "Esc", ";", "Num 1", "Mouse 4", "Gamepad A". Left and right modifier keys share
+// one name ("Ctrl"), and a single ImGuiMod_* flag gives its modifier's name. English;
+// built-in strings, valid for the whole process. "" for ImGuiKey_None and values that are not
+// keys.
 const char* KeyNameText(ImGuiKey key);
 
-// Writes the chord as text, modifiers first in the order Ctrl, Shift, Alt, Win, joined by "+"
-// ("Ctrl+Shift+S"), into buffer (bufferSize bytes, always zero terminated when bufferSize > 0)
-// and returns the full length, which may exceed bufferSize - 1 when the text was cut.
-// ImGuiKey_None writes "". The text parses back with ChordFromText.
+// Writes the chord for display, modifiers first in the order Ctrl, Shift, Alt, Win, joined by
+// "+" ("Ctrl+Shift+S"), into buffer (bufferSize bytes, always zero terminated when
+// bufferSize > 0) and returns the full length, which may exceed bufferSize - 1 when the text
+// was cut. ImGuiKey_None writes "". A modifier key is folded into the modifiers, so LeftShift
+// with Ctrl reads "Ctrl+Shift" whichever side it is. The text parses back with ChordFromText
+// to a chord that matches the same key presses, except that a sided modifier key comes back
+// as its modifier flag (either side); ChordToConfigText keeps the side.
 int ChordToText(ImGuiKeyChord chord, char* buffer, int bufferSize);
 
-// Parses text written by ChordToText, case-insensitive, with optional spaces around "+".
-// Also accepts "Control" and "Super" for the modifiers. Returns false and leaves *chord
-// unchanged when the text names no key or an unknown one; "" parses as ImGuiKey_None.
+// Writes the chord in its configuration form, for files that store bindings: modifiers Ctrl,
+// Shift, Alt, Super, then a key identifier without spaces or punctuation that never changes
+// ("Ctrl+Shift+K", "LeftShift", "Ctrl+Semicolon", "Num0", "MouseX1", "GamepadFaceDown").
+// ChordFromText reads it back to exactly the same chord (a sided modifier key with or without
+// its own flag reads back with it). Same buffer contract as ChordToText.
+int ChordToConfigText(ImGuiKeyChord chord, char* buffer, int bufferSize);
+
+// Parses text written by ChordToText or ChordToConfigText, case-insensitive, with optional
+// spaces around "+". Modifiers come first, in any order; "Control" and "Super" are accepted
+// for Ctrl and Win. Modifiers alone ("Ctrl+Shift") give their flags without a key. Returns
+// false and leaves *chord unchanged when the text names an unknown key, ends in "+", or
+// `text` or `chord` is null; "" parses as ImGuiKey_None. Needs no Dear ImGui context.
 bool ChordFromText(const char* text, ImGuiKeyChord* chord);
 
 // --- Key binds ------------------------------------------------------------------------------
@@ -73,22 +88,32 @@ enum class BindMode
 };
 
 // A binding with a primary and an alternate chord; either one triggers it. Plain data that the
-// app stores and saves (for example as ChordToText text).
+// app stores and saves (for example as ChordToConfigText text).
 struct Keybind
 {
     ImGuiKeyChord primary = ImGuiKey_None;    // ImGuiKey_None: unbound
     ImGuiKeyChord alternate = ImGuiKey_None;  // ImGuiKey_None: unbound
     BindMode mode = BindMode::Hold;
+    // While a text field has the keyboard (io.WantTextInput), keyboard chords are ignored so
+    // typing never triggers the bind; true keeps them working. Mouse and gamepad chords work
+    // either way.
+    bool whileTextInput = false;
 };
 
-// Whether the bind is active this frame. Hold: IsChordDown of either chord. Toggle: a press of
-// either chord (IsChordPressed, no repeat) flips *toggleState, and the result is *toggleState;
-// the caller owns the latch, so one Keybind can drive several states. Always: true. Off:
-// false. `toggleState` may be null for the modes other than Toggle; Toggle with a null latch
-// returns whether a chord was pressed this frame. Unbound chords never match.
+// Whether the bind is active this frame. Hold: IsChordDown of either chord, so the state
+// follows the keys. Toggle: a press of either chord (IsChordPressed without repeat, so a held
+// key flips once) flips *toggleState, once even when both chords go down in the same frame,
+// and the result is *toggleState; the caller owns the latch, so one Keybind can drive several
+// states. Always: true. Off: false, and the latch is left alone. `toggleState` may be null for
+// the modes other than Toggle; Toggle with a null latch returns whether a chord was pressed
+// this frame. Unbound chords never match, and keys locked by a chord capture never count.
+// A latch flips at most once per frame, so asking for the same bind and latch from two places
+// in one frame gives the same answer (the latches flipped in a frame are remembered by
+// address, up to 64 per frame).
 bool IsBindActive(const Keybind& bind, bool* toggleState);
 
-// Either chord of the bind was pressed this frame, whatever the mode (Off excepted).
+// Either chord of the bind was pressed this frame (no repeat), whatever the mode (Off
+// excepted), with the same text field rule as IsBindActive.
 bool IsBindPressed(const Keybind& bind);
 
 // --- Shortcut registry ----------------------------------------------------------------------
@@ -101,12 +126,18 @@ struct ShortcutId
     friend constexpr bool operator==(const ShortcutId&, const ShortcutId&) = default;
 };
 
-// Where a shortcut fires. The routing is Dear ImGui's (ImGui::Shortcut route flags), decided
-// where ShortcutPressed is called.
+// Where a shortcut fires. The routing is Dear ImGui's shortcut routing (ImGui::Shortcut with an
+// owner id per shortcut chord), decided where ShortcutPressed is called. When several scopes
+// want the same chord in a frame, the innermost one wins: the focused item, then the focused
+// window (the deepest child first), then global. A text field that is being edited keeps the
+// keys it uses: chords that type a character (a letter, digit or punctuation key without Ctrl)
+// never fire while one is active, and the field's own chords (Ctrl+A, Ctrl+Z) win over every
+// scope. Shortcuts never fire inside ImGui::BeginDisabled.
 enum class ShortcutScope
 {
-    Global,   // anywhere in the app, unless a focused widget owns the key (a text field)
-    Window,   // only while the window that calls ShortcutPressed, or a child of it, is focused
+    Global,       // anywhere in the app
+    Window,       // only while the window that calls ShortcutPressed, or a child of it, is focused
+    FocusedItem,  // only while the item submitted right before ShortcutPressed has keyboard focus
 };
 
 struct ShortcutOptions
@@ -117,12 +148,19 @@ struct ShortcutOptions
     ShortcutScope scope = ShortcutScope::Global;
     bool repeat = false;                // fires again while the key repeats
     bool enabled = true;
+    // Called with the shortcut's id and `user` on the frame it fires, from ShortcutPressed, or
+    // from facet::EndFrame for a Global shortcut that ShortcutPressed was not called for in
+    // that frame. Window and FocusedItem shortcuts need their ShortcutPressed call, which
+    // tells Facet where they belong. Null: no callback.
+    void (*callback)(ShortcutId id, void* user) = nullptr;
+    void* user = nullptr;
 };
 
 // Registers a shortcut under a unique, stable `name` ("file.save"), which also keys saved
 // rebinds. Strings are copied. The chord given here is the default the shortcut returns to
 // with ResetShortcut. Registering a name that exists replaces its entry and keeps its id.
-// Returns an invalid id for a null or empty name.
+// Returns an invalid id for a null or empty name, or when memory runs out. Works before
+// facet::Init and outside frames; the registry lives for the whole process.
 ShortcutId RegisterShortcut(const char* name, ImGuiKeyChord chord, const ShortcutOptions& options = {});
 // Removes the shortcut; its id becomes invalid. Unknown ids are ignored.
 void UnregisterShortcut(ShortcutId id);
@@ -137,8 +175,13 @@ void SetShortcutChords(ShortcutId id, ImGuiKeyChord primary, ImGuiKeyChord alter
 void ResetShortcut(ShortcutId id);
 
 // True on the frame the shortcut fires: a chord was pressed in the shortcut's scope, or
-// TriggerShortcut asked for it. Call it once per frame where the app handles the action; for
-// ShortcutScope::Window, call it inside the window it belongs to.
+// TriggerShortcut asked for it. Call it once per frame where the app handles the action (a
+// second call in the same frame gives the same answer); for ShortcutScope::Window, call it
+// inside the window it belongs to, for FocusedItem right after the item. The routing of a
+// chord is requested in each call and granted from the next frame on, as with ImGui::Shortcut,
+// so a shortcut that was not asked for in the previous frame cannot fire. A chord of two or
+// more modifiers without a key cannot be routed and never fires (ChordFromText can produce
+// one). False outside a frame and for disabled or unknown shortcuts.
 bool ShortcutPressed(ShortcutId id);
 // Makes ShortcutPressed return true for this shortcut in the next frame, as if its chord had
 // been pressed (CommandPalette runs commands this way). Disabled shortcuts are not triggered.
@@ -167,7 +210,14 @@ int ShortcutCount();
 bool GetShortcut(int index, ShortcutInfo* info);
 bool GetShortcut(ShortcutId id, ShortcutInfo* info);
 // Another enabled shortcut in an overlapping scope that uses `chord` as a chord, for conflict
-// marks; invalid when there is none. `except` is skipped.
+// marks; invalid when there is none (or `chord` is ImGuiKey_None). `except` is skipped, and its
+// scope is the one compared; without `except` the chord is checked as a Global one. Scopes
+// overlap when either is Global; two Window or FocusedItem shortcuts overlap when they were
+// last asked for in the same window or in a window and one of its children, or when either has
+// not been asked for yet (its window is unknown); two FocusedItem shortcuts on different items
+// never overlap. Chords compare after folding a sided modifier key's flag in (LeftShift equals
+// LeftShift + Shift); LeftCtrl and RightCtrl stay different keys. The first conflicting entry
+// in registration order is returned.
 ShortcutId FindChordConflict(ImGuiKeyChord chord, ShortcutId except = {});
 
 } // namespace facet
