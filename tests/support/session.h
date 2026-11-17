@@ -7,8 +7,9 @@
 // What a Session sets up, in this order:
 //   - a WARP device and its immediate context (no GPU needed);
 //   - a fresh Dear ImGui context: display size from the options, a fixed delta time, no ini
-//     file, keyboard navigation on (NavEnableKeyboard), error recovery without asserts so a
-//     test can provoke a usage error and check the report, and the renderer flag
+//     file, keyboard navigation on (NavEnableKeyboard), error recovery without asserts or
+//     tooltips (to the debug log only), so a test can provoke a usage error and count the report
+//     (internal::UsageErrorCount in src/core/core_internal.h), and the renderer flag
 //     ImGuiBackendFlags_RendererHasTextures; the session plays the renderer and marks every
 //     texture request as done after each frame, so fonts and atlases work without a backend;
 //   - the main viewport size and the circle tessellation tables, which a frame would set up,

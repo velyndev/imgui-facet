@@ -39,8 +39,10 @@ Session::Session(const SessionOptions& sessionOptions) : options(sessionOptions)
     io.DisplaySize = options.displaySize;
     io.DeltaTime = options.deltaTime;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // Recoverable errors go to Dear ImGui's debug log only (it needs one output enabled).
     io.ConfigErrorRecoveryEnableAssert = false;
     io.ConfigErrorRecoveryEnableTooltip = false;
+    io.ConfigErrorRecoveryEnableDebugLog = true;
     io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
     // What a frame start would set, so draw lists recorded outside a frame work too.
     ImGui::GetMainViewport()->Size = options.displaySize;

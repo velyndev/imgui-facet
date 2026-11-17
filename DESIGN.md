@@ -173,3 +173,6 @@ The dose caps in Direction apply. The choices behind each effect:
   label moves above its control.
 - **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
   caption names them, so nothing that cannot be operated looks like a control.
+- **Planned widgets.** A declared widget without its implementation draws a fill[3] box with a
+  separator hairline and "Name: planned" in footnote labelSecondary, at the size the widget
+  will take; it is not focusable, so a page of placeholders never looks operable.

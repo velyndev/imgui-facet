@@ -58,6 +58,7 @@ Subsystem ShadowSubsystem();        // src/effects/shadow.cpp
 Subsystem BlurSubsystem();          // src/effects/blur_dx11.cpp
 Subsystem TextureSubsystem();       // src/image/texture_cache.cpp
 Subsystem IconSubsystem();          // src/image/icon_atlas.cpp
+Subsystem WidgetsCommonSubsystem(); // src/widgets/common.cpp
 
 // The ordered table (src/core/subsystems.cpp). Built on first use, valid for the whole run.
 std::span<const Subsystem> Subsystems();

@@ -1,0 +1,228 @@
+#pragma once
+
+// Types and functions shared by the widget families. See docs/api-conventions.md for the rules
+// every widget header follows; this header holds what more than one family needs.
+//
+// Like every Facet function, these are for the thread that runs the Dear ImGui frame (see
+// context.h); the plain types may be built on any thread.
+
+#include <cfloat>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <type_traits>
+
+#include <imgui.h>
+
+#include "facet/core/icons.h"
+#include "facet/core/theme.h"
+#include "facet/core/version.h"
+
+// Bit operators and Has() for a flags enum class with a None = 0 member. Use it at namespace
+// scope, right after the enum.
+#define FACET_FLAGS(E)                                                                             \
+    constexpr E operator|(E a, E b)                                                                \
+    {                                                                                              \
+        return E(std::underlying_type_t<E>(a) | std::underlying_type_t<E>(b));                     \
+    }                                                                                              \
+    constexpr E operator&(E a, E b)                                                                \
+    {                                                                                              \
+        return E(std::underlying_type_t<E>(a) & std::underlying_type_t<E>(b));                     \
+    }                                                                                              \
+    constexpr E operator^(E a, E b)                                                                \
+    {                                                                                              \
+        return E(std::underlying_type_t<E>(a) ^ std::underlying_type_t<E>(b));                     \
+    }                                                                                              \
+    constexpr E operator~(E a)                                                                     \
+    {                                                                                              \
+        return E(~std::underlying_type_t<E>(a));                                                   \
+    }                                                                                              \
+    constexpr E& operator|=(E& a, E b)                                                             \
+    {                                                                                              \
+        return a = a | b;                                                                          \
+    }                                                                                              \
+    constexpr E& operator&=(E& a, E b)                                                             \
+    {                                                                                              \
+        return a = a & b;                                                                          \
+    }                                                                                              \
+    constexpr bool Has(E set, E bit)                                                               \
+    {                                                                                              \
+        return bit != E::None && (set & bit) == bit;                                               \
+    }
+
+namespace facet
+{
+
+// Width value meaning "the available content width" (the same value Dear ImGui uses).
+inline constexpr float kFill = -FLT_MIN;
+
+// Progress value meaning "progress unknown": the indicator sweeps instead of filling
+// (ProgressBar, ProgressRing, LoadingOverlay, toasts with progress).
+inline constexpr float kIndeterminate = -1.0f;
+
+// Control heights from the controlHeight tokens. Inherit takes the innermost PushControlSize,
+// or Regular when none is pushed.
+enum class ControlSize
+{
+    Inherit,
+    Small,
+    Regular,
+    Large,
+};
+
+// Semantic tone of status, alerts, badges and destructive actions; colors from the status and
+// accent tokens.
+enum class Tone
+{
+    Neutral,
+    Accent,
+    Success,
+    Warning,
+    Destructive,
+};
+
+enum class Orientation
+{
+    Horizontal,
+    Vertical,
+};
+
+// Corner radius by layer token (T().radii): None is square, the others name their token.
+enum class Radius
+{
+    None,
+    Element,
+    Control,
+    Card,
+    Popover,
+    Window,
+};
+
+// State of a data view. Ready with a count of 0 shows the empty state.
+enum class DataState
+{
+    Ready,
+    Loading,
+    Error,
+};
+
+// A tri-state check (Checkbox, CheckboxTree, a select-all row). Only the caller sets Mixed.
+enum class CheckState
+{
+    Off,
+    On,
+    Mixed,
+};
+
+// How a value range maps onto a track or a drag distance (sliders, knobs, drag fields).
+// Logarithmic needs min > 0; with min <= 0 the widget falls back to Linear.
+enum class ValueScale
+{
+    Linear,
+    Logarithmic,
+};
+
+// One entry of a single-choice widget (RadioGroup, SegmentedControl, Dropdown, TabBar).
+struct ChoiceItem
+{
+    const char* label = nullptr;   // required; "##" hides the visible part as for widget labels
+    Icon icon;                     // none by default
+    const char* detail = nullptr;  // secondary text where the widget has room; null for none
+    const char* group = nullptr;   // consecutive items with equal text share a group header
+    bool disabled = false;
+    ImGuiID id = 0;                // stable id for reorderable entries; 0 uses the index
+};
+
+// Fills `out` for entry `index` and returns true, or returns false to skip it. Called during
+// the widget call only.
+using ChoiceGetter = bool (*)(void* user, int index, ChoiceItem* out);
+
+// Writes the text for `value` into buffer (bufferSize bytes, zero terminated) and returns its
+// length. Called during the widget call only.
+using FormatFn = int (*)(char* buffer, int bufferSize, double value, void* user);
+
+// Rows [first, last) to submit in a list or table.
+struct RowRange
+{
+    int first = 0;
+    int last = 0;
+};
+
+// Inside BeginVirtualList or BeginDataTable: the next range of rows to submit. Returns false
+// when every range was handed out, and outside those containers. Extra ranges keep the
+// keyboard focused row alive.
+bool NextVisibleRows(RowRange* rows);
+
+// Size used by widgets whose options say ControlSize::Inherit, until the matching
+// PopControlSize. Pushing Inherit keeps the current size. Pushes nest up to
+// kControlSizeStackDepth deep; deeper pushes are reported and ignored (their pops still
+// balance). A pop without a push is reported and ignored, and facet::EndFrame reports sizes
+// still pushed and clears them.
+inline constexpr int kControlSizeStackDepth = 16;
+void PushControlSize(ControlSize size);
+void PopControlSize();
+
+// The size a widget with `size` uses: `size` itself, or for Inherit the innermost
+// PushControlSize, or Regular. Never Inherit.
+ControlSize ResolveControlSize(ControlSize size);
+
+// Height in pixels at the current scale of a control of this size (controlHeightSmall,
+// controlHeight or controlHeightLarge, through Px). Inherit is resolved first.
+float ControlHeight(ControlSize size);
+
+// Text style of the label in a control of this size: Small uses Footnote, Regular and Large
+// use Body. Inherit is resolved first.
+TextStyle ControlTextStyle(ControlSize size);
+
+// Last item: its edit session ended this frame, it was edited during the session, and the
+// session was not canceled.
+bool IsItemEditCommitted();
+// Last item: Escape ended its edit session this frame and restored the starting value.
+bool IsItemEditCanceled();
+
+// Built-in UI strings, English by default. Every member is UTF-8 text a widget shows or uses
+// as an accessible name.
+struct Strings
+{
+    const char* mixed = "Mixed";
+    const char* loading = "Loading";
+    const char* empty = "Nothing to show";
+    const char* noResults = "No results";
+    const char* loadFailed = "Could not load";
+    const char* select = "Select";
+    const char* confirm = "OK";
+    const char* cancel = "Cancel";
+    const char* close = "Close";
+    const char* more = "More";
+    const char* unbound = "Not set";
+    const char* listening = "Press a key";
+    const char* clear = "Clear";
+    const char* search = "Search";
+    const char* copy = "Copy";
+    const char* copied = "Copied";
+    const char* show = "Show";
+    const char* hide = "Hide";
+    const char* remove = "Remove";
+    const char* selectAll = "Select all";
+    const char* reset = "Reset";
+    const char* back = "Back";
+    const char* next = "Next";
+    const char* previous = "Previous";
+    const char* finish = "Finish";
+    const char* skip = "Skip";
+    const char* browse = "Browse";
+    const char* today = "Today";
+    const char* capsLock = "Caps Lock is on";
+    const char* bindHold = "Hold";      // BindMode::Hold
+    const char* bindToggle = "Toggle";  // BindMode::Toggle
+    const char* bindAlways = "Always";  // BindMode::Always
+    const char* bindOff = "Off";        // BindMode::Off
+};
+
+// Replaces the table. Every string is copied; a null member keeps the English default.
+// Allocates only here.
+void SetStrings(const Strings& strings);
+// The table in use. The pointers stay valid until the next SetStrings.
+const Strings& GetStrings();
+
+} // namespace facet

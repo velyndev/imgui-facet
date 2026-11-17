@@ -68,7 +68,7 @@ TEST_CASE("The subsystem table lists every module once in dependency order")
 {
     const auto table = facet::internal::Subsystems();
     const char* expected[] = {"theme",   "scale", "state_storage", "anim", "font",
-                              "texture", "icon",  "shadow",        "blur"};
+                              "texture", "icon",  "shadow",        "blur", "widgets_common"};
     REQUIRE(table.size() == std::size(expected));
     for (size_t i = 0; i < table.size(); ++i)
     {

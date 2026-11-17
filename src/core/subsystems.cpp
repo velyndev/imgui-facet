@@ -8,7 +8,8 @@
 //   texture          image and texture cache; the icon atlas uploads through it
 //   icon             icon atlas; rasterized per scale
 //   shadow           shadow and glow atlas; rasterized per scale
-//   blur             backdrop blur pass; last, it is optional and may fall back
+//   blur             backdrop blur pass; it is optional and may fall back
+//   widgets common   control size stack of the widgets; checked after every block
 // Shutdown runs in reverse, so every module still finds what it depends on.
 
 #include "internal/subsystem.h"
@@ -20,7 +21,7 @@ namespace facet::internal
 
 std::span<const Subsystem> Subsystems()
 {
-    static const std::array<Subsystem, 9> table = {
+    static const std::array<Subsystem, 10> table = {
         ThemeSubsystem(),
         ScaleSubsystem(),
         StateStorageSubsystem(),
@@ -30,6 +31,7 @@ std::span<const Subsystem> Subsystems()
         IconSubsystem(),
         ShadowSubsystem(),
         BlurSubsystem(),
+        WidgetsCommonSubsystem(),
     };
     return table;
 }
