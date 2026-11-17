@@ -163,3 +163,5 @@ These belong to the family but are not part of v1; they get declarations in a la
 - **SectionHeader pinning**: a header that stays at the top of its scroll area while its section
   is visible.
 - **Badge attached to another item**: a counter drawn over the corner of the previous item.
+- **LogView wrapping**: wrapped lines of variable height. Dear ImGui's list clipper needs equal
+  row heights, so this needs a height cache per entry; until then each log row is one line.

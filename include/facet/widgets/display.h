@@ -398,8 +398,7 @@ using LogGetter = bool (*)(void* user, int index, LogEntry* out);
 struct LogViewOptions
 {
     bool autoScroll = true;                // follows new entries while scrolled to the end
-    bool timestamps = true;                // a time column for entries with time >= 0
-    bool wrap = false;                     // wrap long lines (rows get variable heights)
+    bool timestamps = true;                // a time column for entries with a time
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;       // null uses Strings::empty
     const char* errorText = nullptr;       // null uses Strings::loadFailed
@@ -407,8 +406,9 @@ struct LogViewOptions
     float height = 0.0f;                   // units; 0 fills the available height
 };
 
-// A virtualized log with level colors and an optional time column. Only the visible entries
-// are read. When the user scrolls up, following stops and a "jump to latest" button appears;
+// A virtualized log with level colors and an optional time column. Every row is one line of
+// the Body height and a long line is cut at the view edge (hovering shows it whole), so rows
+// have equal heights and only the visible entries are read. When the user scrolls up, following stops and a "jump to latest" button appears;
 // it and End resume. The view is one Tab stop; arrows and Page Up and Down scroll. Filtering
 // is the caller's: pass a getter over the filtered indices. Keeps the scroll state under its id.
 void LogView(const char* id, std::span<const LogEntry> entries, const LogViewOptions& options = {});

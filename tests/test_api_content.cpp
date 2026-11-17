@@ -50,6 +50,12 @@ static_assert(OptionsFollowConventions<facet::KeyValueOptions>());
 static_assert(OptionsFollowConventions<facet::StatTileOptions>());
 static_assert(OptionsFollowConventions<facet::DataTableOptions>());
 
+// Log rows have one height, so the view can read only the visible entries.
+template <class T>
+concept HasWrap = requires(T options) { options.wrap; };
+static_assert(!HasWrap<facet::LogViewOptions>);
+static_assert(HasWrap<facet::CodeViewOptions>);  // the check itself works
+
 static_assert(OptionsFollowConventions<facet::SparklineOptions>());
 static_assert(OptionsFollowConventions<facet::LineChartOptions>());
 static_assert(OptionsFollowConventions<facet::BarChartOptions>());
