@@ -254,8 +254,9 @@ struct SearchFilterBarOptions
 
 // A search field with toggleable filter chips beside it (or under it when narrow); chips that
 // do not fit move into a "more" popover. The query is written per keystroke; Escape in the
-// field clears it. Each chip is a Tab stop; Enter and Space toggle. Returns true when the query
-// or any chip's active member was written.
+// field restores the query from activation, as in every text field (rule 3), and a clear
+// button (Strings::clear) at the end of a non-empty field empties it. Each chip is a Tab stop;
+// Enter and Space toggle. Returns true when the query or any chip's active member was written.
 bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters,
                      const SearchFilterBarOptions& options = {});
 bool SearchFilterBar(const char* label, char* buffer, std::size_t bufferSize, std::span<FilterChip> filters,
