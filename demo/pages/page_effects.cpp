@@ -318,7 +318,7 @@ void DrawGlowSection()
 
 } // namespace
 
-FACET_DEMO_PAGE("effects", "Effects", "Core", 20, "shadows", "glass", "glow")
+FACET_DEMO_PAGE("effects", "Effects", "Foundations", 4, "shadows", "glass", "glow")
 {
     facet::demo::PageHeader("Effects", "Shadows mark floating layers, glass is for the menu shell and popovers, "
                                        "and glow marks the keyboard focus plus one optional accent.");
