@@ -454,6 +454,16 @@ FACET_DEMO_SELFTEST("tokens")
     // Theme and scale lists in the title strip. The script is built before it runs, so every
     // step is the same in both themes: the entries are chosen by their own probes first.
     test.Click("gallery.minimize");  // does nothing offscreen; puts the focus in the strip
+    // The window buttons are Tab stops in order (they do nothing offscreen).
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("gallery.minimize");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("gallery.maximize");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("gallery.close");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("gallery.minimize");
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.ExpectFocused("gallery.scale");
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);

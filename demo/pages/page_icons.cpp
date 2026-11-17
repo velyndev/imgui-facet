@@ -86,6 +86,7 @@ void DrawEmptyState(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     facet::demo::Paragraph("Icon names are lowercase words joined by hyphens, such as chevron-down.");
     if (ImGui::Button("Clear search"))
         icons.search[0] = '\0';
+    facet::ItemCursor();
     ctx.Probe("icons.clearSearch");
 }
 
@@ -190,6 +191,7 @@ FACET_DEMO_PAGE("icons", "Icons", "Media", 10, "default", "search", "empty")
     if (ImGui::GetContentRegionAvail().x < checkboxWidth)
         ImGui::NewLine();
     ImGui::Checkbox("Accent tint", &icons.accentTint);
+    facet::ItemCursor();
     ctx.Probe("icons.tint");
 
     const std::string_view query = Query();
@@ -226,6 +228,18 @@ FACET_DEMO_SELFTEST("icons")
 
     test.Click("icons.clearSearch");
     test.Expect("Clear search brings every icon back",
+                [] { return icons.search[0] == '\0' && shownCount == facet::IconCount(); });
+
+    // The same by keyboard: from the field, Tab passes the tint option and reaches Clear search.
+    test.Click("icons.search");
+    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("xyz"); });
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("icons.tint");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("icons.clearSearch");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on Clear search brings every icon back",
                 [] { return icons.search[0] == '\0' && shownCount == facet::IconCount(); });
 
     test.Click("icons.tint");

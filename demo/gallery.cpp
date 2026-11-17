@@ -218,13 +218,18 @@ float DrawTitleStrip(GalleryState& state, PageCtx& ctx, AppShell* shell)
     facet::ItemCursor();
     ctx.Probe("gallery.minimize");
     ImGui::SameLine();
-    if (ImGui::Button(labels[1]) && shell != nullptr)
+    // A fixed id: the label switches between Maximize and Restore, the item stays.
+    char maximizeLabel[32];
+    std::snprintf(maximizeLabel, sizeof(maximizeLabel), "%s###maximize", labels[1]);
+    if (ImGui::Button(maximizeLabel) && shell != nullptr)
         shell->ToggleMaximize();
     facet::ItemCursor();
+    ctx.Probe("gallery.maximize");
     ImGui::SameLine();
     if (ImGui::Button(labels[2]) && shell != nullptr)
         shell->Close();
     facet::ItemCursor();
+    ctx.Probe("gallery.close");
     if (twoRows)
         DrawSettings(state, ctx, comboWidth);
 

@@ -71,14 +71,17 @@ void DrawControls(facet::demo::PageCtx& ctx)
     facet::demo::LabeledRow("Shadow strength");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     ImGui::SliderFloat("##strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, "%.2fx");
+    facet::ItemCursor();
     ctx.Probe("effects.strength");
     facet::demo::LabeledRow("Blur radius");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     BlurRadius();
     ImGui::SliderFloat("##blur", &effects.blurRadius, kBlurMin, kBlurMax, "%.0f");
+    facet::ItemCursor();
     ctx.Probe("effects.blur");
     facet::demo::LabeledRow("Glow");
     ImGui::Checkbox("Accent glow", &effects.accentGlow);
+    facet::ItemCursor();
     ctx.Probe("effects.glow");
 }
 

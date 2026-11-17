@@ -3,6 +3,7 @@
 // here from the theme colors, or an SVG document written by this page; none is a photo.
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -333,6 +334,32 @@ constexpr RadiusChoice kRadii[] = {
     {"window", &facet::Radii::window},
 };
 
+// One setting as a labeled row of radio buttons. Buttons that do not fit wrap onto further
+// lines starting at the control column. Each button's probe is "<probe>.<lowercase name>".
+void ChoiceRow(facet::demo::PageCtx& ctx, const char* label, const char* probe, const char* const* names, int count,
+               int& selected)
+{
+    const float right = facet::demo::ContentRight();
+    facet::demo::LabeledRow(label);
+    const float column = ImGui::GetCursorPosX();
+    char probeName[64];
+    for (int i = 0; i < count; ++i)
+    {
+        if (i > 0 && !facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth(names[i])))
+            ImGui::SetCursorPosX(column);
+        ImGui::PushID(i);
+        if (ImGui::RadioButton(names[i], selected == i))
+            selected = i;
+        ImGui::PopID();
+        facet::ItemCursor();
+        int length = std::snprintf(probeName, sizeof(probeName), "%s.", probe);
+        for (const char* c = names[i]; *c != '\0' && length + 1 < static_cast<int>(sizeof(probeName)); ++c)
+            probeName[length++] = static_cast<char>(std::tolower(static_cast<unsigned char>(*c)));
+        probeName[length] = '\0';
+        ctx.Probe(probeName);
+    }
+}
+
 } // namespace
 
 // Capture states, in the order passed to FACET_DEMO_PAGE below. "default" shows the top of
@@ -377,33 +404,21 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     }
 
     SectionHeader("Options");
-    facet::demo::LabeledRow("Fit");
-    if (ImGui::RadioButton("Contain", ui.fit == facet::ImageFit::Contain))
-        ui.fit = facet::ImageFit::Contain;
-    ctx.Probe("images.fit.contain");
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Cover", ui.fit == facet::ImageFit::Cover))
-        ui.fit = facet::ImageFit::Cover;
-    ctx.Probe("images.fit.cover");
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Fill", ui.fit == facet::ImageFit::Fill))
-        ui.fit = facet::ImageFit::Fill;
-    ctx.Probe("images.fit.fill");
-
-    facet::demo::LabeledRow("Radius");
-    for (int i = 0; i < static_cast<int>(std::size(kRadii)); ++i)
     {
-        if (i > 0)
-            ImGui::SameLine();
-        ImGui::PushID(i);
-        if (ImGui::RadioButton(kRadii[i].name, ui.radius == i))
-            ui.radius = i;
-        ImGui::PopID();
-        if (i == 0)
-            ctx.Probe("images.radius.element");
+        const char* const names[] = {"Contain", "Cover", "Fill"};
+        int fit = static_cast<int>(ui.fit);
+        ChoiceRow(ctx, "Fit", "images.fit", names, static_cast<int>(std::size(names)), fit);
+        ui.fit = static_cast<facet::ImageFit>(fit);
+    }
+    {
+        const char* names[std::size(kRadii)] = {};
+        for (std::size_t i = 0; i < std::size(kRadii); ++i)
+            names[i] = kRadii[i].name;
+        ChoiceRow(ctx, "Radius", "images.radius", names, static_cast<int>(std::size(names)), ui.radius);
     }
     facet::demo::LabeledRow("Tint");
     ImGui::Checkbox("Accent tint", &ui.tint);
+    facet::ItemCursor();
     ctx.Probe("images.tint");
     {
         facet::ImageOptions options;
@@ -474,6 +489,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     }
     if (ImGui::Button("Load again"))
         StartAsyncLoads();
+    facet::ItemCursor();
     ctx.Probe("images.reload");
     if (ctx.captureState == kStateLoading)
         ctx.RevealInCapture(0.7f);
@@ -516,9 +532,29 @@ FACET_DEMO_SELFTEST("images")
 
     test.Click("images.radius.element");
     test.Expect("clicking element selects the smallest radius", [] { return ui.radius == 0; });
+    test.Click("images.radius.window");
+    test.Expect("clicking window selects the largest radius", [] { return ui.radius == 3; });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("images.radius.card");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused card button selects it", [] { return ui.radius == 2; });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("images.radius.control");
 
     test.Click("images.tint");
     test.Expect("clicking Accent tint turns it on", [] { return ui.tint; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("images.tint");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused checkbox turns the tint off", [] { return !ui.tint; });
+
+    // The next Tab stop is Load again; Space starts the loads anew.
+    test.Do([] { before = assets.async; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("images.reload");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on Load again starts a new load",
+                [] { return assets.async.IsValid() && !(assets.async == before); });
 
     test.Do([] { before = assets.async; });
     test.Click("images.reload");
