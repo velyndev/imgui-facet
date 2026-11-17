@@ -1,0 +1,58 @@
+#pragma once
+
+// Focus ring and keyboard modality.
+//
+// The focus ring tells a keyboard user where the focus is. A mouse user does not need it, and
+// a ring appearing on every clicked control is noise, so the ring shows only while the keyboard
+// modality is on: the last input that counts was a navigation or activation key (Tab, the
+// arrows, Space, Enter, Escape, Home, End, Page Up and Down) or a gamepad button, not a mouse
+// click. Typing text, modifier keys alone and mouse movement keep the modality as it is; a
+// mouse button press or a wheel turn switches it off. The focus subsystem updates the modality
+// in facet::NewFrame from the input Dear ImGui received for the frame.
+//
+// The ring: a continuous-corner stroke of T().metrics.focusRingWidth just outside the control,
+// one hairline away from its edge, with corners concentric to the control's radius, plus a
+// soft halo (the glow the dose rules allow for focus). Its color is colors.focusRing when that
+// reaches 3:1 against every content surface of the theme, otherwise colors.accentText, which
+// reaches 4.5:1 on all of them; so the ring stays visible for any accent in both themes. It
+// fades in and out with ItemState::focusAmount (motion.durationFast). It is drawn into the
+// item's window draw list with the window's clip rectangle, so a control scrolled partly out of
+// a child window has its ring cut at the same edge.
+//
+//     const ItemState item = ItemBehavior(id, size);
+//     ... draw the control ...
+//     DrawItemFocusRing(item, Px(T().radii.control));
+//
+// Widgets with inner parts that take focus (slider handles, segments) draw it around the part:
+//
+//     DrawFocusRing(drawList, handleRect, handleRadius, handle.focusAmount);
+
+#include <imgui.h>
+#include <imgui_internal.h>
+
+#include "internal/item.h"
+
+namespace facet::internal
+{
+
+// True while the focus ring should show: the last counting input was the keyboard or a gamepad.
+bool KeyboardModality();
+// Sets the modality, for code that moves the focus on a key press of its own and for tests.
+void SetKeyboardModality(bool keyboard);
+
+// The color the ring is drawn in for the current theme (see the top of this file).
+ImVec4 FocusRingColor();
+
+// The rectangle the ring covers around a control rectangle (the halo not included).
+ImRect FocusRingRect(const ImRect& rect);
+
+// Draws the ring around `rect` (screen pixels) whose corners have `radius` pixels, at
+// `amount` (0 nothing, 1 fully shown). `corners` takes ImDrawFlags_RoundCorners* as in draw.h.
+void DrawFocusRing(ImDrawList* drawList, const ImRect& rect, float radius, float amount = 1.0f,
+                   ImDrawFlags corners = 0);
+
+// The ring of an item: around item.rect with item.focusAmount, into the current window's draw
+// list. Nothing when the item is not visible or the amount is 0.
+void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners = 0);
+
+} // namespace facet::internal
