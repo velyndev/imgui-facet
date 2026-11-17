@@ -214,8 +214,8 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable labels", &selection, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable getter", &selection, 3, &Getter, nullptr)));
     CHECK_BALANCED(CHECK(facet::SelectableListActivatedRow() == -1));
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", kItems, &v.move)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", kLabels, &v.move)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
     CHECK_BALANCED({
         const bool open = facet::BeginTreeView("Tree", &selection);
         CHECK(open);
@@ -501,8 +501,8 @@ void CallEveryStub(Values& v)
         ImGui::TextUnformatted("child");
         facet::EndLoadingOverlay();
     });
-    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Commands", &v.open, kItems, &v.picked)));
-    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Command labels", &v.open, kLabels, &v.picked)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Commands", &v.open, &v.picked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Command labels", &v.open, &v.picked, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Shortcuts palette", &v.open, &v.pickedShortcut)));
     CHECK_BALANCED(facet::WatermarkOverlay("Watermark", kFields));
     CHECK_BALANCED(CHECK(facet::UnsavedChangesBar("Changes", 2) == facet::UnsavedChangesAction::None));

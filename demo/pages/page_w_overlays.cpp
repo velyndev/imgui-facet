@@ -114,7 +114,7 @@ void CallerOpened(facet::demo::PageCtx& ctx, OverlaysState& s)
     }
     RevealLayer(ctx, kCaptureDrawer);
     LayerSwitch(ctx, "Command palette", "##palette", "overlays.palette", &s.palette, kCapturePalette);
-    facet::CommandPalette("Commands", &s.palette, kCommands, &s.picked);
+    facet::CommandPalette("Commands", &s.palette, &s.picked, kCommands);
     RevealLayer(ctx, kCapturePalette);
 }
 

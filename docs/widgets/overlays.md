@@ -133,9 +133,9 @@ Dims and blocks a region while it loads, with a spinner or a progress bar and a 
 Status: planned
 
 ```cpp
-bool CommandPalette(const char* label, bool* open, std::span<const ChoiceItem> commands, int* picked,
+bool CommandPalette(const char* label, bool* open, int* picked, std::span<const ChoiceItem> commands,
                     const CommandPaletteOptions& options = {});
-bool CommandPalette(const char* label, bool* open, std::span<const char* const> commands, int* picked,
+bool CommandPalette(const char* label, bool* open, int* picked, std::span<const char* const> commands,
                     const CommandPaletteOptions& options = {});
 bool CommandPalette(const char* label, bool* open, ShortcutId* picked, const CommandPaletteOptions& options = {});
 ```

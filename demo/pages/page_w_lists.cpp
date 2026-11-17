@@ -108,7 +108,7 @@ void SelectAndReorder(ListsState& s)
     SectionHeader("Select and reorder");
     facet::SelectableList("Selectable list", &s.selection, kOptions, {.visibleRows = 4});
     facet::ReorderMove move;
-    if (facet::ReorderableList("reorder", s.reorder, &move))
+    if (facet::ReorderableList("reorder", &move, s.reorder))
         facet::ApplyReorderMove(s.reorder, move);
 }
 

@@ -18,14 +18,14 @@ void DrawReorderableList(const char* id, std::size_t count, const ReorderableLis
 
 } // namespace
 
-bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove*,
+bool ReorderableList(const char* id, ReorderMove*, std::span<const ChoiceItem> items,
                      const ReorderableListOptions& options)
 {
     DrawReorderableList(id, items.size(), options);
     return false;
 }
 
-bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove*,
+bool ReorderableList(const char* id, ReorderMove*, std::span<const char* const> items,
                      const ReorderableListOptions& options)
 {
     DrawReorderableList(id, items.size(), options);

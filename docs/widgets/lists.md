@@ -101,9 +101,9 @@ struct ReorderMove { int from = -1; int to = -1; constexpr bool IsValid() const;
 template <class Range>
     requires std::ranges::random_access_range<Range> && std::ranges::sized_range<Range>
 void ApplyReorderMove(Range&& items, const ReorderMove& move);
-bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove* move,
+bool ReorderableList(const char* id, ReorderMove* move, std::span<const ChoiceItem> items,
                      const ReorderableListOptions& options = {});
-bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove* move,
+bool ReorderableList(const char* id, ReorderMove* move, std::span<const char* const> items,
                      const ReorderableListOptions& options = {});
 ```
 
@@ -223,7 +223,7 @@ animation state when the data moves:
 ```cpp
 std::vector<facet::ChoiceItem> items = BuildItems(presets);   // label and id from each preset
 facet::ReorderMove move;
-if (facet::ReorderableList("presets", items, &move))
+if (facet::ReorderableList("presets", &move, items))
 {
     facet::ApplyReorderMove(presets, move);   // the app's std::vector<Preset>
     facet::ApplyReorderMove(items, move);     // keeps the shown rows in step until the next rebuild

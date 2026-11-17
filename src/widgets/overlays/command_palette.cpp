@@ -8,13 +8,13 @@
 namespace facet
 {
 
-bool CommandPalette(const char* label, bool* open, std::span<const ChoiceItem>, int*, const CommandPaletteOptions&)
+bool CommandPalette(const char* label, bool* open, int*, std::span<const ChoiceItem>, const CommandPaletteOptions&)
 {
     internal::StubLayer("CommandPalette", label, open != nullptr && *open);
     return false;
 }
 
-bool CommandPalette(const char* label, bool* open, std::span<const char* const>, int*, const CommandPaletteOptions&)
+bool CommandPalette(const char* label, bool* open, int*, std::span<const char* const>, const CommandPaletteOptions&)
 {
     internal::StubLayer("CommandPalette", label, open != nullptr && *open);
     return false;

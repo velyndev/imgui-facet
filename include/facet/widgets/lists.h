@@ -256,9 +256,9 @@ struct ReorderableListOptions
 // alone otherwise. A row keeps its animation state under ChoiceItem::id (the index when 0), so
 // give items stable ids when the caller moves its data; rows of the label overload are keyed
 // by index. Default width: the available width.
-bool ReorderableList(const char* id, std::span<const ChoiceItem> items, ReorderMove* move,
+bool ReorderableList(const char* id, ReorderMove* move, std::span<const ChoiceItem> items,
                      const ReorderableListOptions& options = {});
-bool ReorderableList(const char* id, std::span<const char* const> items, ReorderMove* move,
+bool ReorderableList(const char* id, ReorderMove* move, std::span<const char* const> items,
                      const ReorderableListOptions& options = {});
 
 // --- Tree view -----------------------------------------------------------------------------------
