@@ -50,7 +50,8 @@ bool IsChordPressed(ImGuiKeyChord chord, bool repeat = false);
 // "Page Up", "Esc", ";", "Num 1", "Mouse 4", "Gamepad A". Left and right modifier keys share
 // one name ("Ctrl"), and a single ImGuiMod_* flag gives its modifier's name. English;
 // built-in strings, valid for the whole process. "" for ImGuiKey_None and values that are not
-// keys.
+// keys. The names do not follow the keyboard layout: a punctuation key is named by its US
+// label (docs/input.md, "Keyboard layouts").
 const char* KeyNameText(ImGuiKey key);
 
 // Writes the chord for display, modifiers first in the order Ctrl, Shift, Alt, Win, joined by

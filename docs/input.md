@@ -41,6 +41,8 @@ if (facet::ChordFromText(savedText, &loaded))                  // load
 
 The buffer functions always zero-terminate (for a size above 0) and return the full length, which may exceed the buffer.
 
+**Keyboard layouts.** A chord holds the `ImGuiKey` that the platform backend reports, and the names are fixed English names of those keys. Dear ImGui's Win32 backend reports letters, digits and the named keys (F5, Page Up) by their Win32 virtual key, which follows the active layout for letters: on a German layout the key labelled Z is `ImGuiKey_Z` and reads `Z`. The punctuation keys are reported by their position, and their names are the labels of a US layout: on a German layout the key labelled Ü is `ImGuiKey_Semicolon` and reads `;`. A stored punctuation chord stays on the same key position when the layout changes; a letter chord stays on the same letter. Names that follow the active layout are planned, not built.
+
 ## Key binds
 
 A `Keybind` holds a primary and an alternate chord and a `BindMode`:
