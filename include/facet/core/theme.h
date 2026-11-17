@@ -305,8 +305,12 @@ ImVec4 ControlBoundaryColor(const Colors& colors);
 // Writes the current theme and scale into a Dear ImGui style (the current context's style
 // when null): every color, and every size, padding, rounding and border from the tokens,
 // multiplied by Scale(); the font scale factors as in scale.h; the base font size from the
-// Body text style. Settings without a token (anti-aliasing, tessellation, global alpha,
-// hover delays) keep their values. Stock Dear ImGui widgets then follow the Facet theme.
+// Body text style. Sizes without a token take the Dear ImGui default times Scale().
+// Settings that are not sizes and have no token keep their values: anti-aliasing,
+// tessellation, global and disabled alpha, hover delays and tooltip flags, title, button and
+// selectable text alignment, the window menu and color button positions, tree line flags,
+// angled table header settings and the mouse cursor scale. Stock Dear ImGui widgets then
+// follow the Facet theme.
 void ApplyImGuiStyle(ImGuiStyle* style = nullptr);
 
 // When on, facet::NewFrame calls ApplyImGuiStyle() whenever the theme or the scale changed

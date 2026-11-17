@@ -196,6 +196,12 @@ TEST_CASE("ApplyImGuiStyle maps tokens and scale onto a Dear ImGui style")
 
     ImGuiStyle style;
     style.Alpha = 0.75f;
+    style.ButtonTextAlign = ImVec2(0.0f, 1.0f);
+    style.SelectableTextAlign = ImVec2(1.0f, 0.5f);
+    style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
+    style.WindowMenuButtonPosition = ImGuiDir_Right;
+    style.ColorButtonPosition = ImGuiDir_Left;
+    style.TreeLinesFlags = ImGuiTreeNodeFlags_DrawLinesFull;
     facet::ApplyImGuiStyle(&style);
     const facet::Theme& theme = facet::T();
     CHECK(style.Colors[ImGuiCol_WindowBg].x == theme.colors.bg.x);
@@ -207,8 +213,15 @@ TEST_CASE("ApplyImGuiStyle maps tokens and scale onto a Dear ImGui style")
     CHECK(style.FontSizeBase == theme.type[facet::TextStyle::Body].size);
     CHECK(style.FontScaleMain * style.FontScaleDpi == doctest::Approx(facet::Scale()));
     CHECK(style.FontScaleDpi == doctest::Approx(1.5f));
-    // Settings without a token are kept.
+    // Settings that are not sizes and have no token are kept.
     CHECK(style.Alpha == 0.75f);
+    CHECK(style.ButtonTextAlign.x == 0.0f);
+    CHECK(style.ButtonTextAlign.y == 1.0f);
+    CHECK(style.SelectableTextAlign.x == 1.0f);
+    CHECK(style.WindowTitleAlign.x == 0.5f);
+    CHECK(style.WindowMenuButtonPosition == ImGuiDir_Right);
+    CHECK(style.ColorButtonPosition == ImGuiDir_Left);
+    CHECK(style.TreeLinesFlags == ImGuiTreeNodeFlags_DrawLinesFull);
     // The frame height of a stock control is the control height token.
     const float frameHeight = theme.type[facet::TextStyle::Body].size * 3.0f + style.FramePadding.y * 2.0f;
     CHECK(frameHeight == doctest::Approx(theme.metrics.controlHeight * 3.0f).epsilon(0.05));

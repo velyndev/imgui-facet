@@ -163,7 +163,8 @@ void ApplyImGuiStyle(ImGuiStyle* target)
     const Theme& theme = T();
 
     // Start from the defaults so repeated calls never compound the scaling, then carry over
-    // the settings that have no token.
+    // the settings that are not sizes and have no token. Sizes without a token take the
+    // Dear ImGui default times the scale, like every other size.
     ImGuiStyle style;
     style.Alpha = target->Alpha;
     style.DisabledAlpha = target->DisabledAlpha;
@@ -177,6 +178,15 @@ void ApplyImGuiStyle(ImGuiStyle* target)
     style.HoverDelayNormal = target->HoverDelayNormal;
     style.HoverFlagsForTooltipMouse = target->HoverFlagsForTooltipMouse;
     style.HoverFlagsForTooltipNav = target->HoverFlagsForTooltipNav;
+    style.WindowTitleAlign = target->WindowTitleAlign;
+    style.WindowMenuButtonPosition = target->WindowMenuButtonPosition;
+    style.ColorButtonPosition = target->ColorButtonPosition;
+    style.ButtonTextAlign = target->ButtonTextAlign;
+    style.SelectableTextAlign = target->SelectableTextAlign;
+    style.TableAngledHeadersAngle = target->TableAngledHeadersAngle;
+    style.TableAngledHeadersTextAlign = target->TableAngledHeadersTextAlign;
+    style.TreeLinesFlags = target->TreeLinesFlags;
+    style.MouseCursorScale = target->MouseCursorScale;
 
     ApplySizes(style, theme);
     style.ScaleAllSizes(Scale());
