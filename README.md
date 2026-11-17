@@ -34,9 +34,25 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
   - Icons: the built-in SVG icon set, icons registered at runtime, and drawing from a
     per-scale atlas work (`icons.h`).
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
-  window, a light and a dark theme and a UI scale setting. It currently has one page
-  (Foundation) that shows the text styles, a few stock Dear ImGui widgets, the theme surfaces with
-  the contrast ratios of their text colors, the embedded assets, the UI scale and the frame time.
+  window, a light and a dark theme or one that follows the Windows app mode, and a UI scale
+  setting. Its pages, listed by group in the navigation:
+  - Foundations
+    - Tokens: every color token with its live contrast ratios, the accent presets, spacing,
+      radii, control heights and the elevation levels.
+    - Type: the text styles and weights, truncation, wrapping and match highlighting.
+    - Motion: smoothing, a spring and a tween side by side with replay, reduce motion and
+      slow-down switches, and their curves sampled at 240 and 30 frames per second.
+    - Draw: corners, hairlines, gradients and alpha, arcs and loading indicators, and
+      `DrawGroup`.
+    - Effects: the elevation shadows, a glass panel over a busy backdrop next to its opaque
+      fallback, and the focus ring halo and accent glow.
+  - Media
+    - Icons: the built-in icon set in a searchable grid at three sizes, with an accent tint
+      and an empty state.
+    - Images: fit modes, corner radii, tint, asynchronous loading with its loading and failed
+      states, and an SVG at three sizes.
+
+  `facet_demo --list-pages` prints the page ids with their capture states.
 - A capture mode that renders pages offscreen into PNG files, and a selftest mode that operates
   pages with scripted mouse and keyboard input.
 - Unit tests with doctest.
@@ -86,12 +102,13 @@ as `facet::imgui_backends`. Using `FACET_IMGUI_TARGET` is not covered by a build
 build\msvc-x64\bin\Release\facet_demo.exe [--page id] [--theme light|dark] [--warp]
 ```
 
-The title strip at the top moves the window (double-click maximizes) and holds a "Dark theme"
-switch, a "UI scale" list (75 to 200 %, multiplied with the monitor DPI scale) and working
-Minimize, Maximize and Close buttons; all of them work with the mouse and the keyboard. When
-the window is too narrow for one row, the theme and scale controls move to a second row. The
-window edges resize it. `--page` selects the page shown first, `--theme` the starting theme
-(default dark). In Debug builds the D3D11 debug layer is used when the Windows "Graphics
+The title strip at the top moves the window (double-click maximizes) and holds a "Theme" list
+(Light, Dark, and System, which follows the Windows app mode), a "UI scale" list (75 to 200 %,
+multiplied with the monitor DPI scale) and working Minimize, Maximize and Close buttons; all of
+them work with the mouse and the keyboard. When the window is too narrow for one row, the theme
+and scale controls move to a second row. The window edges resize it. `--page` selects the page
+shown first, `--theme` the starting theme (default dark); it takes only light or dark, so
+System is chosen in the list. In Debug builds the D3D11 debug layer is used when the Windows "Graphics
 Tools" optional feature is installed.
 
 Every mode rejects options it does not use (exit code 2), so a mistyped run never silently
@@ -125,8 +142,6 @@ theme (default dark; `both` runs every script once per theme). A scripted click 
 outside the visible part of its window scrolls it into view first. It prints a `PASS` or `FAIL`
 line per check, naming the page and theme, and exits with 1 when any check failed.
 
-`facet_demo --list-pages` prints the page ids with their capture states.
-
 ## Design tokens
 
 `DESIGN.md` lists the starting value of every theme token and the reason for each visual
@@ -139,6 +154,7 @@ include/facet/   public headers
 src/             library sources; src/internal holds headers shared inside the library
 assets/icons/    SVG files embedded into the library
 cmake/           dependency, warning and asset embedding scripts
+docs/            topic guides: theming, scaling, images and icons
 demo/            facet_demo; demo/pages holds one file per page
 tests/           doctest unit tests, one file per topic
 third_party/stb/ vendored stb headers
