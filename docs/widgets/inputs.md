@@ -52,13 +52,17 @@ Status: planned.
 ### FilterField
 
 ```cpp
-struct TextFilter { std::string query; bool matchCase; bool wholeWord; };
-bool FilterField(const char* label, TextFilter* filter, const FilterFieldOptions& options = {});
-bool PassesFilter(const TextFilter& filter, std::string_view text);
+struct FilterSettings { bool matchCase; bool wholeWord; };
+bool FilterField(const char* label, std::string* query, FilterSettings* settings,
+                 const FilterFieldOptions& options = {});
+bool FilterField(const char* label, char* buffer, std::size_t bufferSize, FilterSettings* settings,
+                 const FilterFieldOptions& options = {});
+bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 ```
 
-A compact field with match case and whole word toggles; `PassesFilter` tests a text against the
-filter. Status: planned (until then `PassesFilter` lets every text pass).
+A compact field for a filter query the caller keeps, with match case and whole word toggles when
+`settings` is not null; `PassesFilter` tests a text against the query. Status: planned (until then
+`PassesFilter` lets every text pass).
 
 ### Autocomplete
 
@@ -266,6 +270,18 @@ facet::Autocomplete("Place", &city, static_cast<int>(results.size()),
                     &results, {.loading = searchRunning});
 if (const int picked = facet::AutocompleteAcceptedItem(); picked >= 0)
     Select(picked);
+```
+
+A filter over a list. The query and its settings are the caller's; a host without heap use passes
+a `char` buffer instead of the `std::string`.
+
+```cpp
+static std::string query;
+static facet::FilterSettings match;
+facet::FilterField("##filter", &query, &match);
+for (const Entry& entry : entries)
+    if (facet::PassesFilter(query, match, entry.name))
+        DrawEntry(entry);
 ```
 
 Rename in place, started from a context menu by setting the flag.

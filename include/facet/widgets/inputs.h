@@ -127,31 +127,37 @@ bool SearchField(const char* label, char* buffer, std::size_t bufferSize, const 
 
 // --- FilterField ------------------------------------------------------------------------------
 
-// A filter the caller keeps: the query and its match settings. Plain data.
-struct TextFilter
+// How a filter query matches, kept by the caller next to its query. Plain data.
+struct FilterSettings
 {
-    std::string query;
-    bool matchCase = false;
-    bool wholeWord = false;
+    bool matchCase = false;             // otherwise ASCII case-insensitive
+    bool wholeWord = false;             // each query word must match a whole word of the text
 };
 
 struct FilterFieldOptions
 {
     const char* placeholder = nullptr;  // null uses Strings::search
-    bool toggles = true;                // match case and whole word toggle buttons in the field
     ControlSize size = ControlSize::Inherit;
-    float width = 0.0f;
+    float width = 0.0f;                 // units; 0 fills the available width
     bool readOnly = false;
 };
 
-// A compact field that edits a TextFilter: the query per keystroke, the toggles on activation.
-// Returns true when any part of *filter was written.
-bool FilterField(const char* label, TextFilter* filter, const FilterFieldOptions& options = {});
+// A compact search-style field for filtering a list. The query is the caller's text, in a
+// std::string or a char buffer as with TextField, written per keystroke. With non-null
+// `settings`, match case and whole word toggle buttons sit at the end of the field (each a Tab
+// stop, Space or Enter flips it) and write *settings at once; a null `settings` hides them.
+// Escape clears a non-empty query, then ends the session. The visible label part is drawn in
+// front of the field. Returns true when the query or *settings was written. Keeps only Dear
+// ImGui's text input state under its id.
+bool FilterField(const char* label, std::string* query, FilterSettings* settings,
+                 const FilterFieldOptions& options = {});
+bool FilterField(const char* label, char* buffer, std::size_t bufferSize, FilterSettings* settings,
+                 const FilterFieldOptions& options = {});
 
-// Whether `text` matches the filter: every space-separated word of the query occurs in it (as a
-// whole word with wholeWord, ASCII case-insensitive unless matchCase). An empty query matches
-// everything. No allocation; usable from any thread.
-bool PassesFilter(const TextFilter& filter, std::string_view text);
+// Whether `text` matches `query` under `settings`: every space-separated word of the query occurs
+// in the text (as a whole word with wholeWord, ASCII case-insensitive unless matchCase). An
+// empty query matches everything. No allocation; usable from any thread.
+bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 
 // --- Autocomplete -----------------------------------------------------------------------------
 

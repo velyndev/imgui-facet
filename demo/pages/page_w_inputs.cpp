@@ -25,7 +25,8 @@ struct InputsUi
     std::string text;
     std::string secret;
     std::string query;
-    facet::TextFilter filter;
+    std::string filter;
+    facet::FilterSettings filterSettings;
     std::string completion;
     std::vector<std::string> tags = {"Option 1"};
     std::string notes;
@@ -76,7 +77,7 @@ FACET_DEMO_PAGE("inputs", "Inputs", "Widgets", 40)
     LabeledRow("Search field");
     facet::SearchField("##search", &ui.query, {.recent = kOptions});
     LabeledRow("Filter field");
-    facet::FilterField("##filter", &ui.filter);
+    facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
     LabeledRow("Autocomplete");
     facet::Autocomplete("##complete", &ui.completion, kOptions);
     LabeledRow("Tags");

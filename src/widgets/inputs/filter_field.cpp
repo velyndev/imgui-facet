@@ -8,14 +8,20 @@
 namespace facet
 {
 
-bool FilterField(const char* label, TextFilter*, const FilterFieldOptions& options)
+bool FilterField(const char* label, std::string*, FilterSettings*, const FilterFieldOptions& options)
+{
+    internal::ControlStub("FilterField", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
+    return false;
+}
+
+bool FilterField(const char* label, char*, std::size_t, FilterSettings*, const FilterFieldOptions& options)
 {
     internal::ControlStub("FilterField", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
     return false;
 }
 
 // Planned: until Phase 2 every text passes, as with an empty query.
-bool PassesFilter(const TextFilter&, std::string_view)
+bool PassesFilter(std::string_view, const FilterSettings&, std::string_view)
 {
     return true;
 }

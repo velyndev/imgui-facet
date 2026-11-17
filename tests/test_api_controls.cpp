@@ -148,7 +148,7 @@ struct Values
     std::array<float, 3> shares = {0.5f, 0.3f, 0.2f};
     std::string text = "Sample";
     std::array<char, 32> buffer = {'S', 'a', 'm', 'p', 'l', 'e'};
-    facet::TextFilter filter = {"Sample", true, false};
+    facet::FilterSettings filter = {true, false};
     std::vector<std::string> tags = {"Option 1"};
     bool editing = false;
     int unit = 1;
@@ -227,7 +227,6 @@ std::string Describe(const Values& v)
     for (float s : v.shares)
         Append(out, "shares", s);
     out += "text=" + v.text + ";buffer=" + std::string(v.buffer.data()) + ";";
-    out += "filter=" + v.filter.query + ";";
     Append(out, "filter.matchCase", v.filter.matchCase);
     Append(out, "filter.wholeWord", v.filter.wholeWord);
     for (const std::string& tag : v.tags)
@@ -415,8 +414,9 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, SecureField("Secure 2", buffer, bufferSize));
     FACET_CHECK_STUB(false, SearchField("Search 1", &v.text, {.recent = std::span(kLabels)}));
     FACET_CHECK_STUB(false, SearchField("Search 2", buffer, bufferSize, {.loading = true}));
-    FACET_CHECK_STUB(false, FilterField("Filter 1", &v.filter));
-    CHECK(PassesFilter(v.filter, "Sample text"));
+    FACET_CHECK_STUB(false, FilterField("Filter 1", &v.text, &v.filter));
+    FACET_CHECK_STUB(false, FilterField("Filter 2", buffer, bufferSize, nullptr, {.placeholder = "Placeholder"}));
+    CHECK(PassesFilter(v.text, v.filter, "Sample text"));
     FACET_CHECK_STUB(false, Autocomplete("Complete 1", &v.text, kChoices));
     FACET_CHECK_STUB(false, Autocomplete("Complete 2", &v.text, kLabels, {.strict = true}));
     FACET_CHECK_STUB(false, Autocomplete("Complete 3", &v.text, 0, nullptr, nullptr, {.loading = true}));
@@ -480,7 +480,7 @@ void CallEveryStub(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
-constexpr int kStubCalls = 108;
+constexpr int kStubCalls = 109;
 
 } // namespace
 
