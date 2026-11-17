@@ -630,6 +630,32 @@ TEST_CASE("The composite stubs submit one item each, return the neutral result a
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
+TEST_CASE("Stubs without a label submit an item whose id is not the window id")
+{
+    // An empty label hashes to the id of the window, which Dear ImGui asserts on for an item at
+    // the root of a window. Each call runs first in a visible window, where ItemAdd checks it.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    const auto first = [&](const char* name, auto&& call) {
+        INFO("call: ", name);
+        session.SetUi([&] {
+            call();
+            CHECK(ImGui::GetItemID() != 0);
+            CHECK(ImGui::GetItemID() != ImGui::GetCurrentWindow()->ID);
+            CHECK(ImGui::IsItemVisible());
+            ++checked;
+        });
+        session.Frame();
+    };
+    first("Skeleton", [] { facet::Skeleton(); });
+    first("Skeleton, circle", [] { facet::Skeleton({.shape = facet::SkeletonShape::Circle}); });
+    first("CharacterCounter, ring", [] { facet::CharacterCounter(1, 0, {.ring = true}); });
+    first("Badge, empty text", [] { facet::Badge(""); });
+    first("StyledText, null text", [] { facet::StyledText(nullptr); });
+    CHECK(checked == 5);
+}
+
 TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack")
 {
     facet::test::Session session;

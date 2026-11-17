@@ -110,11 +110,19 @@ inline float TextWidth(const char* text, TextStyle style, float minimum = 0.0f)
 }
 
 // The placeholder item: `widget` is the public function name, `label` the label, id or text
-// the widget was given (null for none). Sizes in pixels.
+// the widget was given (null for none). Sizes in pixels. A null or empty label is replaced by
+// "##<widget>": an empty string hashes to the id of the window itself, which Dear ImGui
+// rejects for an item at the root of a window.
 inline void Stub(const char* widget, const char* label, float width, float height)
 {
     if (!CanSubmit())
         return;
+    char hidden[64];
+    if (label == nullptr || label[0] == '\0')
+    {
+        ImFormatString(hidden, sizeof(hidden), "##%s", widget != nullptr ? widget : "");
+        label = hidden;
+    }
     PlannedWidget(widget, label, std::max(1.0f, width), std::max(1.0f, height));
 }
 
