@@ -6,6 +6,7 @@
 
 #include "facet/core/anim.h"
 #include "facet/core/draw.h"
+#include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "internal/state_storage.h"
 
@@ -82,6 +83,16 @@ void SelectionPill::Target(const ImRect& rect)
 {
     target_ = rect;
     hasTarget_ = true;
+}
+
+void PushPillLabelStyle(TextStyle style, bool selected)
+{
+    const TextStyleSpec& spec = T().type[style];
+    FontWeight weight = spec.weight;
+    if (selected && static_cast<int>(weight) < static_cast<int>(FontWeight::Semibold))
+        weight = FontWeight::Semibold;
+    // Entry labels are text sizes: the text face, as PushTextStyle uses for them.
+    ImGui::PushFont(WeightFont(weight), spec.size);
 }
 
 ImRect SelectionPill::End(ImU32 color, float radius)

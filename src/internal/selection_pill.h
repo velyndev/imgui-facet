@@ -14,7 +14,9 @@
 //     {
 //         const ItemState item = ItemBehavior(entryId, size);
 //         if (selected) pill.Target(item.rect);
+//         PushPillLabelStyle(TextStyle::Body, selected);   // semibold when selected
 //         ... draw the label: it lands above the pill ...
+//         PopTextStyle();
 //     }
 //     pill.End(ToU32(T().colors.accentSubtle), Px(T().radii.control));
 //
@@ -32,6 +34,8 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
+
+#include "facet/core/theme.h"
 
 namespace facet::internal
 {
@@ -74,5 +78,12 @@ private:
 // The spring of the edge that leads in the direction of travel: the standard spring with this
 // share of its response, so it arrives first and the pill stretches on the way.
 inline constexpr float kPillLeadingResponse = 0.7f;
+
+// Pushes the font for the label of an entry in a pill group: the font and size of `style`, in
+// semibold (or bolder, when the style already is) when `selected`. The pill is a soft tint whose
+// contrast to the surface and to a hovered entry is low by design; the heavier label is the cue
+// that does not depend on color. Every group with a pill draws its labels this way. Pair with
+// facet::PopTextStyle.
+void PushPillLabelStyle(TextStyle style, bool selected);
 
 } // namespace facet::internal

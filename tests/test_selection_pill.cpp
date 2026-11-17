@@ -187,3 +187,33 @@ TEST_CASE("Selection pill: no target draws nothing, and a returning target start
     session.Frame();
     CHECK(Same(probe.drawn, Entry(probe.origin, 2)));
 }
+
+TEST_CASE("Selection pill: the selected label is semibold, the others keep their weight")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImFont* selectedFont = nullptr;
+    ImFont* otherFont = nullptr;
+    ImFont* headlineFont = nullptr;
+    float selectedSize = 0.0f;
+    session.SetUi([&] {
+        facet::internal::PushPillLabelStyle(facet::TextStyle::Body, true);
+        selectedFont = ImGui::GetFont();
+        selectedSize = ImGui::GetFontSize();
+        facet::PopTextStyle();
+        facet::internal::PushPillLabelStyle(facet::TextStyle::Body, false);
+        otherFont = ImGui::GetFont();
+        facet::PopTextStyle();
+        // A style that is already semibold stays so either way.
+        facet::internal::PushPillLabelStyle(facet::TextStyle::Headline, false);
+        headlineFont = ImGui::GetFont();
+        facet::PopTextStyle();
+    });
+    session.Frame();
+    REQUIRE(facet::WeightFont(facet::FontWeight::Semibold) != nullptr);
+    CHECK(selectedFont == facet::WeightFont(facet::FontWeight::Semibold));
+    CHECK(otherFont == facet::WeightFont(facet::FontWeight::Regular));
+    CHECK(headlineFont == facet::WeightFont(facet::FontWeight::Semibold));
+    CHECK(selectedFont != otherFont);
+    CHECK(selectedSize == doctest::Approx(facet::Px(facet::T().type[facet::TextStyle::Body].size)));
+}

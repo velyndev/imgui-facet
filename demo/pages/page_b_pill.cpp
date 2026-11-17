@@ -95,7 +95,7 @@ void List(facet::demo::PageCtx& ctx)
                 facet::FillRect(drawList, row.rect.Min, row.rect.Max,
                                 facet::ToU32(facet::WithAlpha(fill, fill.w * feedback)), radius);
             }
-            facet::PushTextStyle(facet::TextStyle::Body);
+            facet::internal::PushPillLabelStyle(facet::TextStyle::Body, i == page.entry);
             drawList->AddText(ImVec2(row.rect.Min.x + inset, facet::CenteredTextY(row.rect.Min.y, rowHeight)),
                               facet::ToU32(c.label), kEntries[i]);
             facet::PopTextStyle();

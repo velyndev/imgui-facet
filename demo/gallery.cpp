@@ -378,8 +378,9 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         }
 
         // Titles that do not fit the row end in an ellipsis. Their capitals sit centered in
-        // the row box.
-        facet::PushTextStyle(facet::TextStyle::Body);
+        // the row box. The selected title is semibold, so the selection does not show by the
+        // pill's tint alone.
+        facet::internal::PushPillLabelStyle(facet::TextStyle::Body, selected);
         const float textY = facet::CenteredTextY(row.rect.Min.y, rowHeight);
         char title[128];
         facet::internal::TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr,
@@ -1020,10 +1021,12 @@ bool ProtoSegmented(PageCtx& ctx, const char* id, int* index, std::span<const ch
             }
             const char* label = items[static_cast<size_t>(i)];
             const char* end = ImGui::FindRenderedTextEnd(label);
+            facet::internal::PushPillLabelStyle(facet::TextStyle::Body, i == selected);
             const float textWidth = ImGui::CalcTextSize(label, end).x;
             drawList->AddText(ImVec2(std::round(segmentRect.GetCenter().x - textWidth * 0.5f),
                                      facet::CenteredTextY(segmentRect.Min.y, height)),
                               Color(item.disabled ? c.labelTertiary : c.label), label, end);
+            facet::PopTextStyle();
             facet::internal::DrawFocusRing(drawList, segmentRect, radius, item.focusAmount);
         }
     }
