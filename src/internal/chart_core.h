@@ -85,6 +85,10 @@ struct TickSet
     double step = 0.0;     // linear: the distance between ticks; logarithmic: decades per major tick
     int decimals = 0;      // digits after the point that the labels of this set need
     bool logarithmic = false;
+    // Every label of the set uses exponent form ("1.5e6"): set when the largest tick reaches
+    // 1e6 in magnitude, or the step needs more than 6 decimals (logarithmic: a decade at or
+    // beyond 1e6 or 1e-6). One form per axis, so labels never mix "500000" and "1e6".
+    bool exponent = false;
 };
 
 // How many ticks fit along `pixelLength` when each label takes `labelExtent` pixels along the
@@ -111,9 +115,9 @@ TickSet LogTicks(double min, double max, int targetCount, std::span<Tick> out);
 int StepDecimals(double step);
 
 // Writes the label of a tick of `set` (zero terminated, cut at bufferSize) and returns its
-// full length. Fixed point with set.decimals digits for values below 1e6 in magnitude, and
-// exponent form ("2e6", "1.5e-7") for larger values or more than 6 decimals, with only the
-// digits the step needs. -0 prints as "0".
+// full length. Fixed point with set.decimals digits, or exponent form ("2e6", "1.5e-7") when
+// set.exponent is true, with only the digits the step needs. 0 prints as "0" in exponent
+// form, and -0 never shows a sign.
 int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize);
 
 // --- Data ------------------------------------------------------------------------------------

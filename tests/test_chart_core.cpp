@@ -156,6 +156,19 @@ TEST_CASE("Tick labels print only the digits the step needs")
     CHECK(Label(2.5e6, halfMillions) == "2.5e6");
     const TickSet tiny = SetOf(0.0, 5e-8, 6);
     CHECK(Label(3e-8, tiny) == "3e-8");
+    // One form per axis: the largest tick decides, so 500000 and 1e6 never share an axis.
+    Tick axis[kMaxTicks * 4];
+    const TickSet toTwoMillion = LinearTicks(0.0, 2e6, 5, axis);
+    REQUIRE(toTwoMillion.count == 5);
+    CHECK(toTwoMillion.exponent);
+    CHECK(Label(axis[0].value, toTwoMillion) == "0");
+    CHECK(Label(axis[1].value, toTwoMillion) == "5e5");
+    CHECK(Label(axis[4].value, toTwoMillion) == "2.0e6");
+    const TickSet belowMillion = SetOf(0.0, 9e5, 4);
+    CHECK_FALSE(belowMillion.exponent);
+    CHECK(Label(6e5, belowMillion) == "600000");
+    // Negative ranges decide by magnitude too.
+    CHECK(SetOf(-2e6, 0.0, 5).exponent);
 
     // The returned length is the full length, also when cut.
     char cut[3];
@@ -177,6 +190,14 @@ TEST_CASE("Logarithmic ticks: decades, minor ticks and labels")
     CHECK(Label(0.01, fractions) == "0.01");
     CHECK(Label(0.1, fractions) == "0.1");
     CHECK(Label(1e7, SetOf(1.0, 1e8, 10, true)) == "1e7");
+    // A logarithmic axis that reaches 1e6 labels every decade in exponent form.
+    const TickSet eightDecades = SetOf(1.0, 1e8, 10, true);
+    CHECK(eightDecades.exponent);
+    CHECK(Label(1.0, eightDecades) == "1e0");
+    CHECK(Label(1e4, eightDecades) == "1e4");
+    CHECK(Label(2e3, eightDecades) == "2e3");  // a minor tick keeps its digit
+    CHECK_FALSE(fractions.exponent);
+    CHECK(Label(1e4, SetOf(1.0, 1e5, 10, true)) == "10000");
 
     // Many decades: every n-th one, no minor ticks.
     Tick wide[kMaxTicks * 4];

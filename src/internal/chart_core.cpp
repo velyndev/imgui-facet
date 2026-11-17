@@ -29,6 +29,11 @@ double SafeLog10(double value)
 
 // Relative tolerance for "a tick lies on the end of the range".
 constexpr double kTickTolerance = 1e-9;
+// Tick labels switch to exponent form from this magnitude, past this many decimals, or (on a
+// logarithmic axis) from this decade in either direction.
+constexpr double kExponentFrom = 1e6;
+constexpr int kMaxFixedDecimals = 6;
+constexpr int kExponentDecade = 6;
 
 // Series colors: the chroma of every series, the lightness each theme starts from, the step
 // the lightness moves by until the contrast is reached, and that contrast (WCAG non-text).
@@ -162,12 +167,15 @@ TickSet LinearTicks(double min, double max, int targetCount, std::span<Tick> out
         if (!out.empty())
             out[0] = {min, true};
         set.count = 1;
+        set.exponent = std::fabs(min) >= kExponentFrom;
         return set;
     }
     set.decimals = StepDecimals(set.step);
     const double tolerance = set.step * kTickTolerance * 1e3;
     const double first = std::ceil((min - tolerance) / set.step);
     const double last = std::floor((max + tolerance) / set.step);
+    const double largest = std::max(std::fabs(first), std::fabs(last)) * set.step;
+    set.exponent = largest >= kExponentFrom || set.decimals > kMaxFixedDecimals;
     for (double k = first; k <= last && set.count <= kMaxTicks * 4; k += 1.0)
     {
         double value = k * set.step;
@@ -202,6 +210,7 @@ TickSet LogTicks(double min, double max, int targetCount, std::span<Tick> out)
     TickSet set;
     set.logarithmic = true;
     set.step = static_cast<double>(stride);
+    set.exponent = std::max(std::abs(firstDecade), std::abs(lastDecade)) >= kExponentDecade;
     const auto emit = [&](double value, bool major) {
         if (set.count < static_cast<int>(out.size()))
             out[static_cast<std::size_t>(set.count)] = {value, major};
@@ -233,20 +242,32 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize)
     }
     else if (set.logarithmic)
     {
-        const int exponent = static_cast<int>(std::lround(std::log10(std::max(std::fabs(value), kLogFloor))));
-        if (std::abs(exponent) >= 6)
-            std::snprintf(text, sizeof(text), "1e%d", exponent);
+        // Ticks sit at m * 10^k with m from 1 to 9: one significant digit is enough.
+        const double magnitude = std::max(std::fabs(value), kLogFloor);
+        int exponent = static_cast<int>(std::floor(std::log10(magnitude) + kTickTolerance));
+        double mantissa = std::round(magnitude / std::pow(10.0, exponent));
+        if (mantissa >= 10.0)
+        {
+            mantissa /= 10.0;
+            ++exponent;
+        }
+        if (set.exponent)
+            std::snprintf(text, sizeof(text), "%.0fe%d", mantissa, exponent);
         else
-            std::snprintf(text, sizeof(text), "%.*f", std::max(0, -exponent), value);
+            std::snprintf(text, sizeof(text), "%.*f", std::max(0, -exponent), mantissa * std::pow(10.0, exponent));
     }
     else
     {
         const double step = set.step > 0.0 ? set.step : 1.0;
         if (std::fabs(value) < step * 1e-6)
             value = 0.0;
-        if (value != 0.0 && (std::fabs(value) >= 1e6 || set.decimals > 6))
+        if (set.exponent && value == 0.0)
         {
-            const int exponent = static_cast<int>(std::floor(std::log10(std::fabs(value))));
+            std::snprintf(text, sizeof(text), "%s", "0");
+        }
+        else if (set.exponent)
+        {
+            const int exponent = static_cast<int>(std::floor(std::log10(std::fabs(value)) + kTickTolerance));
             const int stepExponent = static_cast<int>(std::floor(std::log10(step) + kTickTolerance));
             const int digits = std::max(0, exponent - stepExponent);
             const double mantissa = value / std::pow(10.0, exponent);
