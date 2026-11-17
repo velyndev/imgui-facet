@@ -222,7 +222,8 @@ struct KeybindModeSelectorOptions
 };
 
 // Chooses how a key bind activates (BindMode in core/input.h): Hold, Toggle, Always and Off
-// with the Strings bind* names, drawn as a segmented control. Keyboard as SegmentedControl.
+// with the Strings bind* names, drawn as a segmented control. Keyboard as SegmentedControl. The
+// visible label part is the accessible name and is not drawn.
 // Returns true when *mode was written. A mode that is not offered is shown but cannot be
 // chosen again once left.
 bool KeybindModeSelector(const char* label, BindMode* mode, const KeybindModeSelectorOptions& options = {});

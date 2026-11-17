@@ -24,6 +24,11 @@
 //   - Disabled: ImGui::BeginDisabled. readOnly shows the value, lets it be focused and copied,
 //     and never writes.
 //   - Lengths are design units (multiplied by Px()).
+//   - The visible label part is drawn in front of the control, inside the widget width, by the
+//     field-like widgets (ColorWell, ColorInputs, ColorChannelSlider, ColorModeEditor,
+//     DatePicker, DateRangePicker, TimePicker, AnglePicker, IconPicker). The panels
+//     (ColorPicker, SwatchPalette, SatValSquare, ThumbnailPicker, FileBrowser) do not draw it;
+//     for them it is the accessible name and the tooltip of the whole panel.
 
 #include <cstddef>
 #include <span>
@@ -213,8 +218,9 @@ struct AnimatedColor
     float period = 2.0f;                // seconds per cycle, > 0
 };
 
-// The color of `animated` at `seconds` (any running clock, for example ImGui::GetTime()). With
-// reduced motion (T().motion.reduceMotion) it is `color`. No allocation.
+// The color of `animated` at `seconds` (any running clock, for example ImGui::GetTime()). While
+// facet::ReduceMotion() is true (the theme token or the system animation setting) it is `color`.
+// No allocation.
 ImVec4 SampleAnimatedColor(const AnimatedColor& animated, double seconds);
 
 struct ColorModeEditorOptions

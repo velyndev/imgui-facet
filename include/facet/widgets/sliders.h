@@ -24,6 +24,10 @@
 //   - Lengths are design units (multiplied by Px()); value parameters are in value units.
 //   - Formats are printf formats in the Dear ImGui dialect; nullptr uses "%.3g" for float and
 //     "%d" for int. A formatter, when set, is used instead and gets the value as a double.
+//   - Horizontal sliders, RangeInput, RangeSliderHistogram and AllocationBar draw the visible
+//     label part in front of the track, inside the widget width. Knob and ArcRangeSlider draw it
+//     under the dial. Vertical sliders, XYPad, JoystickPad and BoxRangePad do not draw it; for
+//     them it is the accessible name and the tooltip.
 //
 // The multi-handle model, shared by RangeSlider, RangeInput, RangeSliderHistogram, MultiSlider,
 // ArcRangeSlider, BoxRangePad and AllocationBar, so a caller who knows RangeSlider can guess the

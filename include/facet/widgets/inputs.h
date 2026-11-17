@@ -470,7 +470,7 @@ struct PinCodeInputOptions
     int groupSize = 0;                  // a wider gap after every groupSize cells; 0 none
     ControlSize size = ControlSize::Inherit;
     bool readOnly = false;
-    const char* error = nullptr;        // also shakes the cells once (motion permitting)
+    const char* error = nullptr;        // also shakes the cells once, unless facet::ReduceMotion()
     const char* helpText = nullptr;
 };
 
@@ -612,8 +612,9 @@ struct ValidationSummaryOptions
 
 // A list of the Destructive messages that the fields of the current window reported in the
 // previous frame (through `error` options or FieldValidation), each a link that focuses and
-// scrolls to its field. Draws nothing while there are none. Returns true when an entry was
-// activated.
+// scrolls to its field. The visible label part is the heading drawn above the entries ("##name"
+// for none); the id keeps nothing. Each entry is a Tab stop; Enter or Space activates it. Draws
+// nothing and submits no item while there are none. Returns true when an entry was activated.
 bool ValidationSummary(const char* label, const ValidationSummaryOptions& options = {});
 
 } // namespace facet
