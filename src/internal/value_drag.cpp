@@ -315,6 +315,11 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     const auto write = [&](double next) {
         if (readOnly || std::isnan(next))
             return;
+        // Never past the limits of the caller (a handle's neighbours); an edit that the limits
+        // stop at the current value writes nothing.
+        if (options.clampLow > options.clampHigh)
+            return;
+        next = std::clamp(next, options.clampLow, options.clampHigh);
         if (next != *value)
         {
             *value = next;

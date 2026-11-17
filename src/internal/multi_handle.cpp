@@ -77,6 +77,32 @@ bool RestoreSnapshot(ImGuiID owner, std::span<double> values)
     return changed;
 }
 
+// The values handle `index` can take by itself, the way MoveHandle resolves the constraints: so
+// the value drag core never writes a value that MoveHandle would move back (an edit that cannot
+// move then ends without an edit).
+void HandleLimits(std::span<const double> values, int index, const HandleConstraints& c, double* low, double* high)
+{
+    const int n = static_cast<int>(values.size());
+    const double gap = EffectiveGap(c, n);
+    const auto at = [&](int i) { return values[static_cast<size_t>(i)]; };
+    if (c.mirror && n == 2)
+    {
+        const double center = std::clamp(c.center, c.min, c.max);
+        *low = index == 0 ? std::max(c.min, 2.0 * center - c.max) : center + gap * 0.5;
+        *high = index == 0 ? center - gap * 0.5 : std::min(c.max, 2.0 * center - c.min);
+    }
+    else if (c.collision == CollisionMode::Clamp)
+    {
+        *low = std::max(c.min, index > 0 ? at(index - 1) + gap : c.min);
+        *high = std::min(c.max, index < n - 1 ? at(index + 1) - gap : c.max);
+    }
+    else
+    {
+        *low = c.min + gap * index;
+        *high = std::max(*low, c.max - gap * (n - 1 - index));
+    }
+}
+
 // Gives the active item to `id`, as if the mouse press had landed on it.
 void TransferMousePress(ImGuiID id, ImGuiWindow* window, bool focus)
 {
@@ -467,6 +493,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
         const bool wasActive = g.ActiveId == handleIds[i];
         handle = PartBehavior(handleIds[i], rect, handleOptions);
         double value = v[static_cast<size_t>(i)];
+        HandleLimits(v, i, constraints, &drag.clampLow, &drag.clampHigh);
         const ValueDragResult edit = ValueDragBehavior(handle, &value, track, drag);
         // A key press started an edit of this handle: remember where every handle was.
         if (!wasActive && g.ActiveId == handleIds[i])

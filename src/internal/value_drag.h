@@ -53,6 +53,7 @@
 // range is not a whole number of steps. Keyboard steps of continuous values move on a grid of
 // hundredths of the track, so a hundred presses from min end exactly on max.
 
+#include <limits>
 #include <span>
 
 #include <imgui.h>
@@ -161,6 +162,11 @@ struct ValueDragOptions
     bool keyboard = true;   // arrows, Page Up and Down, Home and End while focused
     bool wheel = true;      // the mouse wheel as described at the top
     bool readOnly = false;  // shown and focusable, never written (also ImGuiItemFlags_ReadOnly)
+    // Limits inside the range that an edit never passes, for a handle between neighbours: the
+    // next value is clamped to them before it is written, so an edit that cannot move the value
+    // writes nothing and its session ends without an edit. The defaults do not limit.
+    double clampLow = -std::numeric_limits<double>::infinity();
+    double clampHigh = std::numeric_limits<double>::infinity();
 };
 
 struct ValueDragResult

@@ -460,6 +460,30 @@ TEST_CASE("Value drag: the wheel steps only when focused or with Alt")
     CHECK(slider.value == doctest::Approx(0.49));
 }
 
+TEST_CASE("Value drag: the clamp limits stop an edit, and an edit that cannot move writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.options.clampLow = 0.2;
+    slider.options.clampHigh = 0.6;
+    Install(session, slider);
+    session.Drag({TestSlider::At(session, 0.5), TestSlider::At(session, 0.9)});
+    CHECK(slider.value == 0.6);
+    CHECK(slider.commits == 1);
+    // At the limit: a drag and a key press further on are sessions without an edit.
+    const int changes = slider.changes;
+    session.Drag({TestSlider::At(session, 0.6), TestSlider::At(session, 0.95)});
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(slider.value == 0.6);
+    CHECK(slider.changes == changes);
+    CHECK(slider.commits == 1);
+    CHECK(slider.afterEdit == 1);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(slider.value == 0.2);
+}
+
 TEST_CASE("Value drag: disabled and read-only controls never write")
 {
     facet::test::Session session;

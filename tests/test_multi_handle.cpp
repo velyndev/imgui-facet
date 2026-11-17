@@ -313,6 +313,29 @@ TEST_CASE("Multi-handle behaviour: dragging a handle moves only that handle, cla
     CHECK(range.values[1] == 60.0);
 }
 
+TEST_CASE("Multi-handle behaviour: a handle held by its neighbour edits nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.values[0] = 50.0;
+    range.values[1] = 60.0;
+    Install(session, range);
+    int changedFrames = 0;
+    session.SetUi([&] {
+        range.Ui(session);
+        changedFrames += range.last.changed ? 1 : 0;
+    });
+    session.Drag({TestRange::At(session, 50.0), TestRange::At(session, 80.0)});
+    CHECK(range.values[0] == 50.0);
+    CHECK(changedFrames == 0);
+    CHECK(range.commits == 0);
+    // The arrow key against the neighbour neither.
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(range.values[0] == 50.0);
+    CHECK(range.commits == 0);
+}
+
 TEST_CASE("Multi-handle behaviour: push mode pushes the other handle")
 {
     facet::test::Session session;
