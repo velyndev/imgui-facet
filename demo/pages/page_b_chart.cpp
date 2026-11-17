@@ -208,8 +208,8 @@ ChartOutcome DrawChart(const ChartSpec& spec, ChartCursor& cursor, const facet::
         FormatTick(yTicks[i].value, ySet, text, sizeof(text));
         labelWidth = std::max(labelWidth, labelFont->CalcTextSizeA(labelSize, FLT_MAX, 0.0f, text).x);
     }
-    const ImRect plot(ImVec2(card.Min.x + padding + labelWidth + gap, plotTop),
-                      ImVec2(card.Max.x - padding, plotBottom));
+    const ImRect plot = SnapPlotRect(
+        ImRect(ImVec2(card.Min.x + padding + labelWidth + gap, plotTop), ImVec2(card.Max.x - padding, plotBottom)));
 
     // The plot is one item: hover and keyboard focus read samples. EnableNav makes it a Tab
     // stop; an invisible button is left out of keyboard navigation without it.
