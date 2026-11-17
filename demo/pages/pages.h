@@ -16,6 +16,10 @@
 // When a state changes something below the first screen, call ctx.RevealInCapture() right
 // after that content so the change is scrolled into the captured image.
 //
+// Groups appear in the navigation in this order: Foundations, Media, Blocks (the building
+// blocks of Phase 1c), Widgets (one page per widget family); any other group follows them.
+// Inside a group, pages are ordered by `order`, then by title.
+//
 // Interaction states in capture runs: a capture renders without input, so a page shows the
 // hovered, pressed, focused, dragging or open look of a Facet widget by asking for it right
 // before submitting the widget:

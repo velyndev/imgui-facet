@@ -165,7 +165,11 @@ The dose caps in Direction apply. The choices behind each effect:
 - **Title strip.** The window background with a hairline below it; the title in the headline
   style, labels in labelSecondary in front of their controls.
 - **Navigation.** bgSecondary, group names in footnote labelSecondary, rows one control height
-  tall, and the selection pill in accentSubtle that springs between rows.
+  tall, and the selection pill in accentSubtle that springs between rows. The groups come in a
+  fixed order (Foundations, Media, Blocks, Widgets). The list scrolls when it is taller than the
+  window; the heading of the group at the top stays pinned and the next heading pushes it out,
+  so a scrolled list still says which group its rows belong to, and a newly selected page is
+  scrolled into view.
 - **Pages.** The window background with 24 / 20 padding; every page starts with a Title1
   heading and a one-paragraph summary in labelSecondary, sections with a Title3 heading.
 - **Settings rows.** A page labels each setting in one fixed label column in footnote

@@ -23,6 +23,10 @@ struct GalleryState
     // also forgets an accent left over from an earlier session.
     int appliedMode = -1;
     float appliedScale = 0.0f;
+
+    // The page whose navigation row was last scrolled into view; while it differs from
+    // selectedPage, the navigation scrolls the selected row into view.
+    int revealedPage = -1;
 };
 
 // io settings shared by all modes. Deterministic runs (capture, selftest) also disable

@@ -536,4 +536,21 @@ FACET_DEMO_SELFTEST("tokens")
     using facet::demo::Target;
     test.Wheel(Target::Item("tokens.accent.1"), -3.0f);
     test.Expect("three notches down scroll the page", [] { return tokens.scrollY > 0.0f; });
+
+    // The page list scrolls. A page far down the list is scrolled into view when it is
+    // selected (as by --page), and the keyboard reaches every page: from the first row,
+    // holding Down walks to the last one, and Enter opens it.
+    test.SelectPage("composites");
+    test.ExpectVisible("nav.composites");
+    test.Click("nav.tokens");
+    test.ExpectPage("tokens");
+    test.HoldKey(ImGuiKey_DownArrow, 3.0f);
+    test.ExpectFocused("nav.composites");
+    test.ExpectVisible("nav.composites");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectPage("composites");
+    // Back up: Up walks to the first page, which is scrolled into view under its heading.
+    test.HoldKey(ImGuiKey_UpArrow, 3.0f);
+    test.ExpectFocused("nav.tokens");
+    test.ExpectVisible("nav.tokens");
 }

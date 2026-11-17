@@ -8,6 +8,7 @@
 #include <string>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
@@ -255,8 +256,14 @@ float DrawTitleStrip(GalleryState& state, PageCtx& ctx, AppShell* shell)
     return stripHeight;
 }
 
-// The page list: group headings and one row per page. The selected row sits on the
-// selection pill, which springs to the new row when the selection changes.
+// Most groups whose headings take part in pinning; later groups scroll like rows.
+constexpr int kMaxPinnedGroups = 16;
+
+// The page list: group headings and one row per page, in a list that scrolls when it is
+// taller than the window. The selected row sits on the selection pill, which springs to the
+// new row when the selection changes, and a newly selected page is scrolled into view. The
+// heading of the group at the top stays pinned above the rows, so a scrolled list still
+// shows which group its rows belong to; the next heading pushes it out as it arrives.
 void DrawNavigation(GalleryState& state, PageCtx& ctx)
 {
     const facet::Theme& theme = facet::T();
@@ -291,7 +298,26 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, clear);
 
     const float windowTop = ImGui::GetWindowPos().y;
+    const ImRect inner = ImGui::GetCurrentWindowRead()->InnerClipRect;
+    const float listTop = ImGui::GetCurrentWindowRead()->InnerRect.Min.y;
+    const float spacingY = ImGui::GetStyle().ItemSpacing.y;
+    const float headingHeight = facet::MeasureText(facet::TextStyle::Footnote, "A").y;
+    // A heading block: the heading line, then a small gap before the first row.
+    const float headingBlock = headingHeight + spacingY + facet::Px(theme.spacing.xs) + spacingY;
+    // Where the first heading sits unscrolled, and the band it is pinned in. Rows are clipped
+    // below the band, so a row scrolled under a pinned heading is neither drawn nor hit.
+    const float pinnedY = listTop + padding.y;
+    const float bandBottom = pinnedY + headingBlock;
+    ImGui::PushClipRect(ImVec2(inner.Min.x, bandBottom), inner.Max, true);
+
+    float headingY[kMaxPinnedGroups] = {};
+    const std::string* headingText[kMaxPinnedGroups] = {};
+    int groups = 0;
     float selectedY = -1.0f;
+    float revealTop = 0.0f;
+    float revealBottom = -1.0f;
+    float focusedTop = 0.0f;
+    bool rowFocused = false;
     float rowLeft = 0.0f;
     float rowRight = 0.0f;
     const std::string* currentGroup = nullptr;
@@ -303,10 +329,22 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         {
             if (currentGroup != nullptr)
                 ImGui::Dummy(ImVec2(0.0f, facet::Px(theme.spacing.md)));
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + rowInset);
-            ImGui::PushStyleColor(ImGuiCol_Text, c.labelSecondary);
-            facet::Text(facet::TextStyle::Footnote, "%s", page.group.c_str());
-            ImGui::PopStyleColor();
+            // Headings take their place here and are drawn after the rows (pinned or not);
+            // beyond the pinned groups they are drawn in place.
+            if (groups < kMaxPinnedGroups)
+            {
+                headingY[groups] = ImGui::GetCursorScreenPos().y;
+                headingText[groups] = &page.group;
+                ++groups;
+            }
+            else
+            {
+                facet::PushTextStyle(facet::TextStyle::Footnote);
+                drawList->AddText(ImVec2(ImGui::GetCursorScreenPos().x + rowInset, ImGui::GetCursorScreenPos().y),
+                                  Color(c.labelSecondary), page.group.c_str());
+                facet::PopTextStyle();
+            }
+            ImGui::Dummy(ImVec2(0.0f, headingHeight));
             ImGui::Dummy(ImVec2(0.0f, facet::Px(theme.spacing.xs)));
             currentGroup = &page.group;
         }
@@ -319,6 +357,16 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         facet::ItemCursor();
         std::snprintf(probeName, sizeof(probeName), "nav.%s", page.id.c_str());
         ctx.Probe(probeName);
+        if (ImGui::IsItemFocused())
+        {
+            rowFocused = true;
+            focusedTop = ImGui::GetItemRectMin().y;
+        }
+        if (selected && state.revealedPage != i)
+        {
+            revealTop = ImGui::GetItemRectMin().y;
+            revealBottom = ImGui::GetItemRectMax().y;
+        }
         // The item rectangle includes half the item spacing above and below, so rows can be
         // hit without gaps. The visible row (hover fill, selection pill and title) is the
         // rowHeight box centered in it.
@@ -366,7 +414,53 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         facet::FillRect(drawList, ImVec2(rowLeft, top), ImVec2(rowRight, top + rowHeight), Color(c.accentSubtle),
                         radius);
     }
+    splitter.SetCurrentChannel(drawList, 1);
+    ImGui::PopClipRect();
+
+    // Headings. The group whose heading has reached the band stays pinned there until the
+    // next heading pushes it up; the headings below it scroll with their rows.
+    int pinned = -1;
+    for (int g = 0; g < groups; ++g)
+    {
+        if (headingY[g] <= pinnedY + 0.5f)
+            pinned = g;
+    }
+    facet::PushTextStyle(facet::TextStyle::Footnote);
+    const ImU32 headingColor = Color(c.labelSecondary);
+    const float textX = inner.Min.x + rowInset;
+    if (pinned >= 0)
+    {
+        float y = pinnedY;
+        if (pinned + 1 < groups)
+            y = std::min(y, headingY[pinned + 1] - headingBlock);
+        drawList->AddText(ImVec2(textX, y), headingColor, headingText[pinned]->c_str());
+    }
+    for (int g = pinned + 1; g < groups; ++g)
+    {
+        if (headingY[g] < inner.Max.y)
+            drawList->AddText(ImVec2(textX, headingY[g]), headingColor, headingText[g]->c_str());
+    }
+    facet::PopTextStyle();
     splitter.Merge(drawList);
+
+    // A newly selected page (a click, the keyboard, --page or a capture run) is scrolled to
+    // the middle of the list when it is not fully visible below the band; a row reached with
+    // the keyboard is moved out from under the band. Both take effect in the next frame.
+    // Until the row is visible the request repeats, because a list laid out for the first
+    // time cannot scroll yet; a list too short for a whole row gives up at once.
+    const float visibleBottom = inner.Max.y;
+    if (revealBottom >= 0.0f)
+    {
+        const bool visible = revealTop >= bandBottom - 0.5f && revealBottom <= visibleBottom + 0.5f;
+        if (!visible)
+            ImGui::SetScrollY(ImGui::GetScrollY() + (revealTop + revealBottom) * 0.5f - (bandBottom + visibleBottom) * 0.5f);
+        if (visible || visibleBottom - bandBottom < revealBottom - revealTop)
+            state.revealedPage = state.selectedPage;
+    }
+    else if (rowFocused && focusedTop < bandBottom)
+    {
+        ImGui::SetScrollY(ImGui::GetScrollY() - (bandBottom - focusedTop));
+    }
     ImGui::EndChild();
 }
 

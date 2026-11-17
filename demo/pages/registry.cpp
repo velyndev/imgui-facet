@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <map>
 #include <utility>
 
@@ -27,6 +28,19 @@ Registry& GetRegistry()
     return registry;
 }
 
+// The navigation groups in their fixed order. Other groups follow them.
+constexpr const char* kGroupOrder[] = {"Foundations", "Media", "Blocks", "Widgets"};
+
+int GroupRank(const std::string& group)
+{
+    for (int i = 0; i < static_cast<int>(std::size(kGroupOrder)); ++i)
+    {
+        if (group == kGroupOrder[i])
+            return i;
+    }
+    return static_cast<int>(std::size(kGroupOrder));
+}
+
 void SortPages(std::vector<PageInfo>& pages)
 {
     std::map<std::string, int> groupOrder;
@@ -40,6 +54,10 @@ void SortPages(std::vector<PageInfo>& pages)
     }
 
     std::stable_sort(pages.begin(), pages.end(), [&](const PageInfo& a, const PageInfo& b) {
+        const int rankA = GroupRank(a.group);
+        const int rankB = GroupRank(b.group);
+        if (rankA != rankB)
+            return rankA < rankB;
         const int groupA = groupOrder[a.group];
         const int groupB = groupOrder[b.group];
         if (groupA != groupB)
