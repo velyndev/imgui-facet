@@ -59,7 +59,7 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
               "placeholder line while the flag is on.");
     if (ctx.capture)
         s.shellOpen = ctx.captureState == kCaptureShell;
-    LabeledRow("Show the shell");
+    LabeledRow("Shell");
     ImGui::Checkbox("##shell", &s.shellOpen);
     ctx.Probe("containers.shell");
     if (facet::BeginShell("Shell###shell", &s.shellOpen, {.icon = facet::Icon("settings"), .closeOnEscape = true}))

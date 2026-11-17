@@ -110,7 +110,7 @@ void Steps(facet::demo::PageCtx& ctx, NavigationState& s)
               "its open flag; a planned sheet shows one placeholder line while the flag is on.");
     if (ctx.capture)
         s.shortcutSheet = ctx.captureState == kCaptureShortcuts;
-    LabeledRow("Show the shortcut sheet");
+    LabeledRow("Shortcut sheet");
     ImGui::Checkbox("##shortcuts", &s.shortcutSheet);
     ctx.Probe("navigation.shortcuts");
     facet::ShortcutSheet("Shortcuts", &s.shortcutSheet);

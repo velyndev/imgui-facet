@@ -86,34 +86,34 @@ void RevealLayer(const facet::demo::PageCtx& ctx, int captureState)
 void CallerOpened(facet::demo::PageCtx& ctx, OverlaysState& s)
 {
     SectionHeader("Layers the caller opens");
-    Paragraph("Each of these takes the caller's open flag; the switches set it, and dismissing "
+    Paragraph("Each of these takes the caller's open flag; the switch beside its name sets it, and dismissing "
               "the finished layer clears it. A planned layer shows one placeholder line while its "
               "flag is on.");
-    LayerSwitch(ctx, "Show the modal", "##modal", "overlays.modal", &s.modal, kCaptureModal);
+    LayerSwitch(ctx, "Modal", "##modal", "overlays.modal", &s.modal, kCaptureModal);
     if (facet::BeginModal("Modal", &s.modal))
     {
         Note("Modal content.");
         facet::EndModal();
     }
     RevealLayer(ctx, kCaptureModal);
-    LayerSwitch(ctx, "Show the confirm dialog", "##confirm", "overlays.confirm", &s.confirm, kCaptureConfirm);
+    LayerSwitch(ctx, "Confirm dialog", "##confirm", "overlays.confirm", &s.confirm, kCaptureConfirm);
     facet::ConfirmDialog("Confirm", &s.confirm, "Message of the dialog.", {.destructive = true});
     RevealLayer(ctx, kCaptureConfirm);
-    LayerSwitch(ctx, "Show the popover", "##popover", "overlays.popover", &s.popover, kCapturePopover);
+    LayerSwitch(ctx, "Popover", "##popover", "overlays.popover", &s.popover, kCapturePopover);
     if (facet::BeginPopover("popover", &s.popover, {.placement = facet::PopoverPlacement::Below}))
     {
         Note("Popover content.");
         facet::EndPopover();
     }
     RevealLayer(ctx, kCapturePopover);
-    LayerSwitch(ctx, "Show the drawer", "##drawer", "overlays.drawer", &s.drawer, kCaptureDrawer);
+    LayerSwitch(ctx, "Drawer", "##drawer", "overlays.drawer", &s.drawer, kCaptureDrawer);
     if (facet::BeginDrawer("Drawer", &s.drawer, {.side = facet::DrawerSide::End}))
     {
         Note("Drawer content.");
         facet::EndDrawer();
     }
     RevealLayer(ctx, kCaptureDrawer);
-    LayerSwitch(ctx, "Show the command palette", "##palette", "overlays.palette", &s.palette, kCapturePalette);
+    LayerSwitch(ctx, "Command palette", "##palette", "overlays.palette", &s.palette, kCapturePalette);
     facet::CommandPalette("Commands", &s.palette, kCommands, &s.picked);
     RevealLayer(ctx, kCapturePalette);
 }
