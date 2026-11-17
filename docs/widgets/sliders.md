@@ -30,7 +30,12 @@ AllocationBar share one model, so a caller who knows RangeSlider can guess the o
   Home and End go as far as the handle can.
 - The option members have the same names and order everywhere: `format`, `formatter`,
   `formatterUser`, `scale`, `step`, `minGap`, `collision`, `dragSpan`, the widget's own members,
-  `orientation`, then the common block.
+  `orientation`, then the common block. Every widget of the model has `readOnly`, `mixed`, `error`
+  and `helpText`; `mixed` hides the handles until the first edit writes every value.
+- The two-handle linear widgets (RangeSlider, RangeInput, RangeSliderHistogram) also share
+  `allowOutOfRange` (a typed value outside the range is written and drawn clamped) and
+  `doubleClickReset` (a double click moves a handle to its end of the range, which clears that
+  bound of a filter).
 
 ## Widgets
 
@@ -73,6 +78,7 @@ bool RangeSlider(const char* label, int* low, int* high, int min, int max, const
 ```
 
 Two handles selecting a range, with minimum gap, clamp or push, span drag, mirror, fixed span,
+value bubbles, typed values outside the range, a double click that resets one handle, and
 logarithmic, stepped and vertical variants. Status: planned.
 
 ### RangeInput
@@ -169,7 +175,8 @@ bool AllocationBar(const char* label, std::span<float> shares, std::span<const c
 ```
 
 One bar split into segments whose shares always add up to 1; a divider moves share between its two
-neighbours. Status: planned.
+neighbours. The shares are 0 to 1; `format` and `formatter` both get them in percent. Status:
+planned.
 
 ## Usage
 

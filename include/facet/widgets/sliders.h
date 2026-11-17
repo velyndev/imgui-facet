@@ -42,7 +42,10 @@
 //   - The option members have the same names and order wherever they apply: format, formatter,
 //     formatterUser, scale, step, minGap, collision, dragSpan, the widget's own members,
 //     orientation, then the common block (size, width, height, readOnly, mixed, error,
-//     helpText). The pads use ImVec2 for step and minGap, one value per axis.
+//     helpText). The pads use ImVec2 for step and minGap, one value per axis. Every widget of the
+//     model has readOnly, mixed, error and helpText; `mixed` hides the handles until the first
+//     edit writes every value. The two-handle linear widgets (RangeSlider, RangeInput,
+//     RangeSliderHistogram) also share allowOutOfRange and doubleClickReset.
 
 #include <cstddef>
 #include <span>
@@ -158,11 +161,14 @@ struct RangeSliderOptions
     bool mirror = false;                // moving one handle moves the other the same distance the other way around the range center
     bool fixedSpan = false;             // high - low never changes: every drag and key moves both handles
     bool valueBubble = false;           // each handle shows its value while dragged or focused
+    bool allowOutOfRange = false;       // a typed value outside [min, max] is written; the track shows it clamped
+    bool doubleClickReset = false;      // a double click on a handle moves it to its end of the range (low to min, high to max)
     Orientation orientation = Orientation::Horizontal;
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                 // units, horizontal; 0 fills the available width
     float height = 0.0f;                // units, vertical; 0 for the default fader length
     bool readOnly = false;
+    bool mixed = false;                 // no handles and no fill until the first edit writes both values
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -189,10 +195,12 @@ struct RangeInputOptions
     bool dragSpan = true;
     bool slider = true;                 // the track between the two fields; false shows the fields only
     float fieldWidth = 0.0f;            // units; 0 for the default number field width
+    bool allowOutOfRange = false;       // as RangeSliderOptions::allowOutOfRange, for the fields and typed handles
+    bool doubleClickReset = false;      // as RangeSliderOptions::doubleClickReset
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                 // units; 0 fills; when narrow the fields drop below the track
     bool readOnly = false;
-    bool mixed = false;                 // both fields empty until edited
+    bool mixed = false;                 // both fields empty and no handles until the first edit writes both values
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -217,10 +225,13 @@ struct RangeSliderHistogramOptions
     double minGap = 0.0;
     HandleCollision collision = HandleCollision::Clamp;
     bool dragSpan = true;
+    bool allowOutOfRange = false;       // as RangeSliderOptions::allowOutOfRange
+    bool doubleClickReset = false;      // as RangeSliderOptions::doubleClickReset
     float histogramHeight = 0.0f;       // units; 0 for the default bar area height
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;
     bool readOnly = false;
+    bool mixed = false;                 // as RangeSliderOptions::mixed; the bars are drawn undimmed
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -256,6 +267,7 @@ struct MultiSliderOptions
     float width = 0.0f;
     float height = 0.0f;
     bool readOnly = false;
+    bool mixed = false;                 // the bare track and no handles until the first edit writes every value
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -373,6 +385,7 @@ struct ArcRangeSliderOptions
     float diameter = 0.0f;              // units; 0 derives it from the control height of `size`
     ControlSize size = ControlSize::Inherit;
     bool readOnly = false;
+    bool mixed = false;                 // as RangeSliderOptions::mixed
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -398,6 +411,7 @@ struct BoxRangePadOptions
     float width = 0.0f;                 // units; 0 for the default pad size, kFill fills
     float height = 0.0f;                // units; 0 makes the pad square
     bool readOnly = false;
+    bool mixed = false;                 // no box and no handles until the first edit writes both corners
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -414,8 +428,8 @@ bool BoxRangePad(const char* label, ImVec2* low, ImVec2* high, ImVec2 min, ImVec
 
 struct AllocationBarOptions
 {
-    const char* format = nullptr;       // applied to the share times 100; null: "%.0f%%"
-    FormatFn formatter = nullptr;       // gets the share from 0 to 1
+    const char* format = nullptr;       // gets the share in percent (0 to 100); null: "%.0f%%"
+    FormatFn formatter = nullptr;       // used instead of format; gets the share in percent (0 to 100) too
     void* formatterUser = nullptr;
     double step = 0.0;                  // share units (0 to 1); 0 continuous
     double minGap = 0.0;                // smallest share of one segment, clamped to 1 / segment count
@@ -424,7 +438,7 @@ struct AllocationBarOptions
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                 // units; 0 fills the available width
     bool readOnly = false;
-    bool mixed = false;
+    bool mixed = false;                 // equal segments without dividers until the first edit writes every share
     const char* error = nullptr;
     const char* helpText = nullptr;
 };

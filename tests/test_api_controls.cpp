@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cfloat>
+#include <concepts>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -97,6 +98,37 @@ static_assert(OptionsFollowConventions<facet::AnglePickerOptions>());
 static_assert(OptionsFollowConventions<facet::IconPickerOptions>());
 static_assert(OptionsFollowConventions<facet::ThumbnailPickerOptions>());
 static_assert(OptionsFollowConventions<facet::FileBrowserOptions>());
+
+// The multi-handle model: every widget of it has the same state members, and the two-handle
+// linear ones share the typed-value and reset members.
+template <class Options>
+constexpr bool HasHandleModelState()
+{
+    return requires(Options o) {
+        { o.readOnly } -> std::same_as<bool&>;
+        { o.mixed } -> std::same_as<bool&>;
+        { o.error } -> std::same_as<const char*&>;
+        { o.helpText } -> std::same_as<const char*&>;
+    };
+}
+template <class Options>
+constexpr bool HasTwoHandleMembers()
+{
+    return requires(Options o) {
+        { o.allowOutOfRange } -> std::same_as<bool&>;
+        { o.doubleClickReset } -> std::same_as<bool&>;
+    };
+}
+static_assert(HasHandleModelState<facet::RangeSliderOptions>());
+static_assert(HasHandleModelState<facet::RangeInputOptions>());
+static_assert(HasHandleModelState<facet::RangeSliderHistogramOptions>());
+static_assert(HasHandleModelState<facet::MultiSliderOptions>());
+static_assert(HasHandleModelState<facet::ArcRangeSliderOptions>());
+static_assert(HasHandleModelState<facet::BoxRangePadOptions>());
+static_assert(HasHandleModelState<facet::AllocationBarOptions>());
+static_assert(HasTwoHandleMembers<facet::RangeSliderOptions>());
+static_assert(HasTwoHandleMembers<facet::RangeInputOptions>());
+static_assert(HasTwoHandleMembers<facet::RangeSliderHistogramOptions>());
 
 // The zero member of every choice enum is the default (rule 12).
 static_assert(facet::ButtonVariant{} == facet::ButtonVariant::Secondary);
@@ -389,7 +421,8 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, SliderWithInput("With input 1", &v.number, 0.0f, 1.0f));
     FACET_CHECK_STUB(false, SliderWithInput("With input 2", &v.integer, 0, 10));
     FACET_CHECK_STUB(false, RangeSlider("Range 1", &v.low, &v.high, 0.0f, 1.0f, {.minGap = 0.1, .mirror = true}));
-    FACET_CHECK_STUB(false, RangeSlider("Range 2", &v.lowInt, &v.highInt, 0, 10, {.collision = HandleCollision::Push}));
+    FACET_CHECK_STUB(false, RangeSlider("Range 2", &v.lowInt, &v.highInt, 0, 10,
+                                        {.collision = HandleCollision::Push, .doubleClickReset = true, .mixed = true}));
     FACET_CHECK_STUB(false, RangeInput("Range input 1", &v.low, &v.high, 0.0f, 1.0f));
     FACET_CHECK_STUB(false, RangeInput("Range input 2", &v.lowInt, &v.highInt, 0, 10, {.slider = false}));
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 1", &v.low, &v.high, 0.0f, 1.0f, kBins));
