@@ -13,6 +13,9 @@
 #include <facet/facet.h>
 
 #include "app_shell.h"
+#include "internal/focus.h"
+#include "internal/item.h"
+#include "internal/selection_pill.h"
 #include "internal/text_util.h"
 
 namespace facet::demo
@@ -38,9 +41,6 @@ constexpr float kNavMinWidthInXxxl = 4.0f;  // navigation column in narrow windo
 // Largest share of the window the navigation takes, so narrow windows keep room for the page.
 constexpr float kNavMaxShare = 0.3f;
 constexpr float kComboWidthInXxxl = 3.0f;   // theme and scale lists
-
-// Sub keys of the animated values of the navigation.
-constexpr int kPillY = 0;
 
 int NearestScaleIndex(float scale)
 {
@@ -286,18 +286,11 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
     ImGui::PopStyleColor();
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    // Kept between frames so its channel buffers are reused instead of allocated every frame.
-    static ImDrawListSplitter splitter;
-    splitter.Split(drawList, 2);
-    splitter.SetCurrentChannel(drawList, 1);
+    // The pill animates relative to the list content, so scrolling moves it with its row.
+    facet::internal::SelectionPill pill;
+    pill.Begin(ImGui::GetID("##selection"), drawList,
+               ImVec2(ImGui::GetWindowPos().x - ImGui::GetScrollX(), ImGui::GetWindowPos().y - ImGui::GetScrollY()));
 
-    // Rows draw their own hover and selection, so the stock highlight is turned off.
-    const ImVec4 clear = facet::WithAlpha(c.bg, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_Header, clear);
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, clear);
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, clear);
-
-    const float windowTop = ImGui::GetWindowPos().y;
     const ImRect inner = ImGui::GetCurrentWindowRead()->InnerClipRect;
     const float listTop = ImGui::GetCurrentWindowRead()->InnerRect.Min.y;
     const float spacingY = ImGui::GetStyle().ItemSpacing.y;
@@ -313,13 +306,10 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
     float headingY[kMaxPinnedGroups] = {};
     const std::string* headingText[kMaxPinnedGroups] = {};
     int groups = 0;
-    float selectedY = -1.0f;
     float revealTop = 0.0f;
     float revealBottom = -1.0f;
     float focusedTop = 0.0f;
     bool rowFocused = false;
-    float rowLeft = 0.0f;
-    float rowRight = 0.0f;
     const std::string* currentGroup = nullptr;
     char probeName[96];
     for (int i = 0; i < static_cast<int>(pages.size()); ++i)
@@ -349,53 +339,49 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
             currentGroup = &page.group;
         }
 
+        // A row: the item behaviour block, one control height tall across the list. The
+        // keyboard moves between rows (Dear ImGui navigation); Enter, Space or a click selects.
         const bool selected = state.selectedPage == i;
         ImGui::PushID(page.id.c_str());
-        const ImVec2 rowMin = ImGui::GetCursorScreenPos();
-        if (ImGui::Selectable("##page", selected, ImGuiSelectableFlags_None, ImVec2(0.0f, rowHeight)))
+        const facet::internal::ItemState row =
+            facet::internal::ItemBehavior(ImGui::GetID("##page"), ImVec2(ImGui::GetContentRegionAvail().x, rowHeight));
+        if (row.pressed)
             state.selectedPage = i;
-        facet::ItemCursor();
         std::snprintf(probeName, sizeof(probeName), "nav.%s", page.id.c_str());
         ctx.Probe(probeName);
-        if (ImGui::IsItemFocused())
+        if (row.focused)
         {
             rowFocused = true;
-            focusedTop = ImGui::GetItemRectMin().y;
+            focusedTop = row.rect.Min.y;
         }
         if (selected && state.revealedPage != i)
         {
-            revealTop = ImGui::GetItemRectMin().y;
-            revealBottom = ImGui::GetItemRectMax().y;
-        }
-        // The item rectangle includes half the item spacing above and below, so rows can be
-        // hit without gaps. The visible row (hover fill, selection pill and title) is the
-        // rowHeight box centered in it.
-        const ImVec2 itemMin = ImGui::GetItemRectMin();
-        const ImVec2 itemMax = ImGui::GetItemRectMax();
-        rowLeft = itemMin.x;
-        rowRight = itemMax.x;
-        const float rowTop = facet::Snap(itemMin.y + (itemMax.y - itemMin.y - rowHeight) * 0.5f);
-        if (ImGui::IsItemHovered() && !selected)
-        {
-            const ImU32 hover = Color(ImGui::IsItemActive() ? c.fill[1] : c.fill[2]);
-            facet::FillRect(drawList, ImVec2(rowLeft, rowTop), ImVec2(rowRight, rowTop + rowHeight), hover, radius);
+            revealTop = row.rect.Min.y;
+            revealBottom = row.rect.Max.y;
         }
         if (selected)
-            selectedY = rowTop - windowTop + ImGui::GetScrollY();
+            pill.Target(row.rect);
+        // Hover and press feedback on rows that are not selected; the selected one has the pill.
+        const float feedback = selected ? 0.0f : std::max(row.hoverAmount, row.pressAmount);
+        if (row.visible && feedback > 0.0f)
+        {
+            const ImVec4 fill = facet::Mix(c.fill[2], c.fill[1], row.pressAmount);
+            facet::FillRect(drawList, row.rect.Min, row.rect.Max, Color(facet::WithAlpha(fill, fill.w * feedback)), radius);
+        }
 
         // Titles that do not fit the row end in an ellipsis. Their capitals sit centered in
         // the row box.
         facet::PushTextStyle(facet::TextStyle::Body);
-        const float textY = facet::CenteredTextY(rowTop, rowHeight);
+        const float textY = facet::CenteredTextY(row.rect.Min.y, rowHeight);
         char title[128];
         facet::internal::TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr,
-                                      itemMax.x - rowMin.x - rowInset * 2.0f, facet::internal::TruncateMode::End,
-                                      title, sizeof(title));
-        drawList->AddText(ImVec2(rowMin.x + rowInset, textY), Color(c.label), title);
+                                      row.rect.GetWidth() - rowInset * 2.0f, facet::internal::TruncateMode::End, title,
+                                      sizeof(title));
+        drawList->AddText(ImVec2(row.rect.Min.x + rowInset, textY), Color(c.label), title);
         facet::PopTextStyle();
+        facet::internal::DrawItemFocusRing(row, radius);
         ImGui::PopID();
     }
-    ImGui::PopStyleColor(3);
 
     if (pages.empty())
     {
@@ -404,17 +390,8 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         ImGui::PopStyleColor();
     }
 
-    // The selection pill, under the rows. Its position is kept in content coordinates so
-    // scrolling the list does not animate it.
-    splitter.SetCurrentChannel(drawList, 0);
-    if (selectedY >= 0.0f)
-    {
-        const float y = facet::Spring(ImGui::GetID("##selection"), kPillY, selectedY, theme.motion.standard);
-        const float top = windowTop - ImGui::GetScrollY() + y;
-        facet::FillRect(drawList, ImVec2(rowLeft, top), ImVec2(rowRight, top + rowHeight), Color(c.accentSubtle),
-                        radius);
-    }
-    splitter.SetCurrentChannel(drawList, 1);
+    // The selection pill, under the rows and clipped below the pinned headings like them.
+    pill.End(Color(c.accentSubtle), radius);
     ImGui::PopClipRect();
 
     // Headings. The group whose heading has reached the band stays pinned there until the
@@ -441,7 +418,6 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
             drawList->AddText(ImVec2(textX, headingY[g]), headingColor, headingText[g]->c_str());
     }
     facet::PopTextStyle();
-    splitter.Merge(drawList);
 
     // A newly selected page (a click, the keyboard, --page or a capture run) is scrolled to
     // the middle of the list when it is not fully visible below the band; a row reached with
