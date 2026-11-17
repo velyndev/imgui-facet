@@ -403,15 +403,26 @@ TEST_CASE("Shortcuts do not fire inside a disabled block")
     facet::test::Session session;
     REQUIRE(session.Ready());
     const facet::ShortcutId id = facet::RegisterShortcut("demo.disabled", ImGuiKey_F6);
+    int calls = 0;
+    const auto onFire = [](facet::ShortcutId, void* user) { ++*static_cast<int*>(user); };
+    const facet::ShortcutId withCallback =
+        facet::RegisterShortcut("demo.disabled_callback", ImGuiKey_F7, {.callback = onFire, .user = &calls});
     int count = 0;
     session.SetUi([&] {
         ImGui::BeginDisabled();
         count += facet::ShortcutPressed(id) ? 1 : 0;
+        count += facet::ShortcutPressed(withCallback) ? 1 : 0;
         ImGui::EndDisabled();
     });
     session.Frame();
     session.KeyPress(ImGuiKey_F6);
     CHECK(count == 0);
+    // A trigger does not fire there either, and the frame's end does not fire the callback.
+    facet::TriggerShortcut(id);
+    facet::TriggerShortcut(withCallback);
+    session.Frames(2);
+    CHECK(count == 0);
+    CHECK(calls == 0);
 }
 
 TEST_CASE("Conflicts: the same chord in overlapping scopes")

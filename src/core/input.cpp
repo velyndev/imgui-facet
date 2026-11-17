@@ -218,6 +218,13 @@ bool PollEntry(Entry& entry)
         entry.itemId = g.LastItemData.ID;
         entry.itemFocused = entry.itemId != 0 && g.NavId == entry.itemId && g.NavWindow == g.CurrentWindow;
     }
+    // Inside a disabled block nothing fires, a trigger neither, and no route is requested
+    // (as ImGui::Shortcut does). The entry still counts as asked for this frame.
+    if ((g.CurrentItemFlags & ImGuiItemFlags_Disabled) != 0)
+    {
+        entry.itemFocused = false;
+        return false;
+    }
 
     bool fired = entry.triggered;
     bool route = true;

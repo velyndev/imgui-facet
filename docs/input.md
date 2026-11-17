@@ -89,7 +89,7 @@ When several scopes want a chord in the same frame, the innermost wins: the focu
 
 **Active items and text fields.** An active item (a text field being edited, a slider being dragged) keeps the chords it asks Dear ImGui for, against every scope: a `FocusedItem` shortcut gives up `RouteOverActive` while any item is active. While a text field is being edited, chords that type a character (a letter, digit or punctuation key without Ctrl) never fire, and the field's own chords (Ctrl+A, Ctrl+Z and the others it uses) win. Function keys and Ctrl chords the field does not use still fire.
 
-**Disabled.** `SetShortcutEnabled(id, false)` keeps an entry listed but stops it firing. Shortcuts also never fire inside `ImGui::BeginDisabled`.
+**Disabled.** `SetShortcutEnabled(id, false)` keeps an entry listed but stops it firing. Inside `ImGui::BeginDisabled`, `ShortcutPressed` returns false and requests no route, also on a frame that `TriggerShortcut` asked for, and the call still counts as the shortcut's call for that frame.
 
 **Triggers and callbacks.** `TriggerShortcut(id)` makes `ShortcutPressed` return true in the next frame without a key, as the command palette will do. An optional `callback` with `user` runs on the frame a shortcut fires, once even when `ShortcutPressed` is asked twice. For a `Global` shortcut the app does not ask for, `facet::EndFrame` asks itself and runs the callback; `Window` and `FocusedItem` shortcuts need their `ShortcutPressed` call, which tells Facet where they belong.
 

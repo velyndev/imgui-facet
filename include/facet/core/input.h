@@ -134,7 +134,7 @@ struct ShortcutId
 // Dear ImGui for against every scope. A text field that is being edited keeps the keys it
 // uses: chords that type a character (a letter, digit or punctuation key without Ctrl) never
 // fire while one is active, and the field's own chords (Ctrl+A, Ctrl+Z) win. Shortcuts never
-// fire inside ImGui::BeginDisabled.
+// fire inside ImGui::BeginDisabled, not even when triggered.
 enum class ShortcutScope
 {
     Global,       // anywhere in the app
