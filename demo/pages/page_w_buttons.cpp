@@ -21,6 +21,7 @@ struct ButtonsUi
     bool pinned = false;
     bool latches[3] = {true, false, false};
     int view = 0;
+    int textView = 1;
 };
 
 ButtonsUi ui;
@@ -31,6 +32,7 @@ const facet::ChoiceItem kTools[] = {
     {"List", facet::Icon("list")},
     {"Layers", facet::Icon("layers")},
 };
+const char* const kToolNames[] = {"Option 1", "Option 2", "Option 3"};
 
 } // namespace
 
@@ -73,4 +75,6 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10)
     facet::ToggleButtonGroup("Views", ui.latches, kTools);
     LabeledRow("Exclusive");
     facet::ToggleButtonGroup("View", &ui.view, kTools, {.iconOnly = false});
+    LabeledRow("Text only");
+    facet::ToggleButtonGroup("Text view", &ui.textView, kToolNames);
 }

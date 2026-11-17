@@ -390,6 +390,8 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, Link("Link 1", {.url = "about:blank"}));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 1", flags, kChoices));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 2", &v.index, kChoices, {.allowEmpty = true}));
+    FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 3", flags, kLabels));
+    FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 4", &v.index, kLabels, {.mixed = true}));
 
     // Selection
     FACET_CHECK_STUB(false, Toggle("Toggle 1", &v.flag, {.helpText = "Help"}));
@@ -515,7 +517,7 @@ void CallEveryStub(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
-constexpr int kStubCalls = 110;
+constexpr int kStubCalls = 112;
 
 } // namespace
 

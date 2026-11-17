@@ -12,17 +12,34 @@ namespace facet
 namespace
 {
 
-void Stub(const char* label, std::span<const ChoiceItem> items, const ToggleButtonGroupOptions& options)
+float ButtonWidth(const char* text, bool iconOnly, const ToggleButtonGroupOptions& options)
 {
-    const float height = ControlHeight(options.size);
+    if (iconOnly)
+        return ControlHeight(options.size);
+    return internal::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
+}
+
+void Stub(const char* label, float content, const ToggleButtonGroupOptions& options)
+{
+    // Buttons that do not fit move into a "more" menu, so the group never outgrows the row.
+    internal::ControlStub("ToggleButtonGroup", label, internal::StubFittedWidth(options.width, content),
+                          ControlHeight(options.size));
+}
+
+float ContentWidth(std::span<const ChoiceItem> items, const ToggleButtonGroupOptions& options)
+{
     float content = 0.0f;
     for (const ChoiceItem& item : items)
-    {
-        content += options.iconOnly ? height
-                                    : internal::StubLabelWidth(item.label, options.size) + 2.0f * Px(T().spacing.sm);
-    }
-    // Buttons that do not fit move into a "more" menu, so the group never outgrows the row.
-    internal::ControlStub("ToggleButtonGroup", label, internal::StubFittedWidth(options.width, content), height);
+        content += ButtonWidth(item.label, options.iconOnly, options);
+    return content;
+}
+
+float ContentWidth(std::span<const char* const> items, const ToggleButtonGroupOptions& options)
+{
+    float content = 0.0f;
+    for (const char* item : items)
+        content += ButtonWidth(item, false, options);
+    return content;
 }
 
 } // namespace
@@ -30,13 +47,27 @@ void Stub(const char* label, std::span<const ChoiceItem> items, const ToggleButt
 bool ToggleButtonGroup(const char* label, std::span<bool>, std::span<const ChoiceItem> items,
                        const ToggleButtonGroupOptions& options)
 {
-    Stub(label, items, options);
+    Stub(label, ContentWidth(items, options), options);
     return false;
 }
 
 bool ToggleButtonGroup(const char* label, int*, std::span<const ChoiceItem> items, const ToggleButtonGroupOptions& options)
 {
-    Stub(label, items, options);
+    Stub(label, ContentWidth(items, options), options);
+    return false;
+}
+
+bool ToggleButtonGroup(const char* label, std::span<bool>, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options)
+{
+    Stub(label, ContentWidth(items, options), options);
+    return false;
+}
+
+bool ToggleButtonGroup(const char* label, int*, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options)
+{
+    Stub(label, ContentWidth(items, options), options);
     return false;
 }
 

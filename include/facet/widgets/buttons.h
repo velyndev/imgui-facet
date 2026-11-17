@@ -128,4 +128,11 @@ bool ToggleButtonGroup(const char* label, std::span<bool> selected, std::span<co
 bool ToggleButtonGroup(const char* label, int* index, std::span<const ChoiceItem> items,
                        const ToggleButtonGroupOptions& options = {});
 
+// The same two forms for text buttons with labels only. Items without icons have nothing else
+// to show, so these overloads always draw the labels and ignore iconOnly.
+bool ToggleButtonGroup(const char* label, std::span<bool> selected, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options = {});
+bool ToggleButtonGroup(const char* label, int* index, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options = {});
+
 } // namespace facet

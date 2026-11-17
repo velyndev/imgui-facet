@@ -54,9 +54,14 @@ bool ToggleButtonGroup(const char* label, std::span<bool> selected, std::span<co
                        const ToggleButtonGroupOptions& options = {});
 bool ToggleButtonGroup(const char* label, int* index, std::span<const ChoiceItem> items,
                        const ToggleButtonGroupOptions& options = {});
+bool ToggleButtonGroup(const char* label, std::span<bool> selected, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options = {});
+bool ToggleButtonGroup(const char* label, int* index, std::span<const char* const> items,
+                       const ToggleButtonGroupOptions& options = {});
 ```
 
-A joined row of latched toolbar buttons: independent flags, or one exclusive choice. Status: planned.
+A joined row of latched toolbar buttons: independent flags, or one exclusive choice. The
+label-only forms draw text buttons. Status: planned.
 
 ## Usage
 
