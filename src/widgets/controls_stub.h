@@ -10,8 +10,8 @@
 // stop, so a page of stubs never looks or acts like working controls. It draws the faintest
 // fill wash with a hairline outline in the separator color, and the text "<Widget>: planned
 // (<visible label>)" in Footnote and labelSecondary (labelTertiary inside BeginDisabled). When
-// the box is too narrow the label part is dropped first, then the rest is shortened with an
-// ellipsis, and hovering the box shows the whole text in a tooltip.
+// the box is too narrow the label part is dropped first, then the widget name, then the word
+// "planned" is shortened with an ellipsis; hovering the box shows the whole text in a tooltip.
 //
 // Usage in a stub:
 //
@@ -159,10 +159,11 @@ inline ImVec2 StubPadSize(float widthUnits, float heightUnits)
 inline constexpr int kStubCaptionSize = 192;
 
 // Writes the placeholder text for a box `room` pixels wide, measured in the current font: the
-// longest of "<widget>: planned (<visible label>)" and "<widget>: planned" that fits, or the
-// latter shortened with an ellipsis. Empty when `room` is 0 or less or not even the ellipsis
-// fits. `out` is always zero terminated (outSize > 0). Returns true when the label or part of the
-// name had to be left out.
+// longest of "<widget>: planned (<visible label>)", "<widget>: planned" and "planned" that fits,
+// or "planned" shortened with an ellipsis. The name goes before the word "planned", because that
+// word is what tells a placeholder from a control; the tooltip still shows the whole text.
+// Empty when `room` is 0 or less or not even the ellipsis fits. `out` is always zero terminated
+// (outSize > 0). Returns true when anything had to be left out.
 inline bool StubCaption(const char* widget, const char* label, float room, char* out, std::size_t outSize)
 {
     if (outSize == 0)
@@ -181,10 +182,11 @@ inline bool StubCaption(const char* widget, const char* label, float room, char*
         if (ImGui::CalcTextSize(out).x <= room)
             return false;
     }
-    char shortText[kStubCaptionSize];
-    std::snprintf(shortText, sizeof(shortText), "%s: planned", widget);
-    TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), shortText, nullptr, room, TruncateMode::End, out, outSize);
-    return labelEnd > label || std::strcmp(out, shortText) != 0;
+    std::snprintf(out, outSize, "%s: planned", widget);
+    if (ImGui::CalcTextSize(out).x <= room)
+        return labelEnd > label;
+    TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), "planned", nullptr, room, TruncateMode::End, out, outSize);
+    return true;
 }
 
 // Draws the placeholder look into `box` (pixels): the fill wash, the hairline outline and the

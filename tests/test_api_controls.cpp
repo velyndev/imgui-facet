@@ -645,28 +645,32 @@ TEST_CASE("Controls that narrow themselves never outgrow a short row")
     CHECK(session.ItemRect("asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
 }
 
-TEST_CASE("The placeholder text drops the label, then shortens with an ellipsis")
+TEST_CASE("The placeholder text drops the label, then the name, and keeps the word planned")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     std::string wide;
     std::string medium;
     std::string narrow;
+    std::string tiny;
     std::string none;
-    bool shortened[4] = {};
-    float shortWidth = 0.0f;
+    bool shortened[5] = {};
     session.SetUi([&] {
         facet::PushTextStyle(facet::TextStyle::Footnote);
         char text[facet::internal::kStubCaptionSize];
         const float fullWidth = ImGui::CalcTextSize("RangeSlider: planned (Price)").x;
-        shortWidth = ImGui::CalcTextSize("RangeSlider: planned").x;
+        const float shortWidth = ImGui::CalcTextSize("RangeSlider: planned").x;
+        const float wordWidth = ImGui::CalcTextSize("planned").x;
         shortened[0] = facet::internal::StubCaption("RangeSlider", "Price##range", fullWidth + 1.0f, text, sizeof(text));
         wide = text;
         shortened[1] = facet::internal::StubCaption("RangeSlider", "Price##range", shortWidth + 1.0f, text, sizeof(text));
         medium = text;
-        shortened[2] = facet::internal::StubCaption("RangeSlider", "Price##range", shortWidth / 2.0f, text, sizeof(text));
+        // Room for the word but not for the name: the word stays, the name goes.
+        shortened[2] = facet::internal::StubCaption("RangeSlider", "Price##range", wordWidth + 1.0f, text, sizeof(text));
         narrow = text;
-        shortened[3] = facet::internal::StubCaption("RangeSlider", "Price##range", 0.0f, text, sizeof(text));
+        shortened[3] = facet::internal::StubCaption("RangeSlider", "Price##range", wordWidth * 0.6f, text, sizeof(text));
+        tiny = text;
+        shortened[4] = facet::internal::StubCaption("RangeSlider", "Price##range", 0.0f, text, sizeof(text));
         none = text;
         facet::PopTextStyle();
     });
@@ -674,16 +678,17 @@ TEST_CASE("The placeholder text drops the label, then shortens with an ellipsis"
 
     CHECK(wide == "RangeSlider: planned (Price)");
     CHECK(medium == "RangeSlider: planned");
-    // Shortened: a prefix of the name followed by the ellipsis, never the cut-off full text.
-    CHECK(narrow.size() > 0);
-    CHECK(narrow.size() < medium.size());
-    CHECK(narrow.compare(0, 3, "Ran") == 0);
-    CHECK(narrow.find("planned") == std::string::npos);
+    CHECK(narrow == "planned");
+    // Narrower than the word: its start with the ellipsis, never a cut-off widget name.
+    CHECK(tiny.size() > 0);
+    CHECK(tiny.compare(0, 2, "pl") == 0);
+    CHECK(tiny.find("Ran") == std::string::npos);
     CHECK(none.empty());
     CHECK_FALSE(shortened[0]);
     CHECK(shortened[1]);
     CHECK(shortened[2]);
     CHECK(shortened[3]);
+    CHECK(shortened[4]);
 }
 
 TEST_CASE("FieldValidation sits under the validated item and keeps it as the last item")
