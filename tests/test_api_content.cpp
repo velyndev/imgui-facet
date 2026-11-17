@@ -242,17 +242,34 @@ void DisplayCalls()
     static const DataTableColumn columns[] = {{"Name"}, {"Size", 80.0f, ColumnAlign::End}};
     ImGuiSelectionBasicStorage selection;
     selection.SetItemSelected(1, true);
-    Check("BeginDataTable", Expect::Item, "table", [&] {
-        if (BeginDataTable("table", columns, 10, &selection, {.sortable = true, .frozenColumns = 1, .height = 120.0f}))
+    // Ready with rows: a real Dear ImGui table is open between Begin and End, so the caller's
+    // rows and cells work; it is closed again by End.
+    Check("BeginDataTable, Ready", Expect::NoItem, nullptr, [&] {
+        ImGuiTable* const outer = ImGui::GetCurrentTable();
+        const bool open = BeginDataTable("table", columns, 10, &selection, {.sortable = true, .frozenColumns = 1});
+        CHECK(open);
+        if (open)
         {
+            CHECK(ImGui::GetCurrentTable() != outer);
+            CHECK(ImGui::TableGetColumnCount() == 2);
             CHECK_FALSE(DataTableRow(0));
-            if (BeginDataTableCellEdit())
-                EndDataTableCellEdit();
+            CHECK(ImGui::TableNextColumn());
+            ImGui::TextUnformatted("cell");
+            CHECK_FALSE(BeginDataTableCellEdit());
+            CHECK(ImGui::TableNextColumn());
             EndDataTable();
         }
+        CHECK(ImGui::GetCurrentTable() == outer);
     });
+    for (const DataState state : {DataState::Loading, DataState::Error})
+        Check("BeginDataTable, Loading or Error", Expect::Item, "table",
+              [&] { CHECK_FALSE(BeginDataTable("table", columns, 10, &selection, {.state = state, .height = 120.0f})); });
+    Check("BeginDataTable, empty", Expect::Item, "table",
+          [&] { CHECK_FALSE(BeginDataTable("table", columns, 0, &selection, {.height = 120.0f})); });
     CHECK(selection.Size == 1);
     CHECK(selection.Contains(1));
+    // Outside a table the row call does nothing and the cell edit never opens.
+    Check("DataTableRow outside a table", Expect::NoItem, nullptr, [] { CHECK_FALSE(DataTableRow(0)); });
     Check("BeginDataTableCellEdit", Expect::NoItem, nullptr, [] { CHECK_FALSE(BeginDataTableCellEdit()); });
 }
 
