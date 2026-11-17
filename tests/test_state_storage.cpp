@@ -61,17 +61,62 @@ TEST_CASE("State storage keeps a typed struct per id and collects unused ones")
     CHECK(tracked->value == 7);
     CHECK(store.Count() == 2);
 
+    // At 30 Hz kGcSeconds pass after 60 frames, so the frame count decides.
     destroyedCounters = 0;
-    for (std::uint32_t i = 0; i < facet::internal::StateStore::kGcFrames; ++i)
+    for (std::uint32_t i = 0; i + 1 < facet::internal::StateStore::kGcFrames; ++i)
     {
-        store.BeginFrame();
+        store.BeginFrame(1.0f / 30.0f);
         store.Get(10, counterType, false);
         store.EndFrame();
     }
+    CHECK(store.Count() == 2);
+    store.BeginFrame(1.0f / 30.0f);
+    store.Get(10, counterType, false);
+    store.EndFrame();
     CHECK(store.Count() == 1);
     CHECK(destroyedCounters == 1);
     CHECK(store.Find(10, trackedType) == nullptr);
     CHECK(store.Find(10, counterType) != nullptr);
+}
+
+TEST_CASE("Ephemeral state lives for the same time at 240 Hz as at 60 Hz")
+{
+    facet::internal::StateStore store;
+    auto& counterType = facet::internal::StateTypeOf<CounterState>();
+    static_cast<CounterState*>(store.Get(20, counterType, false))->value = 5;
+    const float dt = 1.0f / 240.0f;
+    // One second hidden: far more than kGcFrames frames, but less than kGcSeconds.
+    for (int i = 0; i < 240; ++i)
+    {
+        store.BeginFrame(dt);
+        store.EndFrame();
+    }
+    REQUIRE(store.Find(20, counterType) != nullptr);
+    CHECK(static_cast<CounterState*>(store.Get(20, counterType, false))->value == 5);
+    // Hidden for longer than kGcSeconds, it is collected at this rate too.
+    const int frames = static_cast<int>(facet::internal::StateStore::kGcSeconds / dt) + 2;
+    for (int i = 0; i < frames; ++i)
+    {
+        store.BeginFrame(dt);
+        store.EndFrame();
+    }
+    CHECK(store.Find(20, counterType) == nullptr);
+}
+
+TEST_CASE("Ephemeral state is collected after kGcFramesAlways frames when the clock stands still")
+{
+    facet::internal::StateStore store;
+    auto& counterType = facet::internal::StateTypeOf<CounterState>();
+    store.Get(30, counterType, false);
+    for (std::uint32_t i = 0; i + 1 < facet::internal::StateStore::kGcFramesAlways; ++i)
+    {
+        store.BeginFrame(0.0f);
+        store.EndFrame();
+    }
+    CHECK(store.Count() == 1);
+    store.BeginFrame(0.0f);
+    store.EndFrame();
+    CHECK(store.Count() == 0);
 }
 
 TEST_CASE("Persistent states survive collection and round-trip through ini records")
@@ -83,7 +128,7 @@ TEST_CASE("Persistent states survive collection and round-trip through ini recor
         static_cast<SavedState*>(store.Get(0xABCDu, savedType, true))->value = 42;
         for (std::uint32_t i = 0; i < facet::internal::StateStore::kGcFrames * 2; ++i)
         {
-            store.BeginFrame();
+            store.BeginFrame(1.0f / 30.0f);
             store.EndFrame();
         }
         CHECK(store.Count() == 1);

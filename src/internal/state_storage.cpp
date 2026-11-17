@@ -9,6 +9,7 @@
 
 #include <imgui_internal.h>
 
+#include "internal/device.h"
 #include "internal/subsystem.h"
 
 namespace facet::internal
@@ -56,6 +57,7 @@ void* StateStore::Get(ImGuiID id, StateTypeInfo& type, bool persistent, bool* cr
     if (it != entries.end())
     {
         it->second.lastFrame = frame;
+        it->second.lastClock = clock;
         it->second.persistent = it->second.persistent || persistent;
         if (created != nullptr)
             *created = false;
@@ -69,6 +71,7 @@ void* StateStore::Get(ImGuiID id, StateTypeInfo& type, bool persistent, bool* cr
     entry.type = &type;
     entry.id = id;
     entry.lastFrame = frame;
+    entry.lastClock = clock;
     entry.persistent = persistent;
 
     // Restore a record the ini file held for this state.
@@ -97,12 +100,20 @@ void* StateStore::Find(ImGuiID id, const StateTypeInfo& type) const
     return it != entries.end() ? it->second.object.get() : nullptr;
 }
 
+void StateStore::BeginFrame(float dt)
+{
+    ++frame;
+    clock += dt > 0.0f ? static_cast<double>(dt) : 0.0;
+}
+
 void StateStore::EndFrame()
 {
     for (auto it = entries.begin(); it != entries.end();)
     {
         const Entry& entry = it->second;
-        if (!entry.persistent && frame - entry.lastFrame >= kGcFrames)
+        const std::uint32_t idleFrames = frame - entry.lastFrame;
+        const bool idle = idleFrames >= kGcFrames && clock - entry.lastClock >= kGcSeconds;
+        if (!entry.persistent && (idle || idleFrames >= kGcFramesAlways))
         {
             if (readEntry == &it->second)
                 readEntry = nullptr;
@@ -277,7 +288,7 @@ void StateShutdown()
 
 void StateNewFrame()
 {
-    GlobalStateStore().BeginFrame();
+    GlobalStateStore().BeginFrame(DeltaTime());
 }
 
 void StateEndFrame()

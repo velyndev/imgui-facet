@@ -6,8 +6,10 @@
 //     struct DropdownState { float scroll = 0.0f; int hovered = -1; };
 //     DropdownState& s = facet::internal::GetState<DropdownState>(id);
 //
-// Ephemeral states are destroyed (destructor runs) when they were not requested for
-// StateStore::kGcFrames frames, so state of widgets that disappeared does not pile up.
+// Ephemeral states are destroyed (destructor runs) when they were not requested for both
+// StateStore::kGcFrames frames and kGcSeconds of frame time (or for kGcFramesAlways frames
+// when the frame time stays 0), so state of widgets that disappeared does not pile up, and
+// how long a hidden widget keeps its state does not depend on the frame rate.
 // Persistent states are never collected and are saved in the Dear ImGui ini file when the
 // type opts in with a name and two functions:
 //
@@ -55,8 +57,12 @@ struct StateTypeInfo
 class StateStore
 {
 public:
-    // Ephemeral states not requested for this many frames are destroyed in EndFrame.
+    // Ephemeral states not requested for kGcFrames frames and kGcSeconds of frame time are
+    // destroyed in EndFrame (2 s is 120 frames at 60 Hz); kGcFramesAlways frames destroy them
+    // whatever the clock says.
     static constexpr std::uint32_t kGcFrames = 120;
+    static constexpr double kGcSeconds = 2.0;
+    static constexpr std::uint32_t kGcFramesAlways = 2400;
 
     StateStore() = default;
     ~StateStore();
@@ -68,8 +74,9 @@ public:
     // The state when it exists, without creating or touching it.
     void* Find(ImGuiID id, const StateTypeInfo& type) const;
 
-    void BeginFrame() { ++frame; }
-    // Destroys ephemeral states not requested for kGcFrames frames.
+    // Starts a frame `dt` seconds after the previous one (negative values count as 0).
+    void BeginFrame(float dt);
+    // Destroys ephemeral states that were not requested recently (see kGcFrames).
     void EndFrame();
     // Destroys every state; pending ini records are kept.
     void Clear();
@@ -101,6 +108,7 @@ private:
         const StateTypeInfo* type = nullptr;
         ImGuiID id = 0;
         std::uint32_t lastFrame = 0;
+        double lastClock = 0.0;  // store clock at the last request
         bool persistent = false;
     };
 
@@ -120,6 +128,7 @@ private:
     Entry* readEntry = nullptr;
     int readPending = -1;
     std::uint32_t frame = 1;
+    double clock = 0.0;  // seconds of frame time since the store was created
 };
 
 // The store used by GetState and GetPersistentState, driven by the library's frame hooks.
