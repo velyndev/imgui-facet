@@ -9,6 +9,7 @@
 #include "facet/core/effects.h"
 #include "facet/core/icons.h"
 #include "facet/core/image.h"
+#include "facet/core/layout.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"

@@ -54,6 +54,8 @@ cursor, disabled ones the not-allowed cursor.
 | Loading periods | shimmer sweep 1.4 s, spinner turn 1 s | Slow enough to read as waiting, fast enough to show that something runs |
 | Elevation | three shadow levels: offset 1 / 4 / 12, blur 3 / 16 / 40 | Shadows separate floating layers by height |
 | Glass | blur radius 20, tint opacity 0.72, saturation 1.5 | Enough tint to keep text on the panel readable over any backdrop |
+| Width classes | Compact below 400, Regular from 400, Expanded from 720 (available width) | Below 400 a label and a usable control no longer fit side by side; from 720 a side column fits next to the content |
+| Labelled rows | label column 112 (gap included), narrowest control beside it 128 | Labels line up across rows; a row stacks before its control gets too narrow to operate |
 
 ## Colors
 

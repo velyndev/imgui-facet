@@ -515,6 +515,11 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.glass.blurRadius = Lerp(a.glass.blurRadius, b.glass.blurRadius, t);
     out.glass.tintOpacity = Lerp(a.glass.tintOpacity, b.glass.tintOpacity, t);
     out.glass.saturation = Lerp(a.glass.saturation, b.glass.saturation, t);
+
+    out.layout.regularFrom = Lerp(a.layout.regularFrom, b.layout.regularFrom, t);
+    out.layout.expandedFrom = Lerp(a.layout.expandedFrom, b.layout.expandedFrom, t);
+    out.layout.labelColumn = Lerp(a.layout.labelColumn, b.layout.labelColumn, t);
+    out.layout.minRowControl = Lerp(a.layout.minRowControl, b.layout.minRowControl, t);
     return out;
 }
 

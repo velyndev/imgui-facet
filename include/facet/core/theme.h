@@ -224,6 +224,16 @@ struct Glass
     float saturation = 1.5f;    // 1 keeps the backdrop saturation
 };
 
+// Responsive layout (layout.h): the width classes of an available width and the columns of
+// labelled rows. Design units.
+struct LayoutTokens
+{
+    float regularFrom = 400.0f;    // widths from here up are WidthClass::Regular, below Compact
+    float expandedFrom = 720.0f;   // widths from here up are WidthClass::Expanded
+    float labelColumn = 112.0f;    // label column of labelled rows, the gap to the control included
+    float minRowControl = 128.0f;  // narrowest control kept beside its label; narrower rows stack
+};
+
 struct Theme
 {
     bool dark = false;
@@ -235,6 +245,7 @@ struct Theme
     Motion motion;
     Elevation elevation;
     Glass glass;
+    LayoutTokens layout;
 
     static Theme Light();
     static Theme Dark();
