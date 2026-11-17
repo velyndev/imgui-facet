@@ -11,10 +11,14 @@
 
 #include <facet/facet.h>
 
+#include "gallery.h"
 #include "pages/pages.h"
 
 namespace
 {
+
+using facet::demo::Paragraph;
+using facet::demo::SectionHeader;
 
 // Layout in multiples of token values, so the page scales with the theme.
 constexpr float kCardHeightControls = 3.0f;       // card height in controlHeightLarge units
@@ -60,8 +64,8 @@ float BlurRadius()
 
 void DrawControls(facet::demo::PageCtx& ctx)
 {
-    ImGui::Text("Glass available: %s", facet::GlassAvailable() ? "yes, panels blur the backdrop"
-                                                               : "no, panels use the opaque fallback");
+    facet::demo::Note("Glass available: %s", facet::GlassAvailable() ? "yes, panels blur the backdrop"
+                                                                     : "no, panels use the opaque fallback");
     const float sliderWidth = ImGui::GetFontSize() * kSliderWidthEm;
     ImGui::SetNextItemWidth(sliderWidth);
     ImGui::SliderFloat("Shadow strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, "%.2fx");
@@ -312,24 +316,27 @@ void DrawGlowSection()
 
 FACET_DEMO_PAGE("effects", "Effects", "Core", 20, "shadows", "glass", "glow")
 {
-    facet::Text(facet::TextStyle::Title1, "Effects");
-    ImGui::TextWrapped("Shadows mark floating layers, glass is for the menu shell and popovers, and glow "
-                       "marks the keyboard focus plus one optional accent.");
+    facet::demo::PageHeader("Effects", "Shadows mark floating layers, glass is for the menu shell and popovers, "
+                                       "and glow marks the keyboard focus plus one optional accent.");
+
+    SectionHeader("Settings");
     DrawControls(ctx);
 
-    ImGui::SeparatorText("Shadows");
+    SectionHeader("Shadows");
+    Paragraph("Three elevation levels over a grouped surface. In the dark theme a black shadow cannot "
+              "darken the black background, so a higher layer also gets a lighter surface.");
     DrawShadows();
     if (ctx.captureState == 0)
-        ctx.RevealInCapture(0.5f);
+        ctx.RevealInCapture(0.8f);
 
-    ImGui::SeparatorText("Glass");
+    SectionHeader("Glass");
     DrawGlassSection();
     // The bottom of the glass section at the bottom of the view, so on short targets the
     // whole backdrop with both panels is in the image.
     if (ctx.captureState == 1)
         ctx.RevealInCapture(1.0f);
 
-    ImGui::SeparatorText("Glow");
+    SectionHeader("Glow");
     DrawGlowSection();
     if (ctx.captureState == 2)
         ctx.RevealInCapture(1.0f);

@@ -13,6 +13,7 @@
 
 #include <facet/facet.h>
 
+#include "gallery.h"
 #include "pages/pages.h"
 
 // The encoder is compiled with internal linkage in this file as well, like in capture.cpp.
@@ -28,6 +29,9 @@
 
 namespace
 {
+
+using facet::demo::Paragraph;
+using facet::demo::SectionHeader;
 
 // Test pattern sizes in texels. They are pixel data, not layout lengths.
 constexpr int kCardWidth = 320;
@@ -338,12 +342,12 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     const float tile = facet::Px(theme.spacing.xxxl) * kTileSpans;
     contentRight = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
 
-    facet::Text(facet::TextStyle::Title1, "Images");
-    ImGui::TextWrapped("Every picture on this page is a generated test pattern (made with CreateImageRGBA "
-                       "from the theme colors) or an SVG document written for this page. None is a photo.");
+    facet::demo::PageHeader("Images", "Every picture on this page is a generated test pattern (made with "
+                                      "CreateImageRGBA from the theme colors) or an SVG document written for this "
+                                      "page. None is a photo.");
 
-    ImGui::SeparatorText("Fit modes");
-    ImGui::TextWrapped("A 16:9 test card in square boxes. The outline marks the box.");
+    SectionHeader("Fit modes");
+    Paragraph("A 16:9 test card in square boxes. The outline marks the box.");
     const char* fitNames[] = {"Contain", "Cover", "Fill"};
     for (int i = 0; i < 3; ++i)
     {
@@ -354,7 +358,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         Example(assets.card, ImVec2(tile, tile), options, fitNames[i]);
     }
 
-    ImGui::SeparatorText("Options");
+    SectionHeader("Options");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Fit");
     ImGui::SameLine();
@@ -393,7 +397,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         Example(assets.card, ImVec2(width, tile), options, "Preview with the options above");
     }
 
-    ImGui::SeparatorText("Corner radii");
+    SectionHeader("Corner radii");
     for (int i = 0; i < static_cast<int>(std::size(kRadii)); ++i)
     {
         facet::ImageOptions options;
@@ -407,8 +411,8 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         Example(assets.card, ImVec2(tile, tile), options, caption);
     }
 
-    ImGui::SeparatorText("Tint");
-    ImGui::TextWrapped("A grey pattern multiplied by theme colors.");
+    SectionHeader("Tint");
+    Paragraph("A grey pattern multiplied by theme colors.");
     struct TintSample
     {
         const char* name;
@@ -430,9 +434,9 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         Example(assets.neutral, ImVec2(small, small), options, tints[i].name);
     }
 
-    ImGui::SeparatorText("Asynchronous loading");
-    ImGui::TextWrapped("Decoded on a worker thread and uploaded at the start of a later frame. A skeleton "
-                       "with a picture glyph shows while decoding runs; a failed load shows an icon and a label.");
+    SectionHeader("Asynchronous loading");
+    Paragraph("Decoded on a worker thread and uploaded at the start of a later frame. A skeleton with a "
+              "picture glyph shows while decoding runs; a failed load shows an icon and a label.");
     {
         facet::ImageOptions options;
         options.fit = facet::ImageFit::Cover;
@@ -457,9 +461,9 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     if (ctx.captureState == kStateLoading)
         ctx.RevealInCapture(0.7f);
 
-    ImGui::SeparatorText("SVG");
-    ImGui::TextWrapped("A full-color SVG keeps its colors. Each copy is rasterized at its design size "
-                       "times the UI scale, and again when the scale changes.");
+    SectionHeader("SVG");
+    Paragraph("A full-color SVG keeps its colors. Each copy is rasterized at its design size times the UI "
+              "scale, and again when the scale changes.");
     for (std::size_t i = 0; i < std::size(kSvgScales); ++i)
     {
         const ImVec2 pixels = facet::ImageSize(assets.svgScaled[i]);

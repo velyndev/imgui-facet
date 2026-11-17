@@ -14,6 +14,7 @@
 
 #include <facet/facet.h>
 
+#include "gallery.h"
 #include "pages/pages.h"
 
 namespace
@@ -82,9 +83,7 @@ void DrawEmptyState(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     ImGui::Dummy(ImVec2(0.0f, padding));
     facet::IconGlyph(facet::Icon("search"), facet::Px(theme.spacing.xxxl), facet::ToU32(c.labelSecondary));
     facet::Text(facet::TextStyle::Headline, "No icons match \"%s\"", icons.search);
-    ImGui::PushStyleColor(ImGuiCol_Text, c.labelSecondary);
-    ImGui::TextWrapped("Icon names are lowercase words joined by hyphens, such as chevron-down.");
-    ImGui::PopStyleColor();
+    facet::demo::Paragraph("Icon names are lowercase words joined by hyphens, such as chevron-down.");
     if (ImGui::Button("Clear search"))
         icons.search[0] = '\0';
     ctx.Probe("icons.clearSearch");
@@ -170,10 +169,11 @@ FACET_DEMO_PAGE("icons", "Icons", "Media", 10, "default", "search", "empty")
         icons.accentTint = ctx.captureState == 1;
     }
 
-    facet::Text(facet::TextStyle::Title1, "Icons");
-    ImGui::TextWrapped("The built-in glyph set: 16 unit grid, 1.5 unit strokes with round ends, drawn in "
-                       "the label color unless a tint is given. Each tile shows the icon at 16, 20 and 24 "
-                       "units, rasterized at the exact pixel size of the current scale.");
+    facet::demo::PageHeader("Icons", "The built-in glyph set: 16 unit grid, 1.5 unit strokes with round ends, "
+                                     "drawn in the label color unless a tint is given. Each tile shows the icon "
+                                     "at 16, 20 and 24 units, rasterized at the exact pixel size of the current "
+                                     "scale.");
+    facet::demo::SectionHeader("Glyph set");
 
     // Search field with its icon in front, like a labelled control.
     ImGui::AlignTextToFramePadding();
@@ -194,12 +194,10 @@ FACET_DEMO_PAGE("icons", "Icons", "Media", 10, "default", "search", "empty")
 
     const std::string_view query = Query();
     emptyStateShown = false;
-    ImGui::PushStyleColor(ImGuiCol_Text, theme.colors.labelSecondary);
     int matches = 0;
     for (int i = 0; i < facet::IconCount(); ++i)
         matches += ContainsNoCase(facet::IconNameAt(i), query) ? 1 : 0;
-    ImGui::Text("%d of %d icons", matches, facet::IconCount());
-    ImGui::PopStyleColor();
+    facet::demo::Note("%d of %d icons", matches, facet::IconCount());
     ImGui::Spacing();
 
     if (matches == 0)
