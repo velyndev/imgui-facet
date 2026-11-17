@@ -19,7 +19,8 @@ void Stub(const char* label, const RatingOptions& options)
     if (icons > kMaxIcons)
         icons = kMaxIcons;
     const float content = internal::StubLabelWidth(label, options.size) + static_cast<float>(icons) * ControlHeight(options.size);
-    internal::ControlStub("Rating", label, content, internal::StubHeight(options.size, options.error, options.helpText));
+    internal::ControlStub("Rating", label, internal::StubFitAvailable(content),
+                          internal::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

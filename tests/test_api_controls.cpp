@@ -744,6 +744,52 @@ TEST_CASE("Pads keep their default size in a wide row and fit a short row")
     CHECK(session.ItemRect("stick asked").GetWidth() == doctest::Approx(facet::Px(100.0f)));
 }
 
+TEST_CASE("Cell rows and the inline calendar fit a short row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string code;
+    float rating = 0.0f;
+    facet::Date date;
+    float available = 0.0f;
+    float wideRating = 0.0f;
+    session.SetUi([&] {
+        facet::PinCodeInput("Code##wide", &code);
+        session.Track("pin wide");
+        facet::Rating("Rating##wide", &rating, {.count = 10});
+        wideRating = GImGui->LastItemData.Rect.GetWidth();
+        facet::DatePicker("Date##wide", &date, {.inlineCalendar = true});
+        session.Track("date wide");
+        // A row far narrower than the cells, the icons or the calendar.
+        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(600.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::PinCodeInput("Code", &code);
+        session.Track("pin");
+        facet::Rating("Rating", &rating, {.count = 10});
+        session.Track("rating");
+        facet::DatePicker("Date", &date, {.inlineCalendar = true});
+        session.Track("date");
+        // The width rules of the conventions still apply to the code field.
+        ImGui::SetNextItemWidth(facet::Px(30.0f));
+        facet::PinCodeInput("Code##next", &code);
+        session.Track("pin next");
+        facet::PinCodeInput("Code##asked", &code, {.width = 300.0f});
+        session.Track("pin asked");
+        ImGui::EndChild();
+    });
+    session.Frame();
+
+    REQUIRE(available > 1.0f);
+    CHECK(session.ItemRect("pin wide").GetWidth() > available);
+    CHECK(wideRating > available);
+    CHECK(session.ItemRect("date wide").GetWidth() > available);
+    CHECK(session.ItemRect("pin").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("rating").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("date").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("pin next").GetWidth() == doctest::Approx(facet::Px(30.0f)));
+    CHECK(session.ItemRect("pin asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
+}
+
 TEST_CASE("The placeholder text drops the label, then the name, and keeps the word planned")
 {
     facet::test::Session session;

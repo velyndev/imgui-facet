@@ -469,6 +469,7 @@ struct PinCodeInputOptions
     bool masked = false;                // cells show dots
     int groupSize = 0;                  // a wider gap after every groupSize cells; 0 none
     ControlSize size = ControlSize::Inherit;
+    float width = 0.0f;                 // units; 0 fits the cells, at most the available width
     bool readOnly = false;
     const char* error = nullptr;        // also shakes the cells once, unless facet::ReduceMotion()
     const char* helpText = nullptr;
@@ -476,7 +477,9 @@ struct PinCodeInputOptions
 
 // A one-time code as separate cells. Typing fills a cell and moves on, Backspace moves back,
 // pasting fills every cell. One Tab stop. Writes per keystroke; the code is complete when its
-// length equals `length`. Returns true when the code was written. Default width: its cells.
+// length equals `length`. Returns true when the code was written. Default width: the label and
+// its cells, at most the available width. In a narrower width the cells shrink, down to a small
+// control height each, and then wrap onto further lines.
 bool PinCodeInput(const char* label, std::string* code, const PinCodeInputOptions& options = {});
 bool PinCodeInput(const char* label, char* buffer, std::size_t bufferSize, const PinCodeInputOptions& options = {});
 
@@ -584,7 +587,8 @@ struct RatingOptions
 
 // A row of icons filled up to *value (0 to count). Hovering previews; a click writes. One Tab
 // stop; Left and Right step, Home and End go to 0 and count. Returns true when *value was
-// written.
+// written. Default width: the label and its icons, at most the available width; in a shorter
+// row the icons shrink to fit.
 bool Rating(const char* label, float* value, const RatingOptions& options = {});
 bool Rating(const char* label, int* value, const RatingOptions& options = {});
 

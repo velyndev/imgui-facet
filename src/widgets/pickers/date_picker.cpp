@@ -25,7 +25,7 @@ bool DatePicker(const char* label, Date*, const DatePickerOptions& options)
     if (options.inlineCalendar)
     {
         const float cell = ControlHeight(options.size);
-        width = internal::StubWidth(options.width, kCalendarColumns * cell);
+        width = internal::StubFittedWidth(options.width, kCalendarColumns * cell);
         height += kCalendarRows * cell + Px(T().spacing.sm);
     }
     internal::ControlStub("DatePicker", label, width, height);

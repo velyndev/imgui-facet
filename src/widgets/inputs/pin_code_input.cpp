@@ -23,7 +23,7 @@ void Stub(const char* label, const PinCodeInputOptions& options)
     const float cell = ControlHeight(options.size);
     const float gap = Px(T().spacing.xs);
     const float content = internal::StubLabelWidth(label, options.size) + static_cast<float>(cells) * (cell + gap) - gap;
-    internal::ControlStub("PinCodeInput", label, content,
+    internal::ControlStub("PinCodeInput", label, internal::StubFittedWidth(options.width, content),
                           internal::StubHeight(options.size, options.error, options.helpText));
 }
 

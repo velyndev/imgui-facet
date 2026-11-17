@@ -278,7 +278,7 @@ struct DatePickerOptions
     bool inlineCalendar = false;        // the calendar is drawn in place instead of in a popover
     const char* placeholder = nullptr;  // shown while *date has no date; null uses Strings::select
     ControlSize size = ControlSize::Inherit;
-    float width = 0.0f;
+    float width = 0.0f;                 // units; 0 fills, or fits the inline calendar (at most the available width)
     bool readOnly = false;
     bool mixed = false;
     const char* error = nullptr;
