@@ -379,16 +379,29 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize)
 
 // --- Data ------------------------------------------------------------------------------------
 
+int SeriesView::Slot(int i) const
+{
+    if (offset == 0 || count <= 0)
+        return i;
+    int start = offset % count;
+    if (start < 0)
+        start += count;
+    const int slot = i + start;
+    return slot >= count ? slot - count : slot;
+}
+
 float SeriesView::X(int i) const
 {
     if (x == nullptr)
         return static_cast<float>(i);
-    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(x) + static_cast<std::ptrdiff_t>(i) * stride);
+    const std::ptrdiff_t bytes = static_cast<std::ptrdiff_t>(Slot(i)) * stride;
+    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(x) + bytes);
 }
 
 float SeriesView::Y(int i) const
 {
-    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(y) + static_cast<std::ptrdiff_t>(i) * stride);
+    const std::ptrdiff_t bytes = static_cast<std::ptrdiff_t>(Slot(i)) * stride;
+    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(y) + bytes);
 }
 
 namespace

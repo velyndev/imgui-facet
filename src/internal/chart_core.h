@@ -134,16 +134,21 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize);
 
 // A series of samples, read in place. With x null, the x of sample i is i. `stride` is the
 // distance in bytes between two samples of x and of y (interleaved data), sizeof(float) for
-// plain arrays.
+// plain arrays. `offset` reads a ring buffer of `count` slots in place: sample i is stored in
+// slot (offset + i) mod count, so a history whose oldest sample sits at the write index is
+// one view, oldest first (offset outside [0, count) is reduced mod count).
 struct SeriesView
 {
     const float* x = nullptr;
     const float* y = nullptr;
     int count = 0;
     int stride = static_cast<int>(sizeof(float));
+    int offset = 0;
 
     float X(int i) const;
     float Y(int i) const;
+    // The storage slot of sample i (0 <= i < count).
+    int Slot(int i) const;
 };
 
 struct Range

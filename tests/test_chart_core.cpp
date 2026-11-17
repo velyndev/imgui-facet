@@ -482,6 +482,59 @@ TEST_CASE("Decimation of an unsorted series reaches its last sample and every ex
     }
 }
 
+TEST_CASE("A ring buffer view reads the samples oldest first")
+{
+    // A history of 5000 samples whose write index is 1234: slot 1234 holds the oldest one.
+    const int count = 5000;
+    const int writeIndex = 1234;
+    const std::vector<float> linear = RandomWalk(count, 7u);
+    std::vector<float> ring(static_cast<std::size_t>(count));
+    std::vector<float> ringX(static_cast<std::size_t>(count));
+    for (int i = 0; i < count; ++i)
+    {
+        const std::size_t slot = static_cast<std::size_t>((writeIndex + i) % count);
+        ring[slot] = linear[static_cast<std::size_t>(i)];
+        ringX[slot] = 0.5f * static_cast<float>(i);
+    }
+    std::vector<float> linearX(static_cast<std::size_t>(count));
+    for (int i = 0; i < count; ++i)
+        linearX[static_cast<std::size_t>(i)] = 0.5f * static_cast<float>(i);
+    const SeriesView flat{.x = linearX.data(), .y = linear.data(), .count = count};
+    const SeriesView view{.x = ringX.data(), .y = ring.data(), .count = count, .offset = writeIndex};
+    // An offset outside [0, count) is reduced mod count.
+    const SeriesView wrapped{.x = ringX.data(), .y = ring.data(), .count = count, .offset = writeIndex - 3 * count};
+    for (const SeriesView& v : {view, wrapped})
+    {
+        CHECK(v.X(0) == 0.0f);
+        CHECK(v.Y(0) == linear.front());
+        CHECK(v.Y(count - 1) == linear.back());
+        CHECK(IsSortedByX(v));
+        CHECK(SeriesRangeY(v).min == SeriesRangeY(flat).min);
+        CHECK(NearestSampleByX(v, 1000.2, true) == NearestSampleByX(flat, 1000.2, true));
+        CHECK(NearestSampleByX(v, 1000.2, false) == NearestSampleByX(flat, 1000.2, false));
+    }
+
+    // Decimation of the ring gives exactly the points of the linear copy, sorted and unsorted.
+    const Scale xScale = MakeScale(ScaleKind::Linear, 0.0, 0.5 * (count - 1), 3.5f, 303.5f);
+    const Range yRange = SeriesRangeY(flat);
+    const Scale yScale = MakeScale(ScaleKind::Linear, yRange.min, yRange.max, 200.0f, 0.0f);
+    std::vector<ImVec2> fromRing(static_cast<std::size_t>(DecimatedCapacity(300.0f)));
+    std::vector<ImVec2> fromFlat(fromRing.size());
+    for (const bool sorted : {true, false})
+    {
+        INFO("sorted ", sorted);
+        const int a = DecimatePolyline(view, xScale, yScale, fromRing, sorted);
+        const int b = DecimatePolyline(flat, xScale, yScale, fromFlat, sorted);
+        REQUIRE(a == b);
+        REQUIRE(a > 0);
+        for (int i = 0; i < a; ++i)
+        {
+            CHECK(fromRing[static_cast<std::size_t>(i)].x == fromFlat[static_cast<std::size_t>(i)].x);
+            CHECK(fromRing[static_cast<std::size_t>(i)].y == fromFlat[static_cast<std::size_t>(i)].y);
+        }
+    }
+}
+
 TEST_CASE("A logarithmic range leaves out samples at or below 0")
 {
     // Counts that start at 0 and a sample below 0: a logarithmic axis spans the positive data.
