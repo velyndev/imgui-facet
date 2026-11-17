@@ -7,7 +7,9 @@
 // only while a key is queried: a key that skipped frames advances by one frame on its next
 // query. The table grows by doubling, so queries allocate only when the number of live keys
 // reaches a new maximum, never per query. EndFrame drops slots that were not queried for
-// kPruneFrames frames.
+// kPruneFrames frames and kPruneSeconds of store time, so how long a hidden key survives does
+// not depend on the frame rate; kPruneFramesAlways frames drop a key also when the clock
+// stands still (a host that passes a delta time of 0).
 //
 // The public functions use one global store, driven by the anim subsystem hooks. Tests and
 // tools create their own store and drive it with BeginFrame(dt) / EndFrame().
@@ -28,8 +30,13 @@ namespace facet::internal
 class AnimStore
 {
 public:
-    // Slots unused for this many frames are removed at EndFrame.
+    // Slots not queried for kPruneFrames frames and kPruneSeconds of store time are removed at
+    // EndFrame. Both must pass: the frame count keeps a key across a few long frames, the
+    // time keeps it across the same wall time at any refresh rate (0.5 s is 30 frames at
+    // 60 Hz). kPruneFramesAlways removes a slot whatever the clock says.
     static constexpr std::uint32_t kPruneFrames = 30;
+    static constexpr double kPruneSeconds = 0.5;
+    static constexpr std::uint32_t kPruneFramesAlways = 600;
 
     // A value counts as settled (and snaps to its target) when the distance and, for springs,
     // the velocity fall below these, relative to the size of the last jump of the target.
@@ -44,7 +51,7 @@ public:
 
     // Advances the clock by dt seconds (negative values count as 0).
     void BeginFrame(float dt);
-    // Prunes slots that were not queried for kPruneFrames frames.
+    // Prunes slots that were not queried recently (see kPruneFrames).
     void EndFrame();
     void Clear();
 
@@ -83,6 +90,7 @@ private:
         Kind kind = Kind::Empty;
         bool settled = true;
         std::uint32_t lastFrame = 0;
+        double lastQueryClock = 0.0;  // store clock at the last query, for pruning
         double time = 0.0;     // store clock at the last update
         float value[4] = {};   // current value (Color: OKLab L, a, b and alpha)
         float target[4] = {};  // target of the running motion

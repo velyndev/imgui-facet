@@ -114,7 +114,9 @@ void AnimStore::EndFrame()
     {
         if (slot.kind == Kind::Empty || slot.kind == Kind::Tombstone)
             continue;
-        if (frame - slot.lastFrame >= kPruneFrames)
+        const std::uint32_t idleFrames = frame - slot.lastFrame;
+        const bool idle = idleFrames >= kPruneFrames && clock - slot.lastQueryClock >= kPruneSeconds;
+        if (idle || idleFrames >= kPruneFramesAlways)
         {
             slot.kind = Kind::Tombstone;
             --live;
@@ -217,6 +219,7 @@ AnimStore::Slot& AnimStore::Acquire(std::uint64_t key, Kind kind, bool& created)
                 slot.time = std::max(slot.time, clock - static_cast<double>(frameDelta));
             }
             slot.lastFrame = frame;
+            slot.lastQueryClock = clock;
             return slot;
         }
         index = (index + 1) & mask;
@@ -231,6 +234,7 @@ AnimStore::Slot& AnimStore::Acquire(std::uint64_t key, Kind kind, bool& created)
     target->key = key;
     target->kind = kind;
     target->lastFrame = frame;
+    target->lastQueryClock = clock;
     target->time = clock;
     ++live;
     created = true;

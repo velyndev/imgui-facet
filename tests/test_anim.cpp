@@ -211,26 +211,68 @@ TEST_CASE("A motion scale of 2 makes a tween take twice as long")
     CHECK(store.Tween(kId, 0, 10.0f, 0.2f, facet::Ease::Linear) == doctest::Approx(5.0f));
 }
 
-TEST_CASE("Keys that are not queried are pruned after kPruneFrames frames")
+TEST_CASE("Keys that are not queried are pruned after kPruneFrames frames once kPruneSeconds passed")
 {
+    // At 30 Hz the time limit passes after 15 frames, so the frame count decides.
     AnimStore store;
     store.Smooth(1, 0, 1.0f, 10.0f);
     store.Smooth(2, 0, 1.0f, 10.0f);
     CHECK(store.LiveSlots() == 2);
     for (std::uint32_t i = 0; i + 1 < AnimStore::kPruneFrames; ++i)
     {
-        store.BeginFrame(1.0f / 60.0f);
+        store.BeginFrame(1.0f / 30.0f);
         store.Smooth(1, 0, 1.0f, 10.0f);
         store.EndFrame();
     }
     CHECK(store.LiveSlots() == 2);
-    store.BeginFrame(1.0f / 60.0f);
+    store.BeginFrame(1.0f / 30.0f);
     store.Smooth(1, 0, 1.0f, 10.0f);
     store.EndFrame();
     CHECK(store.LiveSlots() == 1);
     // A pruned key starts again at its target.
-    store.BeginFrame(1.0f / 60.0f);
+    store.BeginFrame(1.0f / 30.0f);
     CHECK(store.Smooth(2, 0, 5.0f, 10.0f) == 5.0f);
+}
+
+TEST_CASE("A key hidden for 0.2 s survives at 240 Hz and animates when it comes back")
+{
+    AnimStore store;
+    store.Tween(kId, 0, 0.0f, 0.2f, facet::Ease::Linear);
+    const float dt = 1.0f / 240.0f;
+    // 48 hidden frames: more than kPruneFrames, but less than kPruneSeconds.
+    for (int i = 0; i < 48; ++i)
+    {
+        store.BeginFrame(dt);
+        store.EndFrame();
+    }
+    CHECK(store.LiveSlots() == 1);
+    store.BeginFrame(dt);
+    CHECK(store.Tween(kId, 0, 1.0f, 0.2f, facet::Ease::Linear) == doctest::Approx(dt / 0.2f));
+    store.EndFrame();
+
+    // Hidden for longer than kPruneSeconds, it is dropped at this rate too.
+    const int frames = static_cast<int>(AnimStore::kPruneSeconds / dt) + 2;
+    for (int i = 0; i < frames; ++i)
+    {
+        store.BeginFrame(dt);
+        store.EndFrame();
+    }
+    CHECK(store.LiveSlots() == 0);
+}
+
+TEST_CASE("Keys are pruned after kPruneFramesAlways frames when the clock stands still")
+{
+    AnimStore store;
+    store.Smooth(kId, 0, 1.0f, 10.0f);
+    for (std::uint32_t i = 0; i + 1 < AnimStore::kPruneFramesAlways; ++i)
+    {
+        store.BeginFrame(0.0f);
+        store.EndFrame();
+    }
+    CHECK(store.LiveSlots() == 1);
+    store.BeginFrame(0.0f);
+    store.EndFrame();
+    CHECK(store.LiveSlots() == 0);
 }
 
 TEST_CASE("Frames a key is not queried in do not count as motion time")
@@ -240,7 +282,8 @@ TEST_CASE("Frames a key is not queried in do not count as motion time")
     store.Tween(kId, 0, 0.0f, 0.2f, facet::Ease::Linear);
     store.Spring(kId, 1, 0.0f, spec);
     store.Smooth(kId, 2, 0.0f, 12.0f);
-    // The widget is hidden for 20 frames (fewer than kPruneFrames, so the keys survive).
+    // The widget is hidden for 20 frames (fewer than kPruneFrames and kPruneSeconds, so the
+    // keys survive).
     for (int i = 0; i < 20; ++i)
     {
         store.BeginFrame(1.0f / 60.0f);
