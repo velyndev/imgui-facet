@@ -30,8 +30,8 @@ namespace facet
 
 // --- Text -----------------------------------------------------------------------------------
 
-// Horizontal alignment of text inside the width it is given.
-enum class TextAlign
+// Horizontal alignment of text inside the width it is given: styled text and table columns.
+enum class ColumnAlign
 {
     Start,
     Center,
@@ -44,7 +44,7 @@ struct StyledTextOptions
     Tone tone = Tone::Neutral;             // Neutral draws label; the others their status token
     bool secondary = false;                // Neutral only: labelSecondary instead of label
     bool wrap = false;                     // wraps at the item width instead of running past it
-    TextAlign align = TextAlign::Start;    // inside the item width; Start when the width is the text's own
+    ColumnAlign align = ColumnAlign::Start;  // inside the item width; Start when the width is the text's own
     float width = 0.0f;                    // units; 0 the text's own width, or the available width with wrap
 };
 
@@ -469,13 +469,6 @@ struct StatTileOptions
 void StatTile(const char* label, double value, const StatTileOptions& options = {});
 
 // --- Data table -----------------------------------------------------------------------------
-
-enum class ColumnAlign
-{
-    Start,
-    Center,
-    End,
-};
 
 struct DataTableColumn
 {

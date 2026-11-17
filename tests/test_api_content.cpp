@@ -59,6 +59,10 @@ TEST_CASE("Values that mean none default to NaN, outside every value range")
     CHECK(std::isnan(facet::LogEntry{}.time));
 }
 
+// One alignment enum for styled text and table columns.
+static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);
+static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::ColumnAlign>);
+
 template <class T>
 concept HasWrap = requires(T options) { options.wrap; };
 static_assert(!HasWrap<facet::LogViewOptions>);
