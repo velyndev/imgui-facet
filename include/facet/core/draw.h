@@ -6,6 +6,19 @@
 // units with Px() before passing lengths. `corners` takes the ImDrawFlags_RoundXXX flags;
 // 0 rounds every corner, as in ImDrawList. Strokes lie inside the rectangle, so a stroked
 // and a filled rect with the same bounds line up.
+//
+// Drawing a shape under a texture of your own: Dear ImGui takes some shapes from its font
+// atlas through their UVs. Fills sample the atlas's white pixel, anti-aliased strokes sample
+// baked line textures (ImDrawFlags_AALines), and rounded rectangles with a radius of up to
+// IM_DRAWLIST_TEX_CORNERS_ROUNDING_MAX pixels use baked corner textures whenever
+// ImDrawFlags_UseTexForRoundCorners is on together with ImDrawFlags_AAFill or AALines (the
+// default unless the atlas has ImFontAtlasFlags_NoBakedRoundCorners). Under
+// ImDrawList::PushTexture those UVs index the other texture instead. A helper that fills a
+// rounded shape with its own texture therefore wraps it in
+// ImDrawList::PushDrawFlag(ImDrawFlags_UseTexForRoundCorners, false) and PopDrawFlag(), so
+// FillRect builds the corners as geometry, then sets every UV it added itself (for example
+// with ImGui::ShadeVertsLinearUV, as ImDrawList::AddImageRounded does). Strokes and
+// untextured shapes go before PushTexture or after PopTexture.
 
 #include <imgui.h>
 
