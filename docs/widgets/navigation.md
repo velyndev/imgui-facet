@@ -40,7 +40,9 @@ int TabBarClosedTab();
 ```
 
 A tab strip with the selection pill or an underline, closable tabs and an overflow menu; the caller
-draws the content of the selected tab.
+draws the content of the selected tab. Left and Right move between tabs, Ctrl+Page Down and
+Ctrl+Page Up switch tabs from anywhere in the window. Ctrl+Tab is not used: Dear ImGui always claims
+it for its window switcher.
 
 ### BeginMenuBar
 

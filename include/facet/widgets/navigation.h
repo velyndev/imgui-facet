@@ -114,8 +114,9 @@ struct TabBarOptions
 };
 
 // The tab strip; the caller draws the content of the tab *index below it. Tabs show the item
-// icon, label and detail (as a badge). Left and Right move between tabs, Ctrl+Tab and
-// Ctrl+Shift+Tab switch while focus is inside the window. Writes *index and returns true when
+// icon, label and detail (as a badge). Left and Right move between tabs; Ctrl+Page Down and
+// Ctrl+Page Up switch to the next and previous tab while focus is inside the window (Ctrl+Tab
+// stays with Dear ImGui's window switcher, which always claims it). Writes *index and returns true when
 // another tab is chosen. A closed tab is reported by TabBarClosedTab; the caller removes it.
 // Default width: the available width. Tab widths of the last frame are kept under the id.
 bool TabBar(const char* id, int* index, std::span<const ChoiceItem> tabs, const TabBarOptions& options = {});
