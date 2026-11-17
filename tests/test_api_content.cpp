@@ -50,6 +50,16 @@ static_assert(OptionsFollowConventions<facet::KeyValueOptions>());
 static_assert(OptionsFollowConventions<facet::StatTileOptions>());
 static_assert(OptionsFollowConventions<facet::DataTableOptions>());
 
+static_assert(OptionsFollowConventions<facet::SparklineOptions>());
+static_assert(OptionsFollowConventions<facet::LineChartOptions>());
+static_assert(OptionsFollowConventions<facet::BarChartOptions>());
+static_assert(OptionsFollowConventions<facet::DonutChartOptions>());
+static_assert(OptionsFollowConventions<facet::GaugeOptions>());
+static_assert(OptionsFollowConventions<facet::LevelMeterOptions>());
+static_assert(OptionsFollowConventions<facet::FrameTimeGraphOptions>());
+static_assert(OptionsFollowConventions<facet::LegendOptions>());
+static_assert(OptionsFollowConventions<facet::ChartRangeBrushOptions>());
+
 // The stacks a call must leave as it found them.
 struct Stacks
 {
@@ -208,6 +218,46 @@ void DisplayCalls()
     Check("BeginDataTableCellEdit", Expect::NoItem, nullptr, [] { CHECK_FALSE(BeginDataTableCellEdit()); });
 }
 
+void ChartCalls()
+{
+    using namespace facet;
+    static const float values[] = {1.0f, 3.0f, 2.0f};
+    static const ChartSeries series[] = {{.label = "Series 1", .values = values}};
+    static const char* const categories[] = {"Category 1", "Category 2", "Category 3"};
+    static const DonutSlice slices[] = {{"Slice 1", 2.0}, {"Slice 2", 1.0}};
+    static const GaugeZone zones[] = {{0.8, 1.0, Tone::Destructive}};
+    const ChartGetter getter = [](void*, int index, ChartPoint* out) {
+        out->x = index;
+        out->y = values[index];
+        return true;
+    };
+
+    Check("Sparkline", Expect::Item, "Trend", [] { Sparkline("Trend", values, {.bars = true}); });
+    Check("Sparkline, getter", Expect::Item, "Trend 2", [&] { Sparkline("Trend 2", 3, getter, nullptr); });
+    Check("LineChart", Expect::Item, "line", [] { LineChart("line", series, {.yAxis = {.min = 0.0, .max = 4.0}}); });
+    Check("BarChart", Expect::Item, "bars", [] { BarChart("bars", series, categories, {.stacked = true}); });
+    Check("DonutChart", Expect::Item, "donut", [] { DonutChart("donut", slices, {.pie = true}); });
+    Check("Gauge", Expect::Item, "Gauge", [] { Gauge("Gauge", 0.5, 0.0, 1.0, {.zones = zones}); });
+    Check("LevelMeter", Expect::Item, "Meter", [] { LevelMeter("Meter", values, 0.0f, 4.0f); });
+    Check("LevelMeter, vertical", Expect::Item, "Meter 2",
+          [] { LevelMeter("Meter 2", values, 0.0f, 4.0f, {.orientation = Orientation::Vertical}); });
+    Check("FrameTimeGraph", Expect::Item, "frames", [] { FrameTimeGraph("frames"); });
+    Check("FrameTimeGraph, samples", Expect::Item, "frames 2", [] { FrameTimeGraph("frames 2", values, {.compact = true}); });
+
+    LegendItem legend[] = {{"Series 1"}, {"Series 2", 0, true}};
+    Check("Legend", Expect::Item, "legend", [&] { CHECK_FALSE(Legend("legend", legend)); });
+    CHECK_FALSE(legend[0].hidden);
+    CHECK(legend[1].hidden);
+
+    double low = 1.0;
+    double high = 2.0;
+    Check("ChartRangeBrush", Expect::Item, "Range", [&] {
+        CHECK_FALSE(ChartRangeBrush("Range", &low, &high, 0.0, 3.0, series, {.minGap = 0.5}));
+    });
+    CHECK(low == 1.0);
+    CHECK(high == 2.0);
+}
+
 } // namespace
 
 TEST_CASE("The display stubs submit one item each, return the neutral result and keep every stack")
@@ -216,6 +266,16 @@ TEST_CASE("The display stubs submit one item each, return the neutral result and
     REQUIRE(session.Ready());
     int runs = 0;
     RunFrame(session, &runs, &DisplayCalls);
+    CHECK(runs == 1);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+}
+
+TEST_CASE("The chart stubs submit one item each, return the neutral result and keep every stack")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int runs = 0;
+    RunFrame(session, &runs, &ChartCalls);
     CHECK(runs == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
