@@ -4,18 +4,26 @@ Facet is a design framework for Dear ImGui applications on Windows with Direct3D
 a consistent set of custom widgets, a light and a dark theme, icon rendering and proper scaling
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
-**Status: early development.** No Facet widgets exist yet. What exists today:
+**Status: early development.** No Facet widgets exist yet: the fourteen widget family
+headers in `include/facet/widgets/` are in place and their widgets are planned (see
+`docs/widgets.md`). What exists today:
 
-- The CMake build with pinned dependencies and presets for MSVC x64 and x86.
+- The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
+  written once, in `include/facet/core/version.h`, which CMake reads.
 - The library lifetime: `facet::Init`, `NewFrame`, `EndFrame`, `Shutdown`,
   `InvalidateDeviceObjects`, `CreateDeviceObjects`, `Version`, and the embedding of
   `assets/icons/*.svg` into the library at build time.
 - The public core headers in `include/facet/core/`. Every declared function links; the state
   of each area:
   - Core, theme and scale: light and dark presets, a runtime accent with derived readable
-    states, animated theme switches, a mode that follows the Windows app theme and
-    `ApplyImGuiStyle` for stock Dear ImGui widgets (`theme.h`); the UI scale with three modes
-    and pixel snapping helpers (`scale.h`). See `docs/theming.md` and `docs/scaling.md`.
+    states, an accent for one region (`PushAccent` / `PopAccent`), animated theme switches, a
+    mode that follows the Windows app theme and `ApplyImGuiStyle` for stock Dear ImGui widgets
+    (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). See
+    `docs/theming.md` and `docs/scaling.md`.
+  - Core, layout: width classes of the available width and the column layout of labelled rows
+    (`layout.h`) work.
+  - Core, input: key chords, key binds and the shortcut registry are declared (`input.h`); the
+    functions are stubs that return neutral results (planned).
   - Core, color: conversions with OKLab, OKLCH and WCAG contrast (`color.h`) work.
   - Core, drawing: rectangles with circular or continuous corners, hairlines, rounded
     gradients, checkerboards, arcs with round caps, `DrawGroup` and pointer cursor helpers
@@ -33,6 +41,13 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
     `docs/images-and-icons.md`).
   - Icons: the built-in SVG icon set, icons registered at runtime, and drawing from a
     per-scale atlas work (`icons.h`).
+- `include/facet/widgets/common.h`: the types the widget families share, the control size
+  stack (`PushControlSize`), control heights and the built-in strings (`SetStrings`) work; the
+  edit session queries and `NextVisibleRows` are stubs until the blocks behind them exist.
+  `facet/facet.h` includes every core and widget header. The rules for widget declarations
+  are in `docs/api-conventions.md`.
+- `facet::EndFrame` reports a `PushAccent`, `PushControlSize` or Facet scope left open
+  through Dear ImGui's recoverable error path and clears it.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
   window, a light and a dark theme or one that follows the Windows app mode, and a UI scale
   setting. Its pages, listed by group in the navigation:
@@ -51,8 +66,13 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
       and an empty state.
     - Images: fit modes, corner radii, tint, asynchronous loading with its loading and failed
       states, and an SVG at three sizes.
+  - Blocks (planned): one page per building block of the widgets (item behaviour, focus,
+    rows, overflow, value drag, multi-handle, selection pill, fuzzy matching, keys and
+    shortcuts, chart core). Each page says what it will show.
+  - Widgets (planned): one page per widget family. Each page says what it will show.
 
-  `facet_demo --list-pages` prints the page ids with their capture states.
+  The page list scrolls when it is taller than the window and keeps the heading of the group
+  at the top pinned. `facet_demo --list-pages` prints the page ids with their capture states.
 - A capture mode that renders pages offscreen into PNG files, and a selftest mode that operates
   pages with scripted mouse and keyboard input.
 - Unit tests with doctest.
@@ -136,11 +156,15 @@ no Direct3D call failed.
 facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]
 ```
 
-Runs the input scripts that pages register: synthetic clicks and key presses, followed by
-checks, offscreen at the given size and scale (defaults `1280x800`, scale 1) in the given
-theme (default dark; `both` runs every script once per theme). A scripted click on a control
-outside the visible part of its window scrolls it into view first. It prints a `PASS` or `FAIL`
-line per check, naming the page and theme, and exits with 1 when any check failed.
+Runs the input scripts that pages register, followed by checks, offscreen at the given size and
+scale (defaults `1280x800`, scale 1) in the given theme (default dark; `both` runs every script
+once per theme). Scripts click, press and release the mouse apart, drag along a path (also out
+of the window), turn the wheel, press and hold keys with modifiers, rest the mouse on an item,
+type text, and check values with a tolerance, text, focus and visibility. Durations are counted
+in frames of the fixed 1/60 s time step, so a run does not depend on the speed of the machine.
+A scripted click on a control outside the visible part of its window scrolls it into view
+first. It prints a `PASS` or `FAIL` line per check, naming the page and theme, and exits with 1
+when any check failed.
 
 ## Design tokens
 
@@ -150,13 +174,17 @@ choice.
 ## Layout
 
 ```
-include/facet/   public headers
+include/facet/   public headers: core/ (one per module), widgets/ (one per widget family)
 src/             library sources; src/internal holds headers shared inside the library
 assets/icons/    SVG files embedded into the library
 cmake/           dependency, warning and asset embedding scripts
-docs/            topic guides: theming, scaling, images and icons
+docs/            topic guides: theming, scaling, images and icons; api-conventions.md (the
+                 rules every widget declaration follows); widgets.md (the widget families,
+                 with one page each under docs/widgets/)
 demo/            facet_demo; demo/pages holds one file per page
-tests/           doctest unit tests, one file per topic
+tests/           doctest unit tests, one file per topic; tests/support holds the shared
+                 Dear ImGui and WARP session for tests that run frames and scripted input;
+                 tests/headers compiles every public header alone
 third_party/stb/ vendored stb headers
 ```
 
