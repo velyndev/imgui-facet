@@ -124,6 +124,7 @@ const float kStops[] = {0.0f, 0.25f, 1.0f};
 const float kBins[] = {1.0f, 3.0f, 2.0f};
 const ImVec4 kSwatches[] = {{0.2f, 0.4f, 0.8f, 1.0f}, {0.8f, 0.3f, 0.2f, 1.0f}};
 const facet::ThumbnailItem kThumbnails[] = {{"Option 1"}, {"Option 2"}};
+const facet::FileType kFileTypes[] = {{"Option 1", "*.png;*.jpg"}, {"Option 2"}};
 
 // Every value a stub could write, set to values a stub would never produce.
 struct Values
@@ -477,10 +478,11 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 2", std::span<bool>(v.thumbnailFlags), kThumbnails,
                                             {.state = DataState::Loading}));
     FACET_CHECK_STUB(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
+    FACET_CHECK_STUB(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
-constexpr int kStubCalls = 109;
+constexpr int kStubCalls = 110;
 
 } // namespace
 

@@ -52,9 +52,9 @@ const facet::ThumbnailItem kThumbnails[] = {
     {"Option 2", {}, facet::Icon("image")},
     {"Option 3", {}, facet::Icon("image"), true},
 };
-const facet::ChoiceItem kFileTypes[] = {
-    {"Images", {}, "*.png;*.jpg"},
-    {"All files", {}, "*.*"},
+const facet::FileType kFileTypes[] = {
+    {"Images", "*.png;*.jpg"},
+    {"All files"},
 };
 
 } // namespace

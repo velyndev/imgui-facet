@@ -433,24 +433,37 @@ enum class FileBrowserMode
     Folder,  // pick a folder
 };
 
+// One entry of the FileBrowser type menu. Label first, so {"Images", "*.png;*.jpg"} works.
+struct FileType
+{
+    const char* label = nullptr;        // name shown in the type menu; required
+    const char* patterns = nullptr;     // wildcards separated by ";" ("*.png;*.jpg"); null or "" for all files
+};
+
 struct FileBrowserOptions
 {
     FileBrowserMode mode = FileBrowserMode::Open;
-    // Read during the call: one entry per file type in the type menu; `label` is the name shown
-    // ("Images") and `detail` the patterns separated by ";" ("*.png;*.jpg"). Empty: all files.
-    std::span<const ChoiceItem> fileTypes = {};
-    bool showHidden = false;
+    std::span<const FileType> fileTypes = {};  // read during the call; the first is selected at first; empty: all files
+    bool showHidden = false;            // lists hidden and system entries
     float width = 0.0f;                 // units; 0 fills the available width
     float height = 0.0f;                // units; 0 for the default browser height
+    bool readOnly = false;              // browsing and selecting work; the confirm button is off and nothing is written
 };
 
 // A file browser drawn inside the app, for overlays and full-screen hosts where a system dialog
 // cannot be shown. A path bar, a folder list and a file name field. It starts in the folder of
-// *path (or the current directory) and keeps the folder it shows under its id. Reading a folder
-// shows the loading state, an unreadable folder the error state with Strings::loadFailed, an
-// empty one the empty state. Double click or Enter on a file (or the confirm button) writes its
-// full UTF-8 path to *path. Returns true when *path was written. Usually shown inside a modal
-// from overlays.h after PathFieldBrowsePressed.
+// the current path (or the current directory) and keeps the folder it shows under its id.
+// Reading a folder shows the loading state, an unreadable folder the error state with
+// Strings::loadFailed, an empty one the empty state. Double click or Enter on a file (or the
+// confirm button) writes its full UTF-8 path. Returns true when the path was written. The
+// visible label part is the browser's accessible name and is not drawn; the modal or panel
+// around it carries the title. Arrow keys move in the list, Enter opens a folder or confirms a
+// file, Backspace goes to the parent folder. Usually shown inside a modal from overlays.h after
+// PathFieldBrowsePressed.
 bool FileBrowser(const char* label, std::string* path, const FileBrowserOptions& options = {});
+// The same with a char buffer for hosts that avoid the heap. A path that does not fit
+// `bufferSize` bytes (with the terminating zero) is never written cut short: the confirm button
+// stays off for it.
+bool FileBrowser(const char* label, char* buffer, std::size_t bufferSize, const FileBrowserOptions& options = {});
 
 } // namespace facet

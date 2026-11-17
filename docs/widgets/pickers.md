@@ -143,11 +143,13 @@ states. Status: planned.
 ### FileBrowser
 
 ```cpp
+struct FileType { const char* label; const char* patterns; };
 bool FileBrowser(const char* label, std::string* path, const FileBrowserOptions& options = {});
+bool FileBrowser(const char* label, char* buffer, std::size_t bufferSize, const FileBrowserOptions& options = {});
 ```
 
-A file browser drawn inside the app, for overlays and hosts that cannot show a system dialog.
-Status: planned.
+A file browser drawn inside the app, for overlays and hosts that cannot show a system dialog. Its
+label is the accessible name and is not drawn. Status: planned.
 
 ## Usage
 
@@ -193,10 +195,10 @@ facet::DateRangePicker("Period", &from, &to, {.max = today, .presets = presets})
 ```
 
 Picking a file in an overlay, where a system dialog cannot be shown: the browser goes into a modal
-and writes the path on confirm. `detail` of each file type holds its patterns.
+and writes the path on confirm. A file type without patterns lists every file.
 
 ```cpp
-static const facet::ChoiceItem kTypes[] = {{"Images", {}, "*.png;*.jpg"}, {"All files", {}, "*.*"}};
+static const facet::FileType kTypes[] = {{"Images", "*.png;*.jpg"}, {"All files"}};
 if (facet::BeginModal("Open image", &browsing))
 {
     if (facet::FileBrowser("##files", &imagePath, {.fileTypes = kTypes}))
