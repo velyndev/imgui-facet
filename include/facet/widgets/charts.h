@@ -76,7 +76,7 @@ struct SparklineOptions
     bool markMinMax = false;               // dots on the smallest and largest value
     double min = 0.0;                      // value units; min == max: the range of the values
     double max = 0.0;
-    ImU32 color = 0;                       // 0: the accent
+    ImU32 color = 0;                       // 0: the accent (a single series; rule 10 exception)
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 the control height
 };

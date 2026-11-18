@@ -15,7 +15,7 @@ bool Chip(const char* label, const ChipOptions& options)
     namespace stub = internal::controls;
     const float height = ControlHeight(options.size);
     float content = stub::StubLabelWidth(label, options.size) + 2.0f * Px(T().spacing.sm);
-    if (options.icon.IsValid() || options.color.w > 0.0f)
+    if (options.icon.IsValid() || options.color != 0)
         content += Px(T().spacing.lg);
     if (options.removable)
         content += height;

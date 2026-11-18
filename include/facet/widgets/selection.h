@@ -144,7 +144,7 @@ struct ChipOptions
     bool selected = false;              // shows the on look; the caller flips it on activation
     bool removable = false;             // adds a remove button; read ChipRemovePressed after the call
     Icon icon;                          // leading icon; none by default
-    ImVec4 color = {0.0f, 0.0f, 0.0f, 0.0f};  // leading dot in this data color; alpha 0 for none
+    ImU32 color = 0;                    // leading dot in this data color (packed sRGB); 0 for none
     ControlSize size = ControlSize::Inherit;
 };
 

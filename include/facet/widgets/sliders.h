@@ -266,7 +266,9 @@ struct MultiSliderOptions
     bool allowRemove = false;           // vector overload: Delete on a focused handle, or dragging it off the track, removes it
     int minHandles = 0;                 // vector overload: removing stops at this count
     int maxHandles = 0;                 // vector overload: adding stops at this count; 0 unlimited
-    std::span<const ImVec4> segmentColors = {};  // read during the call; data colors of the segments, repeated; empty: one accent fill
+    std::span<const ImU32> segmentColors = {};  // read during the call; data colors of the segments, repeated; a 0 entry
+                                        // takes the chart palette color of its index; empty: one accent fill,
+                                        // because a slider is a control and the fill shows its value
     Orientation orientation = Orientation::Horizontal;
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;
@@ -439,7 +441,8 @@ struct AllocationBarOptions
     double step = 0.0;                  // share units (0 to 1); 0 continuous
     double minGap = 0.0;                // smallest share of one segment, clamped to 1 / segment count
     HandleCollision collision = HandleCollision::Clamp;  // Push lets a divider move the dividers beyond it
-    std::span<const ImVec4> segmentColors = {};  // read during the call; data colors, repeated; empty: neutral fills
+    std::span<const ImU32> segmentColors = {};  // read during the call; data colors, repeated; empty or a 0 entry:
+                                        // the chart palette color of the segment index, as in DonutChart
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                 // units; 0 fills the available width
     bool readOnly = false;

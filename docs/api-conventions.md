@@ -104,6 +104,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 ## 10. Per-call styling
 
 - A call may choose `variant`, `size`, `tone`, and `width`, plus colors that are the data itself (picked colors, chart series, image tint). A subtree may use `PushAccent` and `PushControlSize`.
+- Data colors that a widget only displays are `ImU32` (packed sRGB, straight alpha); colors the user edits are `ImVec4` (pickers, `GradientStop`, `AccentPicker`). The value 0 is automatic, with one meaning per kind: for indexed data (series, slices, legend entries, the segments of `AllocationBar` and `MultiSlider`) it takes the chart palette color of the index, so the same shares get the same colors in every widget; for markers and adornments (a chip dot, an inventory tint) it means none. Two documented exceptions use the accent instead: `Sparkline`, a single series next to a number, and `MultiSlider` with no segment colors, a control whose fill shows its value. *Reason: one type and one default rule, so data passed to two widgets looks the same in both.*
 - Radii, spacing, fonts, the focus ring, motion, shadows and blur are fixed by the theme. Facet widgets read tokens and ignore `ImGui::PushStyleColor`, `PushStyleVar` and `PushFont`. Fonts come from `SetFontSet`, and text size follows the style font scale (see `scale.h`), which a host may manage itself. *Reason: the dose caps in DESIGN.md hold only if a call cannot break them.*
 
 ## 11. Interplay with Dear ImGui
