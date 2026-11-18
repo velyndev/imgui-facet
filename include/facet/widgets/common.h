@@ -148,9 +148,9 @@ struct RowRange
     int last = 0;
 };
 
-// Inside BeginVirtualList or BeginDataTable: the next range of rows to submit. Returns false
-// when every range was handed out, and outside those containers. Extra ranges keep the
-// keyboard focused row alive.
+// Inside BeginVirtualList, BeginItemGrid (ranges of tile indices) or BeginDataTable: the next
+// range of rows to submit. Returns false when every range was handed out, and outside those
+// containers. Extra ranges keep the keyboard focused row alive.
 bool NextVisibleRows(RowRange* rows);
 
 // Size used by widgets whose options say ControlSize::Inherit, until the matching
