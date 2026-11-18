@@ -152,7 +152,7 @@ bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, 
 // The view of an ImageViewer, owned by the caller so it can be saved or reset.
 struct ImageViewerState
 {
-    float zoom = 0.0f;                     // image pixels per design unit; 0 fits the image
+    float zoom = 0.0f;                     // design units per image pixel (1 is 100 percent); 0 fits the image
     ImVec2 center = {0.0f, 0.0f};          // image pixel at the viewport center
 };
 
@@ -160,14 +160,16 @@ struct ImageViewerOptions
 {
     bool minimap = false;                  // overview with the visible region while zoomed in
     bool checkerboard = true;              // a checkerboard behind transparent pixels
-    float maxZoom = 32.0f;                 // image pixels per unit at the closest zoom
+    float maxZoom = 32.0f;                 // design units per image pixel at the closest zoom
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fills the available height
 };
 
 // A zoom and pan viewport. The wheel zooms around the cursor, a drag pans with inertia, a
 // double click toggles between fit and 100 percent; while focused, + and - zoom, arrows pan
-// and 0 fits. The visible label part is the alt text. Returns true when *view was written.
+// and 0 fits. 100 percent is one image pixel per design unit (zoom 1), so it follows the UI
+// scale like every other length. The visible label part is the alt text and is not drawn.
+// Returns true when *view was written.
 bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {});
 
 struct ImageCompareOptions
