@@ -334,7 +334,7 @@ void CallEveryStub(Values& v)
         ImGui::TextUnformatted("child");
         facet::EndTitleBar();
     });
-    CHECK_BALANCED(CHECK(facet::TitleBarPressedButton() == facet::WindowButton::None));
+    CHECK_BALANCED(CHECK(facet::TitleBarButtonPressed() == facet::WindowButton::None));
     CHECK_BALANCED({
         const bool open = facet::BeginOverlay("Overlay", &v.visible);
         CHECK(open);
@@ -462,7 +462,7 @@ void CallEveryStub(Values& v)
         ImGui::TextUnformatted("control");
         facet::EndSettingsRow();
     });
-    CHECK_BALANCED(CHECK_FALSE(facet::IsSettingsRowResetPressed()));
+    CHECK_BALANCED(CHECK_FALSE(facet::SettingsRowResetPressed()));
     CHECK_BALANCED({
         const bool open = facet::BeginDependentGroup("Dependent", false);
         CHECK(open);

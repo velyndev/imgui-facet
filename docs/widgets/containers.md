@@ -59,7 +59,7 @@ Status: planned
 ```cpp
 void BeginTitleBar(const char* label, const TitleBarOptions& options = {});
 void EndTitleBar();
-WindowButton TitleBarPressedButton();
+WindowButton TitleBarButtonPressed();
 class TitleBarScope;
 ```
 
@@ -254,7 +254,7 @@ if (facet::BeginAppFrame("app", {.hostMaximized = maximized, .minSize = {640.0f,
     facet::BeginTitleBar("Editor", {.icon = facet::Icon("monitor"), .windowButtons = true, .maximized = maximized});
     DrawTitleBarItems();                                       // the app's trailing items
     facet::EndTitleBar();
-    switch (facet::TitleBarPressedButton())
+    switch (facet::TitleBarButtonPressed())
     {
     case facet::WindowButton::Minimize: ShowWindow(hwnd, SW_MINIMIZE); break;
     case facet::WindowButton::Maximize: ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE); break;

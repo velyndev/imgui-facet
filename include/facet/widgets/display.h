@@ -128,12 +128,19 @@ struct InlineAlertOptions
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
+// What the caller does after an InlineAlert call.
+enum class InlineAlertAction
+{
+    None,       // nothing happened this frame
+    Action,     // the action was activated
+    Dismissed,  // the close button or Escape (while the alert has focus) dismissed it
+};
+
 // A tinted callout box inside the content (a field group's warning, a hint above a form). The
 // visible label part is the title in Headline ("##id" for none); `message` is the wrapped body.
-// `open` as in Banner (null: no close button). Returns true on the frame the action is
-// activated. The close button and the action are Tab stops. Keeps the collapse animation
-// under its id.
-bool InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {});
+// `open` as in Banner (null: no close button). Returns the action of this frame, like Banner.
+// The close button and the action are Tab stops. Keeps the collapse animation under its id.
+InlineAlertAction InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {});
 
 struct EmptyStateOptions
 {

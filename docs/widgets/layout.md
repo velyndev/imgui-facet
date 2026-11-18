@@ -113,7 +113,7 @@ Status: planned
 ```cpp
 void BeginSettingsRow(const char* label, const SettingsRowOptions& options = {});
 void EndSettingsRow();
-bool IsSettingsRowResetPressed();
+bool SettingsRowResetPressed();
 class SettingsRowScope;
 ```
 
@@ -171,7 +171,7 @@ if (facet::BeginDependentGroup("shadow options", shadows))
     facet::BeginSettingsRow("Strength", {.modified = strength != kDefaultStrength, .resetButton = true});
     ImGui::SliderFloat("##value", &strength, 0.0f, 2.0f);
     facet::EndSettingsRow();
-    if (facet::IsSettingsRowResetPressed())
+    if (facet::SettingsRowResetPressed())
         strength = kDefaultStrength;
     facet::EndDependentGroup();
 }

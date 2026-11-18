@@ -122,7 +122,7 @@ private:
 // backend of Dear ImGui turns WM_NCMOUSEMOVE and WM_NCMOUSELEAVE into mouse positions, but not
 // the buttons: the host passes WM_NCLBUTTONDOWN and WM_NCLBUTTONUP with HTMAXBUTTON to
 // io.AddMouseButtonEvent(0, down) and returns 0 without calling DefWindowProc, so the drawn
-// maximize button shows hover and press and TitleBarPressedButton reports it.
+// maximize button shows hover and press and TitleBarButtonPressed reports it.
 enum class FrameHit
 {
     Client,          // Facet content: the host passes the input to Dear ImGui
@@ -199,14 +199,14 @@ struct TitleBarOptions
 // subtitle, then the caller's items, then the window buttons. Items submitted between
 // BeginTitleBar and EndTitleBar sit at the trailing end, right-aligned with their widths from
 // the last frame. The free area of the bar is the drag region (Caption in AppFrameHitTest).
-// EndTitleBar is always called. A window button press is read with TitleBarPressedButton. The
+// EndTitleBar is always called. A window button press is read with TitleBarButtonPressed. The
 // window buttons are named by Strings::minimize, Strings::maximize, Strings::restore and
 // Strings::close.
 void BeginTitleBar(const char* label, const TitleBarOptions& options = {});
 void EndTitleBar();
 
 // The window button activated in the last EndTitleBar of this frame, or None.
-WindowButton TitleBarPressedButton();
+WindowButton TitleBarButtonPressed();
 
 class [[nodiscard]] TitleBarScope
 {

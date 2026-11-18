@@ -1,4 +1,4 @@
-// BeginSettingsRow, EndSettingsRow and IsSettingsRowResetPressed (layout.h). Planned: shows the
+// BeginSettingsRow, EndSettingsRow and SettingsRowResetPressed (layout.h). Planned: shows the
 // control inside the frame placeholder of src/widgets/structure_stub.h until Phase 2 implements
 // the row. The label is pushed on the id stack until EndSettingsRow, as rule 2 requires.
 
@@ -18,7 +18,7 @@ void EndSettingsRow()
     internal::EndStubFrame("BeginSettingsRow");
 }
 
-bool IsSettingsRowResetPressed()
+bool SettingsRowResetPressed()
 {
     return false;
 }

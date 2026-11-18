@@ -30,7 +30,7 @@ returns the neutral result.
 | ImageViewer | `bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {})` | Zoom and pan viewport with fit and 100 percent, optional minimap | planned |
 | ImageCompare | `bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after, const ImageCompareOptions& options = {})` | Before and after images with a draggable divider | planned |
 | TimelineScrubber | `bool TimelineScrubber(const char* label, double* playhead, double duration, const TimelineScrubberOptions& options = {})`, overload with `double* loopIn, double* loopOut` | Time ruler with a playhead and optional loop markers | planned |
-| DropZone | `DropZoneResult DropZone(const char* label, std::span<const char* const> acceptTypes, const DropZoneOptions& options = {})`, `const ImGuiPayload* DropZonePayload()` | Area that accepts drag and drop payloads of given types and can be activated | planned |
+| DropZone | `DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTypes, const DropZoneOptions& options = {})`, `const ImGuiPayload* DropZonePayload()` | Area that accepts drag and drop payloads of given types and can be activated | planned |
 
 ## Usage
 
@@ -80,10 +80,10 @@ window messages into a payload.
 static const char* const types[] = {"app.asset"};
 switch (facet::DropZone("Assets", types, {.hint = "Drop an asset here", .icon = facet::Icon("upload")}))
 {
-case facet::DropZoneResult::Dropped:
+case facet::DropZoneAction::Dropped:
     AddAsset(*static_cast<const AssetRef*>(facet::DropZonePayload()->Data));
     break;
-case facet::DropZoneResult::Activated:
+case facet::DropZoneAction::Activated:
     OpenAssetBrowser();
     break;
 default:

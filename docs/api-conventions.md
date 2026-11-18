@@ -29,7 +29,12 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
   - for value and choice widgets: the value or selection was written this frame;
   - for `BeginX`: the content must be submitted.
   
-  Dialogs that end with a choice return an enum (`DialogResult`). *Reason: `dirty |= facet::Slider(...)` keeps working.*
+  Other results take one of these shapes, and no other:
+  - an `XAction` enum whose zero member is `None`, for a widget with several outcomes (`BannerAction`, `InlineAlertAction`, `DropZoneAction`, `WizardAction`); dialogs that end with a choice return `DialogResult`;
+  - an `XResult` struct when an outcome carries data (`LayerListResult`, `InventoryResult`, `PresetListResult`); a move inside one list is a `ReorderMove`, which `ApplyReorderMove` applies;
+  - an `int` index, -1 for none, for an action widget with several targets (`Breadcrumbs`, `ItemDetailCard`).
+  
+  Events after a call are read with query functions named `<Widget><Subject><Event>()`, with no `Is` prefix (`ChipRemovePressed`, `SettingsRowResetPressed`, `TitleBarButtonPressed`, `DataStateViewRetryPressed`), returning `bool` or the activated value. A query that returns the index of an entry is named `<Widget><Past tense><Entry>()` (`TabBarClosedTab`, `ChipGroupRemovedItem`, `SelectableListActivatedRow`) and returns -1 for none. *Reason: `dirty |= facet::Slider(...)` keeps working, and every result reads the same way.*
 - Writes follow Dear ImGui 1.93. Drags, steppers, arrow keys and clicks write at once. Typed text writes per keystroke in text fields (`ImGuiItemFlags_LiveEditOnInputText` is on by default). Typed numbers write on Enter, Tab or focus loss (`ImGuiItemFlags_LiveEditOnInputScalar` is off by default). Callers change either default with `ImGui::PushItemFlag`. *Reason: a Facet field and a stock field next to it behave the same way.*
 - Escape during an edit restores the value from activation, writes it, and returns true on that frame, as stock widgets do. *Reason: the stock queries keep their meaning.*
 - Edit sessions are read through item queries after the call. `ImGui::IsItemActivated`, `IsItemDeactivated` and `IsItemDeactivatedAfterEdit` work on every Facet widget. `common.h` adds two queries:
@@ -177,7 +182,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 3. Is the options struct an aggregate with defaults on every member, ordered as widget members, then data block, then common block, with the common names and types unchanged?
 4. Is every on/off feature a `bool`, every choice an enum class whose zero member is the default, and is there no flags enum unless the set is stored?
 5. Is every length in design units with the unit in a comment, and does the width follow the precedence in rule 6?
-6. Does the bool result mean pressed, written, or content-to-submit, and do the stock item queries describe the whole widget?
+6. Does the bool result mean pressed, written, or content-to-submit; is any other result an `XAction` enum, an `XResult` struct or an index with -1 for none; are event queries named `<Widget><Subject><Event>()` without `Is`; and do the stock item queries describe the whole widget?
 7. Is there no disabled option, and do `readOnly`, `error`, `helpText`, `mixed` and `loading` appear wherever they apply, and `state`, `emptyText` and `errorText` on every widget whose items can be fetched?
 8. For a container: does Begin return `[[nodiscard]] bool` only when content can be skipped, is End documented, and is there an `XScope`?
 9. Are strings `const char*` read during the call, lists spans of label-first items, and lazy lists function pointers with `void* user`?

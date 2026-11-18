@@ -1,4 +1,4 @@
-// BeginTitleBar, EndTitleBar and TitleBarPressedButton (containers.h). Planned: shows the
+// BeginTitleBar, EndTitleBar and TitleBarButtonPressed (containers.h). Planned: shows the
 // caller's items inside the frame placeholder of src/widgets/structure_stub.h until Phase 2
 // implements the title bar; no window button is ever reported.
 
@@ -18,7 +18,7 @@ void EndTitleBar()
     internal::EndStubFrame("BeginTitleBar");
 }
 
-WindowButton TitleBarPressedButton()
+WindowButton TitleBarButtonPressed()
 {
     return WindowButton::None;
 }

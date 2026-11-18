@@ -163,7 +163,7 @@ default: break;
 ```cpp
 const facet::LayerListResult r = facet::LayerList("layers", &selectedLayer, layerRows);
 if (r.action == facet::LayerAction::Moved)
-    MoveLayer(r.index, r.to);              // reorders the application's layers and layerRows
+    facet::ApplyReorderMove(layers, r.move);  // the application's layers, in the order of layerRows
 ```
 
 ### Drag and drop between custom items

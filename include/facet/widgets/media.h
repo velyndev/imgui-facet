@@ -227,7 +227,7 @@ bool TimelineScrubber(const char* label, double* playhead, double* loopIn, doubl
 // --- Drop zone ------------------------------------------------------------------------------
 
 // What happened in a DropZone this frame.
-enum class DropZoneResult
+enum class DropZoneAction
 {
     None,
     Dropped,    // a payload of an accepted type was dropped; read it with DropZonePayload
@@ -249,7 +249,7 @@ struct DropZoneOptions
 // visible label part is the text in the zone unless `hint` replaces it; then it is the zone's
 // tooltip. Files dragged in from the operating system reach
 // it only when the host submits them as a payload (the host owns the window messages).
-DropZoneResult DropZone(const char* label, std::span<const char* const> acceptTypes,
+DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTypes,
                         const DropZoneOptions& options = {});
 // The payload of the last DropZone call that returned Dropped, valid until the end of the
 // frame; null otherwise.

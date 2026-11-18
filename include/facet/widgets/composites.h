@@ -39,6 +39,7 @@
 #include "facet/core/theme.h"
 #include "facet/widgets/common.h"
 #include "facet/widgets/display.h"
+#include "facet/widgets/lists.h"
 #include "facet/widgets/media.h"
 
 namespace facet
@@ -664,14 +665,14 @@ enum class LayerAction
     Selected,    // *selected was written
     Visibility,  // layers[index].visible was written (and others, for solo)
     Lock,        // layers[index].locked was written
-    Moved,       // move layer `index` to position `to`; the caller reorders its data
+    Moved,       // `move` says which layer moved where; the caller reorders its data
 };
 
 struct LayerListResult
 {
     LayerAction action = LayerAction::None;
-    int index = -1;
-    int to = -1;
+    int index = -1;                        // the layer of Visibility and Lock; -1 otherwise
+    ReorderMove move;                      // Moved: apply it with ApplyReorderMove (lists.h)
 };
 
 struct LayerListOptions

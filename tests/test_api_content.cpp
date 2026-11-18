@@ -298,7 +298,8 @@ void DisplayCalls()
     Check("Banner without close button", Expect::Item, "##banner2",
           [] { CHECK(Banner("##banner2", nullptr, "Message") == BannerAction::None); });
     Check("InlineAlert", Expect::Item, "Title##alert", [&] {
-        CHECK_FALSE(InlineAlert("Title##alert", &open, "Message", {.tone = Tone::Warning, .actionLabel = "Action"}));
+        CHECK(InlineAlert("Title##alert", &open, "Message", {.tone = Tone::Warning, .actionLabel = "Action"}) ==
+              InlineAlertAction::None);
     });
     CHECK(open);
     Check("EmptyState", Expect::Item, "Nothing here", [] {
@@ -488,7 +489,7 @@ void MediaCalls()
     CHECK(loopIn == 0.5);
     CHECK(loopOut == 2.0);
 
-    Check("DropZone", Expect::Item, "Drop", [] { CHECK(DropZone("Drop", types) == DropZoneResult::None); });
+    Check("DropZone", Expect::Item, "Drop", [] { CHECK(DropZone("Drop", types) == DropZoneAction::None); });
     Check("DropZonePayload", Expect::NoItem, nullptr, [] { CHECK(DropZonePayload() == nullptr); });
 }
 
@@ -691,7 +692,7 @@ void CanvasCalls()
         const LayerListResult result = LayerList("layers", &selected, layers);
         CHECK(result.action == LayerAction::None);
         CHECK(result.index == -1);
-        CHECK(result.to == -1);
+        CHECK_FALSE(result.move.IsValid());
     });
     CHECK(selected == 1);
     CHECK(layersBefore.Unchanged());

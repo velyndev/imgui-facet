@@ -270,7 +270,7 @@ struct ReorderableListOptions
 // Rows that are dragged by their grip (or anywhere on the row) to a new place while the other
 // rows move aside to show the gap. With the keyboard, Alt+Up and Alt+Down move the focused
 // row. Writes *move and returns true on the frame a row lands on a new place; *move is left
-// alone otherwise. A row keeps its animation state under ChoiceItem::id (the index when 0), so
+// alone otherwise, so read it only on a frame that returned true (as with stock widgets). A row keeps its animation state under ChoiceItem::id (the index when 0), so
 // give items stable ids when the caller moves its data; rows of the label overload are keyed
 // by index. While `state` is Loading or Error, or with no items, one row shows the loading,
 // error or empty state instead and nothing can move. Default width: the available width.

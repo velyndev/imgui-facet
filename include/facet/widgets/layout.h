@@ -288,7 +288,7 @@ struct SettingsRowOptions
     const char* description = nullptr; // second line under the label in labelSecondary; null for none
     Icon icon;                         // before the label
     bool modified = false;             // marks a value that differs from its default
-    bool resetButton = false;          // with modified: a reset button at the end; read IsSettingsRowResetPressed
+    bool resetButton = false;          // with modified: a reset button at the end; read SettingsRowResetPressed
     float labelWidth = 0.0f;           // units; label column with its gap; 0 for layout.labelColumn
 };
 
@@ -300,7 +300,7 @@ void BeginSettingsRow(const char* label, const SettingsRowOptions& options = {})
 void EndSettingsRow();
 
 // Whether the reset button of the last EndSettingsRow of this frame was activated.
-bool IsSettingsRowResetPressed();
+bool SettingsRowResetPressed();
 
 class [[nodiscard]] SettingsRowScope
 {
