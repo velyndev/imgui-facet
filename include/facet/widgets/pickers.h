@@ -364,6 +364,7 @@ struct AnglePickerOptions
     bool field = true;                  // a degrees field beside the dial
     float diameter = 0.0f;              // units; 0 derives it from the control height of `size`
     ControlSize size = ControlSize::Inherit;
+    float width = 0.0f;                 // units; 0 fits label, dial and field, at most the available width
     bool readOnly = false;
     bool mixed = false;
     const char* error = nullptr;
@@ -373,7 +374,8 @@ struct AnglePickerOptions
 // A round dial with a needle; *radians is the angle, counter-clockwise from the right (the
 // convention of ImGui::SliderAngle values). Dragging points the needle at the pointer; arrow keys
 // turn it by one degree (Shift by snapDegrees). Writes while dragging. Returns true when
-// *radians was written.
+// *radians was written. Default width: the label, the dial and the degrees field, at most the
+// available width. In a narrower width the field shrinks first; the dial keeps its diameter.
 bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& options = {});
 
 // --- IconPicker -------------------------------------------------------------------------------

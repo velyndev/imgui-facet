@@ -819,6 +819,37 @@ TEST_CASE("Cell rows and the inline calendar fit a short row")
     CHECK(session.ItemRect("pin asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
 }
 
+TEST_CASE("AnglePicker fits a short row and follows the width rules")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float radians = 0.5f;
+    float available = 0.0f;
+    session.SetUi([&] {
+        facet::AnglePicker("Angle##wide", &radians);
+        session.Track("wide");
+        // A row narrower than the dial and its degrees field.
+        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(400.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::AnglePicker("Angle", &radians);
+        session.Track("short");
+        ImGui::SetNextItemWidth(facet::Px(30.0f));
+        facet::AnglePicker("Angle##next", &radians);
+        session.Track("next");
+        facet::AnglePicker("Angle##asked", &radians, {.width = 300.0f});
+        session.Track("asked");
+        ImGui::EndChild();
+    });
+    session.Frame();
+
+    REQUIRE(available > 1.0f);
+    CHECK(session.ItemRect("wide").GetWidth() > available);
+    CHECK(session.ItemRect("short").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("next").GetWidth() == doctest::Approx(facet::Px(30.0f)));
+    CHECK(session.ItemRect("asked").GetWidth() == doctest::Approx(facet::Px(300.0f)));
+    CHECK(radians == 0.5f);
+}
+
 TEST_CASE("The placeholder text drops the label, then the name, and keeps the word planned")
 {
     facet::test::Session session;

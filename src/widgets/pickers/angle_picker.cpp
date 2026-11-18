@@ -21,10 +21,10 @@ bool AnglePicker(const char* label, float*, const AnglePickerOptions& options)
 {
     const Theme& t = T();
     const float diameter = internal::StubDial(options.diameter, options.size);
-    float width = internal::StubLabelWidth(label, options.size) + diameter;
+    float content = internal::StubLabelWidth(label, options.size) + diameter;
     if (options.field)
-        width += Px(t.spacing.sm) + Px(t.spacing.xxxl) * kFieldInXxxl;
-    internal::ControlStub("AnglePicker", label, width,
+        content += Px(t.spacing.sm) + Px(t.spacing.xxxl) * kFieldInXxxl;
+    internal::ControlStub("AnglePicker", label, internal::StubFittedWidth(options.width, content),
                           diameter + internal::StubMessageHeight(options.error, options.helpText));
     return false;
 }
