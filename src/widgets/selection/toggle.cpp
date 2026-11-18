@@ -12,9 +12,10 @@ namespace facet
 
 bool Toggle(const char* label, bool*, const ToggleOptions& options)
 {
-    const float content = internal::StubLabelWidth(label, options.size) + Px(T().metrics.toggleWidth);
-    internal::ControlStub("Toggle", label, internal::StubWidth(options.width, content),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    namespace stub = internal::controls;
+    const float content = stub::StubLabelWidth(label, options.size) + Px(T().metrics.toggleWidth);
+    stub::ControlStub("Toggle", label, stub::StubWidth(options.width, content),
+                          stub::StubHeight(options.size, options.error, options.helpText));
     return false;
 }
 

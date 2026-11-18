@@ -12,10 +12,11 @@ namespace facet
 
 bool SatValSquare(const char* label, ImVec4*, const SatValSquareOptions& options)
 {
-    const float available = internal::StubWidth(kFill, 0.0f);
-    const float preferred = Px(T().spacing.xxxl) * internal::kStubPickerInXxxl;
-    const float side = internal::StubWidth(options.width, available < preferred ? available : preferred);
-    internal::ControlStub("SatValSquare", label, side, side);
+    namespace stub = internal::controls;
+    const float available = stub::StubWidth(kFill, 0.0f);
+    const float preferred = Px(T().spacing.xxxl) * stub::kStubPickerInXxxl;
+    const float side = stub::StubWidth(options.width, available < preferred ? available : preferred);
+    stub::ControlStub("SatValSquare", label, side, side);
     return false;
 }
 

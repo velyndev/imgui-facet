@@ -17,11 +17,15 @@
 //
 //     bool Toggle(const char* label, bool*, const ToggleOptions& options)
 //     {
-//         const float content = internal::StubLabelWidth(label, options.size) + Px(T().metrics.toggleWidth);
-//         internal::ControlStub("Toggle", label, internal::StubWidth(options.width, content),
-//                               internal::StubHeight(options.size, options.error, options.helpText));
+//         namespace stub = internal::controls;
+//         const float content = stub::StubLabelWidth(label, options.size) + Px(T().metrics.toggleWidth);
+//         stub::ControlStub("Toggle", label, stub::StubWidth(options.width, content),
+//                           stub::StubHeight(options.size, options.error, options.helpText));
 //         return false;
 //     }
+//
+// The helpers live in facet::internal::controls so they never collide with the placeholder
+// helpers of the other widget groups, which are linked into the same library.
 
 #include <cstddef>
 #include <cstdio>
@@ -38,7 +42,7 @@
 #include "facet/widgets/common.h"
 #include "internal/text_util.h"
 
-namespace facet::internal
+namespace facet::internal::controls
 {
 
 // True inside a frame with a current window: the only time a stub draws.
@@ -315,4 +319,4 @@ inline void MessageStub(const char* widget, const char* text)
     g.LastItemData = last;
 }
 
-} // namespace facet::internal
+} // namespace facet::internal::controls

@@ -12,7 +12,8 @@ namespace
 
 void Stub(const char* label, const SearchFieldOptions& options)
 {
-    internal::ControlStub("SearchField", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
+    namespace stub = internal::controls;
+    stub::ControlStub("SearchField", label, stub::StubWidth(options.width, 0.0f), ControlHeight(options.size));
 }
 
 } // namespace

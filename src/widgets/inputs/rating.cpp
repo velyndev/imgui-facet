@@ -15,12 +15,13 @@ constexpr int kMaxIcons = 10;
 
 void Stub(const char* label, const RatingOptions& options)
 {
+    namespace stub = internal::controls;
     int icons = options.count < 1 ? 1 : options.count;
     if (icons > kMaxIcons)
         icons = kMaxIcons;
-    const float content = internal::StubLabelWidth(label, options.size) + static_cast<float>(icons) * ControlHeight(options.size);
-    internal::ControlStub("Rating", label, internal::StubFitAvailable(content),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    const float content = stub::StubLabelWidth(label, options.size) + static_cast<float>(icons) * ControlHeight(options.size);
+    stub::ControlStub("Rating", label, stub::StubFitAvailable(content),
+                          stub::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

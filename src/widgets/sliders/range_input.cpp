@@ -12,8 +12,9 @@ namespace
 
 void Stub(const char* label, const RangeInputOptions& options)
 {
-    internal::ControlStub("RangeInput", label, internal::StubWidth(options.width, 0.0f),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    namespace stub = internal::controls;
+    stub::ControlStub("RangeInput", label, stub::StubWidth(options.width, 0.0f),
+                          stub::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

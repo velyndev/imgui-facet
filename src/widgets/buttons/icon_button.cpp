@@ -10,8 +10,9 @@ namespace facet
 
 bool IconButton(const char* label, Icon, const IconButtonOptions& options)
 {
+    namespace stub = internal::controls;
     const float side = ControlHeight(options.size);
-    internal::ControlStub("IconButton", label, side, side);
+    stub::ControlStub("IconButton", label, side, side);
     return false;
 }
 

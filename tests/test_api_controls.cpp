@@ -861,21 +861,22 @@ TEST_CASE("The placeholder text drops the label, then the name, and keeps the wo
     std::string none;
     bool shortened[5] = {};
     session.SetUi([&] {
+        namespace stub = facet::internal::controls;
         facet::PushTextStyle(facet::TextStyle::Footnote);
-        char text[facet::internal::kStubCaptionSize];
+        char text[stub::kStubCaptionSize];
         const float fullWidth = ImGui::CalcTextSize("RangeSlider: planned (Price)").x;
         const float shortWidth = ImGui::CalcTextSize("RangeSlider: planned").x;
         const float wordWidth = ImGui::CalcTextSize("planned").x;
-        shortened[0] = facet::internal::StubCaption("RangeSlider", "Price##range", fullWidth + 1.0f, text, sizeof(text));
+        shortened[0] = stub::StubCaption("RangeSlider", "Price##range", fullWidth + 1.0f, text, sizeof(text));
         wide = text;
-        shortened[1] = facet::internal::StubCaption("RangeSlider", "Price##range", shortWidth + 1.0f, text, sizeof(text));
+        shortened[1] = stub::StubCaption("RangeSlider", "Price##range", shortWidth + 1.0f, text, sizeof(text));
         medium = text;
         // Room for the word but not for the name: the word stays, the name goes.
-        shortened[2] = facet::internal::StubCaption("RangeSlider", "Price##range", wordWidth + 1.0f, text, sizeof(text));
+        shortened[2] = stub::StubCaption("RangeSlider", "Price##range", wordWidth + 1.0f, text, sizeof(text));
         narrow = text;
-        shortened[3] = facet::internal::StubCaption("RangeSlider", "Price##range", wordWidth * 0.6f, text, sizeof(text));
+        shortened[3] = stub::StubCaption("RangeSlider", "Price##range", wordWidth * 0.6f, text, sizeof(text));
         tiny = text;
-        shortened[4] = facet::internal::StubCaption("RangeSlider", "Price##range", 0.0f, text, sizeof(text));
+        shortened[4] = stub::StubCaption("RangeSlider", "Price##range", 0.0f, text, sizeof(text));
         none = text;
         facet::PopTextStyle();
     });

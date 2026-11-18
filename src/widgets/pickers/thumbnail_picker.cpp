@@ -18,8 +18,9 @@ constexpr float kTileInXxxl = 3.0f;
 
 void Stub(const char* label, std::size_t itemCount, const ThumbnailPickerOptions& options)
 {
+    namespace stub = internal::controls;
     const Theme& t = T();
-    const float width = internal::StubWidth(options.width, 0.0f);
+    const float width = stub::StubWidth(options.width, 0.0f);
     const float gap = Px(t.spacing.sm);
     const float tileWidth = options.thumbnailSize.x > 0.0f ? Px(options.thumbnailSize.x) : Px(t.spacing.xxxl) * kTileInXxxl;
     const float tileHeight = options.thumbnailSize.y > 0.0f ? Px(options.thumbnailSize.y) : tileWidth;
@@ -31,7 +32,7 @@ void Stub(const char* label, std::size_t itemCount, const ThumbnailPickerOptions
         columns = 1;
     const int count = itemCount > 0 ? static_cast<int>(itemCount) : 1;
     const int rows = (count + columns - 1) / columns;
-    internal::ControlStub("ThumbnailPicker", label, width, static_cast<float>(rows) * (tileHeight + caption + gap) - gap);
+    stub::ControlStub("ThumbnailPicker", label, width, static_cast<float>(rows) * (tileHeight + caption + gap) - gap);
 }
 
 } // namespace

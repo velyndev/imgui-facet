@@ -12,10 +12,11 @@ namespace
 
 void Stub(const char* label, const KnobOptions& options)
 {
-    const float diameter = internal::StubDial(options.diameter, options.size);
+    namespace stub = internal::controls;
+    const float diameter = stub::StubDial(options.diameter, options.size);
     // The label line sits under the dial.
-    const float height = diameter + internal::StubLabelLine(label) + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("Knob", label, diameter, height);
+    const float height = diameter + stub::StubLabelLine(label) + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("Knob", label, diameter, height);
 }
 
 } // namespace

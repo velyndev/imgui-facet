@@ -14,15 +14,17 @@ namespace
 
 float SegmentWidth(const char* text, const SegmentedControlOptions& options)
 {
+    namespace stub = internal::controls;
     if (options.iconOnly)
         return ControlHeight(options.size);
-    return internal::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
+    return stub::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
 }
 
 void Stub(const char* label, float content, const SegmentedControlOptions& options)
 {
+    namespace stub = internal::controls;
     // Labels collapse to icons when the row is short, so the control never outgrows it.
-    internal::ControlStub("SegmentedControl", label, internal::StubFittedWidth(options.width, content),
+    stub::ControlStub("SegmentedControl", label, stub::StubFittedWidth(options.width, content),
                           ControlHeight(options.size));
 }
 

@@ -14,24 +14,27 @@ namespace
 
 void Stub(const char* id, float textWidth, const InlineRenameOptions& options)
 {
+    namespace stub = internal::controls;
     // While not editing the widget is as wide as its text.
     const float content = textWidth + 2.0f * Px(T().spacing.sm);
-    internal::ControlStub("InlineRename", id, internal::StubWidth(options.width, content),
-                          internal::StubHeight(options.size, options.error, nullptr));
+    stub::ControlStub("InlineRename", id, stub::StubWidth(options.width, content),
+                          stub::StubHeight(options.size, options.error, nullptr));
 }
 
 } // namespace
 
 bool InlineRename(const char* id, std::string* text, bool*, const InlineRenameOptions& options)
 {
-    Stub(id, text != nullptr ? internal::StubTextWidth(text->data(), text->size(), options.size) : 0.0f, options);
+    namespace stub = internal::controls;
+    Stub(id, text != nullptr ? stub::StubTextWidth(text->data(), text->size(), options.size) : 0.0f, options);
     return false;
 }
 
 bool InlineRename(const char* id, char* buffer, std::size_t bufferSize, bool*, const InlineRenameOptions& options)
 {
+    namespace stub = internal::controls;
     // The buffer may lack a terminator: never read past bufferSize.
-    Stub(id, internal::StubTextWidth(buffer, bufferSize, options.size), options);
+    Stub(id, stub::StubTextWidth(buffer, bufferSize, options.size), options);
     return false;
 }
 

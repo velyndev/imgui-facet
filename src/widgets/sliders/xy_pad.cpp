@@ -10,8 +10,9 @@ namespace facet
 
 bool XYPad(const char* label, ImVec2*, ImVec2, ImVec2, const XYPadOptions& options)
 {
-    const ImVec2 size = internal::StubPadSize(options.width, options.height);
-    internal::ControlStub("XYPad", label, size.x, size.y + internal::StubMessageHeight(options.error, options.helpText));
+    namespace stub = internal::controls;
+    const ImVec2 size = stub::StubPadSize(options.width, options.height);
+    stub::ControlStub("XYPad", label, size.x, size.y + stub::StubMessageHeight(options.error, options.helpText));
     return false;
 }
 

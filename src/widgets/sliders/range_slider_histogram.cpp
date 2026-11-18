@@ -16,10 +16,11 @@ constexpr float kHistogramInControls = 2.0f;
 
 void Stub(const char* label, const RangeSliderHistogramOptions& options)
 {
+    namespace stub = internal::controls;
     const float control = ControlHeight(options.size);
     const float bars = options.histogramHeight > 0.0f ? Px(options.histogramHeight) : control * kHistogramInControls;
-    internal::ControlStub("RangeSliderHistogram", label, internal::StubWidth(options.width, 0.0f),
-                          bars + internal::StubHeight(options.size, options.error, options.helpText));
+    stub::ControlStub("RangeSliderHistogram", label, stub::StubWidth(options.width, 0.0f),
+                          bars + stub::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

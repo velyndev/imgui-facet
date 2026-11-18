@@ -15,11 +15,12 @@ namespace
 
 void Stub(const char* label, const TextAreaOptions& options)
 {
+    namespace stub = internal::controls;
     const int lines = options.minLines > 0 ? options.minLines : 1;
     const float lineHeight = MeasureText(TextStyle::Body, "Ag").y;
-    const float height = internal::StubLabelLine(label) + static_cast<float>(lines) * lineHeight
-                         + 2.0f * Px(T().spacing.sm) + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("TextArea", label, internal::StubWidth(options.width, 0.0f), height);
+    const float height = stub::StubLabelLine(label) + static_cast<float>(lines) * lineHeight
+                         + 2.0f * Px(T().spacing.sm) + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("TextArea", label, stub::StubWidth(options.width, 0.0f), height);
 }
 
 } // namespace

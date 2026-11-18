@@ -12,10 +12,11 @@ namespace facet
 
 bool ColorPicker(const char* label, ImVec4*, const ColorPickerOptions& options)
 {
+    namespace stub = internal::controls;
     const Theme& t = T();
-    const float available = internal::StubWidth(kFill, 0.0f);
-    const float preferred = Px(t.spacing.xxxl) * internal::kStubPickerInXxxl;
-    const float width = internal::StubWidth(options.width, available < preferred ? available : preferred);
+    const float available = stub::StubWidth(kFill, 0.0f);
+    const float preferred = Px(t.spacing.xxxl) * stub::kStubPickerInXxxl;
+    const float width = stub::StubWidth(options.width, available < preferred ? available : preferred);
     const float control = ControlHeight(ControlSize::Inherit);
     // The square, then the hue and alpha bars, the inputs and the swatches, each on its own row.
     float height = width + control + Px(t.spacing.sm);
@@ -25,7 +26,7 @@ bool ColorPicker(const char* label, ImVec4*, const ColorPickerOptions& options)
         height += control + Px(t.spacing.sm);
     if (!options.swatches.empty())
         height += control + Px(t.spacing.sm);
-    internal::ControlStub("ColorPicker", label, width, height);
+    stub::ControlStub("ColorPicker", label, width, height);
     return false;
 }
 

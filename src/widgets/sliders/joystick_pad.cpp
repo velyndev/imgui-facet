@@ -19,10 +19,11 @@ constexpr float kJoystickInXxxl = 4.0f;
 
 bool JoystickPad(const char* label, ImVec2*, const JoystickPadOptions& options)
 {
+    namespace stub = internal::controls;
     const float diameter = options.diameter > 0.0f ? Px(options.diameter)
-                                                   : internal::StubFitAvailable(Px(T().spacing.xxxl) * kJoystickInXxxl);
-    internal::ControlStub("JoystickPad", label, diameter,
-                          diameter + internal::StubMessageHeight(options.error, options.helpText));
+                                                   : stub::StubFitAvailable(Px(T().spacing.xxxl) * kJoystickInXxxl);
+    stub::ControlStub("JoystickPad", label, diameter,
+                          diameter + stub::StubMessageHeight(options.error, options.helpText));
     return false;
 }
 

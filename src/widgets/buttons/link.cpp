@@ -10,7 +10,8 @@ namespace facet
 
 bool Link(const char* label, const LinkOptions& options)
 {
-    internal::ControlStub("Link", label, internal::StubLabelWidth(label, options.size),
+    namespace stub = internal::controls;
+    stub::ControlStub("Link", label, stub::StubLabelWidth(label, options.size),
                           ControlHeight(options.size));
     return false;
 }

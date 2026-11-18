@@ -10,15 +10,17 @@ namespace facet
 
 void FieldValidation(const char* message, const FieldValidationOptions&)
 {
+    namespace stub = internal::controls;
     if (message == nullptr)
         return;
     // Layout only, under the validated item, which stays the last item.
-    internal::MessageStub("FieldValidation", message);
+    stub::MessageStub("FieldValidation", message);
 }
 
 bool ValidationSummary(const char* label, const ValidationSummaryOptions& options)
 {
-    internal::ControlStub("ValidationSummary", label, internal::StubWidth(options.width, 0.0f),
+    namespace stub = internal::controls;
+    stub::ControlStub("ValidationSummary", label, stub::StubWidth(options.width, 0.0f),
                           ControlHeight(ControlSize::Inherit));
     return false;
 }

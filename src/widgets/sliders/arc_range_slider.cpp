@@ -10,9 +10,10 @@ namespace facet
 
 bool ArcRangeSlider(const char* label, float*, float*, float, float, const ArcRangeSliderOptions& options)
 {
-    const float diameter = internal::StubDial(options.diameter, options.size);
-    const float height = diameter + internal::StubLabelLine(label) + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("ArcRangeSlider", label, diameter, height);
+    namespace stub = internal::controls;
+    const float diameter = stub::StubDial(options.diameter, options.size);
+    const float height = diameter + stub::StubLabelLine(label) + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("ArcRangeSlider", label, diameter, height);
     return false;
 }
 

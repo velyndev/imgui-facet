@@ -12,10 +12,11 @@ namespace
 
 void Stub(const char* label, std::size_t itemCount, const CheckboxGroupOptions& options)
 {
+    namespace stub = internal::controls;
     const int rows = static_cast<int>(itemCount) + (options.selectAll ? 1 : 0);
-    const float height = internal::StubLabelLine(label) + static_cast<float>(rows > 0 ? rows : 1) * ControlHeight(options.size)
-                         + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("CheckboxGroup", label, internal::StubWidth(0.0f, 0.0f), height);
+    const float height = stub::StubLabelLine(label) + static_cast<float>(rows > 0 ? rows : 1) * ControlHeight(options.size)
+                         + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("CheckboxGroup", label, stub::StubWidth(0.0f, 0.0f), height);
 }
 
 } // namespace

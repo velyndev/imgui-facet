@@ -14,9 +14,10 @@ namespace
 
 void Stub(const char* label, const CheckboxOptions& options)
 {
+    namespace stub = internal::controls;
     const Theme& t = T();
-    const float content = Px(t.metrics.checkboxSize) + Px(t.spacing.sm) + internal::StubLabelWidth(label, options.size);
-    internal::ControlStub("Checkbox", label, content, internal::StubHeight(options.size, options.error, options.helpText));
+    const float content = Px(t.metrics.checkboxSize) + Px(t.spacing.sm) + stub::StubLabelWidth(label, options.size);
+    stub::ControlStub("Checkbox", label, content, stub::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

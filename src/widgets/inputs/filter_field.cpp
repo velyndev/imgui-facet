@@ -10,13 +10,15 @@ namespace facet
 
 bool FilterField(const char* label, std::string*, FilterSettings*, const FilterFieldOptions& options)
 {
-    internal::ControlStub("FilterField", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
+    namespace stub = internal::controls;
+    stub::ControlStub("FilterField", label, stub::StubWidth(options.width, 0.0f), ControlHeight(options.size));
     return false;
 }
 
 bool FilterField(const char* label, char*, std::size_t, FilterSettings*, const FilterFieldOptions& options)
 {
-    internal::ControlStub("FilterField", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
+    namespace stub = internal::controls;
+    stub::ControlStub("FilterField", label, stub::StubWidth(options.width, 0.0f), ControlHeight(options.size));
     return false;
 }
 

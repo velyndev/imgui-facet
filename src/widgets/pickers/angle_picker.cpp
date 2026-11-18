@@ -19,13 +19,14 @@ constexpr float kFieldInXxxl = 2.5f;
 
 bool AnglePicker(const char* label, float*, const AnglePickerOptions& options)
 {
+    namespace stub = internal::controls;
     const Theme& t = T();
-    const float diameter = internal::StubDial(options.diameter, options.size);
-    float content = internal::StubLabelWidth(label, options.size) + diameter;
+    const float diameter = stub::StubDial(options.diameter, options.size);
+    float content = stub::StubLabelWidth(label, options.size) + diameter;
     if (options.field)
         content += Px(t.spacing.sm) + Px(t.spacing.xxxl) * kFieldInXxxl;
-    internal::ControlStub("AnglePicker", label, internal::StubFittedWidth(options.width, content),
-                          diameter + internal::StubMessageHeight(options.error, options.helpText));
+    stub::ControlStub("AnglePicker", label, stub::StubFittedWidth(options.width, content),
+                          diameter + stub::StubMessageHeight(options.error, options.helpText));
     return false;
 }
 

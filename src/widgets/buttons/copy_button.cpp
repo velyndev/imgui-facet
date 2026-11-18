@@ -10,9 +10,10 @@ namespace facet
 
 bool CopyButton(const char* label, const char*, const CopyButtonOptions& options)
 {
+    namespace stub = internal::controls;
     const float height = ControlHeight(options.size);
-    const float width = options.showLabel ? height + internal::StubLabelWidth(label, options.size) : height;
-    internal::ControlStub("CopyButton", label, width, height);
+    const float width = options.showLabel ? height + stub::StubLabelWidth(label, options.size) : height;
+    stub::ControlStub("CopyButton", label, width, height);
     return false;
 }
 

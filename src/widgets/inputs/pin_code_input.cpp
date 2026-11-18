@@ -17,14 +17,15 @@ constexpr int kMaxCells = 16;
 
 void Stub(const char* label, const PinCodeInputOptions& options)
 {
+    namespace stub = internal::controls;
     int cells = options.length < 1 ? 1 : options.length;
     if (cells > kMaxCells)
         cells = kMaxCells;
     const float cell = ControlHeight(options.size);
     const float gap = Px(T().spacing.xs);
-    const float content = internal::StubLabelWidth(label, options.size) + static_cast<float>(cells) * (cell + gap) - gap;
-    internal::ControlStub("PinCodeInput", label, internal::StubFittedWidth(options.width, content),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    const float content = stub::StubLabelWidth(label, options.size) + static_cast<float>(cells) * (cell + gap) - gap;
+    stub::ControlStub("PinCodeInput", label, stub::StubFittedWidth(options.width, content),
+                          stub::StubHeight(options.size, options.error, options.helpText));
 }
 
 } // namespace

@@ -10,9 +10,10 @@ namespace facet
 
 bool SliderStepped(const char* label, float*, std::span<const float>, const SliderSteppedOptions& options)
 {
-    const ImVec2 size = internal::StubSliderSize(options.orientation, options.width, options.height, options.size,
+    namespace stub = internal::controls;
+    const ImVec2 size = stub::StubSliderSize(options.orientation, options.width, options.height, options.size,
                                                  options.error, options.helpText);
-    internal::ControlStub("SliderStepped", label, size.x, size.y);
+    stub::ControlStub("SliderStepped", label, size.x, size.y);
     return false;
 }
 

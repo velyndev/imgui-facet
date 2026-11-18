@@ -12,13 +12,14 @@ namespace facet
 
 bool Chip(const char* label, const ChipOptions& options)
 {
+    namespace stub = internal::controls;
     const float height = ControlHeight(options.size);
-    float content = internal::StubLabelWidth(label, options.size) + 2.0f * Px(T().spacing.sm);
+    float content = stub::StubLabelWidth(label, options.size) + 2.0f * Px(T().spacing.sm);
     if (options.icon.IsValid() || options.color.w > 0.0f)
         content += Px(T().spacing.lg);
     if (options.removable)
         content += height;
-    internal::ControlStub("Chip", label, content, height);
+    stub::ControlStub("Chip", label, content, height);
     return false;
 }
 

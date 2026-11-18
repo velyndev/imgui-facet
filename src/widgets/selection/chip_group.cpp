@@ -12,7 +12,8 @@ namespace
 
 void Stub(const char* label, const ChipGroupOptions& options)
 {
-    internal::ControlStub("ChipGroup", label, internal::StubWidth(options.width, 0.0f), ControlHeight(options.size));
+    namespace stub = internal::controls;
+    stub::ControlStub("ChipGroup", label, stub::StubWidth(options.width, 0.0f), ControlHeight(options.size));
 }
 
 } // namespace

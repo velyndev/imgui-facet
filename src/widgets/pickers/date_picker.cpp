@@ -20,15 +20,16 @@ constexpr float kCalendarColumns = 7.0f;
 
 bool DatePicker(const char* label, Date*, const DatePickerOptions& options)
 {
-    float width = internal::StubWidth(options.width, 0.0f);
-    float height = internal::StubHeight(options.size, options.error, options.helpText);
+    namespace stub = internal::controls;
+    float width = stub::StubWidth(options.width, 0.0f);
+    float height = stub::StubHeight(options.size, options.error, options.helpText);
     if (options.inlineCalendar)
     {
         const float cell = ControlHeight(options.size);
-        width = internal::StubFittedWidth(options.width, kCalendarColumns * cell);
+        width = stub::StubFittedWidth(options.width, kCalendarColumns * cell);
         height += kCalendarRows * cell + Px(T().spacing.sm);
     }
-    internal::ControlStub("DatePicker", label, width, height);
+    stub::ControlStub("DatePicker", label, width, height);
     return false;
 }
 

@@ -12,12 +12,13 @@ namespace facet
 
 bool Button(const char* label, const ButtonOptions& options)
 {
+    namespace stub = internal::controls;
     const Theme& t = T();
     const float height = ControlHeight(options.size);
-    float content = internal::StubLabelWidth(label, options.size) + 2.0f * Px(t.spacing.md);
+    float content = stub::StubLabelWidth(label, options.size) + 2.0f * Px(t.spacing.md);
     if (options.icon.IsValid())
         content += Px(t.spacing.lg) + Px(t.spacing.xs);
-    internal::ControlStub("Button", label, internal::StubWidth(options.width, content), height);
+    stub::ControlStub("Button", label, stub::StubWidth(options.width, content), height);
     return false;
 }
 

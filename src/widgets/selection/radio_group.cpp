@@ -12,11 +12,12 @@ namespace
 
 void Stub(const char* label, std::size_t itemCount, const RadioGroupOptions& options)
 {
+    namespace stub = internal::controls;
     const bool vertical = options.orientation == Orientation::Vertical;
     const int rows = vertical && itemCount > 0 ? static_cast<int>(itemCount) : 1;
-    const float height = internal::StubLabelLine(label) + static_cast<float>(rows) * ControlHeight(options.size)
-                         + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("RadioGroup", label, internal::StubWidth(0.0f, 0.0f), height);
+    const float height = stub::StubLabelLine(label) + static_cast<float>(rows) * ControlHeight(options.size)
+                         + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("RadioGroup", label, stub::StubWidth(0.0f, 0.0f), height);
 }
 
 } // namespace

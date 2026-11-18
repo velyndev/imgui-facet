@@ -12,9 +12,10 @@ namespace
 
 void Stub(const char* label, const SliderOptions& options)
 {
-    const ImVec2 size = internal::StubSliderSize(options.orientation, options.width, options.height, options.size,
+    namespace stub = internal::controls;
+    const ImVec2 size = stub::StubSliderSize(options.orientation, options.width, options.height, options.size,
                                                  options.error, options.helpText);
-    internal::ControlStub("Slider", label, size.x, size.y);
+    stub::ControlStub("Slider", label, size.x, size.y);
 }
 
 } // namespace

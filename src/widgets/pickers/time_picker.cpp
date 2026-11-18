@@ -19,10 +19,11 @@ constexpr float kColumnRows = 5.0f;
 
 bool TimePicker(const char* label, TimeOfDay*, const TimePickerOptions& options)
 {
-    float height = internal::StubHeight(options.size, options.error, options.helpText);
+    namespace stub = internal::controls;
+    float height = stub::StubHeight(options.size, options.error, options.helpText);
     if (options.inlineColumns)
         height += kColumnRows * ControlHeight(options.size) + Px(T().spacing.sm);
-    internal::ControlStub("TimePicker", label, internal::StubWidth(options.width, 0.0f), height);
+    stub::ControlStub("TimePicker", label, stub::StubWidth(options.width, 0.0f), height);
     return false;
 }
 

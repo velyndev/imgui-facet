@@ -21,12 +21,13 @@ constexpr float kHexInXxxl = 2.5f;
 
 bool ColorWell(const char* label, ImVec4*, const ColorWellOptions& options)
 {
+    namespace stub = internal::controls;
     const float height = ControlHeight(options.size);
-    float content = internal::StubLabelWidth(label, options.size) + height * kSwatchInControls;
+    float content = stub::StubLabelWidth(label, options.size) + height * kSwatchInControls;
     if (options.showHex)
         content += Px(T().spacing.xxxl) * kHexInXxxl;
-    internal::ControlStub("ColorWell", label, internal::StubWidth(options.width, content),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    stub::ControlStub("ColorWell", label, stub::StubWidth(options.width, content),
+                          stub::StubHeight(options.size, options.error, options.helpText));
     return false;
 }
 

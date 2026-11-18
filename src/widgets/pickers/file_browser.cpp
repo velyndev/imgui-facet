@@ -16,8 +16,9 @@ constexpr float kBrowserInControls = 10.0f;
 
 void Stub(const char* label, const FileBrowserOptions& options)
 {
+    namespace stub = internal::controls;
     const float height = options.height > 0.0f ? Px(options.height) : ControlHeight(ControlSize::Inherit) * kBrowserInControls;
-    internal::ControlStub("FileBrowser", label, internal::StubWidth(options.width, 0.0f), height);
+    stub::ControlStub("FileBrowser", label, stub::StubWidth(options.width, 0.0f), height);
 }
 
 } // namespace

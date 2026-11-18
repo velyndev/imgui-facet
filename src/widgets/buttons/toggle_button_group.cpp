@@ -14,15 +14,17 @@ namespace
 
 float ButtonWidth(const char* text, bool iconOnly, const ToggleButtonGroupOptions& options)
 {
+    namespace stub = internal::controls;
     if (iconOnly)
         return ControlHeight(options.size);
-    return internal::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
+    return stub::StubLabelWidth(text, options.size) + 2.0f * Px(T().spacing.sm);
 }
 
 void Stub(const char* label, float content, const ToggleButtonGroupOptions& options)
 {
+    namespace stub = internal::controls;
     // Buttons that do not fit move into a "more" menu, so the group never outgrows the row.
-    internal::ControlStub("ToggleButtonGroup", label, internal::StubFittedWidth(options.width, content),
+    stub::ControlStub("ToggleButtonGroup", label, stub::StubFittedWidth(options.width, content),
                           ControlHeight(options.size));
 }
 

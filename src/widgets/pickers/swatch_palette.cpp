@@ -14,7 +14,8 @@ namespace
 
 void Stub(const char* label, std::size_t swatchCount, bool history, const SwatchPaletteOptions& options)
 {
-    const float width = internal::StubWidth(options.width, 0.0f);
+    namespace stub = internal::controls;
+    const float width = stub::StubWidth(options.width, 0.0f);
     const float swatch = ControlHeight(options.size);
     const float gap = Px(T().spacing.xs);
     int columns = options.columns;
@@ -25,7 +26,7 @@ void Stub(const char* label, std::size_t swatchCount, bool history, const Swatch
     // The trailing + swatch of the editable form is counted like a swatch.
     const int count = static_cast<int>(swatchCount) + 1;
     const int rows = (count + columns - 1) / columns + (history ? 1 : 0);
-    internal::ControlStub("SwatchPalette", label, width, static_cast<float>(rows) * (swatch + gap) - gap);
+    stub::ControlStub("SwatchPalette", label, width, static_cast<float>(rows) * (swatch + gap) - gap);
 }
 
 } // namespace

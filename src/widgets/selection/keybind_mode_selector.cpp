@@ -12,6 +12,7 @@ namespace facet
 
 bool KeybindModeSelector(const char* label, BindMode*, const KeybindModeSelectorOptions& options)
 {
+    namespace stub = internal::controls;
     const Strings& strings = GetStrings();
     const char* const modes[] = {strings.bindHold, strings.bindToggle, options.allowAlways ? strings.bindAlways : nullptr,
                                  options.allowOff ? strings.bindOff : nullptr};
@@ -19,11 +20,11 @@ bool KeybindModeSelector(const char* label, BindMode*, const KeybindModeSelector
     for (const char* mode : modes)
     {
         if (mode != nullptr)
-            content += internal::StubLabelWidth(mode, options.size) + 2.0f * Px(T().spacing.sm);
+            content += stub::StubLabelWidth(mode, options.size) + 2.0f * Px(T().spacing.sm);
     }
     // Too narrow for the segments it becomes a dropdown, so it never outgrows the row.
-    internal::ControlStub("KeybindModeSelector", label, internal::StubFittedWidth(options.width, content),
-                          internal::StubHeight(options.size, options.error, options.helpText));
+    stub::ControlStub("KeybindModeSelector", label, stub::StubFittedWidth(options.width, content),
+                          stub::StubHeight(options.size, options.error, options.helpText));
     return false;
 }
 

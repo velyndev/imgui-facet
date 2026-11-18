@@ -19,10 +19,11 @@ constexpr float kRows = 3.0f;
 
 bool ColorModeEditor(const char* label, AnimatedColor*, const ColorModeEditorOptions& options)
 {
+    namespace stub = internal::controls;
     const float control = ControlHeight(ControlSize::Inherit);
     const float height = kRows * control + (kRows - 1.0f) * Px(T().spacing.sm)
-                         + internal::StubMessageHeight(options.error, options.helpText);
-    internal::ControlStub("ColorModeEditor", label, internal::StubWidth(options.width, 0.0f), height);
+                         + stub::StubMessageHeight(options.error, options.helpText);
+    stub::ControlStub("ColorModeEditor", label, stub::StubWidth(options.width, 0.0f), height);
     return false;
 }
 

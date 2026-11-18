@@ -10,9 +10,10 @@ namespace facet
 
 bool ColorChannelSlider(const char* label, ImVec4*, const ColorChannelSliderOptions& options)
 {
+    namespace stub = internal::controls;
     const ImVec2 size =
-        internal::StubSliderSize(options.orientation, options.width, options.height, options.size, nullptr, nullptr);
-    internal::ControlStub("ColorChannelSlider", label, size.x, size.y);
+        stub::StubSliderSize(options.orientation, options.width, options.height, options.size, nullptr, nullptr);
+    stub::ControlStub("ColorChannelSlider", label, size.x, size.y);
     return false;
 }
 
