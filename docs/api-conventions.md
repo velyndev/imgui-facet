@@ -59,6 +59,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 ## 6. Size and layout
 
 - Every length in a `widgets/` header is in design units, and Facet multiplies it by `Px()`. Core headers state their unit per function: core `Image`, `IconGlyph`, draw and effects functions take pixels, as their Dear ImGui counterparts do. Stock calls such as `ImGui::SetNextItemWidth` stay in pixels; wrap units with `facet::Px`. *Reason: widgets stay correct at every scale, and the low-level layer keeps Dear ImGui's convention.*
+- Host-facing coordinates (hit tests, input regions, the window placement position) are pixels of the host's coordinate space, stated per declaration. *Reason: the host compares them with window messages and OS rectangles, which know nothing of the UI scale.*
 - The width is taken from the first of these that is set:
   1. `options.width`: a value > 0 is units, `kFill` (`-FLT_MIN`) is the available width, and any other value < 0 is the available width minus that many units;
   2. `ImGui::SetNextItemWidth`;
@@ -105,6 +106,9 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - A widget snapshots `SetNextItemWidth`, `SetNextItemAllowOverlap`, `SetNextItemSelectionUserData`, `SetKeyboardFocusHere` and pushed item flags at entry, before its first sub-item, because `ItemAdd` clears them.
 - A widget leaves the id stack, style stack, item width and font as it found them.
 - Moving focus between items is Dear ImGui navigation and needs the host to enable `NavEnableKeyboard`. Keys inside a focused widget (arrows, Home, End, Escape) are read by Facet through key routing. Facet draws its own focus ring after keyboard input and never the stock highlight.
+- After a mouse click, Dear ImGui shows the keyboard focus on the first Tab instead of moving it; Facet keeps this.
+- A hit target grown to `minHitTarget` around a small visual never takes a click that lands on a neighbour's visible rectangle.
+- A label or title that a widget cuts with an ellipsis shows its full text on keyboard focus as well as on hover.
 - Facet never changes io flags and reads input only from `ImGuiIO`, so scripted input drives every widget.
 - While `KeybindCapture` listens, it owns every key and stays active, so `io.WantCaptureKeyboard` is true.
 - Where Dear ImGui has a type, Facet uses it: `ImGuiKeyChord`; `ImGuiSelectionBasicStorage*` plus `BeginMultiSelect` for every list and table; `ImGui::TableGetSortSpecs` inside `BeginDataTable`.
