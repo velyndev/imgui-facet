@@ -155,9 +155,8 @@ default: break;
 }
 ```
 
-`r.source` is the id of the widget the drag started in, so drags between two grids or from an
-`ItemSlot` arrive with the source grid's id; compare it with `ImGui::GetID("bag")` taken in the
-same id scope.
+`r.source` is the id of the grid, tile or slot the drag started in; compare it with
+`ImGui::GetID` of that widget's id or label (`ImGui::GetID("bag")`), taken in the same id scope.
 
 ### Layer list
 
