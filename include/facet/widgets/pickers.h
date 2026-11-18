@@ -431,12 +431,13 @@ struct ThumbnailPickerOptions
 };
 
 // A grid of captioned thumbnails; the picked one shows the selection ring. The single form is
-// one Tab stop with arrow-key movement; the multi form flips `selected` flags (one per item)
-// with Space or Ctrl+click. Returns true when *index or a flag was written. With a count of 0
+// one Tab stop with arrow-key movement. The multi form holds checked values, not a selection
+// (lists.h): `checked` has one flag per item, each tile is a Tab stop, and a click or Space
+// flips its flag, like OptionCardGroup. Returns true when *index or a flag was written. With a count of 0
 // in Ready it shows the empty state; Loading shows skeleton tiles; Error shows errorText.
 bool ThumbnailPicker(const char* label, int* index, std::span<const ThumbnailItem> items,
                      const ThumbnailPickerOptions& options = {});
-bool ThumbnailPicker(const char* label, std::span<bool> selected, std::span<const ThumbnailItem> items,
+bool ThumbnailPicker(const char* label, std::span<bool> checked, std::span<const ThumbnailItem> items,
                      const ThumbnailPickerOptions& options = {});
 
 // --- FileBrowser ------------------------------------------------------------------------------

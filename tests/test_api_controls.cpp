@@ -514,6 +514,8 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, DragNumber("Drag 3", &v.real, {.wrap = true}));
     FACET_CHECK_STUB(false, UnitInput("Unit 1", &v.real, &v.unit, kUnits));
     FACET_CHECK_STUB(false, VectorInput("Vector 1", std::span<float>(v.vector), {.linkToggle = true}));
+    FACET_CHECK_STUB(false, VectorInput("Vector 3", &v.point));
+    FACET_CHECK_STUB(false, VectorInput("Vector 4", &v.color));
     FACET_CHECK_STUB(false, VectorInput("Vector 2", std::span<int>(v.vectorInt)));
     FACET_CHECK_STUB(false, SizeInput("Size 1", &v.size));
     FACET_CHECK_STUB(false, SizeInput("Size 2", &v.sizeX, &v.sizeY, {.swapButton = true}));
@@ -559,7 +561,7 @@ void CallEveryStub(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
-constexpr int kStubCalls = 114;
+constexpr int kStubCalls = 116;
 
 } // namespace
 

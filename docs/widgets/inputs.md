@@ -145,6 +145,8 @@ Status: planned.
 ```cpp
 bool VectorInput(const char* label, std::span<float> components, const VectorInputOptions& options = {});
 bool VectorInput(const char* label, std::span<int> components, const VectorInputOptions& options = {});
+bool VectorInput(const char* label, ImVec2* value, const VectorInputOptions& options = {});
+bool VectorInput(const char* label, ImVec4* value, const VectorInputOptions& options = {});
 ```
 
 One to four drag fields side by side with axis labels and an optional proportional lock.

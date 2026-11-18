@@ -387,6 +387,10 @@ struct VectorInputOptions
 // four components show the first four read-only. Keeps the link state under its id.
 bool VectorInput(const char* label, std::span<float> components, const VectorInputOptions& options = {});
 bool VectorInput(const char* label, std::span<int> components, const VectorInputOptions& options = {});
+// The same for the two and four components of an ImVec2 or ImVec4 (axis labels X, Y and X, Y,
+// Z, W unless axisLabels names them).
+bool VectorInput(const char* label, ImVec2* value, const VectorInputOptions& options = {});
+bool VectorInput(const char* label, ImVec4* value, const VectorInputOptions& options = {});
 
 // --- SizeInput --------------------------------------------------------------------------------
 

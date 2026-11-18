@@ -135,7 +135,7 @@ Status: planned.
 ```cpp
 bool ThumbnailPicker(const char* label, int* index, std::span<const ThumbnailItem> items,
                      const ThumbnailPickerOptions& options = {});
-bool ThumbnailPicker(const char* label, std::span<bool> selected, std::span<const ThumbnailItem> items,
+bool ThumbnailPicker(const char* label, std::span<bool> checked, std::span<const ThumbnailItem> items,
                      const ThumbnailPickerOptions& options = {});
 ```
 

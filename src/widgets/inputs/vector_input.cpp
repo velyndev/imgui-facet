@@ -31,4 +31,16 @@ bool VectorInput(const char* label, std::span<int>, const VectorInputOptions& op
     return false;
 }
 
+bool VectorInput(const char* label, ImVec2*, const VectorInputOptions& options)
+{
+    Stub(label, options);
+    return false;
+}
+
+bool VectorInput(const char* label, ImVec4*, const VectorInputOptions& options)
+{
+    Stub(label, options);
+    return false;
+}
+
 } // namespace facet
