@@ -1,8 +1,7 @@
 // Per-frame work of the widget families lists, navigation, containers, layout and overlays.
-// Owner from Phase 1c part A on: the structure API package. While the widgets are planned, the
-// end of a frame forgets the placeholder frames a caller left open (the scope stack, which runs
-// after this module, reports them). The toast stack of overlays.h is drawn from here once
-// Phase 2 implements it.
+// While the widgets are planned, the end of a frame forgets the placeholder frames a caller left
+// open (the scope stack, which runs after this module, reports them). The toast stack of
+// overlays.h is planned to be drawn from here once Phase 2 implements it.
 
 #include "internal/subsystem.h"
 #include "widgets/structure_stub.h"

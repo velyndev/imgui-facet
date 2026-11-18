@@ -1,5 +1,4 @@
 // Width classes and the labelled row layout (layout.h).
-// Owner from Phase 1c part A on: the interaction blocks package (row layout and responsive core).
 
 #include "facet/core/layout.h"
 

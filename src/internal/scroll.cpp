@@ -1,6 +1,5 @@
 // Scroll core: overlay scrollbars, smooth wheel scrolling and edge fades.
-// Owner from Phase 1c part B on: the surface blocks package, which adds scroll.h and the
-// behaviour. For now the module has no hooks.
+// Planned for Phase 1c part B: scroll.h and the behaviour. For now the module has no hooks.
 
 #include "internal/subsystem.h"
 

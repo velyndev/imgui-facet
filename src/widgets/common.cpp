@@ -1,6 +1,5 @@
 // Behaviour behind widgets/common.h: the control size stack, the built-in strings, the edit
 // session queries (fed by the item behaviour and the value drag core) and the visible row ranges.
-// Owner from Phase 1c part A on: the interaction blocks package.
 
 #include "facet/widgets/common.h"
 

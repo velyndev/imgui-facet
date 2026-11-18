@@ -1,6 +1,5 @@
 // Per-frame work of the widget families buttons, selection, sliders, inputs and pickers.
-// Owner from Phase 1c part A on: the controls API package, which fills the hooks it needs.
-// For now the module has no hooks.
+// The widgets are placeholders until Phase 2, so the module has no hooks yet.
 
 #include "internal/subsystem.h"
 

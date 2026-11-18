@@ -1,7 +1,6 @@
 // Per-frame work of the widget families display, charts, media and composites, for example
 // sampling frame times for the frame time graph.
-// Owner from Phase 1c part A on: the content API package, which fills the hooks it needs.
-// For now the module has no hooks.
+// The widgets are placeholders until Phase 2, so the module has no hooks yet.
 
 #include "internal/subsystem.h"
 
