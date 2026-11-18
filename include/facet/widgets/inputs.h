@@ -624,9 +624,10 @@ struct ValidationSummaryOptions
 // A list of the Destructive messages that the fields of the current window reported in the
 // previous frame (through `error` options or FieldValidation), each a link that focuses and
 // scrolls to its field; a field reported without an id (FieldValidation after a group or a
-// stock composite widget) is listed and scrolled to, but not focused. The visible label part is the heading drawn above the entries ("##name"
-// for none); the id keeps nothing. Each entry is a Tab stop; Enter or Space activates it. Draws
-// nothing and submits no item while there are none. Returns true when an entry was activated.
+// stock composite widget) is listed and scrolled to, but not focused. The visible label part is
+// the heading drawn above the entries ("##name" for none); the id keeps nothing. Each entry is a
+// Tab stop; Enter or Space activates it. Draws nothing and submits no item while there are none.
+// Returns true when an entry was activated.
 bool ValidationSummary(const char* label, const ValidationSummaryOptions& options = {});
 
 } // namespace facet
