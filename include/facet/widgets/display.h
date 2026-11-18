@@ -60,12 +60,16 @@ struct TruncatedTextOptions
     int maxLines = 1;                      // lines before the ellipsis; End mode only for more than 1
     TextStyle style = TextStyle::Body;
     bool secondary = false;                // labelSecondary instead of label
+    bool focusable = false;                // a Tab stop; while cut, keyboard focus shows the whole text as a tooltip
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
 // Text cut with an ellipsis to fit its width. While text was cut, hovering the item shows the
-// whole text as a tooltip. Not focusable and not activatable; keeps no state. A null text
-// draws nothing but still submits an item of one line.
+// whole text as a tooltip, and so does keyboard focus with `focusable` (rule 11). Text that a
+// keyboard user must be able to read in full, and that sits outside a focusable row, sets
+// focusable; in table cells and list rows the row's focus shows the tooltip instead. The text is
+// the item id of a focusable one (PushID in loops). Never activatable; keeps no state. A null
+// text draws nothing but still submits an item of one line.
 void TruncatedText(const char* text, const TruncatedTextOptions& options = {});
 
 struct SectionHeaderOptions
