@@ -99,6 +99,11 @@ bool Mirrored(const HandleConstraints& c, int count)
     return c.mirror && count == 2 && c.collision != CollisionMode::Free;
 }
 
+bool FixedSpan(const HandleConstraints& c, int count)
+{
+    return c.fixedSpan && count >= 2 && !Mirrored(c, count) && c.collision != CollisionMode::Free;
+}
+
 // The key of handle `index`, 0 without keys.
 ImGuiID KeyOf(std::span<const ImGuiID> keys, int index)
 {
@@ -146,7 +151,13 @@ void HandleLimits(std::span<const double> values, int index, const HandleConstra
     const int n = static_cast<int>(values.size());
     const double gap = EffectiveGap(c, n);
     const auto at = [&](int i) { return values[static_cast<size_t>(i)]; };
-    if (Mirrored(c, n))
+    if (FixedSpan(c, n))
+    {
+        // As far as the whole run can go: the first handle reaches min, the last reaches max.
+        *low = c.min + (at(index) - at(0));
+        *high = std::max(*low, c.max - (at(n - 1) - at(index)));
+    }
+    else if (Mirrored(c, n))
     {
         const double center = std::clamp(c.center, c.min, c.max);
         *low = index == 0 ? std::max(c.min, 2.0 * center - c.max) : center + gap * 0.5;
@@ -251,6 +262,8 @@ bool MoveHandle(std::span<double> values, int index, double target, const Handle
     const int n = static_cast<int>(values.size());
     if (index < 0 || index >= n || std::isnan(target))
         return false;
+    if (FixedSpan(c, n))
+        return MoveSpan(values, 0, n - 1, target - values[static_cast<size_t>(index)], c);
     const double gap = EffectiveGap(c, n);
     double before[kMaxHandles];
     const int kept = std::min(n, kMaxHandles);
@@ -648,6 +661,22 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
                 result.changed = true;
             }
             result.canceled = true;
+        }
+        else if (edit.changed && FixedSpan(constraints, n))
+        {
+            // The run moves from where every handle was when the edit began, so rounding and
+            // step snapping never add up over a drag.
+            const EditSnapshot& snapshot = Snapshot();
+            const bool haveStart = snapshot.owner == id && snapshot.count == n;
+            double moved[kMaxHandles];
+            for (int k = 0; k < n; ++k)
+                moved[k] = haveStart ? snapshot.values[k] : v[static_cast<size_t>(k)];
+            MoveHandle(std::span<double>(moved, static_cast<size_t>(n)), i, value, constraints);
+            for (int k = 0; k < n; ++k)
+            {
+                result.changed = result.changed || moved[k] != v[static_cast<size_t>(k)];
+                v[static_cast<size_t>(k)] = moved[k];
+            }
         }
         else if (edit.changed)
         {

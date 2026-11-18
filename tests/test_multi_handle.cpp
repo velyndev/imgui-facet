@@ -167,6 +167,30 @@ TEST_CASE("Multi-handle: a span keeps its distances and stops at the limits")
     CHECK(three[2] == 60.0);
 }
 
+TEST_CASE("Multi-handle: a fixed span moves every handle with the one that is moved")
+{
+    std::array<double, 2> v = {20.0, 50.0};
+    HandleConstraints c = Range(5.0);
+    c.fixedSpan = true;
+    CHECK(MoveHandle(v, 0, 30.0, c));
+    CHECK(v[0] == 30.0);
+    CHECK(v[1] == 60.0);
+    CHECK(MoveHandle(v, 1, 40.0, c));
+    CHECK(v[0] == 10.0);
+    CHECK(v[1] == 40.0);
+    // At the range end the run stops as a whole; past it nothing moves.
+    CHECK(MoveHandle(v, 0, 90.0, c));
+    CHECK(v[0] == 70.0);
+    CHECK(v[1] == 100.0);
+    CHECK_FALSE(MoveHandle(v, 1, 120.0, c));
+    // Mirror wins over a fixed span.
+    c.mirror = true;
+    c.center = 50.0;
+    std::array<double, 2> m = {40.0, 60.0};
+    CHECK(MoveHandle(m, 0, 30.0, c));
+    CHECK(m[1] == 70.0);
+}
+
 TEST_CASE("Multi-handle: handles are added and removed in order")
 {
     std::array<double, 5> storage = {10.0, 50.0, 90.0, 0.0, 0.0};
@@ -678,6 +702,50 @@ TEST_CASE("Multi-handle behaviour: each handle is a Tab stop moved by the arrows
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() != range.last.span.id);
     CHECK(ImGui::GetFocusID() != range.last.track.id);
+}
+
+TEST_CASE("Multi-handle behaviour: a fixed span moves both handles on a drag, a key and a track click")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.options.constraints.fixedSpan = true;
+    range.options.spanDrag = false;
+    range.options.drag.mapping.step = 1.0;
+    Install(session, range);
+    // A drag of the low handle in both directions carries the high one along.
+    session.Drag({TestRange::At(session, 20.0), TestRange::At(session, 30.0)});
+    CHECK(range.values[0] == doctest::Approx(30.0));
+    CHECK(range.values[1] == doctest::Approx(70.0));
+    session.Drag({TestRange::At(session, 30.0), TestRange::At(session, 10.0)});
+    CHECK(range.values[0] == doctest::Approx(10.0));
+    CHECK(range.values[1] == doctest::Approx(50.0));
+    // The high handle toward max stops when it reaches the end; the gap stays 40.
+    session.Drag({TestRange::At(session, 50.0), TestRange::At(session, 99.0), TestRange::At(session, 100.0)});
+    CHECK(range.values[1] == doctest::Approx(100.0));
+    CHECK(range.values[0] == doctest::Approx(60.0));
+    // A key step at the range end changes nothing and edits nothing.
+    REQUIRE(ImGui::GetFocusID() == range.handles[1].id);
+    const int commits = range.commits;
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(range.values[1] == 100.0);
+    CHECK(range.commits == commits);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(range.values[0] == doctest::Approx(59.0));
+    CHECK(range.values[1] == doctest::Approx(99.0));
+    // A track click outside the span shifts the run instead of resizing it.
+    session.Click(TestRange::At(session, 20.0));
+    CHECK(range.values[0] == doctest::Approx(20.0));
+    CHECK(range.values[1] == doctest::Approx(60.0));
+    // Escape during a drag restores both.
+    session.MouseMove(TestRange::At(session, 20.0));
+    session.MouseDown();
+    session.MouseMove(TestRange::At(session, 35.0));
+    CHECK(range.values[1] == doctest::Approx(75.0));
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    CHECK(range.values[0] == doctest::Approx(20.0));
+    CHECK(range.values[1] == doctest::Approx(60.0));
 }
 
 TEST_CASE("Multi-handle behaviour: a handle disabled during a key session releases the active id")

@@ -77,6 +77,11 @@ struct HandleConstraints
     // the pair stays symmetric. Collisions then cannot happen; the gap and the range still hold.
     bool mirror = false;
     double center = 0.5;
+    // Every edit of one handle moves all handles by the same value delta (MoveSpan), so the
+    // distances between them never change and the run stops as a whole at the range ends. The
+    // distances stay equal in value units, also on a logarithmic mapping. Ignored with mirror
+    // and with CollisionMode::Free.
+    bool fixedSpan = false;
 };
 
 // The minimum gap the constraints really use for `count` handles: minGap clamped to 0 to
@@ -88,8 +93,9 @@ double EffectiveGap(const HandleConstraints& constraints, int count);
 // the caller's variables are written only after an edit.
 void ConstrainHandles(std::span<double> values, const HandleConstraints& constraints);
 
-// Moves handle `index` to `target` and resolves the constraints. Returns true when any value
-// changed. An index outside the span or a NaN target changes nothing.
+// Moves handle `index` to `target` and resolves the constraints. With fixedSpan it moves every
+// handle by target minus the handle's value instead (MoveSpan over all of them). Returns true
+// when any value changed. An index outside the span or a NaN target changes nothing.
 bool MoveHandle(std::span<double> values, int index, double target, const HandleConstraints& constraints);
 
 // Moves handles first to last (inclusive) by `delta`, keeping their distances. At the range ends
