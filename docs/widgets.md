@@ -6,9 +6,12 @@ holds the types the families share (`ControlSize`, `Tone`, `ChoiceItem`, `DataSt
 control size stack, the edit session queries and the built-in strings). Every declaration
 follows [the API conventions](api-conventions.md).
 
-**Status: planned.** No widget is implemented yet. The family headers are being filled with
-documented declarations whose bodies only draw a placeholder; the widgets themselves are built
-in Phase 2. The demo gallery has one page per family under Widgets.
+**Status: planned.** No widget is implemented yet. Every family header declares its widgets
+with documentation comments, and every declared function links: its body draws a placeholder
+at the widget's default size ("Name: planned"), returns the neutral result and writes nothing.
+The widgets themselves are built in Phase 2. Each family page under `docs/widgets/` gives the
+status of every entry. The demo gallery has one page per family under
+Widgets.
 
 | Family | Header | Documentation | What it holds |
 |---|---|---|---|
@@ -28,4 +31,6 @@ in Phase 2. The demo gallery has one page per family under Widgets.
 | Composites | `facet/widgets/composites.h` | [composites](widgets/composites.md) | Curve and gradient editors, property grids, console views, key bind and preset lists, inventory grids |
 
 The low-level drawing, images and icons that exist today are in the core headers; see
-[theming](theming.md), [scaling](scaling.md) and [images and icons](images-and-icons.md).
+[theming](theming.md), [scaling](scaling.md), [images and icons](images-and-icons.md),
+[layout](layout.md) (width classes and labelled rows) and [input](input.md) (key chords, key
+binds and shortcuts).
