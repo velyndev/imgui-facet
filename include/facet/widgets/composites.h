@@ -725,14 +725,22 @@ struct AccentPickerOptions
 {
     std::span<const AccentPreset> presets = {};  // empty uses AccentPresets(); the first is "theme default"
     bool customColor = true;               // a color well for any color after the presets
-    bool apply = true;                     // calls SetAccent (ClearAccent for the first preset) when written
+    bool apply = true;                     // when written: ClearAccent for the theme default, else SetAccent
     ControlSize size = ControlSize::Inherit;
     bool readOnly = false;
 };
 
-// A row of accent swatches. One Tab stop: arrows move, Enter and Space choose. Returns true
-// when *accent was written.
-bool AccentPicker(const char* label, ImVec4* accent, const AccentPickerOptions& options = {});
+// A row of accent swatches. One Tab stop: arrows move, Enter and Space choose. The first preset
+// stands for "each theme's own accent", which no single color can say (the dark preset uses a
+// lighter blue than the light one), so it is a value of its own: choosing it writes
+// *themeDefault = true and leaves *accent as it is; choosing any other swatch or the custom
+// color writes *accent and *themeDefault = false. While *themeDefault is true the first swatch
+// is marked, otherwise the swatch equal to *accent (or the custom well). A null themeDefault
+// offers no theme default: the first preset is a color like the others. A null accent draws the
+// picker read-only. The visible label part is the accessible name and is not drawn; put the
+// picker in a settings row for a visible label. Returns true when *themeDefault or *accent was
+// written. Keeps no state; the default width fits the swatches.
+bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {});
 
 struct UiScaleControlOptions
 {

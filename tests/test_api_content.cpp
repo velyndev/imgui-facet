@@ -602,8 +602,13 @@ void ToolCalls()
     CHECK(mode == ThemeMode::Dark);
     ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
     const Snapshot accentBefore(accent);
-    Check("AccentPicker", Expect::Item, "Accent", [&] { CHECK_FALSE(AccentPicker("Accent", &accent)); });
+    bool themeDefault = false;
+    Check("AccentPicker", Expect::Item, "Accent",
+          [&] { CHECK_FALSE(AccentPicker("Accent", &themeDefault, &accent)); });
+    Check("AccentPicker, no theme default", Expect::Item, "Accent 2",
+          [&] { CHECK_FALSE(AccentPicker("Accent 2", nullptr, &accent)); });
     CHECK(accentBefore.Unchanged());
+    CHECK_FALSE(themeDefault);
     float scale = 1.25f;
     Check("UiScaleControl", Expect::Item, "Scale",
           [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.keyboardZoom = true})); });
@@ -856,7 +861,7 @@ TEST_CASE("Content-sized stubs are wide enough to name the widget and say planne
         wide("ItemSlot", [&] { ItemSlot("A", item); });
         wide("UserChip", [] { UserChip("A", ImageHandle{}, {.compact = true}); });
         wide("ThemeModeControl", [&] { ThemeModeControl("##theme", &mode); });
-        wide("AccentPicker", [&] { AccentPicker("##accent", &accent, {.customColor = false}); });
+        wide("AccentPicker", [&] { AccentPicker("##accent", nullptr, &accent, {.customColor = false}); });
         BeginPreviewCanvas("canvas", ImVec2(100.0f, 100.0f));
         wide("CanvasElement", [&] { CanvasElement("A", &element); });
         EndPreviewCanvas();

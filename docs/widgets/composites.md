@@ -45,7 +45,7 @@ Item data always belongs to the caller and is read during the call.
 | KeybindList | `bool KeybindList(const char* id, const KeybindListOptions& options = {})` (the shortcut registry), overload with `std::span<KeybindListItem>` | Editable table of key binds with conflict marks and reset | planned |
 | PresetList | `PresetListResult PresetList(const char* id, int* active, std::span<const PresetItem> presets, const PresetListOptions& options = {})` | Preset manager with create, save, rename, duplicate, delete, import and export | planned |
 | ThemeModeControl | `bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {})` | Light, Dark and System segments that can apply the mode | planned |
-| AccentPicker | `bool AccentPicker(const char* label, ImVec4* accent, const AccentPickerOptions& options = {})` | Accent swatches plus a custom color that can apply the accent | planned |
+| AccentPicker | `bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {})` | Accent swatches with a theme default and a custom color that can apply the accent | planned |
 | UiScaleControl | `bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {})` | Stepped UI scale with optional Ctrl zoom keys | planned |
 | InventoryGrid | `InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots, const InventoryGridOptions& options = {})` | Slot grid with drag to move, swap, merge and split | planned |
 | ItemTile | `bool ItemTile(const char* id, const InventoryItem& item, const ItemTileOptions& options = {})` | One item tile with count, category bar, lock and cooldown | planned |
@@ -117,6 +117,22 @@ if (facet::SettingsSearchMatch("Vertical sync", {.keywords = "vsync tearing", .s
 facet::EndSettingsSearch();
 // In the navigation, drawn before the page: hits of the last frame.
 const int hits = facet::SettingsSearchHitCount("settings", "Display");
+```
+
+### Accent picker in saved settings
+
+"Each theme's own accent" is not one color, so the picker reports it as a value of its own. An
+application that saves settings stores both values and applies them itself.
+
+```cpp
+if (facet::AccentPicker("##accent", &settings.themeAccent, &settings.accent, {.apply = false}))
+{
+    if (settings.themeAccent)
+        facet::ClearAccent();              // each theme shows its own accent again
+    else
+        facet::SetAccent(settings.accent);
+    SaveSettings();
+}
 ```
 
 ### Inventory grid

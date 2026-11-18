@@ -6,7 +6,7 @@
 namespace facet
 {
 
-bool AccentPicker(const char* label, ImVec4*, const AccentPickerOptions& options)
+bool AccentPicker(const char* label, bool*, ImVec4*, const AccentPickerOptions& options)
 {
     namespace stub = internal::content;
     const std::size_t presets = options.presets.empty() ? AccentPresets().size() : options.presets.size();

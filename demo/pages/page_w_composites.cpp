@@ -64,6 +64,7 @@ struct CompositesUi
     };
     int preset = 0;
     facet::ThemeMode themeMode = facet::ThemeMode::System;
+    bool themeAccent = true;
     ImVec4 accent = {0.0f, 0.0f, 0.0f, 1.0f};
     float uiScale = 1.0f;
     int slot = 0;
@@ -134,7 +135,7 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     LabeledRow("ThemeModeControl");
     facet::ThemeModeControl("Theme##composites", &ui.themeMode, {.apply = false});
     LabeledRow("AccentPicker");
-    facet::AccentPicker("Accent##composites", &ui.accent, {.apply = false});
+    facet::AccentPicker("Accent##composites", &ui.themeAccent, &ui.accent, {.apply = false});
     LabeledRow("UiScaleControl");
     facet::UiScaleControl("UI scale##composites", &ui.uiScale, kScaleMin, kScaleMax, {.apply = false});
 
