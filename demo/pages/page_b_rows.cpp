@@ -238,6 +238,17 @@ FACET_DEMO_SELFTEST("rows")
     });
     test.KeyPress(ImGuiKey_Space);
     test.Expect("the toggle in that row works by mouse and keyboard", [] { return !page.longToggle; });
+    // The navigation titles follow the same rule. This page's title is cut in narrow windows at
+    // large scales; there the keyboard focus on its row shows it in full.
+    test.Click("nav.rows");
+    test.Hover(T::Item("rows.width"), 0.1f);
+    test.KeyPress(ImGuiKey_Tab);  // after a click, the first Tab shows the focus where it is
+    test.ExpectFocused("nav.rows");
+    test.Expect("a cut navigation title shows in full on keyboard focus", [] {
+        ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
+        return !facet::demo::NavTitleCut("rows") || (tooltip != nullptr && tooltip->Active);
+    });
+
     // Validation: the error line appears when the bounds cross.
     test.Expect("no error while the bounds are in order", [] { return !page.error; });
     test.Click("rows.lower");

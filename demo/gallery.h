@@ -53,6 +53,9 @@ void ClearColor(float out[4]);
 // With a shell, the title strip moves the window and its buttons control it; without one
 // (offscreen runs) the strip is drawn the same way and the window buttons do nothing.
 void DrawGallery(GalleryState& state, PageCtx& ctx, AppShell* shell);
+// True when the navigation title of page `pageId` ended in an ellipsis in the last frame (for
+// selftests: a cut title shows in full on hover and on keyboard focus).
+bool NavTitleCut(const char* pageId);
 
 // Building blocks for the demo pages, drawn with the text style and color tokens.
 

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <iterator>
 #include <string>
+#include <vector>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -64,6 +65,13 @@ int NearestScaleIndex(float scale)
 ImU32 Color(const ImVec4& color)
 {
     return facet::ToU32(color);
+}
+
+// Per page: its navigation title ended in an ellipsis in the last frame.
+std::vector<unsigned char>& NavTitleCuts()
+{
+    static std::vector<unsigned char> cuts;
+    return cuts;
 }
 
 facet::ThemeMode ModeOf(const GalleryState& state)
@@ -320,6 +328,9 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
     bool rowFocused = false;
     const std::string* currentGroup = nullptr;
     char probeName[96];
+    std::vector<unsigned char>& cuts = NavTitleCuts();
+    if (cuts.size() != pages.size())
+        cuts.assign(pages.size(), 0);
     for (int i = 0; i < static_cast<int>(pages.size()); ++i)
     {
         const PageInfo& page = pages[static_cast<size_t>(i)];
@@ -383,11 +394,26 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx)
         facet::internal::PushPillLabelStyle(facet::TextStyle::Body, selected);
         const float textY = facet::CenteredTextY(row.rect.Min.y, rowHeight);
         char title[128];
-        facet::internal::TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr,
-                                      row.rect.GetWidth() - rowInset * 2.0f, facet::internal::TruncateMode::End, title,
-                                      sizeof(title));
+        const facet::internal::TruncateResult cut = facet::internal::TruncateText(
+            ImGui::GetFont(), ImGui::GetFontSize(), page.title.c_str(), nullptr, row.rect.GetWidth() - rowInset * 2.0f,
+            facet::internal::TruncateMode::End, title, sizeof(title));
         drawList->AddText(ImVec2(row.rect.Min.x + rowInset, textY), Color(c.label), title);
         facet::PopTextStyle();
+        cuts[static_cast<size_t>(i)] = cut.truncated ? 1 : 0;
+        // A cut title shows in full as a tooltip: beside the row while the keyboard focus is on
+        // it, at the pointer while the pointer rests on it.
+        if (cut.truncated && row.visible)
+        {
+            if (row.focusVisible)
+            {
+                ImGui::SetNextWindowPos(ImVec2(row.rect.Max.x + facet::Px(theme.spacing.xs), row.rect.Min.y));
+                ImGui::SetTooltip("%s", page.title.c_str());
+            }
+            else if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+            {
+                ImGui::SetTooltip("%s", page.title.c_str());
+            }
+        }
         facet::internal::DrawItemFocusRing(row, radius);
         ImGui::PopID();
     }
@@ -557,6 +583,18 @@ void Paragraph(const char* text)
     ImGui::TextWrapped("%s", text);
     ImGui::PopStyleColor();
     facet::PopTextStyle();
+}
+
+bool NavTitleCut(const char* pageId)
+{
+    const std::span<const PageInfo> pages = Pages();
+    const std::vector<unsigned char>& cuts = NavTitleCuts();
+    for (size_t i = 0; i < pages.size() && i < cuts.size(); ++i)
+    {
+        if (pages[i].id == pageId)
+            return cuts[i] != 0;
+    }
+    return false;
 }
 
 float ContentRight()
