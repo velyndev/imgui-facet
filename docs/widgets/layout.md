@@ -229,11 +229,12 @@ for (const Tag& tag : tags)
 facet::EndFlow();
 ```
 
-An item grid over a large inventory; only the visible tiles are submitted:
+A grid over a large set of tiles (thumbnails, files); only the visible tiles are submitted, and the
+tile content is the caller's own drawing:
 
 ```cpp
 static ImGuiSelectionBasicStorage selection;
-if (facet::BeginItemGrid("inventory", itemCount, &selection, {.minTileWidth = 72.0f}))
+if (facet::BeginItemGrid("tiles", itemCount, &selection, {.minTileWidth = 72.0f}))
 {
     facet::RowRange tiles;
     while (facet::NextVisibleRows(&tiles))

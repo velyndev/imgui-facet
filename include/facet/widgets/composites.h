@@ -478,7 +478,7 @@ struct InventoryGridOptions
 InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots,
                               const InventoryGridOptions& options = {});
 
-struct ItemTileOptions
+struct InventoryTileOptions
 {
     bool selected = false;                 // the accent ring
     bool dragSource = true;                // the tile can be dragged (InventoryPayload)
@@ -489,9 +489,9 @@ struct ItemTileOptions
 // One item tile outside a grid: image, count, category bar, lock and cooldown. `id` is never
 // shown; the item label is the tooltip and accessible name. Returns true on the frame it was
 // activated (click, Enter, Space).
-bool ItemTile(const char* id, const InventoryItem& item, const ItemTileOptions& options = {});
+bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {});
 
-struct ItemSlotOptions
+struct InventorySlotOptions
 {
     Icon placeholderIcon;                  // drawn faintly while the slot is empty; none for no icon
     const char* payloadType = nullptr;     // null uses kInventoryPayloadType
@@ -501,10 +501,10 @@ struct ItemSlotOptions
 // A single slot (an equipment slot) that accepts inventory drops and can be dragged from. The
 // visible label part names the slot (tooltip while empty). The slot is highlighted while an
 // item hovers it. Returns the drop or drag action for the caller to apply.
-InventoryResult ItemSlot(const char* label, const InventoryItem& item, const ItemSlotOptions& options = {});
+InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {});
 
-// One stat line of an ItemDetailCard.
-struct ItemStat
+// One stat line of an InventoryDetailCard.
+struct InventoryStat
 {
     const char* label = nullptr;
     double value = 0.0;
@@ -512,10 +512,10 @@ struct ItemStat
     bool lowerIsBetter = false;            // which direction of the difference is good
 };
 
-struct ItemDetailCardOptions
+struct InventoryDetailCardOptions
 {
     const char* description = nullptr;     // wrapped body text
-    std::span<const ItemStat> stats = {};
+    std::span<const InventoryStat> stats = {};
     const char* statFormat = nullptr;      // printf for stat values; null: "%g"
     std::span<const char* const> tags = {};     // shown as badges
     std::span<const char* const> actions = {};  // buttons at the bottom; the first is primary
@@ -525,7 +525,7 @@ struct ItemDetailCardOptions
 // A detail card for one item: image, the visible label part as title, description, stats
 // with differences, tags and actions. Also usable inside BeginRichTooltip as a hover card.
 // Returns the index of the action activated this frame, or -1.
-int ItemDetailCard(const char* label, ImageHandle image, const ItemDetailCardOptions& options = {});
+int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {});
 
 // --- Cards and people -----------------------------------------------------------------------
 

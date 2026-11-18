@@ -41,7 +41,7 @@ const facet::InventoryItem kSlots[] = {
     {},
     {},
 };
-const facet::ItemStat kStats[] = {{"Stat 1", 4.0, 3.0}, {"Stat 2", 2.0}};
+const facet::InventoryStat kStats[] = {{"Stat 1", 4.0, 3.0}, {"Stat 2", 2.0}};
 const char* const kTags[] = {"Tag 1", "Tag 2"};
 const char* const kActions[] = {"Action 1", "Action 2"};
 const facet::AvatarItem kProfiles[] = {{"Profile 1"}, {"Profile 2"}};
@@ -142,12 +142,12 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     SectionHeader("Inventory");
     LabeledRow("InventoryGrid");
     facet::InventoryGrid("inventory", &ui.slot, kSlots, {.columns = 3});
-    LabeledRow("ItemTile");
-    facet::ItemTile("tile", kSlots[0], {.selected = true});
-    LabeledRow("ItemSlot");
-    facet::ItemSlot("Slot 1", facet::InventoryItem{}, {.placeholderIcon = facet::Icon("grid")});
-    LabeledRow("ItemDetailCard");
-    facet::ItemDetailCard("Item 1", facet::ImageHandle{},
+    LabeledRow("InventoryTile");
+    facet::InventoryTile("tile", kSlots[0], {.selected = true});
+    LabeledRow("InventorySlot");
+    facet::InventorySlot("Slot 1", facet::InventoryItem{}, {.placeholderIcon = facet::Icon("grid")});
+    LabeledRow("InventoryDetailCard");
+    facet::InventoryDetailCard("Item 1", facet::ImageHandle{},
                           {.description = "Placeholder description.", .stats = kStats, .tags = kTags,
                            .actions = kActions});
 

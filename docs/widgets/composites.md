@@ -48,9 +48,9 @@ Item data always belongs to the caller and is read during the call.
 | AccentPicker | `bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {})` | Accent swatches with a theme default and a custom color that can apply the accent | planned |
 | UiScaleControl | `bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {})` | Stepped UI scale with optional Ctrl zoom keys | planned |
 | InventoryGrid | `InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots, const InventoryGridOptions& options = {})` | Slot grid with drag to move, swap, merge and split | planned |
-| ItemTile | `bool ItemTile(const char* id, const InventoryItem& item, const ItemTileOptions& options = {})` | One item tile with count, category bar, lock and cooldown | planned |
-| ItemSlot | `InventoryResult ItemSlot(const char* label, const InventoryItem& item, const ItemSlotOptions& options = {})` | Single slot that accepts inventory drops | planned |
-| ItemDetailCard | `int ItemDetailCard(const char* label, ImageHandle image, const ItemDetailCardOptions& options = {})` | Detail card with stats and differences, tags and actions | planned |
+| InventoryTile | `bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {})` | One item tile with count, category bar, lock and cooldown | planned |
+| InventorySlot | `InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {})` | Single slot that accepts inventory drops | planned |
+| InventoryDetailCard | `int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {})` | Detail card with stats and differences, tags and actions | planned |
 | MediaCard | `bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {})` | Card with a cover image, title, detail and badges | planned |
 | UserChip | `bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {})` | Avatar, name and detail in a pill for the signed-in account | planned |
 | ProfileSwitcher | `ProfileSwitcherAction ProfileSwitcher(const char* id, int* current, std::span<const AvatarItem> profiles, const ProfileSwitcherOptions& options = {})` | List of profiles with add and manage entries | planned |
@@ -168,11 +168,11 @@ if (r.action == facet::LayerAction::Moved)
 
 ### Drag and drop between custom items
 
-An `ItemTile` is an inventory drag source by default; one item has one drag source, so the tile
+An `InventoryTile` is an inventory drag source by default; one item has one drag source, so the tile
 turns its own off before it becomes the source of an application payload.
 
 ```cpp
-facet::ItemTile("tile", item, {.dragSource = false});
+facet::InventoryTile("tile", item, {.dragSource = false});
 if (facet::BeginDragSource("app.item", &itemId, sizeof(itemId), {.previewText = item.label}))
     facet::EndDragSource();
 

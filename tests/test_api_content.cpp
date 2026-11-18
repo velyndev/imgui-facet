@@ -192,9 +192,9 @@ static_assert(OptionsFollowConventions<facet::SettingsSearchMatchOptions>());
 static_assert(OptionsFollowConventions<facet::KeybindListOptions>());
 static_assert(OptionsFollowConventions<facet::PresetListOptions>());
 static_assert(OptionsFollowConventions<facet::InventoryGridOptions>());
-static_assert(OptionsFollowConventions<facet::ItemTileOptions>());
-static_assert(OptionsFollowConventions<facet::ItemSlotOptions>());
-static_assert(OptionsFollowConventions<facet::ItemDetailCardOptions>());
+static_assert(OptionsFollowConventions<facet::InventoryTileOptions>());
+static_assert(OptionsFollowConventions<facet::InventorySlotOptions>());
+static_assert(OptionsFollowConventions<facet::InventoryDetailCardOptions>());
 static_assert(OptionsFollowConventions<facet::MediaCardOptions>());
 static_assert(OptionsFollowConventions<facet::UserChipOptions>());
 static_assert(OptionsFollowConventions<facet::ProfileSwitcherOptions>());
@@ -650,13 +650,13 @@ void InventoryCalls()
     Check("InventoryGrid, columns", Expect::Item, "bag 2",
           [&] { CHECK(neutral(InventoryGrid("bag 2", &selected, slots, {.columns = 2, .slotSize = 40.0f}))); });
     CHECK(selected == 2);
-    Check("ItemTile", Expect::Item, "tile", [] { CHECK_FALSE(ItemTile("tile", slots[0], {.selected = true})); });
-    Check("ItemSlot", Expect::Item, "Slot", [&] { CHECK(neutral(ItemSlot("Slot", slots[1]))); });
+    Check("InventoryTile", Expect::Item, "tile", [] { CHECK_FALSE(InventoryTile("tile", slots[0], {.selected = true})); });
+    Check("InventorySlot", Expect::Item, "Slot", [&] { CHECK(neutral(InventorySlot("Slot", slots[1]))); });
 
-    static const ItemStat stats[] = {{"Stat", 2.0, 1.0}};
+    static const InventoryStat stats[] = {{"Stat", 2.0, 1.0}};
     static const char* const actions[] = {"Action"};
-    Check("ItemDetailCard", Expect::Item, "Item", [] {
-        CHECK(ItemDetailCard("Item", ImageHandle{}, {.stats = stats, .actions = actions}) == -1);
+    Check("InventoryDetailCard", Expect::Item, "Item", [] {
+        CHECK(InventoryDetailCard("Item", ImageHandle{}, {.stats = stats, .actions = actions}) == -1);
     });
     Check("MediaCard", Expect::Item, "Card", [] { CHECK_FALSE(MediaCard("Card", ImageHandle{}, {.selected = true})); });
     Check("UserChip", Expect::Item, "Name", [] { CHECK_FALSE(UserChip("Name", ImageHandle{}, {.detail = "Detail"})); });
@@ -864,7 +864,7 @@ TEST_CASE("Stubs follow kFill and widths relative to the available width")
         static const float channels[] = {0.5f};
         for (const float units : {kFill, -10.0f})
         {
-            fills("ItemDetailCard", units, [](float w) { ItemDetailCard("Item", ImageHandle{}, {.width = w}); });
+            fills("InventoryDetailCard", units, [](float w) { InventoryDetailCard("Item", ImageHandle{}, {.width = w}); });
             fills("MediaCard", units, [](float w) { MediaCard("Card", ImageHandle{}, {.width = w}); });
             fills("ImageView", units, [](float w) { ImageView("Image", ImageHandle{}, {.width = w}); });
             fills("LevelMeter", units, [](float w) {
@@ -942,8 +942,8 @@ TEST_CASE("Content-sized stubs are wide enough to name the widget and say planne
         wide("ImageView", [] { ImageView("A", ImageHandle{}); });
         wide("Avatar", [] { Avatar("A", ImageHandle{}); });
         wide("AvatarGroup", [] { AvatarGroup("A", avatars); });
-        wide("ItemTile", [&] { ItemTile("tile", item); });
-        wide("ItemSlot", [&] { ItemSlot("A", item); });
+        wide("InventoryTile", [&] { InventoryTile("tile", item); });
+        wide("InventorySlot", [&] { InventorySlot("A", item); });
         wide("UserChip", [] { UserChip("A", ImageHandle{}, {.compact = true}); });
         wide("ThemeModeControl", [&] { ThemeModeControl("##theme", &mode); });
         wide("AccentPicker", [&] { AccentPicker("##accent", nullptr, &accent, {.customColor = false}); });
