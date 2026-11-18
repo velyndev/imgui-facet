@@ -169,7 +169,7 @@ struct Values
     int picked = 4;
     facet::ShortcutId pickedShortcut = {5};
     facet::FramePlacement placement = {
-        .position = {10.0f, 20.0f}, .size = {300.0f, 200.0f}, .scale = 1.5f, .maximized = true};
+        .position = {10.0f, 20.0f}, .restoredSize = {300.0f, 200.0f}, .scale = 1.5f, .maximized = true};
 
     bool operator==(const Values& o) const
     {
@@ -179,7 +179,7 @@ struct Values
                move.to == o.move.to && open == o.open && closed == o.closed && pinned == o.pinned &&
                visible == o.visible && ratio == o.ratio && sizes == o.sizes && step == o.step && page == o.page &&
                picked == o.picked && pickedShortcut == o.pickedShortcut && p.position.x == q.position.x &&
-               p.position.y == q.position.y && p.size.x == q.size.x && p.size.y == q.size.y &&
+               p.position.y == q.position.y && p.restoredSize.x == q.restoredSize.x && p.restoredSize.y == q.restoredSize.y &&
                p.scale == q.scale && p.maximized == q.maximized;
     }
 };

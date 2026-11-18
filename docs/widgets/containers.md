@@ -302,7 +302,7 @@ facet::Init(desc);
 ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
 facet::FramePlacement placement;
 if (facet::LoadAppFramePlacement("main", &placement))
-    ApplyPlacement(hwnd, ClampToMonitors(placement));  // size in pixels: size * the monitor's scale
+    ApplyPlacement(hwnd, ClampToMonitors(placement));  // size in pixels: restoredSize * the monitor's scale
 ShowWindow(hwnd, placement.maximized ? SW_SHOWMAXIMIZED : SW_SHOW);
 // WM_EXITSIZEMOVE and WM_CLOSE:
 facet::SaveAppFramePlacement("main", CurrentPlacement(hwnd));   // restored rect, Scale() and IsZoomed

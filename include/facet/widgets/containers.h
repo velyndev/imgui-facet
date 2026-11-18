@@ -144,13 +144,14 @@ ImVec2 AppFrameMaxSize();
 // because monitors of different scales share that one coordinate space and a position in units
 // would have no single scale to convert with. The size is in design units (pixels divided by
 // Scale() when saved), so the window comes back at the same apparent size on a monitor with
-// another scale: the host multiplies it by the scale of the monitor that holds `position`.
+// another scale: the host multiplies restoredSize by the scale of the monitor that holds
+// `position`.
 struct FramePlacement
 {
     ImVec2 position = {0.0f, 0.0f};    // pixels, virtual screen; top-left corner of the restored (not maximized) window
-    ImVec2 size = {0.0f, 0.0f};        // units; size of the restored window
-    float scale = 0.0f;                // Scale() when it was saved; 0 when unknown. With the same scale, size * scale is the exact pixel size
-    bool maximized = false;            // the window was maximized; position and size are its restored placement
+    ImVec2 restoredSize = {0.0f, 0.0f};  // units; size of the restored window
+    float scale = 0.0f;                // Scale() when it was saved; 0 when unknown. With the same scale, restoredSize * scale is the exact pixel size
+    bool maximized = false;            // the window was maximized; position and restoredSize are its restored placement
 };
 
 // Stores the placement under `id` (hashed alone, not on the id stack) in Facet's part of the
@@ -253,7 +254,8 @@ struct ScreenRegion
 // The host passes input to the game or app when false.
 bool OverlayWantsMouse();
 bool OverlayWantsKeyboard();
-// Whether a point (pixels) lies on a Facet window that takes input in the last frame.
+// Whether `point` (pixels, main viewport coordinates, as ScreenRegion) lies on a Facet window
+// that took input in the last frame.
 bool OverlayHitTest(ImVec2 point);
 // Writes the screen rectangles that take input in the last frame (visible menu windows and
 // popups; not click-through windows) into `regions` and returns how many exist, which may be
