@@ -454,22 +454,22 @@ private:
 
 struct CardOptions
 {
-    const char* title = nullptr;       // header line; null for none
     Icon icon;                         // before the title
     float width = 0.0f;                // units; 0 fills the available width
     float height = 0.0f;               // units; 0 fits the content
 };
 
-// A grouped surface (bgSecondary, card radius), not interactive. Its content is always
+// A grouped surface (bgSecondary, card radius), not interactive. The visible label part is the
+// header line, as for GroupBox and Shell ("##id" for a card without one). Its content is always
 // submitted; EndCard is always called. The card is the last item after EndCard. Ids are not
 // scoped by the card.
-void BeginCard(const char* id, const CardOptions& options = {});
+void BeginCard(const char* label, const CardOptions& options = {});
 void EndCard();
 
 class [[nodiscard]] CardScope
 {
 public:
-    explicit CardScope(const char* id, const CardOptions& options = {}) { BeginCard(id, options); }
+    explicit CardScope(const char* label, const CardOptions& options = {}) { BeginCard(label, options); }
     ~CardScope() { EndCard(); }
     CardScope(const CardScope&) = delete;
     CardScope& operator=(const CardScope&) = delete;

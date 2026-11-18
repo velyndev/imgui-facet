@@ -156,12 +156,12 @@ An inline toggle that reveals content below it, as a row or as a link.
 Status: planned
 
 ```cpp
-void BeginCard(const char* id, const CardOptions& options = {});
+void BeginCard(const char* label, const CardOptions& options = {});
 void EndCard();
 class CardScope;
 ```
 
-A grouped surface with an optional title, not interactive.
+A grouped surface whose visible label part is its title (`"##id"` for none), not interactive.
 
 ### BeginGroupBox
 

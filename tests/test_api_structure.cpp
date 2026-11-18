@@ -378,7 +378,7 @@ void CallEveryStub(Values& v)
         facet::EndDisclosure();
     });
     CHECK_BALANCED({
-        facet::BeginCard("Card", {.title = "Title"});
+        facet::BeginCard("Title##card");
         ImGui::TextUnformatted("child");
         facet::EndCard();
     });

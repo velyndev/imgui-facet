@@ -114,7 +114,7 @@ void Grouping(ContainersState& s)
         Note("Disclosed content.");
         facet::EndDisclosure();
     }
-    facet::BeginCard("card", {.title = "Card title", .icon = facet::Icon("layers")});
+    facet::BeginCard("Card title", {.icon = facet::Icon("layers")});
     Note("Card content.");
     facet::EndCard();
     if (facet::BeginGroupBox("Group box", {.description = "Description"}))

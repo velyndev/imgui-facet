@@ -7,9 +7,9 @@
 namespace facet
 {
 
-void BeginCard(const char* id, const CardOptions&)
+void BeginCard(const char* label, const CardOptions&)
 {
-    internal::BeginStubFrame("BeginCard", "Card", id, false);
+    internal::BeginStubFrame("BeginCard", "Card", label, false);
 }
 
 void EndCard()

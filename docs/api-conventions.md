@@ -15,7 +15,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 ## 2. Labels and ids
 
 - The first parameter of every widget that keeps state across frames is `const char* label` or `const char* id`, and it follows Dear ImGui exactly. The whole string is hashed on the current id stack. Text after `##` is hidden. `###` makes only the suffix the id. *Reason: users already know these rules, so Facet adds no second id system.*
-- The parameter is called `label` when its visible part is drawn or used as a tooltip or alt text. It is called `id` when it is never shown (`BeginCard`, `TabBar`, `BeginDataTable`). Being an accessible name alone does not make it a `label`: Dear ImGui has no accessibility output, so text that is only a name would never be seen. *Reason: the parameter name tells the caller whether the text appears.*
+- The parameter is called `label` when its visible part is drawn or used as a tooltip or alt text. It is called `id` when it is never shown (`TabBar`, `BeginDataTable`, `BeginToolbar`). Being an accessible name alone does not make it a `label`: Dear ImGui has no accessibility output, so text that is only a name would never be seen. *Reason: the parameter name tells the caller whether the text appears.*
 - A label whose visible text changes from frame to frame must use `###` to keep a stable id. In loops, the caller uses `ImGui::PushID(i)` exactly as with stock widgets. Facet never makes ids unique on its own. *Reason: the id must not depend on display text.*
 - Icon-only controls take a label whose visible part is required. It is the tooltip and the accessible name. An empty visible part asserts. The one exception is `CopyButton`, whose empty visible part falls back to `Strings::copy`, because its purpose is the same everywhere. *Reason: every control has a name.*
 - Parts and entries inside a widget (handles, segments, tabs, rows) get ids under the widget id. The id is `item.id` when that is non-zero, and the index otherwise. Item labels in a list do not need to be unique. A widget that reorders entries itself (gradient stops passing each other) carries their part ids, focus and drag across the move; `item.id` is needed only where the caller reorders. *Reason: one id per widget for the caller, and stable state for entries that can be reordered.*
@@ -549,20 +549,20 @@ private:
 
 struct CardOptions
 {
-    const char* title = nullptr;       // header line; null for none
     Icon icon;
     float width = 0.0f;                // units; 0 fills
     float height = 0.0f;               // units; 0 fits the content
 };
 
-// A grouped surface, not interactive. Its content is always submitted; EndCard is always called.
-void BeginCard(const char* id, const CardOptions& options = {});
+// A grouped surface, not interactive; the visible label part is the header line ("##id" for
+// none). Its content is always submitted; EndCard is always called.
+void BeginCard(const char* label, const CardOptions& options = {});
 void EndCard();
 
 class [[nodiscard]] CardScope
 {
 public:
-    explicit CardScope(const char* id, const CardOptions& options = {}) { BeginCard(id, options); }
+    explicit CardScope(const char* label, const CardOptions& options = {}) { BeginCard(label, options); }
     ~CardScope() { EndCard(); }
     CardScope(const CardScope&) = delete;
     CardScope& operator=(const CardScope&) = delete;
