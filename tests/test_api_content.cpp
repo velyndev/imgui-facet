@@ -109,6 +109,12 @@ static_assert(HasDataBlock<facet::InventoryGridOptions>());
 static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
 static_assert(HasDataBlock<facet::LayerListOptions>());
 static_assert(!HasDataBlock<facet::SparklineOptions>());  // the check itself works
+// DataStateView takes the state as a parameter, so its options hold only the texts of the
+// block, still after the widget members (rule 4).
+static_assert(offsetof(facet::DataStateViewOptions, retryLabel) < offsetof(facet::DataStateViewOptions, emptyText));
+static_assert(offsetof(facet::DataStateViewOptions, emptyText) < offsetof(facet::DataStateViewOptions, errorText));
+static_assert(offsetof(facet::DataStateViewOptions, errorText) < offsetof(facet::DataStateViewOptions, height));
+static_assert(offsetof(facet::DonutChartOptions, diameter) < offsetof(facet::DonutChartOptions, state));
 
 // Every widget that writes a value, a selection or item members has readOnly (rule 7).
 template <class T>

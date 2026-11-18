@@ -147,10 +147,10 @@ struct DonutChartOptions
     float minSliceFraction = 0.0f;         // slices below this share of the total merge into one "other" slice; 0 keeps all
     const char* otherLabel = nullptr;      // label of the merged slice; null uses Strings::more
     bool legend = false;
+    float diameter = 0.0f;                 // units; 0 for the chart height default
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;       // shown when the total is 0
     const char* errorText = nullptr;
-    float diameter = 0.0f;                 // units; 0 for the chart height default
 };
 
 // A ring (or pie) of slices proportional to their values. The chart is one Tab stop; Left and

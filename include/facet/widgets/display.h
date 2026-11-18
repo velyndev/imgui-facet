@@ -154,9 +154,9 @@ bool EmptyState(const char* label, const EmptyStateOptions& options = {});
 struct DataStateViewOptions
 {
     int skeletonRows = 3;                  // placeholder rows while Loading
-    const char* emptyText = nullptr;       // null uses Strings::empty
-    const char* errorText = nullptr;       // null uses Strings::loadFailed
     const char* retryLabel = nullptr;      // a retry button in the error state; null for none
+    const char* emptyText = nullptr;       // null uses Strings::empty (the state is a parameter)
+    const char* errorText = nullptr;       // null uses Strings::loadFailed
     float height = 0.0f;                   // units; 0 keeps the height of the last Ready frame
 };
 
