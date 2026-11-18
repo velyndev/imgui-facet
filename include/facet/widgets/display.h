@@ -479,7 +479,9 @@ struct DataTableColumn
     float width = 0.0f;                    // units; 0 stretches
     ColumnAlign align = ColumnAlign::Start;
     bool editable = false;                 // cells of this column can enter edit mode
-    ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_None;  // stock flags: DefaultSort, NoHide, NoSort
+    ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_None;  // stock flags: DefaultSort, NoHide, NoSort;
+                                           // a sizing flag (WidthFixed, WidthStretch) set here wins over the
+                                           // policy `width` implies; `width` stays the fixed column's initial width
 };
 
 struct DataTableOptions

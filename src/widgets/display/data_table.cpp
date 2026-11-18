@@ -52,9 +52,12 @@ bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, in
     for (int i = 0; i < columnCount; ++i)
     {
         const DataTableColumn& column = columns[static_cast<std::size_t>(i)];
-        const ImGuiTableColumnFlags sizing =
-            column.width > 0.0f ? ImGuiTableColumnFlags_WidthFixed : ImGuiTableColumnFlags_WidthStretch;
-        ImGui::TableSetupColumn(column.label, column.flags | sizing, column.width > 0.0f ? Px(column.width) : 0.0f);
+        // A sizing flag the caller set wins; Dear ImGui accepts only one of them per column.
+        ImGuiTableColumnFlags flags = column.flags;
+        if ((flags & ImGuiTableColumnFlags_WidthMask_) == 0)
+            flags |= column.width > 0.0f ? ImGuiTableColumnFlags_WidthFixed : ImGuiTableColumnFlags_WidthStretch;
+        const bool fixed = (flags & ImGuiTableColumnFlags_WidthFixed) != 0;
+        ImGui::TableSetupColumn(column.label, flags, fixed && column.width > 0.0f ? Px(column.width) : 0.0f);
     }
     return true;
 }

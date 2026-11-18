@@ -759,6 +759,40 @@ TEST_CASE("Stubs without a label submit an item whose id is not the window id")
     CHECK(checked == 5);
 }
 
+TEST_CASE("A column sizing flag set by the caller replaces the one its width implies")
+{
+    // Dear ImGui accepts one sizing flag per column (an assertion in debug builds), so a caller
+    // flag must not be combined with the policy that `width` implies.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        using namespace facet;
+        static const DataTableColumn columns[] = {
+            {.label = "Fixed", .flags = ImGuiTableColumnFlags_WidthFixed},
+            {.label = "Stretch", .width = 80.0f, .flags = ImGuiTableColumnFlags_WidthStretch},
+            {.label = "Auto"},
+            {.label = "Sized", .width = 40.0f},
+        };
+        const ImGuiTableColumnFlags expected[] = {ImGuiTableColumnFlags_WidthFixed, ImGuiTableColumnFlags_WidthStretch,
+                                                  ImGuiTableColumnFlags_WidthStretch, ImGuiTableColumnFlags_WidthFixed};
+        const bool open = BeginDataTable("sizing", columns, 1, nullptr);
+        CHECK(open);
+        if (!open)
+            return;
+        const ImGuiTable* table = ImGui::GetCurrentTable();
+        for (int i = 0; i < 4; ++i)
+        {
+            INFO("column " << i);
+            CHECK((table->Columns[i].Flags & ImGuiTableColumnFlags_WidthMask_) == expected[i]);
+            ++checked;
+        }
+        EndDataTable();
+    });
+    session.Frame();
+    CHECK(checked == 4);
+}
+
 TEST_CASE("Content-sized stubs are wide enough to name the widget and say planned")
 {
     facet::test::Session session;
