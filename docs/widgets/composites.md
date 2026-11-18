@@ -115,9 +115,12 @@ if (facet::SettingsSearchMatch("Vertical sync", {.keywords = "vsync tearing", .s
     facet::EndSettingsRow();
 }
 facet::EndSettingsSearch();
-// In the navigation, drawn before the page: hits of the last frame.
+// In the navigation, drawn before the page and in another window: hits of the last frame.
 const int hits = facet::SettingsSearchHitCount("settings", "Display");
 ```
+
+The search name `"settings"` is global, not hashed on the id stack, so the navigation finds the
+counts from any window. Two searches open in the same frame need different names.
 
 ### Accent picker in saved settings
 

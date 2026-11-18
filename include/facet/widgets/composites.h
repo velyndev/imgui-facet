@@ -284,13 +284,19 @@ struct SettingsSearchOptions
 // EndSettingsSearch, ask SettingsSearchMatch before each settings row and submit the row only
 // when it returns true. The filter is an option, as in PropertyGridOptions and
 // KeybindListOptions. Content is always submitted; EndSettingsSearch is always called.
+//
+// Unlike a widget id, `id` names the search for the whole application: the hit counts are
+// stored under ImHashStr(id) with seed 0, not under the current id stack, so a navigation in
+// another window finds them by the same string (as shortcut names work in core/input.h). Two
+// searches open in one frame need different names. Begin pushes nothing on the id stack.
 void BeginSettingsSearch(const char* id, const SettingsSearchOptions& options = {});
 void EndSettingsSearch();
 // True when the row should be shown: outside a settings search, for an empty filter, or when the
 // filter matches the label, description or keywords (fuzzy). Counts the hit for its section.
 bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {});
-// Hits of the settings search `id` in its last completed frame, for one section (null: all),
-// so a navigation drawn before the page can show counts.
+// Hits of the settings search named `id` (the same string as in BeginSettingsSearch, looked up
+// without the id stack) in its last completed frame, for one section (null: all), so a
+// navigation drawn before the page, in any window, can show counts. 0 for an unknown name.
 int SettingsSearchHitCount(const char* id, const char* section);
 
 class [[nodiscard]] SettingsSearchScope
