@@ -499,6 +499,7 @@ struct DataTableOptions
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fills the available height
+    bool readOnly = false;                 // no cell enters edit mode; selection and sorting still work
 };
 
 // A Dear ImGui table with Facet headers, a header row that stays in view, virtualized rows and

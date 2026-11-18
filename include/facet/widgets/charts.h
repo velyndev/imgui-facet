@@ -10,6 +10,8 @@
 // option pattern for axes: ChartAxis (range, scale, format, grid) on every chart with axes.
 // Series colors are data and may be set per series; 0 picks color number i of the chart
 // palette for series i, so a Legend with color 0 matches the chart it sits next to.
+// Legend and ChartRangeBrush write values and have `readOnly` (rule 7): they show the value
+// and can be focused, but write nothing and return false.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. Every widget here is declared and planned: its body draws a
@@ -237,6 +239,7 @@ struct LegendOptions
     bool toggle = true;                    // entries are Tab stops; activation flips hidden,
                                            // Alt+activation shows only that entry
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;                 // entries stay Tab stops and show hidden, but never flip it
 };
 
 // Color swatches with labels. With toggle, a click, Enter or Space flips the entry's hidden
@@ -250,6 +253,7 @@ struct ChartRangeBrushOptions
     bool wheelZoom = true;                 // the wheel over the brush zooms around the cursor
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for twice the control height
+    bool readOnly = false;
 };
 
 // A small overview of `overview` (drawn like a LineChart without axes) with a window from *low

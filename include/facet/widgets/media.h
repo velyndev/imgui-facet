@@ -8,6 +8,9 @@
 // here take design units and Radius tokens. A handle that is still loading shows a skeleton,
 // a failed one a marker with the alt text, so there is no separate asynchronous image widget.
 //
+// Every widget that writes a value or a selection has `readOnly` (rule 7): the widget shows
+// its value and can be focused, but writes nothing and returns false.
+//
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. Every widget here is declared and planned: its body draws a
 // placeholder until Phase 2 implements it (docs/widgets/media.md lists the status of each).
@@ -116,6 +119,7 @@ struct ThumbnailStripOptions
     const char* emptyText = nullptr;       // shown for 0 items; null uses Strings::empty
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;                 // the row still scrolls; the selection is shown, never written
 };
 
 // A horizontally scrolling row of thumbnails with the chosen one ringed. One Tab stop; Left
@@ -174,6 +178,7 @@ struct ImageCompareOptions
     ImageFit fit = ImageFit::Contain;
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 from the first image's aspect ratio
+    bool readOnly = false;
 };
 
 // Two images of the same size on top of each other with a divider at *split (0 to 1). The
@@ -193,6 +198,7 @@ struct TimelineScrubberOptions
     double step = 0.0;                     // seconds per arrow key step; 0 for a hundredth of the duration
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for twice the control height
+    bool readOnly = false;                 // the ruler still zooms and pans; the handles never write
 };
 
 // A time ruler from 0 to `duration` seconds with a playhead. Dragging the ruler or the playhead

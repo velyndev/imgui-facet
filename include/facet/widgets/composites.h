@@ -14,6 +14,10 @@
 // id: the item's `id` member when it is non-zero, the index otherwise, so a caller that
 // reorders its items sets `id` and the per-entry state (hover, animations) follows the item.
 //
+// Every widget that writes a value, a selection or item members has `readOnly` (rule 7): the
+// widget shows its value, can be focused and its text copied, writes nothing, starts no drag,
+// accepts no drop and returns the neutral result.
+//
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families, and this header includes the family headers whose types it takes.
 // Every widget here is declared and planned: its body draws a placeholder until Phase 2
@@ -217,6 +221,7 @@ struct ConsoleViewOptions
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fills the available height
+    bool readOnly = false;                 // the log stays usable; the command field takes no input
 };
 
 // A LogView over the caller's entries with a command field under it. Typing writes the command
@@ -250,6 +255,7 @@ struct SearchFilterBarOptions
     const char* placeholder = nullptr;     // null uses Strings::search
     int resultCount = -1;                  // shown after the field; < 0 hides it
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;
 };
 
 // A search field with toggleable filter chips beside it (or under it when narrow); chips that
@@ -312,6 +318,7 @@ struct KeybindListOptions
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
+    bool readOnly = false;                 // as KeybindCapture's readOnly: chords shown, never captured
 };
 
 // The shortcut registry (core/input.h) as an editable table: label, primary and alternate
@@ -372,6 +379,7 @@ struct PresetListOptions
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
+    bool readOnly = false;                 // the list and the active mark show; the menu is not offered
 };
 
 // A preset manager: the list with the active preset marked, unsaved markers, and actions in a
@@ -440,6 +448,7 @@ struct InventoryGridOptions
     const char* emptyText = nullptr;       // shown for 0 slots; null uses Strings::empty
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;
 };
 
 // A fixed grid of slots. Drag an item onto an empty slot to move it, onto another item to swap
@@ -544,6 +553,7 @@ struct ProfileSwitcherOptions
     const char* emptyText = nullptr;       // shown for 0 profiles; null uses Strings::empty
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;                 // the current profile shows; switching, add and manage are off
 };
 
 // A list of profiles with avatars and a check on the current one. One Tab stop: arrows move,
@@ -608,6 +618,7 @@ struct CanvasElementOptions
     bool resizable = false;                // edge and corner handles change extent
     bool snap = true;                      // snaps to the canvas center, edges, safe area and other elements
     bool anchorPicker = true;              // a 3 x 3 anchor control while selected; keeps the position on change
+    bool readOnly = false;
 };
 
 // A draggable element inside BeginPreviewCanvas, drawn as a labelled box (the visible label
@@ -651,6 +662,7 @@ struct LayerListOptions
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 fits the rows
+    bool readOnly = false;                 // rows can still be selected; toggles and reordering are off
 };
 
 // Ordered layer rows, topmost first, with visibility and lock toggles; dragging across the
@@ -703,6 +715,7 @@ struct ThemeModeControlOptions
     bool apply = true;                     // calls SetThemeMode when *mode is written
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                    // units; 0 fits the segments
+    bool readOnly = false;
 };
 
 // A segmented control for Light, Dark and System. Returns true when *mode was written.
@@ -714,6 +727,7 @@ struct AccentPickerOptions
     bool customColor = true;               // a color well for any color after the presets
     bool apply = true;                     // calls SetAccent (ClearAccent for the first preset) when written
     ControlSize size = ControlSize::Inherit;
+    bool readOnly = false;
 };
 
 // A row of accent swatches. One Tab stop: arrows move, Enter and Space choose. Returns true
@@ -727,6 +741,7 @@ struct UiScaleControlOptions
     bool apply = true;                     // calls SetUiScale when written
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                    // units; 0 fills the available width
+    bool readOnly = false;                 // also turns keyboardZoom off
 };
 
 // A stepped control for the user UI scale between `min` and `max` (1 is 100 percent), shown as

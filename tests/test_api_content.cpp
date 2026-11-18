@@ -110,6 +110,31 @@ static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
 static_assert(HasDataBlock<facet::LayerListOptions>());
 static_assert(!HasDataBlock<facet::SparklineOptions>());  // the check itself works
 
+// Every widget that writes a value, a selection or item members has readOnly (rule 7).
+template <class T>
+concept HasReadOnly = requires { requires std::is_same_v<decltype(T::readOnly), bool>; };
+static_assert(!HasReadOnly<facet::GaugeOptions>);  // the check itself works
+static_assert(HasReadOnly<facet::DataTableOptions>);
+static_assert(HasReadOnly<facet::LegendOptions>);
+static_assert(HasReadOnly<facet::ChartRangeBrushOptions>);
+static_assert(HasReadOnly<facet::ThumbnailStripOptions>);
+static_assert(HasReadOnly<facet::ImageCompareOptions>);
+static_assert(HasReadOnly<facet::TimelineScrubberOptions>);
+static_assert(HasReadOnly<facet::CurveEditorOptions>);
+static_assert(HasReadOnly<facet::BezierEditorOptions>);
+static_assert(HasReadOnly<facet::GradientEditorOptions>);
+static_assert(HasReadOnly<facet::ConsoleViewOptions>);
+static_assert(HasReadOnly<facet::SearchFilterBarOptions>);
+static_assert(HasReadOnly<facet::KeybindListOptions>);
+static_assert(HasReadOnly<facet::PresetListOptions>);
+static_assert(HasReadOnly<facet::InventoryGridOptions>);
+static_assert(HasReadOnly<facet::ProfileSwitcherOptions>);
+static_assert(HasReadOnly<facet::CanvasElementOptions>);
+static_assert(HasReadOnly<facet::LayerListOptions>);
+static_assert(HasReadOnly<facet::ThemeModeControlOptions>);
+static_assert(HasReadOnly<facet::AccentPickerOptions>);
+static_assert(HasReadOnly<facet::UiScaleControlOptions>);
+
 // Chart x values are doubles like ChartPoint, ChartAxis and the range brush: a float near
 // 1.7e9 seconds steps by 128 s.
 static_assert(std::is_same_v<decltype(facet::ChartSeries::x), std::span<const double>>);
