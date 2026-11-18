@@ -4,9 +4,11 @@ Facet is a design framework for Dear ImGui applications on Windows with Direct3D
 a consistent set of custom widgets, a light and a dark theme, icon rendering and proper scaling
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
-**Status: early development.** No Facet widgets exist yet: the fourteen widget family
-headers in `include/facet/widgets/` are in place and their widgets are planned (see
-`docs/widgets.md`). What exists today:
+**Status: early development.** No Facet widget is implemented yet. The fourteen widget family
+headers in `include/facet/widgets/` declare the planned widgets with documentation comments;
+every declared function links and draws a placeholder that says "planned", returns the neutral
+result and writes nothing (see `docs/widgets.md` and the family pages under `docs/widgets/`).
+The building blocks the widgets will be made of exist inside the library. What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -21,9 +23,11 @@ headers in `include/facet/widgets/` are in place and their widgets are planned (
     (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). See
     `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
-    (`layout.h`) work.
-  - Core, input: key chords, key binds and the shortcut registry are declared (`input.h`); the
-    functions are stubs that return neutral results (planned).
+    (`layout.h`) work. See `docs/layout.md`.
+  - Core, input: key chords as text and back, key binds in the modes Hold, Toggle, Always and
+    Off, and the shortcut registry with global, window and focused item scopes and conflict
+    lookup (`input.h`) work. Key binds accept extra modifiers unless `exactModifiers` is set;
+    chords and shortcuts need exactly their modifiers. See `docs/input.md`.
   - Core, color: conversions with OKLab, OKLCH and WCAG contrast (`color.h`) work.
   - Core, drawing: rectangles with circular or continuous corners, hairlines, rounded
     gradients, checkerboards, arcs with round caps, `DrawGroup` and pointer cursor helpers
@@ -42,10 +46,18 @@ headers in `include/facet/widgets/` are in place and their widgets are planned (
   - Icons: the built-in SVG icon set, icons registered at runtime, and drawing from a
     per-scale atlas work (`icons.h`).
 - `include/facet/widgets/common.h`: the types the widget families share, the control size
-  stack (`PushControlSize`), control heights and the built-in strings (`SetStrings`) work; the
-  edit session queries and `NextVisibleRows` are stubs until the blocks behind them exist.
-  `facet/facet.h` includes every core and widget header. The rules for widget declarations
-  are in `docs/api-conventions.md`.
+  stack (`PushControlSize`), control heights, the built-in strings (`SetStrings`) and the edit
+  session queries (`IsItemEditCommitted`, `IsItemEditCanceled`) work; `NextVisibleRows` is a
+  stub that returns false until the list core exists (planned). `facet/facet.h` includes every
+  core and widget header. The rules for widget declarations are in `docs/api-conventions.md`.
+- The building blocks of the widgets, internal to the library (`src/internal/`, each header
+  starts with a usage sketch): item behaviour (hover, press, focus, disabled and hit targets
+  of at least `minHitTarget`), keyboard modality and the focus ring, labelled rows and row
+  groups, overflow fitting, the value drag core (linear, logarithmic, stepped, wrapping and
+  delta mappings with one edit session per drag or key press), the multi-handle model, the
+  selection pill, fuzzy matching with ranked match ranges, chord capture, and the chart core
+  (scales, ticks and labels, hover snapping, decimation and series colors). The popup host,
+  scroll core, list and selection core, drag and drop core and text field core are planned.
 - `facet::EndFrame` reports a `PushAccent`, `PushControlSize` or Facet scope left open
   through Dear ImGui's recoverable error path and clears it.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
@@ -66,13 +78,38 @@ headers in `include/facet/widgets/` are in place and their widgets are planned (
       and an empty state.
     - Images: fit modes, corner radii, tint, asynchronous loading with its loading and failed
       states, and an SVG at three sizes.
-  - Blocks (planned): one page per building block of the widgets (item behaviour, focus,
-    rows, overflow, value drag, multi-handle, selection pill, fuzzy matching, keys and
-    shortcuts, chart core). Each page says what it will show.
-  - Widgets (planned): one page per widget family. Each page says what it will show.
+  - Blocks: one page per building block, each operated through prototype controls that are
+    built only from the blocks (they are not the Phase 2 widgets) and covered by selftests.
+    - Item behaviour: hover, press, focus and disabled states with their animated amounts,
+      and grown hit targets.
+    - Focus: the focus ring on every surface it must stay visible on, and cut by the edge of
+      a scrolling region; shown only after keyboard input.
+    - Rows and width classes: labelled rows with a shared label column, descriptions, help
+      and error texts, modified markers and reset buttons, stacking in narrow widths.
+    - Overflow: a row of buttons that moves what does not fit behind a "More" button.
+    - Value drag: linear, whole-number, stepped, logarithmic, snapping, vertical, read-only
+      and disabled sliders with their edit sessions, fine and coarse movement, and Escape to
+      restore the value.
+    - Multi-handle: range sliders whose handles stop at or push each other, logarithmic,
+      stepped, mirrored and vertical ones, a draggable span, and three handles that can be
+      added and removed.
+    - Selection pill: the sliding highlight behind the selected entry.
+    - Fuzzy matching: the built-in icon names ranked as you type, with the matched letters
+      highlighted, an empty state, and the time one key press takes over 10000 generated
+      names.
+    - Keys and shortcuts: chord capture, three registered shortcuts in different scopes, a
+      conflict message, and one key bind per mode with a live indicator.
+    - Chart core: generated functions with nice ticks, a crosshair that follows the mouse or
+      the arrow keys after Tab, a logarithmic axis, a 100000 sample series drawn through
+      decimation, the series colors with their contrast, and an empty state.
+  - Widgets: one page per widget family (Buttons, Selection, Sliders, Inputs, Pickers, Lists,
+    Navigation, Containers, Layout, Overlays, Display, Charts, Media, Composites). Every widget
+    on them is a placeholder of its declared size that cannot be operated.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
-  at the top pinned. `facet_demo --list-pages` prints the page ids with their capture states.
+  at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection
+  pill block; the selected title is semibold, and a cut title shows in full on hover and on
+  keyboard focus. `facet_demo --list-pages` prints the page ids with their capture states.
 - A capture mode that renders pages offscreen into PNG files, and a selftest mode that operates
   pages with scripted mouse and keyboard input.
 - Unit tests with doctest.
@@ -178,9 +215,9 @@ include/facet/   public headers: core/ (one per module), widgets/ (one per widge
 src/             library sources; src/internal holds headers shared inside the library
 assets/icons/    SVG files embedded into the library
 cmake/           dependency, warning and asset embedding scripts
-docs/            topic guides: theming, scaling, images and icons; api-conventions.md (the
-                 rules every widget declaration follows); widgets.md (the widget families,
-                 with one page each under docs/widgets/)
+docs/            topic guides: theming, scaling, images and icons, layout, input;
+                 api-conventions.md (the rules every widget declaration follows); widgets.md
+                 (the widget families, with one page each under docs/widgets/)
 demo/            facet_demo; demo/pages holds one file per page
 tests/           doctest unit tests, one file per topic; tests/support holds the shared
                  Dear ImGui and WARP session for tests that run frames and scripted input;
