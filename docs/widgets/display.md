@@ -92,8 +92,8 @@ selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int row
     return static_cast<ImGuiID>(itemIds[shown[row]]);   // the application's stable item ids
 };
 static const facet::DataTableColumn columns[] = {
-    {"Name", 0.0f, facet::ColumnAlign::Start, true},           // editable
-    {"Size", 80.0f, facet::ColumnAlign::End},
+    {"Name", 0.0f, facet::Align::Start, true},           // editable
+    {"Size", 80.0f, facet::Align::End},
 };
 const int rowCount = static_cast<int>(order.size());
 if (facet::BeginDataTable("files", columns, rowCount, &selection, {.sortable = true, .frozenColumns = 1}))

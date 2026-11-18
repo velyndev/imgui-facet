@@ -199,7 +199,7 @@ The shared pieces exist as real headers, which are authoritative:
 - `include/facet/core/theme.h`: `PushAccent` and `PopAccent`, the scoped accent of rule 10, with `kAccentStackDepth`.
 - `include/facet/core/input.h`: chords, `KeyNameText`, `ChordToText` and `ChordFromText`, `BindMode`, `Keybind`, `IsBindActive`, `IsBindPressed` and the shortcut registry.
 - `include/facet/core/layout.h`: `WidthClass` and its queries, and `LayoutLabeledRow`.
-- `include/facet/widgets/common.h`: `FACET_FLAGS`, `kFill`, `kIndeterminate`, `ControlSize`, `Tone`, `Orientation`, `Radius`, `DataState`, `CheckState`, `ValueScale`, `ChoiceItem`, `ChoiceGetter`, `FormatFn`, `RowRange`, `NextVisibleRows`, the control size stack with `ResolveControlSize`, `ControlHeight` and `ControlTextStyle`, `IsItemEditCommitted`, `IsItemEditCanceled`, and the `Strings` table with `SetStrings` and `GetStrings`.
+- `include/facet/widgets/common.h`: `FACET_FLAGS`, `kFill`, `kIndeterminate`, `ControlSize`, `Tone`, `Orientation`, `Radius`, `Align`, `ScreenCorner`, `DataState`, `CheckState`, `ValueScale`, `ChoiceItem`, `ChoiceGetter`, `FormatFn`, `RowRange`, `NextVisibleRows`, the control size stack with `ResolveControlSize`, `ControlHeight` and `ControlTextStyle`, `IsItemEditCommitted`, `IsItemEditCanceled`, and the `Strings` table with `SetStrings` and `GetStrings`.
 
 The widget signatures below show the rules applied. They are the starting point of the family headers, not frozen declarations.
 
@@ -707,13 +707,13 @@ struct ProgressBarOptions
 // animation. fraction 0 to 1, or kIndeterminate.
 void ProgressBar(const char* label, float fraction, const ProgressBarOptions& options = {});
 
-enum class ColumnAlign { Start, Center, End };
+// Align { Start, Center, End } is in common.h: text and labels take it too.
 
 struct DataTableColumn
 {
     const char* label = nullptr;
     float width = 0.0f;                // units; 0 stretches
-    ColumnAlign align = ColumnAlign::Start;
+    Align align = Align::Start;
     ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_None;  // stock flags: DefaultSort, NoHide
 };
 

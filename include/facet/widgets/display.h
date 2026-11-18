@@ -30,21 +30,13 @@ namespace facet
 
 // --- Text -----------------------------------------------------------------------------------
 
-// Horizontal alignment of text inside the width it is given: styled text and table columns.
-enum class ColumnAlign
-{
-    Start,
-    Center,
-    End,
-};
-
 struct StyledTextOptions
 {
     TextStyle style = TextStyle::Body;     // size and weight from T().type
     Tone tone = Tone::Neutral;             // Neutral draws label; the others their status token
     bool secondary = false;                // Neutral only: labelSecondary instead of label
     bool wrap = false;                     // wraps at the item width instead of running past it
-    ColumnAlign align = ColumnAlign::Start;  // inside the item width; Start when the width is the text's own
+    Align align = Align::Start;  // inside the item width; Start when the width is the text's own
     float width = 0.0f;                    // units; 0 the text's own width, or the available width with wrap
 };
 
@@ -485,7 +477,7 @@ struct DataTableColumn
 {
     const char* label = nullptr;           // header text; "##" hides it, as for widget labels
     float width = 0.0f;                    // units; 0 stretches
-    ColumnAlign align = ColumnAlign::Start;
+    Align align = Align::Start;
     bool editable = false;                 // cells of this column can enter edit mode
     ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_None;  // stock flags: DefaultSort, NoHide, NoSort;
                                            // a sizing flag (WidthFixed, WidthStretch) set here wins over the

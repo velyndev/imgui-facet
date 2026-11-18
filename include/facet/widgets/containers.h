@@ -27,22 +27,12 @@ namespace facet
 
 // --- Shell -----------------------------------------------------------------------------------
 
-// Where a shell first appears in the display, until a saved position exists. The corners are in
-// the order of ScreenCorner (overlays.h).
-enum class ShellPlacement
-{
-    Center,
-    BottomRight,
-    BottomLeft,
-    TopRight,
-    TopLeft,
-};
-
 struct ShellOptions
 {
     Icon icon;                         // before the title; none by default
     ImVec2 initialSize = {0.0f, 0.0f}; // units; used until a saved size exists; 0 for the token default
-    ShellPlacement placement = ShellPlacement::Center;  // first position in the display; Center by default
+    bool centered = true;              // first position, until a saved one exists: the display center
+    ScreenCorner corner = ScreenCorner::BottomRight;  // with centered off: the display corner of the first position
     ImVec2 minSize = {0.0f, 0.0f};     // units; 0 keeps the title bar and one control row
     ImVec2 maxSize = {0.0f, 0.0f};     // units; 0 for the display size
     bool resizable = true;             // every edge and corner resizes

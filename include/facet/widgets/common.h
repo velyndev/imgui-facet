@@ -98,6 +98,23 @@ enum class Radius
     Window,
 };
 
+// Alignment of text inside the width it is given (styled text, table columns, labels).
+enum class Align
+{
+    Start,
+    Center,
+    End,
+};
+
+// A corner of the display (the toast stack, a shell's first position, a watermark).
+enum class ScreenCorner
+{
+    BottomRight,
+    BottomLeft,
+    TopRight,
+    TopLeft,
+};
+
 // State of a data view. Ready with a count of 0 shows the empty state.
 enum class DataState
 {

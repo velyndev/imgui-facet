@@ -234,15 +234,7 @@ bool ToastActionPressed(ToastId toast);
 bool IsToastVisible(ToastId toast);
 void DismissToast(ToastId toast);
 
-// A corner of the display. ShellPlacement (containers.h) lists the corners in the same order
-// after its Center member.
-enum class ScreenCorner
-{
-    BottomRight,
-    BottomLeft,
-    TopRight,
-    TopLeft,
-};
+// ScreenCorner is in common.h: shells take it too.
 
 // Where the toast stack sits; BottomRight until changed. Applies from the next frame.
 void SetToastCorner(ScreenCorner corner);

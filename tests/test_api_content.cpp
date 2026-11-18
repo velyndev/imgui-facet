@@ -151,8 +151,8 @@ static_assert(std::is_same_v<decltype(&facet::LevelMeter), void (*)(const char*,
                                                                     double, const facet::LevelMeterOptions&)>);
 
 // One alignment enum for styled text and table columns.
-static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);
-static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::ColumnAlign>);
+static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::Align>);
+static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::Align>);
 
 template <class T>
 concept HasWrap = requires(T options) { options.wrap; };
@@ -365,7 +365,7 @@ void DisplayCalls()
     static const float trend[] = {1.0f, 2.0f, 3.0f};
     Check("StatTile", Expect::Item, "Tile", [] { StatTile("Tile", 42.0, {.delta = 1.5, .trend = trend}); });
 
-    static const DataTableColumn columns[] = {{"Name"}, {"Size", 80.0f, ColumnAlign::End}};
+    static const DataTableColumn columns[] = {{"Name"}, {"Size", 80.0f, Align::End}};
     ImGuiSelectionBasicStorage selection;
     selection.SetItemSelected(1, true);
     // Ready with rows: a real Dear ImGui table is open between Begin and End, so the caller's

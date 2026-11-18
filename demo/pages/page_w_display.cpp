@@ -29,7 +29,7 @@ const facet::LogEntry kLogEntries[] = {
 const facet::DataTableColumn kColumns[] = {
     {"Column 1"},
     {"Column 2"},
-    {"Column 3", 0.0f, facet::ColumnAlign::End},
+    {"Column 3", 0.0f, facet::Align::End},
 };
 constexpr int kTableRows = 3;
 const int kHighlightedLines[] = {2};
