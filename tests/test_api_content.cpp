@@ -870,6 +870,32 @@ TEST_CASE("Stubs follow kFill and widths relative to the available width")
     CHECK(checked == 10);
 }
 
+TEST_CASE("Stub placeholders are at least as tall as a small control")
+{
+    // The placeholder text is Footnote; a box of one line of Body or less cuts its descenders.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        using namespace facet;
+        const float minimum = ControlHeight(ControlSize::Small);
+        const auto tall = [&](const char* widget, auto&& call) {
+            INFO("widget: " << std::string(widget));
+            call();
+            CHECK(ImGui::GetItemRectSize().y >= minimum);
+            ++checked;
+        };
+        tall("StyledText", [] { StyledText("A"); });
+        tall("StyledText, footnote", [] { StyledText("A", {.style = TextStyle::Footnote}); });
+        tall("TruncatedText", [] { TruncatedText("A"); });
+        tall("Skeleton, one line", [] { Skeleton({.lines = 1}); });
+        tall("Skeleton, low", [] { Skeleton({.shape = SkeletonShape::Rect, .height = 4.0f}); });
+        tall("StatusDot", [] { StatusDot("##dot"); });
+    });
+    session.Frame();
+    CHECK(checked == 6);
+}
+
 TEST_CASE("Content-sized stubs are wide enough to name the widget and say planned")
 {
     facet::test::Session session;

@@ -5,7 +5,10 @@
 // call to these helpers: it submits one item of the size the finished widget will have, drawn
 // by internal::PlannedWidget (a hairline box with "<Widget>: planned" in labelSecondary,
 // Footnote, cut off where the box ends), and returns the neutral result. Phase 2 replaces a
-// stub body with the widget and drops the include.
+// stub body with the widget and drops the include. Two placeholder-only exceptions to "the
+// size the finished widget will have": a placeholder is never narrower than its text
+// (ContentWidth) and never lower than the small control height (Stub), so the text is not cut
+// and the box does not turn into a pill around one line of text.
 //
 // Sizes come from the theme tokens through Px(). Where the theme has no token for a default
 // yet (chart height, panel height, card width), the default is a named multiple of a spacing
@@ -126,11 +129,14 @@ inline float ContentWidth(const char* widget, float natural)
 // The placeholder item: `widget` is the public function name, `label` the label, id or text
 // the widget was given (null for none). Sizes in pixels. A null or empty label is replaced by
 // "##<widget>": an empty string hashes to the id of the window itself, which Dear ImGui
-// rejects for an item at the root of a window.
+// rejects for an item at the root of a window. The height is raised to at least the small
+// control height, which holds the Footnote placeholder text with room above and below; text
+// and skeleton lines are lower than that, and their placeholder would cut the descenders.
 inline void Stub(const char* widget, const char* label, float width, float height)
 {
     if (!CanSubmit())
         return;
+    height = std::max(height, ControlHeight(ControlSize::Small));
     char hidden[64];
     if (label == nullptr || label[0] == '\0')
     {
