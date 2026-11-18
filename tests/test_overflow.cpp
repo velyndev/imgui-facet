@@ -166,6 +166,70 @@ TEST_CASE("Overflow: edge cases")
     CHECK(FitOverflow(odd, std::numeric_limits<float>::quiet_NaN(), kGap, kButton, 0.0f, nullptr, two).hiddenCount == 2);
 }
 
+namespace
+{
+
+constexpr OverflowItem Sep()
+{
+    return {6.0f, 0, facet::internal::OverflowKind::Separator};
+}
+
+} // namespace
+
+TEST_CASE("Overflow: a fully hidden trailing group leaves no separator before the button")
+{
+    // A A | B B: 4 * 50 + 6 + 4 gaps of 4 = 222 px with everything visible.
+    std::array<OverflowItem, 5> items = {{{50.0f, 1}, {50.0f, 1}, Sep(), {50.0f, 0}, {50.0f, 0}}};
+    bool visible[5] = {};
+    CHECK(FitOverflow(items, 222.0f, kGap, kButton, 0.0f, nullptr, visible).hiddenCount == 0);
+    CHECK(visible[2]);
+    // Room for group A and the button only: 50 + 4 + 50 + 4 + 30 = 138 px.
+    const OverflowResult fit = FitOverflow(items, 140.0f, kGap, kButton, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 2);
+    CHECK(visible[0]);
+    CHECK(visible[1]);
+    CHECK_FALSE(visible[2]);
+    CHECK_FALSE(visible[3]);
+    CHECK(fit.usedWidth == doctest::Approx(138.0f));
+    // The separator's room is given back: without it this width would not hold group A.
+    CHECK(OverflowRequiredWidth(items, 2, kGap, kButton) == doctest::Approx(138.0f));
+}
+
+TEST_CASE("Overflow: hiding a middle group leaves one separator between the others")
+{
+    // A | B | C, with B lowest priority.
+    std::array<OverflowItem, 5> items = {{{50.0f, 2}, Sep(), {50.0f, 0}, Sep(), {50.0f, 1}}};
+    bool visible[5] = {};
+    // A, C, one separator and the button: 50 + 6 + 50 + 2 gaps + 4 + 30 = 148 px; the second
+    // separator would need 10 px more.
+    const OverflowResult fit = FitOverflow(items, 150.0f, kGap, kButton, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 1);
+    CHECK(visible[0]);
+    CHECK_FALSE(visible[2]);
+    CHECK(visible[4]);
+    CHECK(CountVisible(visible, 5) == 3);
+    CHECK(visible[1] != visible[3]);
+    CHECK(fit.usedWidth == doctest::Approx(148.0f));
+}
+
+TEST_CASE("Overflow: separators at either end of the row never show")
+{
+    std::array<OverflowItem, 4> items = {{Sep(), {50.0f, 0}, {50.0f, 0}, Sep()}};
+    bool visible[4] = {};
+    const OverflowResult fit = FitOverflow(items, 1000.0f, kGap, kButton, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 0);
+    CHECK_FALSE(visible[0]);
+    CHECK_FALSE(visible[3]);
+    CHECK(fit.usedWidth == doctest::Approx(104.0f));
+    // Separators alone: nothing shows and there is no button.
+    std::array<OverflowItem, 2> only = {{Sep(), Sep()}};
+    bool two[2] = {true, true};
+    const OverflowResult none = FitOverflow(only, 1000.0f, kGap, kButton, 0.0f, nullptr, two);
+    CHECK_FALSE(none.showButton);
+    CHECK_FALSE(two[0]);
+    CHECK_FALSE(two[1]);
+}
+
 TEST_CASE("Overflow: rows longer than the inline buffer are fitted the same way")
 {
     std::vector<OverflowItem> items(100, OverflowItem{10.0f, 0});

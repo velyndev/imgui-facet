@@ -17,51 +17,86 @@ namespace
 // rounding noise in the measured widths.
 constexpr float kFitTolerance = 1e-3f;
 
-// Widths of the items sorted by drop rank (rank 0 is hidden first), in a buffer on the stack
-// for typical rows and on the heap beyond kOverflowInlineItems.
-class RankedWidths
+// The drop rank of every entry (rank 0 is hidden first; -1 for a separator, which has no rank
+// of its own), in a buffer on the stack for typical rows and on the heap beyond
+// kOverflowInlineItems.
+class Ranked
 {
 public:
-    explicit RankedWidths(std::span<const OverflowItem> items)
+    explicit Ranked(std::span<const OverflowItem> items) : items_(items)
     {
         const std::size_t count = items.size();
         if (count > inline_.size())
         {
-            heap_.reset(new (std::nothrow) float[count]);
+            heap_.reset(new (std::nothrow) int[count]);
             if (heap_ == nullptr)
             {
                 failed_ = true;  // out of memory: the caller shows every item
                 return;
             }
-            widths_ = heap_.get();
+            ranks_ = heap_.get();
         }
         else
         {
-            widths_ = inline_.data();
+            ranks_ = inline_.data();
         }
         for (std::size_t i = 0; i < count; ++i)
         {
+            if (items[i].kind == OverflowKind::Separator)
+            {
+                ranks_[i] = -1;
+                continue;
+            }
+            ++itemCount_;
             // The rank is the number of items dropped before item i: lower priorities, and equal
-            // priorities further to the end.
-            std::size_t rank = 0;
+            // priorities further to the end. Separators do not count.
+            int rank = 0;
             for (std::size_t j = 0; j < count; ++j)
             {
+                if (items[j].kind == OverflowKind::Separator)
+                    continue;
                 if (items[j].priority < items[i].priority || (items[j].priority == items[i].priority && j > i))
                     ++rank;
             }
-            widths_[rank] = std::max(0.0f, items[i].width);
+            ranks_[i] = rank;
         }
-        count_ = static_cast<int>(count);
     }
 
-    // The width of the items that stay with `hidden` items dropped, with gaps and button.
-    float Required(int hidden, float gap, float buttonWidth) const
+    // Writes the visibility of every entry with the `hidden` lowest-ranked items dropped (when
+    // `visible` is not empty) and returns the width of what shows, with gaps and the button. A
+    // separator shows only between two visible items; of several separators between the same
+    // two items the last one shows, and none shows at the start or the end of the row.
+    float Resolve(int hidden, float gap, float buttonWidth, std::span<bool> visible) const
     {
-        hidden = std::clamp(hidden, 0, count_);
+        hidden = std::clamp(hidden, 0, itemCount_);
         float width = 0.0f;
-        for (int rank = hidden; rank < count_; ++rank)
-            width += widths_[rank];
-        const int shown = count_ - hidden;
+        int shown = 0;
+        bool itemBefore = false;
+        int pending = -1;  // a separator waiting for a visible item after it
+        const auto show = [&](std::size_t i) {
+            width += std::max(0.0f, items_[i].width);
+            ++shown;
+            if (i < visible.size())
+                visible[i] = true;
+        };
+        for (std::size_t i = 0; i < items_.size(); ++i)
+        {
+            if (i < visible.size())
+                visible[i] = false;
+            if (ranks_[i] < 0)
+            {
+                if (itemBefore)
+                    pending = static_cast<int>(i);
+                continue;
+            }
+            if (ranks_[i] < hidden)
+                continue;
+            if (pending >= 0)
+                show(static_cast<std::size_t>(pending));
+            pending = -1;
+            show(i);
+            itemBefore = true;
+        }
         if (shown > 1)
             width += gap * static_cast<float>(shown - 1);
         if (hidden > 0)
@@ -69,26 +104,15 @@ public:
         return width;
     }
 
-    int Count() const { return count_; }
+    int ItemCount() const { return itemCount_; }
     bool Failed() const { return failed_; }
 
-    // The drop rank of item `index`.
-    static int RankOf(std::span<const OverflowItem> items, std::size_t index)
-    {
-        int rank = 0;
-        for (std::size_t j = 0; j < items.size(); ++j)
-        {
-            if (items[j].priority < items[index].priority || (items[j].priority == items[index].priority && j > index))
-                ++rank;
-        }
-        return rank;
-    }
-
 private:
-    std::array<float, kOverflowInlineItems> inline_{};
-    std::unique_ptr<float[]> heap_;
-    float* widths_ = nullptr;
-    int count_ = 0;
+    std::span<const OverflowItem> items_;
+    std::array<int, kOverflowInlineItems> inline_{};
+    std::unique_ptr<int[]> heap_;
+    int* ranks_ = nullptr;
+    int itemCount_ = 0;
     bool failed_ = false;
 };
 
@@ -96,8 +120,10 @@ private:
 
 float OverflowRequiredWidth(std::span<const OverflowItem> items, int hidden, float gap, float buttonWidth)
 {
-    const RankedWidths ranked(items);
-    return ranked.Required(hidden, std::max(0.0f, gap), std::max(0.0f, buttonWidth));
+    const Ranked ranked(items);
+    if (ranked.Failed())
+        return 0.0f;
+    return ranked.Resolve(hidden, std::max(0.0f, gap), std::max(0.0f, buttonWidth), {});
 }
 
 OverflowResult FitOverflow(std::span<const OverflowItem> items, float available, float gap, float buttonWidth,
@@ -110,23 +136,28 @@ OverflowResult FitOverflow(std::span<const OverflowItem> items, float available,
         available = 0.0f;
 
     OverflowResult result;
-    const RankedWidths ranked(items);
-    const int count = ranked.Count();
+    const Ranked ranked(items);
     if (ranked.Failed())
     {
         for (std::size_t i = 0; i < items.size() && i < visible.size(); ++i)
             visible[i] = true;
         return result;
     }
+    const int count = ranked.ItemCount();
     if (count == 0)
     {
+        // Separators alone never show.
+        for (std::size_t i = 0; i < items.size() && i < visible.size(); ++i)
+            visible[i] = false;
         if (state != nullptr)
             state->hidden = 0;
         return result;
     }
 
+    // Every comparison uses the width of the resolved row (separators included only where they
+    // show), so hiding a whole group also gives back the room of its separator.
     const auto fits = [&](int hidden, float spare) {
-        return ranked.Required(hidden, gap, buttonWidth) + spare <= available + kFitTolerance;
+        return ranked.Resolve(hidden, gap, buttonWidth, {}) + spare <= available + kFitTolerance;
     };
 
     // The fewest hidden items that fit. Hiding the first item adds the button, so hidden = 0 is
@@ -168,12 +199,9 @@ OverflowResult FitOverflow(std::span<const OverflowItem> items, float available,
         state->hidden = hidden;
     }
 
-    for (std::size_t i = 0; i < items.size() && i < visible.size(); ++i)
-        visible[i] = RankedWidths::RankOf(items, i) >= hidden;
-
     result.hiddenCount = hidden;
     result.showButton = hidden > 0;
-    result.usedWidth = ranked.Required(hidden, gap, buttonWidth);
+    result.usedWidth = ranked.Resolve(hidden, gap, buttonWidth, visible);
     return result;
 }
 

@@ -25,7 +25,12 @@
 //     for (int i = 0; i < kCount; ++i) if (visible[i]) ... draw item i ...
 //     if (fit.showButton) ... draw the "more" button listing the items with !visible[i] ...
 //
-// No heap allocation for up to kOverflowInlineItems items; longer rows allocate a scratch
+// Groups: entries of kind Separator between items divide a row into groups. When the items on
+// one side of a separator are all hidden, the separator goes too, so the row never ends in a
+// separator before the button or shows two in a row. A flexible spacer (ToolbarSpacer) has no
+// minimum width and stays out of the fitter; the caller places it in the room that is left.
+//
+// No heap allocation for up to kOverflowInlineItems entries; longer rows allocate a scratch
 // array per call.
 
 #include <span>
@@ -35,10 +40,20 @@ namespace facet::internal
 
 inline constexpr int kOverflowInlineItems = 64;
 
+enum class OverflowKind
+{
+    Item,       // a button, tab or crumb: shown, or moved into the overflow list
+    // A divider between groups (a toolbar separator). It is never ranked, hidden on its own or
+    // listed in the overflow; it shows only with a visible item on each side, one per pair of
+    // neighbours, never at either end of the row. Its width and gaps count only while it shows.
+    Separator,
+};
+
 struct OverflowItem
 {
     float width = 0.0f;  // pixels; negative counts as 0
-    int priority = 0;    // higher stays visible longer
+    int priority = 0;    // higher stays visible longer; unused for separators
+    OverflowKind kind = OverflowKind::Item;
 };
 
 // Kept by the caller from one frame to the next. A default value means "nothing hidden yet".
@@ -49,9 +64,9 @@ struct OverflowState
 
 struct OverflowResult
 {
-    int hiddenCount = 0;      // items in the overflow list
+    int hiddenCount = 0;      // items in the overflow list (separators never count)
     bool showButton = false;  // true exactly when hiddenCount > 0
-    float usedWidth = 0.0f;   // visible items, the gaps between them and the button
+    float usedWidth = 0.0f;   // visible items and separators, the gaps between them and the button
 };
 
 // Decides which items stay visible in `available` pixels. `gap` is the space between two
