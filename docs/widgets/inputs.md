@@ -62,7 +62,8 @@ bool PassesFilter(std::string_view query, const FilterSettings& settings, std::s
 
 A compact field for a filter query the caller keeps, with match case and whole word toggles when
 `settings` is not null; `PassesFilter` tests a text against the query. Status: planned (until then
-`PassesFilter` lets every text pass).
+`PassesFilter` lets every text pass). `FilterSettings` and `PassesFilter` are declared in `common.h`, because the
+property grid, keybind list and settings search take the same settings through `filterSettings`.
 
 ### Autocomplete
 

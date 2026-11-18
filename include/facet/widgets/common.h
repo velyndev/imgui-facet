@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <type_traits>
 
 #include <imgui.h>
@@ -190,6 +191,20 @@ float ControlHeight(ControlSize size);
 // Text style of the label in a control of this size: Small uses Footnote, Regular and Large
 // use Body. Inherit is resolved first.
 TextStyle ControlTextStyle(ControlSize size);
+
+// How a filter query matches, kept by the caller next to its query (FilterField, and the
+// filtered composite views). Plain data.
+struct FilterSettings
+{
+    bool matchCase = false;             // otherwise ASCII case-insensitive
+    bool wholeWord = false;             // each query word must match a whole word of the text
+};
+
+// Whether `text` matches `query` under `settings`: every space-separated word of the query occurs
+// in the text (as a whole word with wholeWord, ASCII case-insensitive unless matchCase). An
+// empty query matches everything. No allocation; usable from any thread. Until Phase 2
+// implements it, every text passes, as with an empty query.
+bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 
 // Last item: its edit session ended this frame, it was edited during the session, and the
 // session was not canceled.

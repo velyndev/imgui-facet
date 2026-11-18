@@ -128,12 +128,7 @@ bool SearchField(const char* label, char* buffer, std::size_t bufferSize, const 
 
 // --- FilterField ------------------------------------------------------------------------------
 
-// How a filter query matches, kept by the caller next to its query. Plain data.
-struct FilterSettings
-{
-    bool matchCase = false;             // otherwise ASCII case-insensitive
-    bool wholeWord = false;             // each query word must match a whole word of the text
-};
+// FilterSettings and PassesFilter are in common.h: the composite views filter with them too.
 
 struct FilterFieldOptions
 {
@@ -156,11 +151,6 @@ bool FilterField(const char* label, std::string* query, FilterSettings* settings
 bool FilterField(const char* label, char* buffer, std::size_t bufferSize, FilterSettings* settings,
                  const FilterFieldOptions& options = {});
 
-// Whether `text` matches `query` under `settings`: every space-separated word of the query occurs
-// in the text (as a whole word with wholeWord, ASCII case-insensitive unless matchCase). An
-// empty query matches everything. No allocation; usable from any thread. Until Phase 2
-// implements it, every text passes, as with an empty query.
-bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 
 // --- Autocomplete -----------------------------------------------------------------------------
 

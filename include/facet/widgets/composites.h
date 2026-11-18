@@ -136,7 +136,8 @@ bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const G
 
 struct PropertyGridOptions
 {
-    const char* filter = nullptr;          // rows whose label or keywords do not match (fuzzy) are skipped
+    const char* filter = nullptr;          // rows whose label or keywords do not match are skipped
+    const FilterSettings* filterSettings = nullptr;  // null: fuzzy matching; set: PassesFilter rules (FilterField)
     float labelWidth = 0.0f;               // units, the label column with its gap; 0 uses T().layout.labelColumn;
                                            // the user can drag the column edge (kept under the id)
 };
@@ -295,6 +296,7 @@ struct SettingsSearchMatchOptions
 struct SettingsSearchOptions
 {
     const char* filter = nullptr;          // the search text (usually from a search field); null or empty matches every row
+    const FilterSettings* filterSettings = nullptr;  // null: fuzzy matching; set: PassesFilter rules (FilterField)
 };
 
 // Settings search over rows the caller submits: between BeginSettingsSearch and
@@ -332,7 +334,8 @@ public:
 
 struct KeybindListOptions
 {
-    const char* filter = nullptr;          // only rows whose label or chord text match (fuzzy)
+    const char* filter = nullptr;          // only rows whose label or chord text match
+    const FilterSettings* filterSettings = nullptr;  // null: fuzzy matching; set: PassesFilter rules (FilterField)
     bool alternate = true;                 // a second capture slot per row
     bool groups = true;                    // group headers from the group text
     DataState state = DataState::Ready;    // Loading shows skeleton rows, Error the error state
