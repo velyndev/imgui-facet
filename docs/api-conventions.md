@@ -48,6 +48,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - Positional parameters are the label or id, every pointer the widget writes through or keeps across frames (value, `bool* open`, selection storage), range bounds, and the item data. Everything else goes into one trailing `const XOptions& options = {}`. There are no other default arguments and no flags parameter. *Reason: one test decides every signature.*
 - Option structs are aggregates: no constructors, no base classes, a default member initializer on every member. Callers use designated initializers (`{.variant = facet::ButtonVariant::Primary}`). Positional brace initialization of an options struct is not supported. *Reason: named members can be added without breaking callers.*
 - Options may hold pointers that the widget only reads during the call: strings, spans, `const` pointers, and a function pointer with its `void* user`.
+- Secondary text has two names: `description` is the wrapped line under a title or label (settings rows, cards, toasts, section headers), and `detail` is short text at the end of a row or after a title (tree nodes, combo items, accordion headers, the title bar). A text shown only on hover is `tooltip`. `ChoiceItem::detail` is drawn by each widget in the place it has room for, as the widget states.
 - An on/off feature is a named `bool`. A one-of choice is an enum class member. A flags enum exists only when the set itself is a value the caller stores. *Reason: no engineer has to choose between a bool and a bit.*
 - Member order is: widget-specific members, most used first; then the data block (`state`, `emptyText`, `errorText`) where it applies; then the common block. The common block always uses these names, types and order, and each member appears only where it applies: `ControlSize size`, `float width`, `float height`, `bool readOnly`, `bool loading`, `bool mixed`, `const char* error`, `const char* helpText`. The bare name `size` always means `ControlSize`. Two-dimensional lengths use compound names (`minSize`, `initialSize`). A compile-time test checks the common block in every options struct. *Reason: the same option is spelled the same way in 180 structs.*
 - A new member is appended at the end of the struct. Its default keeps the old behavior, and its trailing comment ends with `(since x.y)`. Never add an overload that differs only in the options type, because `{}` would become ambiguous. *Reason: existing calls keep compiling, and readers know which release has the member.*
@@ -651,7 +652,7 @@ struct ToastOptions
 {
     Tone tone = Tone::Neutral;
     Icon icon;
-    const char* detail = nullptr;
+    const char* description = nullptr; // wrapped line under the text
     const char* actionLabel = nullptr; // one action button
     float duration = 0.0f;             // seconds; 0 token default; < 0 until dismissed
 };

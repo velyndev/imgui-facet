@@ -51,8 +51,8 @@ Item data always belongs to the caller and is read during the call.
 | InventoryTile | `bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {})` | One item tile with count, category bar, lock and cooldown | planned |
 | InventorySlot | `InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {})` | Single slot that accepts inventory drops | planned |
 | InventoryDetailCard | `int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {})` | Detail card with stats and differences, tags and actions | planned |
-| MediaCard | `bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {})` | Card with a cover image, title, detail and badges | planned |
-| UserChip | `bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {})` | Avatar, name and detail in a pill for the signed-in account | planned |
+| MediaCard | `bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {})` | Card with a cover image, title, description and badges | planned |
+| UserChip | `bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {})` | Avatar, name and description in a pill for the signed-in account | planned |
 | ProfileSwitcher | `ProfileSwitcherAction ProfileSwitcher(const char* id, int* current, std::span<const AvatarItem> profiles, const ProfileSwitcherOptions& options = {})` | List of profiles with add and manage entries | planned |
 | PreviewCanvas | `void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanvasOptions& options = {})`, `void EndPreviewCanvas()`, `PreviewCanvasScope` | Letterboxed preview of a target resolution with grid, safe area and guides | planned |
 | CanvasElement | `bool CanvasElement(const char* label, CanvasElementState* element, const CanvasElementOptions& options = {})` | Anchored, draggable element inside a preview canvas | planned |

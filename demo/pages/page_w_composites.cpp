@@ -106,7 +106,7 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     facet::BeginPropertyGrid("properties");
     if (facet::BeginPropertyCategory("Category 1"))
     {
-        if (facet::BeginPropertyRow("Property 1", {.description = "Placeholder description"}))
+        if (facet::BeginPropertyRow("Property 1", {.tooltip = "Placeholder description"}))
         {
             ImGui::Checkbox("##value", &ui.option);
             facet::EndPropertyRow();
@@ -153,9 +153,9 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
 
     SectionHeader("Cards and people");
     LabeledRow("MediaCard");
-    facet::MediaCard("Title", facet::ImageHandle{}, {.detail = "Detail", .badges = kTags});
+    facet::MediaCard("Title", facet::ImageHandle{}, {.description = "Detail", .badges = kTags});
     LabeledRow("UserChip");
-    facet::UserChip("Profile 1", facet::ImageHandle{}, {.detail = "Placeholder"});
+    facet::UserChip("Profile 1", facet::ImageHandle{}, {.description = "Placeholder"});
     LabeledRow("ProfileSwitcher");
     facet::ProfileSwitcher("profiles", &ui.profile, kProfiles, {.addLabel = "Add profile"});
 

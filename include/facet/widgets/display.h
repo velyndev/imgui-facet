@@ -70,13 +70,13 @@ void TruncatedText(const char* text, const TruncatedTextOptions& options = {});
 
 struct SectionHeaderOptions
 {
-    const char* subtitle = nullptr;        // second line in labelSecondary; null for none
+    const char* description = nullptr;     // wrapped line under the heading in labelSecondary; null for none
     const char* actionLabel = nullptr;     // trailing link-style action; null for none
     bool divider = false;                  // hairline in separator under the header
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
-// A section heading (Title3) with an optional subtitle, a trailing action and a divider. The
+// A section heading (Title3) with an optional description, a trailing action and a divider. The
 // visible label part is the heading; the label is also the id of the action. Returns true on
 // the frame the action is activated (click, Enter, Space while it has keyboard focus); without
 // actionLabel it is not a Tab stop and always returns false. Keeps no state.

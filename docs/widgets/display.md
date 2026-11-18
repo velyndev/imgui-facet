@@ -18,7 +18,7 @@ names the widget) and returns the neutral result (false, `None`, nothing written
 |---|---|---|---|
 | StyledText | `void StyledText(const char* text, const StyledTextOptions& options = {})` | Text in a theme text style and a semantic tone, with wrapping and alignment | planned |
 | TruncatedText | `void TruncatedText(const char* text, const TruncatedTextOptions& options = {})` | Text cut with an ellipsis at the end, middle or start; full text as tooltip when cut | planned |
-| SectionHeader | `bool SectionHeader(const char* label, const SectionHeaderOptions& options = {})` | Section heading with subtitle, trailing action and divider; true when the action is activated | planned |
+| SectionHeader | `bool SectionHeader(const char* label, const SectionHeaderOptions& options = {})` | Section heading with description, trailing action and divider; true when the action is activated | planned |
 | Banner | `BannerAction Banner(const char* label, bool* open, const char* message, const BannerOptions& options = {})` | Full-width strip for view-wide conditions, with up to two actions and a close button | planned |
 | InlineAlert | `InlineAlertAction InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {})` | Tinted callout inside the content with one optional action | planned |
 | EmptyState | `bool EmptyState(const char* label, const EmptyStateOptions& options = {})` | Centered placeholder for a view without content, with one action | planned |

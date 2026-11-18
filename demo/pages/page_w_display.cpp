@@ -63,7 +63,7 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110)
     facet::TruncatedText("A placeholder line that is cut with an ellipsis where it does not fit",
                          {.mode = facet::TruncateMode::Middle});
     LabeledRow("SectionHeader");
-    facet::SectionHeader("Section title", {.subtitle = "Subtitle", .actionLabel = "Action", .divider = true});
+    facet::SectionHeader("Section title", {.description = "Description", .actionLabel = "Action", .divider = true});
 
     SectionHeader("Alerts and states");
     LabeledRow("Banner");

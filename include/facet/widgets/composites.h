@@ -160,7 +160,7 @@ void EndPropertyCategory();
 
 struct PropertyRowOptions
 {
-    const char* description = nullptr;     // tooltip of the label; null for none
+    const char* tooltip = nullptr;         // tooltip of the label; null for none
     const char* keywords = nullptr;        // extra words the filter matches; null for none
     bool modified = false;                 // marks a value that differs from its default
 };
@@ -534,28 +534,28 @@ int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDet
 
 struct MediaCardOptions
 {
-    const char* detail = nullptr;          // second line in labelSecondary
+    const char* description = nullptr;     // wrapped line under the title in labelSecondary; null for none
     std::span<const char* const> badges = {};
     bool selected = false;                 // the accent ring
     ImageFit fit = ImageFit::Cover;
     float width = 0.0f;                    // units; 0 for the card width default; narrow cards lay out horizontally
 };
 
-// A card with a cover image, the visible label part as title, a detail line and badges. One
+// A card with a cover image, the visible label part as title, a description line and badges. One
 // Tab stop; returns true on the frame it was activated. For a menu, call BeginContextMenu
 // right after it.
 bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {});
 
 struct UserChipOptions
 {
-    const char* detail = nullptr;          // second line; null for none
+    const char* description = nullptr;     // line under the name; null for none
     bool showStatus = false;
     Tone status = Tone::Neutral;
     bool compact = false;                  // the avatar alone (the name stays the tooltip)
     ControlSize size = ControlSize::Inherit;
 };
 
-// An avatar with a name and a detail line in a pill, for the signed-in account. One Tab stop;
+// An avatar with a name and a description line in a pill, for the signed-in account. One Tab stop;
 // returns true on the frame it was activated (the caller opens its account popover). The visible
 // label part is the name in the chip, and the tooltip when compact.
 bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {});

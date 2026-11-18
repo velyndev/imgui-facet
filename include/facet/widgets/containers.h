@@ -179,7 +179,7 @@ enum class WindowButton
 struct TitleBarOptions
 {
     Icon icon;                         // before the title; none by default
-    const char* subtitle = nullptr;    // second text after the title in labelSecondary; null for none
+    const char* detail = nullptr;      // short text after the title in labelSecondary; null for none
     bool windowButtons = false;        // minimize, maximize or restore and close at the trailing end
     bool maximized = false;            // the maximize button shows restore
     float width = 0.0f;                // units; 0 fills the available width
@@ -187,7 +187,7 @@ struct TitleBarOptions
 };
 
 // A title row: icon, the visible label part as title (truncated with an ellipsis when narrow),
-// subtitle, then the caller's items, then the window buttons. Items submitted between
+// detail, then the caller's items, then the window buttons. Items submitted between
 // BeginTitleBar and EndTitleBar sit at the trailing end, right-aligned with their widths from
 // the last frame. The free area of the bar is the drag region (Caption in AppFrameHitTest).
 // EndTitleBar is always called. A window button press is read with TitleBarButtonPressed. The

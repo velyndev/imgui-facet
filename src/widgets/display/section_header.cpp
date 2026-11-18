@@ -10,7 +10,7 @@ bool SectionHeader(const char* label, const SectionHeaderOptions& options)
 {
     namespace stub = internal::content;
     float height = stub::LineHeight(TextStyle::Title3) + Px(T().spacing.sm);
-    if (options.subtitle != nullptr)
+    if (options.description != nullptr)
         height += stub::LineHeight(TextStyle::Footnote);
     stub::Stub("SectionHeader", label, stub::ResolveWidth(options.width, 0.0f), height);
     return false;

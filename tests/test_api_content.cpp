@@ -287,7 +287,7 @@ void DisplayCalls()
     Check("StyledText", Expect::Item, "Body text", [] { StyledText("Body text", {.tone = Tone::Accent}); });
     Check("TruncatedText", Expect::Item, "A long line", [] { TruncatedText("A long line", {.mode = TruncateMode::Middle}); });
     Check("SectionHeader", Expect::Item, "Section", [] {
-        CHECK_FALSE(SectionHeader("Section", {.subtitle = "Subtitle", .actionLabel = "Action"}));
+        CHECK_FALSE(SectionHeader("Section", {.description = "Description", .actionLabel = "Action"}));
     });
 
     bool open = true;
@@ -659,7 +659,7 @@ void InventoryCalls()
         CHECK(InventoryDetailCard("Item", ImageHandle{}, {.stats = stats, .actions = actions}) == -1);
     });
     Check("MediaCard", Expect::Item, "Card", [] { CHECK_FALSE(MediaCard("Card", ImageHandle{}, {.selected = true})); });
-    Check("UserChip", Expect::Item, "Name", [] { CHECK_FALSE(UserChip("Name", ImageHandle{}, {.detail = "Detail"})); });
+    Check("UserChip", Expect::Item, "Name", [] { CHECK_FALSE(UserChip("Name", ImageHandle{}, {.description = "Detail"})); });
     Check("UserChip, compact", Expect::Item, "Name 2", [] { CHECK_FALSE(UserChip("Name 2", ImageHandle{}, {.compact = true})); });
 
     static const AvatarItem profiles[] = {{"Profile 1"}, {"Profile 2"}};

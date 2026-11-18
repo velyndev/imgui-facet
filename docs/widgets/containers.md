@@ -63,7 +63,7 @@ WindowButton TitleBarButtonPressed();
 class TitleBarScope;
 ```
 
-A title row with icon, subtitle, the caller's trailing items and optional window buttons; its free
+A title row with icon, detail text, the caller's trailing items and optional window buttons; its free
 area is the drag region.
 
 ### BeginOverlay (overlay controller)

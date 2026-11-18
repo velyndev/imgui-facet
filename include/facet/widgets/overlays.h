@@ -215,7 +215,7 @@ struct ToastOptions
 {
     Tone tone = Tone::Neutral;         // colors the icon; Neutral has no status color
     Icon icon;                         // none: the tone's icon
-    const char* detail = nullptr;      // second line; null for none
+    const char* description = nullptr; // wrapped line under the text; null for none
     const char* actionLabel = nullptr; // one action button; null for none
     float duration = 0.0f;             // seconds; 0 for the token default; < 0 until dismissed
     bool progressBar = false;          // a progress bar under the text
