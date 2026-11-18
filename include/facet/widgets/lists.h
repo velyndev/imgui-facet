@@ -11,9 +11,11 @@
 // Two kinds of multiple choice use two kinds of storage:
 //   - A selection (highlighted rows that the next command acts on) lives in a caller-owned
 //     ImGuiSelectionBasicStorage and is driven by ImGui::BeginMultiSelect, so Ctrl, Shift, box
-//     select and Ctrl+A behave as in every other multi-select list. The storage keys an entry
-//     by AdapterIndexToStorageId(index): the index itself unless the caller sets the adapter,
-//     for example to an item id that survives reordering.
+//     select and Ctrl+A behave as in every other multi-select list. In the index-based lists
+//     (SelectableList, DataTable, VirtualList, ItemGrid) the storage keys an entry by
+//     AdapterIndexToStorageId(index): the index itself unless the caller sets the adapter, for
+//     example to an item id that survives reordering. The tree view keys entries by node id
+//     (BeginTreeView).
 //   - Checked values (a set of options that are on) are a std::span<bool> with one entry per
 //     item, written like any other edited value. std::vector<bool> packs its bits and does not
 //     convert to a span; keep the flags in std::array<bool, N>, a bool array or
@@ -294,7 +296,14 @@ struct TreeViewOptions
 // A tree whose nodes are submitted between BeginTreeView and EndTreeView with BeginTreeNode and
 // TreeLeaf. `selection` (caller-owned, null for no selection) holds the selected nodes keyed by
 // TreeNodeOptions::id, or by the node's id on the id stack when that is 0; click, Ctrl+click
-// and Shift+click select through ImGui::BeginMultiSelect over the visible nodes. Arrows move,
+// and Shift+click select through ImGui::BeginMultiSelect over the visible nodes. A tree has no
+// stable index, so Facet applies the selection requests itself: it writes `selection` with
+// SetItemSelected and Clear, never calls ApplyRequests, and never reads or changes the storage's
+// AdapterIndexToStorageId or UserData, so the caller sets neither. Ctrl+A selects the visible
+// nodes (those whose parents are open) in the order they were submitted in the previous frame;
+// Shift ranges run between two visible nodes in submission order; Escape and a plain click
+// clear the whole storage, including selected nodes hidden under closed parents. Closing a
+// parent leaves its selected descendants selected. Arrows move,
 // Right opens or goes to the first child, Left closes or goes to the parent, typing jumps.
 // Returns false while the state is not Ready (the state is drawn instead) or while the view is
 // out of sight; call EndTreeView only after true. The view keeps its scroll position under the id.
