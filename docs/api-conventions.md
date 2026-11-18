@@ -98,6 +98,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 ## 9. Icons and images
 
 - Icons are `facet::Icon` by value, and `Icon{}` means none. An option or item member is named `icon`. Icon size and color follow the widget size and state.
+- A widget that can show its icon without its label spells that choice `bool iconOnly`, whatever its default; the visible label part then becomes the tooltip. A reduced form that is not about icons (an avatar without the name) is `compact`.
 - Images are `ImageHandle` by value. The media widget `ImageView` takes design units and a `Radius` token, and has an `ID3D11ShaderResourceView*` overload for app textures, as core `Image` does. *Reason: radii stay on the token scale, and app textures need no extra registration step.*
 
 ## 10. Per-call styling

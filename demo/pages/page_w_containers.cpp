@@ -86,7 +86,7 @@ void Bars(ContainersState&)
     facet::ToolbarButton("Remove", facet::Icon("trash"));
     facet::ToolbarSeparator();
     facet::ToolbarSpacer();
-    facet::ToolbarButton("Settings", facet::Icon("settings"), {.showLabel = true});
+    facet::ToolbarButton("Settings", facet::Icon("settings"), {.iconOnly = false});
     facet::EndToolbar();
     facet::BeginStatusBar("statusbar");
     facet::StatusItem("Status 1", {.icon = facet::Icon("info")});

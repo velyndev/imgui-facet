@@ -322,7 +322,7 @@ void EndToolbar();
 struct ToolbarButtonOptions
 {
     bool selected = false;             // shows the on look; the caller flips its state on activation
-    bool showLabel = false;            // the visible label part beside the icon, not only as tooltip
+    bool iconOnly = true;              // shows the icon; the visible label part becomes the tooltip
     int priority = 0;                  // higher stays visible longer when the toolbar is narrow
 };
 

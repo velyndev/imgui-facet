@@ -415,7 +415,7 @@ void CallEveryStub(Values& v)
     // Buttons
     FACET_CHECK_STUB(false, Button("Button 1", {.variant = ButtonVariant::Primary, .icon = Icon("check")}));
     FACET_CHECK_STUB(false, IconButton("Icon button 1", Icon("settings"), {.selected = true}));
-    FACET_CHECK_STUB(false, CopyButton("Copy 1", "Sample", {.showLabel = true}));
+    FACET_CHECK_STUB(false, CopyButton("Copy 1", "Sample", {.iconOnly = false}));
     FACET_CHECK_STUB(false, Link("Link 1", {.url = "about:blank"}));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 1", flags, kChoices));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 2", &v.index, kChoices, {.allowEmpty = true}));

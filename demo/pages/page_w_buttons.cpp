@@ -65,7 +65,7 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10)
 
     SectionHeader("Copy and links");
     LabeledRow("Copy button");
-    facet::CopyButton("Copy sample text", "Sample text", {.showLabel = true});
+    facet::CopyButton("Copy sample text", "Sample text", {.iconOnly = false});
     LabeledRow("Link");
     facet::Link("Placeholder link", {.url = "about:blank"});
 

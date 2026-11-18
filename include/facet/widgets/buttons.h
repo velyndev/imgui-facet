@@ -72,7 +72,7 @@ bool IconButton(const char* label, Icon icon, const IconButtonOptions& options =
 struct CopyButtonOptions
 {
     ButtonVariant variant = ButtonVariant::Plain;
-    bool showLabel = false;             // draws the visible label after the icon; otherwise icon only
+    bool iconOnly = true;               // shows the icon; the visible label part becomes the tooltip
     ControlSize size = ControlSize::Inherit;
 };
 
@@ -81,7 +81,7 @@ struct CopyButtonOptions
 // Strings::copied. The visible label part is the tooltip and the accessible name; an empty
 // visible part uses Strings::copy. Returns true on the frame it copied. A null `text` draws the
 // button disabled and returns false. Default width: one control height, or its content with
-// showLabel. Keeps the time of the last copy under its id.
+// iconOnly off. Keeps the time of the last copy under its id.
 bool CopyButton(const char* label, const char* text, const CopyButtonOptions& options = {});
 
 // --- Link -------------------------------------------------------------------------------------
