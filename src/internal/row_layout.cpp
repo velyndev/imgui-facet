@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "core/core_internal.h"
 #include "facet/core/color.h"
@@ -37,6 +38,8 @@ struct RowFrame
     float controlHeight = 0.0f;
     float resetSize = 0.0f;    // 0 without a reset slot
     float gap = 0.0f;
+    bool navSeenBefore = false;  // the focused item was submitted before the row began
+    char fullLabel[kLabelBuffer] = {};  // the label's text, for the keyboard tooltip of a cut label
 };
 
 struct RowStack
@@ -194,10 +197,21 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     }
     PopTextStyle();
 
-    // The full label as a tooltip when it was cut.
+    // The full label as a tooltip when it was cut: on hover here, on keyboard focus in EndRow.
     if (layout.truncated && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(layout.label.Min, layout.label.Max) &&
         ImGui::GetActiveID() == 0)
         ImGui::SetTooltip("%.*s", static_cast<int>(labelEnd - label), label);
+    if (layout.truncated)
+    {
+        // Kept for EndRow, cut at a whole UTF-8 character when longer than the buffer.
+        int length = std::min(static_cast<int>(labelEnd - label), kLabelBuffer - 1);
+        if (length < labelEnd - label)
+            while (length > 0 && (static_cast<unsigned char>(label[length]) & 0xC0) == 0x80)
+                --length;
+        std::memcpy(row.fullLabel, label, static_cast<size_t>(length));
+        row.fullLabel[length] = '\0';
+    }
+    row.navSeenBefore = GImGui->NavIdIsAlive;
 
     // The description under the label, wrapped in the column.
     float blockBottom = columns.stacked ? row.origin.y + lineHeight : row.origin.y + row.controlHeight;
@@ -250,6 +264,16 @@ bool EndRow()
     ImGui::EndGroup();
     const float controlBottom = std::max(ImGui::GetItemRectMax().y, layout.control.Max.y);
     const float slotWidth = layout.control.GetWidth();
+
+    // The full text of a cut label for keyboard users: while the visible focus is on an item of
+    // this slot (Dear ImGui marks the focused item alive when it is submitted), the tooltip shows
+    // under the label.
+    ImGuiContext& g = *GImGui;
+    if (layout.truncated && !row.navSeenBefore && g.NavIdIsAlive && g.NavWindow == g.CurrentWindow && KeyboardModality())
+    {
+        ImGui::SetNextWindowPos(ImVec2(layout.label.Min.x, layout.label.Max.y + Px(theme.spacing.xs)));
+        ImGui::SetTooltip("%s", row.fullLabel);
+    }
 
     // The message under the control: the error, or else the help text.
     const char* message = row.options.error != nullptr ? row.options.error : row.options.helpText;

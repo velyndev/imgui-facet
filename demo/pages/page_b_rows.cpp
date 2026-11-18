@@ -138,7 +138,8 @@ FACET_DEMO_PAGE("rows", "Rows and width classes", "Blocks", 30, "default", "narr
                             "Labelled rows with a shared label column, and the width classes that let a layout "
                             "stack its columns in narrow regions.");
     Note("Prototype controls in rows from the row layout block. Labels share the column of the widest one, end in an "
-         "ellipsis with the full text on hover when they do not fit, and go above their control when the region "
+         "ellipsis with the full text on hover or keyboard focus when they do not fit, and go above their control "
+         "when the region "
          "gets narrow.");
 
     const float available = facet::AvailableWidthUnits();
@@ -226,7 +227,17 @@ FACET_DEMO_SELFTEST("rows")
         ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
         return tooltip != nullptr && tooltip->Active;
     });
-
+    // The same text for keyboard users: the visible focus on the row's control shows it too,
+    // with the pointer away from the label.
+    test.Click("rows.long");
+    test.KeyPress(ImGuiKey_Tab);  // after a click, the first Tab shows the focus where it is
+    test.ExpectFocused("rows.long");
+    test.Expect("keyboard focus on its control shows the full text", [] {
+        ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
+        return tooltip != nullptr && tooltip->Active;
+    });
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("the toggle in that row works by mouse and keyboard", [] { return !page.longToggle; });
     // Validation: the error line appears when the bounds cross.
     test.Expect("no error while the bounds are in order", [] { return !page.error; });
     test.Click("rows.lower");

@@ -20,7 +20,8 @@
 // its own line above the control, which then takes the whole width. The label is drawn in the
 // control's text style and the label color, with its baseline on the baseline of the text of a
 // control of options.size, so label and control text line up. A label too long for its column
-// ends in an ellipsis, and resting the pointer on it shows the full text as a tooltip. The
+// ends in an ellipsis, and resting the pointer on it shows the full text as a tooltip, as does
+// keyboard focus on the row's control (the tooltip then sits under the label). The
 // optional description is a second line under the label (footnote, labelSecondary, wrapped in
 // the column). Under the control come the help text (footnote, labelSecondary) or, replacing
 // it, the error message with the error icon in the destructive color, wrapped in the slot.

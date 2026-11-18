@@ -136,6 +136,46 @@ TEST_CASE("Rows: a long label ends in an ellipsis and shows the full text on hov
     CHECK(probe.itemWidth > 0.0f);
 }
 
+TEST_CASE("Rows: keyboard focus on the control shows the full text of a cut label")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe before;
+    RowLayout layout;
+    ImGuiID control = 0;
+    session.SetUi([&] {
+        Row("Before", {}, before);
+        layout = BeginRow("A label much longer than the label column can hold");
+        control = ImGui::GetID("##value");
+        ImGui::Button("##value");
+        EndRow();
+        ImGui::Button("after");
+    });
+    session.Frames(2);
+    REQUIRE(layout.truncated);
+    // The pointer stays away from the label: only the focus can show the tooltip.
+    session.MouseMove(ImVec2(590.0f, 390.0f));
+    const auto tooltipShown = [] {
+        ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
+        return tooltip != nullptr && tooltip->Active && !tooltip->Hidden;
+    };
+    CHECK_FALSE(tooltipShown());
+    // The row before has no Tab stop, so Tab focuses the control of the cut row.
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == control);
+    CHECK(tooltipShown());
+    // Placed under the label.
+    ImGuiWindow* tooltip = ImGui::FindWindowByName("##Tooltip_00");
+    REQUIRE(tooltip != nullptr);
+    CHECK(tooltip->Pos.y >= layout.label.Max.y);
+    CHECK(tooltip->Pos.x == doctest::Approx(layout.label.Min.x));
+    // Focus on an item after the row hides it again.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() != control);
+    CHECK_FALSE(tooltipShown());
+}
+
 TEST_CASE("Rows: a group shares one label column sized by its widest label")
 {
     LayoutGuard guard;
