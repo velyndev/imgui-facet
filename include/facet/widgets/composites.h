@@ -69,6 +69,8 @@ struct CurveEditorOptions
 // click on a point removes it (never below two). Each point is a Tab stop with a focus ring;
 // arrows move it (Shift fine, Ctrl coarse) and it never passes its neighbours. Writes while
 // dragging. Returns true when points or *count were written. min > max is swapped per axis.
+// The visible label part is the accessible name and is not drawn (the editors are canvases;
+// a settings or property row gives them a visible label).
 bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max,
                  const CurveEditorOptions& options = {});
 
@@ -91,7 +93,8 @@ struct BezierEditorOptions
 };
 
 // An easing editor with the two control points as handles, each a Tab stop moved with arrows.
-// x stays in 0 to 1. Writes while dragging. Returns true when *curve was written.
+// x stays in 0 to 1. Writes while dragging. Returns true when *curve was written. The visible
+// label part is the accessible name and is not drawn.
 bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {});
 
 // One color stop of a gradient; color is sRGB with straight alpha.
@@ -113,7 +116,8 @@ struct GradientEditorOptions
 // kept sorted by position (a stop dragged past another changes places with it). A click on
 // the bar adds a stop with the color at that point; dragging a stop off the bar or Delete
 // removes it (never below one). Activating a stop opens a popover with a color picker. Each
-// stop is a Tab stop; arrows move it. Returns true when stops or *count were written.
+// stop is a Tab stop; arrows move it. Returns true when stops or *count were written. The
+// visible label part is the accessible name and is not drawn.
 bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count,
                     const GradientEditorOptions& options = {});
 
@@ -263,6 +267,8 @@ struct SearchFilterBarOptions
 // field restores the query from activation, as in every text field (rule 3), and a clear
 // button (Strings::clear) at the end of a non-empty field empties it. Each chip is a Tab stop;
 // Enter and Space toggle. Returns true when the query or any chip's active member was written.
+// The visible label part is drawn in front of the field inside the width (rule 6) and is the
+// field's accessible name; use "##name" in settings rows and toolbars.
 bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters,
                      const SearchFilterBarOptions& options = {});
 bool SearchFilterBar(const char* label, char* buffer, std::size_t bufferSize, std::span<FilterChip> filters,
@@ -539,7 +545,8 @@ struct UserChipOptions
 };
 
 // An avatar with a name and a detail line in a pill, for the signed-in account. One Tab stop;
-// returns true on the frame it was activated (the caller opens its account popover).
+// returns true on the frame it was activated (the caller opens its account popover). The visible
+// label part is the name in the chip, and the tooltip when compact.
 bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {});
 
 enum class ProfileSwitcherAction
@@ -724,7 +731,9 @@ struct ThemeModeControlOptions
     bool readOnly = false;
 };
 
-// A segmented control for Light, Dark and System. Returns true when *mode was written.
+// A segmented control for Light, Dark and System. Returns true when *mode was written. The
+// visible label part is drawn in front of the segments inside the width (rule 6); use "##name"
+// in settings rows.
 bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {});
 
 struct AccentPickerOptions
@@ -759,7 +768,8 @@ struct UiScaleControlOptions
 };
 
 // A stepped control for the user UI scale between `min` and `max` (1 is 100 percent), shown as
-// percent. Returns true when *scale was written. min > max is swapped.
+// percent. Returns true when *scale was written. min > max is swapped. The visible label part
+// is drawn in front of the control inside the width (rule 6); use "##name" in settings rows.
 bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {});
 
 // --- Drag and drop --------------------------------------------------------------------------

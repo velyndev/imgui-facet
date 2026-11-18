@@ -124,7 +124,8 @@ struct ThumbnailStripOptions
 
 // A horizontally scrolling row of thumbnails with the chosen one ringed. One Tab stop; Left
 // and Right move the selection, Home and End jump; the wheel scrolls. *selected -1 means none.
-// Returns true when *selected was written. Scroll position kept under the id.
+// Returns true when *selected was written. Scroll position kept under the id. The visible label
+// part is the accessible name and is not drawn; put the strip in a settings row for a visible label.
 bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem> items,
                     const ThumbnailStripOptions& options = {});
 bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGetter getter, void* user,
@@ -146,7 +147,8 @@ struct CarouselOptions
 
 // One slide at a time with previous and next buttons and page dots. The slide follows a
 // horizontal drag and snaps by velocity with the standard spring. One Tab stop for the slides
-// (Left and Right page) plus the buttons. Returns true when *index was written.
+// (Left and Right page) plus the buttons. Returns true when *index was written. The visible label
+// part is the accessible name and is not drawn; slide captions come from the items.
 bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, const CarouselOptions& options = {});
 
 // The view of an ImageViewer, owned by the caller so it can be saved or reset.
@@ -185,7 +187,8 @@ struct ImageCompareOptions
 
 // Two images of the same size on top of each other with a divider at *split (0 to 1). The
 // divider is a handle: drag it, or focus it and use arrows (Shift fine, Ctrl coarse), Home and
-// End. A click elsewhere moves it there. Returns true when *split was written.
+// End. A click elsewhere moves it there. Returns true when *split was written. The visible
+// label part is the accessible name and is not drawn; the corner captions come from the options.
 bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after,
                   const ImageCompareOptions& options = {});
 
@@ -206,7 +209,8 @@ struct TimelineScrubberOptions
 // A time ruler from 0 to `duration` seconds with a playhead. Dragging the ruler or the playhead
 // writes *playhead while dragging; the wheel zooms around the cursor and Shift+wheel pans
 // (zoom kept under the id). The playhead is a Tab stop; arrows step, Home and End jump. A
-// duration <= 0 draws the ruler read-only. Returns true when a value was written.
+// duration <= 0 draws the ruler read-only. Returns true when a value was written. The visible
+// label part is the accessible name and is not drawn, so the ruler keeps the whole width.
 bool TimelineScrubber(const char* label, double* playhead, double duration, const TimelineScrubberOptions& options = {});
 // With loop markers: *loopIn and *loopOut are two more handles, each a Tab stop, that never
 // cross (loopIn <= loopOut).

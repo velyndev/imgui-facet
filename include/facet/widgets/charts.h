@@ -261,7 +261,8 @@ struct ChartRangeBrushOptions
 // its own Tab stop and focus ring (arrows move it; Shift fine, Ctrl coarse); dragging the
 // window body pans it; a click outside the window moves the nearer edge. Returns true when
 // *low or *high was written. The selected range then drives the x axis of a larger chart.
-// min > max is swapped; edges never cross and keep minGap.
+// min > max is swapped; edges never cross and keep minGap. The visible label part is the
+// accessible name and is not drawn, so the overview lines up with the chart above it.
 bool ChartRangeBrush(const char* label, double* low, double* high, double min, double max,
                      std::span<const ChartSeries> overview, const ChartRangeBrushOptions& options = {});
 
