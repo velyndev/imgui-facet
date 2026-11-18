@@ -119,7 +119,10 @@ struct GradientEditorOptions
 };
 
 // A gradient bar with draggable stops. `stops` is the caller's storage as in CurveEditor,
-// kept sorted by position (a stop dragged past another changes places with it). A click on
+// kept sorted by position (a stop dragged past another changes places with it). The widget makes
+// that swap itself and carries the moved stop's drag, keyboard focus and open color popover to
+// its new index, so a stop never loses them in the middle of a drag (its parts are keyed by
+// index otherwise). A click on
 // the bar adds a stop with the color at that point; dragging a stop off the bar or Delete
 // removes it (never below one). Activating a stop opens a popover with a color picker. Each
 // stop is a Tab stop; arrows move it. Returns true when stops or *count were written. The
