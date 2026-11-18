@@ -170,7 +170,7 @@ struct AutocompleteOptions
     bool fuzzy = true;                  // fuzzy matching with highlights; otherwise prefix matching
     bool inlineCompletion = false;      // the best match continues the text in labelSecondary; Tab or Right accepts it
     bool strict = false;                // on commit, text that matches no suggestion is restored
-    int maxVisibleItems = 0;            // list height in rows; 0 for the default
+    int maxVisibleRows = 0;             // popup height in rows at most; fewer suggestions shrink it; 0 for the token default
     DataState state = DataState::Ready; // the state of the suggestions, as for Dropdown in lists.h
     const char* emptyText = nullptr;    // null uses Strings::noResults
     const char* errorText = nullptr;    // the list in the Error state; null uses Strings::loadFailed

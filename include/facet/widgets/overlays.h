@@ -320,7 +320,7 @@ struct CommandPaletteOptions
 {
     const char* placeholder = nullptr; // placeholder of the search field; null uses Strings::search
     ImGuiKeyChord openChord = ImGuiKey_None;   // a press writes *open = true; none by default
-    int maxVisibleItems = 0;           // rows; 0 for the token default
+    int maxVisibleRows = 0;            // list height in rows at most; fewer entries shrink it; 0 for the token default
     bool recentFirst = true;           // recently picked entries come first while the field is empty
     const char* emptyText = nullptr;   // null uses Strings::noResults
 };

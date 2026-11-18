@@ -451,7 +451,7 @@ struct DropdownOptions
 {
     const char* placeholder = nullptr; // shown while *index is -1; null uses Strings::select
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
-    int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    int maxVisibleRows = 0;            // popup height in rows at most; fewer items shrink it; 0 for the token default
     DataState state = DataState::Ready; // the items: Loading and Error show in the open list
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults
     const char* errorText = nullptr;   // null uses Strings::loadFailed

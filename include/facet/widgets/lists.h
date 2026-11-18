@@ -45,7 +45,7 @@ struct DropdownOptions
 {
     const char* placeholder = nullptr; // shown while *index is -1; null uses Strings::select
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
-    int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    int maxVisibleRows = 0;            // popup height in rows at most; fewer items shrink it; 0 for the token default
     DataState state = DataState::Ready;  // the state of the items, shown in the open list (see below)
     const char* emptyText = nullptr;   // null uses Strings::empty, or Strings::noResults while filtering
     const char* errorText = nullptr;   // the open list in the Error state; null uses Strings::loadFailed
@@ -95,7 +95,7 @@ struct MultiDropdownOptions
     MultiDropdownSummary summary = MultiDropdownSummary::List;  // what the closed field shows
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
     bool selectAllRow = false;         // a first row that checks or clears every enabled item
-    int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    int maxVisibleRows = 0;            // popup height in rows at most; fewer items shrink it; 0 for the token default
     DataState state = DataState::Ready;  // the state of the items, as for Dropdown
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults
     const char* errorText = nullptr;   // null uses Strings::loadFailed
@@ -121,7 +121,7 @@ bool MultiDropdown(const char* label, std::span<bool> checked, std::span<const c
 struct ComboOptions
 {
     Icon icon;                         // shown in the field before the preview text
-    int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    int maxVisibleRows = 0;            // popup height in rows at most; fewer items shrink it; 0 for the token default
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills the available width
     bool readOnly = false;             // the field does not open
@@ -166,7 +166,7 @@ private:
 
 struct ListBoxOptions
 {
-    int visibleRows = 0;               // height in rows; 0 for the token default
+    int visibleRows = 0;               // fixed height in rows, also with fewer items; 0 for the token default
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // null uses Strings::empty
     const char* errorText = nullptr;   // null uses Strings::loadFailed
@@ -196,7 +196,7 @@ bool ListBox(const char* label, int* index, int itemCount, ChoiceGetter getter, 
 struct SelectableListOptions
 {
     bool boxSelect = true;             // a drag that starts in empty space selects the rows it covers
-    int visibleRows = 0;               // height in rows; 0 for the token default
+    int visibleRows = 0;               // fixed height in rows, also with fewer items; 0 for the token default
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // null uses Strings::empty
     const char* errorText = nullptr;   // null uses Strings::loadFailed
@@ -395,7 +395,7 @@ struct TransferListOptions
     const char* sourceTitle = nullptr; // heading of the source list; null for none
     const char* targetTitle = nullptr; // heading of the target list; null for none
     bool searchable = true;            // a filter field above each list
-    int visibleRows = 0;               // height of each list in rows; 0 for the token default
+    int visibleRows = 0;               // fixed height of each list in rows; 0 for the token default
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // shown by each list without rows; null uses Strings::empty
     const char* errorText = nullptr;   // null uses Strings::loadFailed
@@ -420,7 +420,7 @@ struct SearchableChecklistOptions
     const char* placeholder = nullptr; // placeholder of the filter field; null uses Strings::search
     bool selectAllRow = true;          // a row that checks or clears every visible enabled item
     bool checkedFirst = false;         // checked items are listed before the others
-    int visibleRows = 0;               // height in rows; 0 for the token default
+    int visibleRows = 0;               // fixed height in rows, also with fewer items; 0 for the token default
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults
     const char* errorText = nullptr;   // null uses Strings::loadFailed
