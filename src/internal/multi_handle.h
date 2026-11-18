@@ -7,8 +7,9 @@
 // Two layers:
 //
 // 1. Pure logic (no Dear ImGui context needed, unit tested directly). Handle values are kept in
-//    ascending order in one span (in any order with CollisionMode::Free). HandleConstraints holds the range, the minimum gap between
-//    neighbours, the collision mode and the optional mirror. MoveHandle moves one handle and
+//    ascending order in one span (in any order with CollisionMode::Free). HandleConstraints
+//    holds the range, the minimum gap between neighbours, the collision mode and the optional
+//    mirror. MoveHandle moves one handle and
 //    resolves the constraints, MoveSpan moves a run of handles together, ConstrainHandles
 //    repairs values that came in invalid, InsertHandle and RemoveHandle change the count.
 //    PickHandle (along a track) and PickHandle2D (on a plane) choose the handle a press takes,

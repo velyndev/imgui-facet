@@ -53,10 +53,11 @@
 // facet::IsItemEditCanceled on the frame Escape ended it.
 //
 // Precision: a drag maps the pointer travel since the press onto a fraction of the track (in
-// delta mode, onto an offset from the value at the press) and converts it to a value each frame;
-// nothing is accumulated in value units, so no rounding drift builds up. Fraction 0 is exactly `min` and 1 exactly `max`; stepped and
-// integer values land exactly on min + n * step, and `max` is always reachable even when the
-// range is not a whole number of steps. Keyboard steps of continuous values move on a grid of
+// delta mode, onto an offset from the value at the press) and converts it to a value each
+// frame; nothing is accumulated in value units, so no rounding drift builds up. Fraction 0 is
+// exactly `min` and 1 exactly `max`; stepped and integer values land exactly on
+// min + n * step, and `max` is always reachable even when the range is not a whole number of
+// steps. Keyboard steps of continuous values move on a grid of
 // hundredths of the track, so a hundred presses from min end exactly on max.
 
 #include <limits>
