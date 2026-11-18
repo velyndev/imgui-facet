@@ -252,6 +252,29 @@ TEST_CASE("Rows: the reset button keeps its slot and reports activation")
     CHECK(resets == 1);  // not shown while unmodified
 }
 
+TEST_CASE("Rows: every row of a group keeps the reset slot of a resettable one")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(600.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe plain;
+    RowProbe resettable;
+    RowProbe outside;
+    session.SetUi([&] {
+        facet::internal::BeginRowGroup("group");
+        Row("Plain", {}, plain);
+        Row("Scale", {.resettable = true}, resettable);
+        facet::internal::EndRowGroup();
+        Row("Outside", {}, outside);
+    });
+    session.Frames(3);
+    // Nothing is modified, so no reset button shows, but the controls end in one line.
+    CHECK(plain.control.Max.x == doctest::Approx(resettable.control.Max.x));
+    CHECK(plain.layout.control.Max.x == doctest::Approx(resettable.layout.control.Max.x));
+    // Rows outside the group keep the whole width.
+    CHECK(outside.control.Max.x > resettable.control.Max.x);
+}
+
 TEST_CASE("Rows: each row scopes its control's id by the label")
 {
     LayoutGuard guard;

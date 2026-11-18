@@ -33,7 +33,9 @@
 // Inside BeginRowGroup / EndRowGroup the label column is the widest label of the group measured
 // in the previous frame plus the gap, at least the labelColumn token and at most
 // kRowGroupMaxShare of the available width; outside a group it is the token (or
-// options.labelColumn). The row pushes its label on the id stack until EndRow, so the control
+// options.labelColumn). When any row of a group is resettable, every row of the group keeps
+// the reset slot free (also measured in the previous frame), so the controls end in one line.
+// The row pushes its label on the id stack until EndRow, so the control
 // in every row can use the same "##value". The row is one group item, so rows stack with the
 // window's item spacing and work inside table cells.
 

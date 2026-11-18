@@ -51,6 +51,8 @@ struct GroupFrame
     ImGuiID id = 0;
     float columnUnits = 0.0f;    // this frame's column, from the last frame's measurement
     float measuredUnits = 0.0f;  // the widest label plus marker of this frame
+    float resetUnits = 0.0f;     // this frame's reset slot, from the last frame's measurement
+    float measuredResetUnits = 0.0f;  // the widest reset slot of this frame
 };
 
 struct GroupStack
@@ -63,6 +65,7 @@ struct GroupStack
 struct RowGroupState
 {
     float widestUnits = 0.0f;
+    float resetUnits = 0.0f;
 };
 
 RowStack& Rows()
@@ -126,7 +129,7 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     row.origin = window->DC.CursorPos;
     row.resetSize = options.resettable ? row.controlHeight : 0.0f;
     const float available = std::max(0.0f, ImGui::GetContentRegionAvail().x);
-    const float resetSlot = options.resettable ? row.resetSize + row.gap : 0.0f;
+    float resetSlot = options.resettable ? row.resetSize + row.gap : 0.0f;
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
 
     ImGui::BeginGroup();
@@ -145,6 +148,9 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     {
         GroupFrame& group = groups.groups[groups.depth - 1];
         group.measuredUnits = std::max(group.measuredUnits, (labelWidth + markerSpace) / Scale());
+        // Every row of the group keeps the widest reset slot free, so the controls end in one line.
+        group.measuredResetUnits = std::max(group.measuredResetUnits, resetSlot / Scale());
+        resetSlot = std::max(resetSlot, group.resetUnits * Scale());
         if (columnUnits <= 0.0f)
         {
             const float maxUnits = available * kRowGroupMaxShare / Scale();
@@ -313,6 +319,7 @@ void BeginRowGroup(const char* id)
     group.id = ImGui::GetID(id != nullptr ? id : "");
     const RowGroupState& state = GetState<RowGroupState>(group.id);
     group.columnUnits = state.widestUnits > 0.0f ? state.widestUnits + T().spacing.sm : 0.0f;
+    group.resetUnits = state.resetUnits;
 }
 
 void EndRowGroup()
@@ -329,7 +336,9 @@ void EndRowGroup()
         return;
     }
     const GroupFrame& group = stack.groups[--stack.depth];
-    GetState<RowGroupState>(group.id).widestUnits = group.measuredUnits;
+    RowGroupState& state = GetState<RowGroupState>(group.id);
+    state.widestUnits = group.measuredUnits;
+    state.resetUnits = group.measuredResetUnits;
 }
 
 void EndFrameRows()
