@@ -24,7 +24,9 @@ Three dials set the character, each from 1 (calm) to 3 (bold):
 **Identity motif: the sliding selection pill.** One soft accent-tinted highlight sits behind
 the selected entry and springs to the next one when the selection changes (standard spring).
 Tabs, the sidebar, segmented controls and lists are to share this one gesture once they exist,
-so it is recognisably Facet without any ornament; today the demo navigation uses it.
+so it is recognisably Facet without any ornament; today the selection pill block in
+`src/internal/selection_pill.h` draws it for the demo navigation and the prototypes on the
+Selection pill page.
 
 **Dose caps.** Effects are allowed only where they carry meaning:
 
@@ -119,6 +121,60 @@ Contrast rules, checked by the unit tests:
   every skeleton on screen sweeps in step from one shared clock, so one screen has one loading
   language.
 
+## Blocks
+
+The building blocks in `src/internal/` that widgets are made of. The choices behind each:
+
+- **Hit target.** The hit rectangle grows to minHitTarget around small visuals and yields to
+  any neighbour whose visible rectangle is under the pointer; Dear ImGui still reports the
+  visible rectangle.
+- **Focus ring.** One hairline of surface between control and ring, concentric corners in the
+  control's own corner shape (circular arcs around knobs), focusRing width, a soft halo,
+  faded over durationFast; shown only after keyboard or gamepad input, because a mouse user
+  already knows where they clicked.
+- **Ring color.** focusRing when it reaches 3:1 on every surface, otherwise accentText, so the
+  ring is visible with every accent preset.
+- **Selection pill motion.** The leading edge uses the standard spring at 0.7 of its response,
+  so the pill stretches slightly and settles; it animates relative to the group's content so
+  scrolling never animates it.
+- **Selection pill label.** The selected entry's label is semibold, because the pill tint is
+  soft by design and selection must not rest on color alone.
+- **Row labels.** Labels in the control's text style on the control text baseline, so label
+  and value read as one line.
+- **Row groups.** A group shares its widest label as the column, capped at 40 % of the row, so
+  one long label cannot squeeze every control.
+- **Reset slot.** A group reserves the reset slot in every row when one row is resettable, so
+  the controls end in one line; the slot stays reserved while nothing is modified, so the
+  control does not jump when the reset button appears.
+- **Modified marker.** A labelSecondary dot after the label marks a changed setting, a shape
+  rather than a color change, so the meaning does not rest on color alone.
+- **Cut row labels.** A cut label shows its full text as a tooltip on hover and, under the
+  label, on keyboard focus of the row's control, so keyboard users can read it too.
+- **Row texts.** Description under the label, help text under the control, and an error
+  replaces the help text with the error icon in destructive.
+- **Disabled rows.** A disabled row draws its label, marker, description and help text in
+  labelTertiary; an error keeps destructive, because it still needs to be read.
+- **Series colors.** Hues step around the OKLCH circle from the accent hue, neighbours far
+  apart, and each color moves in lightness until it reaches 3:1 on every surface, so lines
+  and areas stay distinguishable from the background with any accent.
+- **Plot edges** sit on whole pixels, so clip edges and grid lines stay crisp at every scale.
+
+### Prototype controls
+
+The Blocks pages operate the blocks through prototype controls in `demo/`. They are not the
+Phase 2 widgets; their look is the starting point for them:
+
+- **Fills** step fill[2], fill[1], fill[0] for rest, hover and press with a 3:1 boundary
+  hairline, so the states differ in more than one subtle shade and the edge stays visible.
+- **Tracks.** The unfilled slider track is in the 3:1 boundary color so the range ends stay
+  visible.
+- **Knobs** are bg with a 3:1 outline and grow 15 % while held, which confirms the grab.
+- **Span.** A range's filled span thickens by spacing.xs while a press would grab it or it is
+  dragged, so the user sees that the whole span moves.
+- **Marks.** Step ticks (including an off-grid max) and snap stops are labelSecondary dots.
+- **Read-only** fills in labelSecondary, so a value that cannot change does not look like an
+  accent selection.
+
 ## Effects
 
 The dose caps in Direction apply. The choices behind each effect:
@@ -169,14 +225,28 @@ The dose caps in Direction apply. The choices behind each effect:
   fixed order (Foundations, Media, Blocks, Widgets). The list scrolls when it is taller than the
   window; the heading of the group at the top stays pinned and the next heading pushes it out,
   so a scrolled list still says which group its rows belong to, and a newly selected page is
-  scrolled into view.
+  scrolled into view. The rows run on the item behaviour, the focus ring and the selection pill
+  block; the selected title is semibold, and a cut title shows in full beside the row on
+  keyboard focus and at the pointer on hover.
 - **Pages.** The window background with 24 / 20 padding; every page starts with a Title1
   heading and a one-paragraph summary in labelSecondary, sections with a Title3 heading.
 - **Settings rows.** A page labels each setting in one fixed label column in footnote
   labelSecondary, with the control after it, so option rows line up; in narrow windows the
-  label moves above its control.
+  label moves above its control. The Blocks pages use the row block instead (see Blocks), the
+  other pages keep this simpler row, so the Foundations and Media pages stay on stock controls.
 - **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
   caption names them, so nothing that cannot be operated looks like a control.
-- **Planned widgets.** A declared widget without its implementation draws a fill[3] box with a
-  separator hairline and "Name: planned" in footnote labelSecondary, at the size the widget
-  will take; it is not focusable, so a page of placeholders never looks operable.
+- **Planned widgets.** A declared widget without its implementation draws a box at the size the
+  widget will take with "Name: planned" in footnote labelSecondary; it is not focusable, so a
+  page of placeholders never looks operable. Controls and content widgets draw a fill[3] box
+  with a separator hairline in the control radius; structure widgets (lists, navigation,
+  containers, layout, overlays) draw a dashed separator hairline with square corners, so a
+  container placeholder reads as a frame around the caller's content.
+- **Narrow placeholders.** A narrow controls placeholder drops the label part first, then the
+  widget name, before the word "planned" is shortened, so the box still says that it is a
+  placeholder.
+- **Field messages.** The FieldValidation placeholder is spacing.xs taller than its text, so its
+  hairline never crosses the text.
+- **Placeholder sizes.** Pads, cell rows and the inline calendar shrink to the available width
+  by default, so a placeholder never runs under the scrollbar; content placeholders are at
+  least a small control tall, so a box around one line of text does not cut its descenders.
