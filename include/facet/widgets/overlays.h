@@ -150,7 +150,9 @@ struct ContextMenuOptions
 };
 
 // A menu that opens on right click, the Menu key or Shift+F10 over the target, at the pointer
-// (or at the focused item for the keys). `id` names the popup, so it also works after widgets
+// (or at the focused item for the keys). Facet reads the Menu key and Shift+F10 on the focused
+// item itself through key ownership, like Escape (rule 8), so the keys work without
+// ImGuiConfigFlags_NavEnableKeyboard. `id` names the popup, so it also works after widgets
 // made of several items. Returns true while open: submit menu items (facet::MenuItem,
 // BeginMenu), then call EndContextMenu. Returns false while closed; call EndContextMenu only
 // after true.
