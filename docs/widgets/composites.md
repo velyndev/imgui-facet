@@ -35,9 +35,9 @@ Item data always belongs to the caller and is read during the call.
 
 | Widget | Declaration | What it does | Status |
 |---|---|---|---|
-| CurveEditor | `bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {})` | Response curve through draggable, addable control points | planned |
+| CurveEditor | `bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {})`, `bool CurveEditor(const char* label, std::vector<ImVec2>* points, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {})` | Response curve through draggable, addable control points | planned |
 | BezierEditor | `bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {})` | Cubic easing editor with two handles, presets and numeric fields | planned |
-| GradientEditor | `bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count, const GradientEditorOptions& options = {})` | Gradient bar with draggable color stops | planned |
+| GradientEditor | `bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count, const GradientEditorOptions& options = {})`, `bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options = {})` | Gradient bar with draggable color stops | planned |
 | PropertyGrid | `void BeginPropertyGrid(const char* id, const PropertyGridOptions& options = {})`, `void EndPropertyGrid()`, `[[nodiscard]] bool BeginPropertyCategory(...)`, `void EndPropertyCategory()`, `[[nodiscard]] bool BeginPropertyRow(...)`, `void EndPropertyRow()`, with scopes | Inspector of labelled rows in collapsible categories with a filter | planned |
 | ConsoleView | `bool ConsoleView(const char* id, std::string* command, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {})`, overloads with a getter and with a `char*` buffer | Log view with a command field, history and Tab completion | planned |
 | SearchFilterBar | `bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {})`, overload with a `char*` buffer | Search field with toggleable filter chips and a result count | planned |

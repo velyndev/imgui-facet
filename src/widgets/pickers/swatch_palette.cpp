@@ -3,6 +3,8 @@
 
 #include "facet/widgets/pickers.h"
 
+#include <algorithm>
+
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "widgets/controls_stub.h"
@@ -35,6 +37,14 @@ bool SwatchPalette(const char* label, ImVec4*, std::span<const ImVec4> swatches,
                    const SwatchPaletteOptions& options)
 {
     Stub(label, swatches.size(), history != nullptr, options);
+    return false;
+}
+
+bool SwatchPalette(const char* label, ImVec4*, std::span<ImVec4> storage, int* count, ColorHistory* history,
+                   const SwatchPaletteOptions& options)
+{
+    const std::size_t used = count != nullptr && *count > 0 ? std::min(static_cast<std::size_t>(*count), storage.size()) : 0;
+    Stub(label, used, history != nullptr, options);
     return false;
 }
 

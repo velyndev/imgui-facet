@@ -10,6 +10,7 @@
 #include <cstring>
 #include <type_traits>
 #include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -502,6 +503,11 @@ void EditorCalls()
     });
     CHECK(count == 3);
     CHECK(pointsBefore.Unchanged());
+    std::vector<ImVec2> pointVector = {{0.0f, 0.0f}, {1.0f, 1.0f}};
+    Check("CurveEditor, vector", Expect::Item, "Curve 2", [&] {
+        CHECK_FALSE(CurveEditor("Curve 2", &pointVector, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f)));
+    });
+    CHECK(pointVector.size() == 2);
 
     CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
     const Snapshot curveBefore(curve);
@@ -516,6 +522,11 @@ void EditorCalls()
     });
     CHECK(stopCount == 2);
     CHECK(stopsBefore.Unchanged());
+    std::vector<GradientStop> stopVector = {{0.0f}, {1.0f}};
+    Check("GradientEditor, vector", Expect::Item, "Gradient 2", [&] {
+        CHECK_FALSE(GradientEditor("Gradient 2", &stopVector));
+    });
+    CHECK(stopVector.size() == 2);
 
     // Open categories and rows take content; the row pushes its label on the id stack.
     Check("PropertyGrid", Expect::NoItem, nullptr, [] {

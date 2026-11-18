@@ -110,14 +110,17 @@ Status: planned.
 bool MultiSlider(const char* label, std::span<float> values, float min, float max,
                  const MultiSliderOptions& options = {});
 bool MultiSlider(const char* label, std::span<int> values, int min, int max, const MultiSliderOptions& options = {});
+bool MultiSlider(const char* label, std::span<float> storage, int* count, float min, float max,
+                 const MultiSliderOptions& options = {});
 bool MultiSlider(const char* label, std::vector<float>* values, float min, float max,
                  const MultiSliderOptions& options = {});
 int MultiSliderAddedHandle();
 int MultiSliderRemovedHandle();
 ```
 
-N ordered handles on one track dividing it into colored segments; the vector form can add and remove
-handles. Status: planned.
+N ordered handles on one track dividing it into colored segments; the storage and count form and the
+vector form can add and remove handles, while the fixed span forms report `allowAdd` and
+`allowRemove` as a usage error. Status: planned.
 
 ### Knob
 

@@ -29,6 +29,7 @@
 #include <limits>
 #include <span>
 #include <string>
+#include <vector>
 
 #include <imgui.h>
 
@@ -73,6 +74,9 @@ struct CurveEditorOptions
 // of the canvas on hover and keyboard focus (rule 6); a settings or property row gives them a
 // visible label.
 bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max,
+                 const CurveEditorOptions& options = {});
+// The same in a vector the widget resizes (rule 5). Allocates only when a point is added.
+bool CurveEditor(const char* label, std::vector<ImVec2>* points, ImVec2 min, ImVec2 max,
                  const CurveEditorOptions& options = {});
 
 // A cubic easing curve from (0, 0) to (1, 1) given by its two control points.
@@ -121,6 +125,8 @@ struct GradientEditorOptions
 // visible label part is the canvas tooltip, as for CurveEditor.
 bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count,
                     const GradientEditorOptions& options = {});
+// The same in a vector the widget resizes (rule 5). Allocates only when a stop is added.
+bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options = {});
 
 // --- Property grid --------------------------------------------------------------------------
 

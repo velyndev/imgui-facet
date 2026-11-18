@@ -47,6 +47,8 @@ Status: planned.
 struct ColorHistory { static constexpr int kCapacity = 8; ImVec4 colors[kCapacity]; int count; };
 bool SwatchPalette(const char* label, ImVec4* color, std::span<const ImVec4> swatches, ColorHistory* history,
                    const SwatchPaletteOptions& options = {});
+bool SwatchPalette(const char* label, ImVec4* color, std::span<ImVec4> storage, int* count, ColorHistory* history,
+                   const SwatchPaletteOptions& options = {});
 bool SwatchPalette(const char* label, ImVec4* color, std::vector<ImVec4>* swatches, ColorHistory* history,
                    const SwatchPaletteOptions& options = {});
 ```

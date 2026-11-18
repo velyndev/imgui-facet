@@ -3,6 +3,7 @@
 
 #include "facet/widgets/sliders.h"
 
+#include "core/core_internal.h"
 #include "widgets/controls_stub.h"
 
 namespace facet
@@ -18,15 +19,31 @@ void Stub(const char* label, const MultiSliderOptions& options)
     stub::ControlStub("MultiSlider", label, size.x, size.y);
 }
 
+// The fixed-count overloads cannot add or remove handles: asking them to is a usage error,
+// reported once per call and then ignored.
+void CheckFixedCount(const MultiSliderOptions& options)
+{
+    if (options.allowAdd || options.allowRemove)
+        internal::ReportUsageError("MultiSlider: allowAdd and allowRemove need the storage and count or the vector overload");
+}
+
 } // namespace
 
 bool MultiSlider(const char* label, std::span<float>, float, float, const MultiSliderOptions& options)
 {
+    CheckFixedCount(options);
     Stub(label, options);
     return false;
 }
 
 bool MultiSlider(const char* label, std::span<int>, int, int, const MultiSliderOptions& options)
+{
+    CheckFixedCount(options);
+    Stub(label, options);
+    return false;
+}
+
+bool MultiSlider(const char* label, std::span<float>, int*, float, float, const MultiSliderOptions& options)
 {
     Stub(label, options);
     return false;

@@ -14,4 +14,12 @@ bool GradientEditor(const char* label, std::span<GradientStop>, int*, const Grad
     return false;
 }
 
+bool GradientEditor(const char* label, std::vector<GradientStop>*, const GradientEditorOptions& options)
+{
+    namespace stub = internal::content;
+    stub::Stub("GradientEditor", label, stub::ResolveWidth(options.width, 0.0f),
+               stub::ResolveHeight(options.height, stub::ControlRows(stub::kTallControlRows)));
+    return false;
+}
+
 } // namespace facet

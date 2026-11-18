@@ -150,9 +150,13 @@ struct SwatchPaletteOptions
 // Returns true when *color was written.
 bool SwatchPalette(const char* label, ImVec4* color, std::span<const ImVec4> swatches, ColorHistory* history,
                    const SwatchPaletteOptions& options = {});
-// The same with swatches the user edits: a trailing + swatch adds *color, Delete removes the
-// focused swatch, and dragging reorders. Returns true when *color or *swatches was written.
-// Allocates only when a swatch is added.
+// The same with swatches the user edits: a trailing + swatch adds *color (while there is room),
+// Delete removes the focused swatch, and dragging reorders. In the caller's storage (rule 5):
+// `storage` is the capacity and the first *count entries are the swatches. Returns true when
+// *color, the swatches or *count was written. Never allocates.
+bool SwatchPalette(const char* label, ImVec4* color, std::span<ImVec4> storage, int* count, ColorHistory* history,
+                   const SwatchPaletteOptions& options = {});
+// The same in a vector the widget resizes. Allocates only when a swatch is added.
 bool SwatchPalette(const char* label, ImVec4* color, std::vector<ImVec4>* swatches, ColorHistory* history,
                    const SwatchPaletteOptions& options = {});
 

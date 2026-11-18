@@ -14,4 +14,12 @@ bool CurveEditor(const char* label, std::span<ImVec2>, int*, ImVec2, ImVec2, con
     return false;
 }
 
+bool CurveEditor(const char* label, std::vector<ImVec2>*, ImVec2, ImVec2, const CurveEditorOptions& options)
+{
+    namespace stub = internal::content;
+    stub::Stub("CurveEditor", label, stub::ResolveWidth(options.width, 0.0f),
+               stub::ResolveHeight(options.height, stub::Spans(stub::kChartHeightSpans)));
+    return false;
+}
+
 } // namespace facet

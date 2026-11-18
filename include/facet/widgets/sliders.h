@@ -262,10 +262,11 @@ struct MultiSliderOptions
     double minGap = 0.0;                // value units; smallest distance between neighbouring handles
     HandleCollision collision = HandleCollision::Clamp;
     bool dragSpan = false;              // dragging a segment moves the two handles around it
-    bool allowAdd = false;              // vector overload: a double click on the track adds a handle
-    bool allowRemove = false;           // vector overload: Delete on a focused handle, or dragging it off the track, removes it
-    int minHandles = 0;                 // vector overload: removing stops at this count
-    int maxHandles = 0;                 // vector overload: adding stops at this count; 0 unlimited
+    bool allowAdd = false;              // growable overloads: a double click on the track adds a handle
+    bool allowRemove = false;           // growable overloads: Delete on a focused handle, or dragging it off the track, removes it
+    int minHandles = 0;                 // growable overloads: removing stops at this count
+    int maxHandles = 0;                 // growable overloads: adding stops at this count; 0: the storage
+                                        // capacity (span overload) or unlimited (vector); the smaller wins
     std::span<const ImU32> segmentColors = {};  // read during the call; data colors of the segments, repeated; a 0 entry
                                         // takes the chart palette color of its index; empty: one accent fill,
                                         // because a slider is a control and the fill shows its value
@@ -281,14 +282,21 @@ struct MultiSliderOptions
 
 // N handles on one track, in ascending order, following the multi-handle model above; handle i
 // is values[i]. The handles divide the track into segments, filled with segmentColors. Returns
-// true when a value was written (or, for the vector overload, a handle was added or removed).
-// An empty span or vector draws the bare track.
+// true when a value was written (or, for the growable overloads, a handle was added or removed).
+// An empty span or vector draws the bare track. These two overloads keep the handle count:
+// allowAdd and allowRemove need a growable overload, and set here they are reported as a usage
+// error (IM_ASSERT_USER_ERROR) and ignored, so a std::vector passed by value cannot silently
+// lose its add and remove.
 bool MultiSlider(const char* label, std::span<float> values, float min, float max,
                  const MultiSliderOptions& options = {});
 bool MultiSlider(const char* label, std::span<int> values, int min, int max, const MultiSliderOptions& options = {});
-// The same with a vector the widget resizes when allowAdd or allowRemove is on. A new handle is
-// inserted where it keeps the order; read MultiSliderAddedHandle or MultiSliderRemovedHandle to
-// update data kept per handle or per segment. Allocates only when a handle is added.
+// Growable, in the caller's storage (rule 5): `storage` is the capacity and the first *count
+// values are the handles. allowAdd and allowRemove write *count. A new handle is inserted where
+// it keeps the order; read MultiSliderAddedHandle or MultiSliderRemovedHandle to update data
+// kept per handle or per segment. Never allocates.
+bool MultiSlider(const char* label, std::span<float> storage, int* count, float min, float max,
+                 const MultiSliderOptions& options = {});
+// Growable, in a vector the widget resizes. Allocates only when a handle is added.
 bool MultiSlider(const char* label, std::vector<float>* values, float min, float max,
                  const MultiSliderOptions& options = {});
 

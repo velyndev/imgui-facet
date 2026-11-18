@@ -204,6 +204,8 @@ struct Values
     std::array<float, 3> handles = {0.1f, 0.5f, 0.9f};
     std::array<int, 2> handlesInt = {3, 6};
     std::vector<float> handleVector = {0.2f, 0.7f};
+    std::array<float, 4> handleStorage = {0.2f, 0.6f, 0.0f, 0.0f};
+    int handleCount = 2;
     ImVec2 point = {0.3f, 0.4f};
     ImVec2 boxLow = {0.1f, 0.2f};
     ImVec2 boxHigh = {0.6f, 0.7f};
@@ -229,6 +231,8 @@ struct Values
     ImVec4 color = {0.1f, 0.2f, 0.3f, 0.4f};
     facet::ColorHistory history = {{{0.5f, 0.5f, 0.5f, 1.0f}}, 1};
     std::vector<ImVec4> swatches = {{0.9f, 0.8f, 0.7f, 1.0f}};
+    std::array<ImVec4, 3> swatchStorage = {{{0.9f, 0.8f, 0.7f, 1.0f}}};
+    int swatchCount = 1;
     facet::AnimatedColor animated = {facet::ColorAnimation::Pulse, {0.1f, 0.2f, 0.3f, 1.0f}, {0.4f, 0.5f, 0.6f, 1.0f}, 3.0f};
     facet::Date date = {2001, 2, 3};
     facet::Date start = {2001, 2, 3};
@@ -281,6 +285,12 @@ std::string Describe(const Values& v)
     for (int h : v.handlesInt)
         Append(out, "handlesInt", h);
     Append(out, "handleVector.size", static_cast<double>(v.handleVector.size()));
+    for (float h : v.handleStorage)
+        Append(out, "handleStorage", h);
+    Append(out, "handleCount", v.handleCount);
+    Append(out, "swatchCount", v.swatchCount);
+    for (const ImVec4& s : v.swatchStorage)
+        Append(out, "swatchStorage", s);
     for (float h : v.handleVector)
         Append(out, "handleVector", h);
     Append(out, "point", v.point);
@@ -461,6 +471,8 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, MultiSlider("Multi 1", std::span<float>(v.handles), 0.0f, 1.0f));
     FACET_CHECK_STUB(false, MultiSlider("Multi 2", std::span<int>(v.handlesInt), 0, 10));
     FACET_CHECK_STUB(false, MultiSlider("Multi 3", &v.handleVector, 0.0f, 1.0f, {.allowAdd = true, .allowRemove = true}));
+    FACET_CHECK_STUB(false, MultiSlider("Multi 4", std::span<float>(v.handleStorage), &v.handleCount, 0.0f, 1.0f,
+                                        {.allowAdd = true, .allowRemove = true}));
     CHECK(MultiSliderAddedHandle() == -1);
     CHECK(MultiSliderRemovedHandle() == -1);
     FACET_CHECK_STUB(false, Knob("Knob 1", &v.number, 0.0f, 1.0f, {.variant = KnobVariant::Dot}));
@@ -528,6 +540,7 @@ void CallEveryStub(Values& v)
     FACET_CHECK_STUB(false, ColorInputs("Inputs 1", &v.color, {.model = ColorModel::Hsv}));
     FACET_CHECK_STUB(false, SwatchPalette("Palette 1", &v.color, std::span(kSwatches), &v.history));
     FACET_CHECK_STUB(false, SwatchPalette("Palette 2", &v.color, &v.swatches, nullptr));
+    FACET_CHECK_STUB(false, SwatchPalette("Palette 3", &v.color, std::span<ImVec4>(v.swatchStorage), &v.swatchCount, nullptr));
     FACET_CHECK_STUB(false, SatValSquare("Square 1", &v.color));
     FACET_CHECK_STUB(false, ColorChannelSlider("Channel 1", &v.color, {.channel = ColorChannel::Alpha}));
     FACET_CHECK_STUB(false, ColorModeEditor("Mode editor 1", &v.animated));
@@ -546,7 +559,7 @@ void CallEveryStub(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallEveryStub.
-constexpr int kStubCalls = 112;
+constexpr int kStubCalls = 114;
 
 } // namespace
 
