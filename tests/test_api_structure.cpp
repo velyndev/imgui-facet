@@ -663,6 +663,30 @@ TEST_CASE("A structure placeholder takes its width by the precedence of rule 6")
     CHECK(session.ItemId("default") == defaultId);
 }
 
+TEST_CASE("A reorderable list placeholder takes one row per item or one row for its state")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::ReorderMove move;
+    session.SetUi([&] {
+        facet::ReorderableList("ready", &move, kItems);
+        session.Track("ready");
+        facet::ReorderableList("loading", &move, kItems, {.state = facet::DataState::Loading});
+        session.Track("loading");
+        facet::ReorderableList("error", &move, kLabels, {.state = facet::DataState::Error});
+        session.Track("error");
+        facet::ReorderableList("empty", &move, std::span<const facet::ChoiceItem>());
+        session.Track("empty");
+    });
+    session.Frame();
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("ready").GetHeight() == doctest::Approx(row * static_cast<float>(std::size(kItems))));
+    CHECK(session.ItemRect("loading").GetHeight() == doctest::Approx(row));
+    CHECK(session.ItemRect("error").GetHeight() == doctest::Approx(row));
+    CHECK(session.ItemRect("empty").GetHeight() == doctest::Approx(row));
+    CHECK_FALSE(move.IsValid());
+}
+
 TEST_CASE("A narrow structure placeholder truncates its text inside its outline")
 {
     facet::test::Session session;

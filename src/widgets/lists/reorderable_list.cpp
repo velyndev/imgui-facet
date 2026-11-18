@@ -1,5 +1,6 @@
 // ReorderableList (lists.h). Planned: draws the placeholder of src/widgets/structure_stub.h
-// until Phase 2 implements the widget. Returns false and never writes *move.
+// until Phase 2 implements the widget, one row per item, or the one row of the loading, error or
+// empty state. Returns false and never writes *move.
 
 #include "facet/widgets/lists.h"
 #include "widgets/structure_stub.h"
@@ -11,7 +12,8 @@ namespace
 
 void DrawReorderableList(const char* id, std::size_t count, const ReorderableListOptions& options)
 {
-    const int rows = count == 0 ? 1 : static_cast<int>(count);
+    const bool rowsShown = options.state == DataState::Ready && count > 0;
+    const int rows = rowsShown ? static_cast<int>(count) : 1;
     internal::StubItem("ReorderableList", id, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(options.size));
 }
