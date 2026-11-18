@@ -171,11 +171,12 @@ struct AutocompleteOptions
     bool inlineCompletion = false;      // the best match continues the text in labelSecondary; Tab or Right accepts it
     bool strict = false;                // on commit, text that matches no suggestion is restored
     int maxVisibleItems = 0;            // list height in rows; 0 for the default
+    DataState state = DataState::Ready; // the state of the suggestions, as for Dropdown in lists.h
     const char* emptyText = nullptr;    // null uses Strings::noResults
+    const char* errorText = nullptr;    // the list in the Error state; null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;
     bool readOnly = false;
-    bool loading = false;               // the list shows the loading state (suggestions from a slow source)
     bool mixed = false;
     const char* error = nullptr;
     const char* helpText = nullptr;
@@ -186,7 +187,9 @@ struct AutocompleteOptions
 // its label, Escape closes the list (a second Escape ends the session). Returns true when the
 // text was written. Read AutocompleteAcceptedItem after the call to learn which suggestion was
 // taken. Suggestions are spans read during the call, or a count and a getter called during the
-// call (for large or changing sources; set `loading` while they are fetched).
+// call (for large or changing sources; set `state` to Loading while they are fetched and to Error
+// when fetching failed: the list says so and the text stays editable; `error` remains the
+// validation message of the typed text).
 bool Autocomplete(const char* label, std::string* text, std::span<const ChoiceItem> suggestions,
                   const AutocompleteOptions& options = {});
 bool Autocomplete(const char* label, std::string* text, std::span<const char* const> suggestions,

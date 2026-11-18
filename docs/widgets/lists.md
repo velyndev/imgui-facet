@@ -35,7 +35,8 @@ bool Dropdown(const char* label, int* index, int itemCount, ChoiceGetter getter,
 ```
 
 A field that opens a list with icons, group headers, typeahead and an optional fuzzy filter, and
-writes the chosen index.
+writes the chosen index. Items fetched from a slow source set `state`: the open list shows the
+loading or error row, and the closed field marks an error, while the field keeps its value.
 
 ### MultiDropdown
 

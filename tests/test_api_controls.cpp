@@ -484,7 +484,7 @@ void CallEveryStub(Values& v)
     CHECK(PassesFilter(v.text, v.filter, "Sample text"));
     FACET_CHECK_STUB(false, Autocomplete("Complete 1", &v.text, kChoices));
     FACET_CHECK_STUB(false, Autocomplete("Complete 2", &v.text, kLabels, {.strict = true}));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 3", &v.text, 0, nullptr, nullptr, {.loading = true}));
+    FACET_CHECK_STUB(false, Autocomplete("Complete 3", &v.text, 0, nullptr, nullptr, {.state = facet::DataState::Loading}));
     FACET_CHECK_STUB(false, Autocomplete("Complete 4", buffer, bufferSize, kChoices));
     FACET_CHECK_STUB(false, Autocomplete("Complete 5", buffer, bufferSize, kLabels));
     FACET_CHECK_STUB(false, Autocomplete("Complete 6", buffer, bufferSize, 0, nullptr, nullptr));

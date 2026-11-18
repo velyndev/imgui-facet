@@ -46,11 +46,12 @@ struct DropdownOptions
     const char* placeholder = nullptr; // shown while *index is -1; null uses Strings::select
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
     int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    DataState state = DataState::Ready;  // the state of the items, shown in the open list (see below)
     const char* emptyText = nullptr;   // null uses Strings::empty, or Strings::noResults while filtering
+    const char* errorText = nullptr;   // the open list in the Error state; null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills the available width
     bool readOnly = false;
-    bool loading = false;              // the list shows the loading state; the field keeps its value
     bool mixed = false;                // the field shows Strings::mixed until a choice is made
     const char* error = nullptr;
     const char* helpText = nullptr;
@@ -66,6 +67,12 @@ struct DropdownOptions
 // the getter are read during the call only. The label's visible part is drawn in front of the
 // field (rule 6). Default width: the available width. While the list is open, its scroll
 // position and filter text are kept under the id.
+//
+// Items fetched from a slow or remote source: `state` describes the items, not the field.
+// Loading shows the loading row and Error shows errorText inside the open list, and the closed
+// field shows the error glyph at its end, so the failure is visible without opening the list. The
+// field keeps its value and stays usable in both states. `error` stays the caller's validation
+// message under the field; it says that the chosen value is wrong, not that the items failed.
 bool Dropdown(const char* label, int* index, std::span<const ChoiceItem> items,
               const DropdownOptions& options = {});
 bool Dropdown(const char* label, int* index, std::span<const char* const> items,
@@ -89,11 +96,12 @@ struct MultiDropdownOptions
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
     bool selectAllRow = false;         // a first row that checks or clears every enabled item
     int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    DataState state = DataState::Ready;  // the state of the items, as for Dropdown
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults
+    const char* errorText = nullptr;   // null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills the available width
     bool readOnly = false;
-    bool loading = false;
     const char* error = nullptr;
     const char* helpText = nullptr;
 };
@@ -102,7 +110,7 @@ struct MultiDropdownOptions
 // `checked` holds one entry per item; extra entries are ignored, missing ones count as false
 // and are never written. Space, Enter or a click toggles the row under the cursor; Escape or a
 // click outside closes. Writes the toggled entry at once and returns true on that frame.
-// Opening keys, width and kept state as Dropdown.
+// Opening keys, width, kept state and the item states as Dropdown.
 bool MultiDropdown(const char* label, std::span<bool> checked, std::span<const ChoiceItem> items,
                    const MultiDropdownOptions& options = {});
 bool MultiDropdown(const char* label, std::span<bool> checked, std::span<const char* const> items,

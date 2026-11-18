@@ -82,9 +82,9 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - **Disabled:** there is no option for it; callers use `ImGui::BeginDisabled`. Facet reads the item flags and draws the disabled tokens. A disabled widget shows the not-allowed cursor, is not a Tab stop, returns false, and still answers `IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)`. *Reason: one channel, so stock and Facet items agree.*
 - **Read-only:** `readOnly` exists on every value widget. The value is shown, can be focused and copied, is never written, and the widget returns false. A caller-pushed `ImGuiItemFlags_ReadOnly` (`imgui_internal.h`) counts the same as `readOnly`.
 - **Validation** belongs to the caller. A non-null `error` draws the error outline and the message under the control in the destructive token, and replaces `helpText`. Facet validates nothing beyond clamping ranges.
-- **Loading:** `loading` exists on actions and on widgets that wait (fetching lists, async fields). It keeps the widget size, shows the spinner, and ignores input.
+- **Loading:** `loading` exists on actions and on fields that wait (async fields). It keeps the widget size, shows the spinner, and ignores input. Widgets whose items can be fetched (data views and the popup lists `Dropdown`, `MultiDropdown` and `Autocomplete`) take the data block below instead, because their items can also fail to load.
 - **Mixed:** `mixed` shows the indeterminate look until the first edit writes a definite value. It is equivalent to a caller-pushed `ImGuiItemFlags_MixedValue`. Checkboxes use the `CheckState` overload instead.
-- **Data views** take `DataState { Ready, Loading, Error }` plus `emptyText` and `errorText`. A count of 0 in `Ready` shows the empty state, so there is one source for "empty". Built-in English strings come from the `Strings` table, which `SetStrings` replaces.
+- **Data views and popup lists** take `DataState { Ready, Loading, Error }` plus `emptyText` and `errorText`. In a popup list the state belongs to the items: the open list shows it, the field stays usable, and `error` remains the validation message of the chosen value. A count of 0 in `Ready` shows the empty state, so there is one source for "empty". Built-in English strings come from the `Strings` table, which `SetStrings` replaces.
 - **Built-in text** that a widget shows or uses as a name (a button, a segment, a heading) comes from a `Strings` member, never from a literal in the widget, and the header names the member in full (`Strings::minimize`, not "minimize"). A member with numbers in it is a template with named tokens (`"Page {page} of {count}"`), not a printf format: a translation can reorder the tokens, and nothing it contains can break the formatting. A count that needs a singular form has a second member (`unsavedChange`, `unsavedChanges`). A test checks that every `Strings::` name in the headers and docs exists.
 
 ## 8. Containers and popups
@@ -177,7 +177,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 4. Is every on/off feature a `bool`, every choice an enum class whose zero member is the default, and is there no flags enum unless the set is stored?
 5. Is every length in design units with the unit in a comment, and does the width follow the precedence in rule 6?
 6. Does the bool result mean pressed, written, or content-to-submit, and do the stock item queries describe the whole widget?
-7. Is there no disabled option, and do `readOnly`, `error`, `helpText`, `mixed` and `loading` appear wherever they apply?
+7. Is there no disabled option, and do `readOnly`, `error`, `helpText`, `mixed` and `loading` appear wherever they apply, and `state`, `emptyText` and `errorText` on every widget whose items can be fetched?
 8. For a container: does Begin return `[[nodiscard]] bool` only when content can be skipped, is End documented, and is there an `XScope`?
 9. Are strings `const char*` read during the call, lists spans of label-first items, and lazy lists function pointers with `void* user`?
 10. Does nothing throw, is null and range handling documented, and does the comment carry every item from rule 16?
@@ -452,11 +452,12 @@ struct DropdownOptions
     const char* placeholder = nullptr; // shown while *index is -1; null uses Strings::select
     bool searchable = false;           // filter field at the top of the list, fuzzy matched
     int maxVisibleItems = 0;           // list height in rows; 0 for the token default
+    DataState state = DataState::Ready; // the items: Loading and Error show in the open list
     const char* emptyText = nullptr;   // null uses Strings::empty or Strings::noResults
+    const char* errorText = nullptr;   // null uses Strings::loadFailed
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;
     bool readOnly = false;
-    bool loading = false;              // the list shows the loading state
     bool mixed = false;
     const char* error = nullptr;
     const char* helpText = nullptr;

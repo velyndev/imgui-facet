@@ -258,7 +258,9 @@ facet::TextField("Command", &command, {.callback = CompleteCommand, .callbackUse
 ```
 
 Suggestions from a large source. The getter fills one `ChoiceItem` per index during the call;
-`loading` shows the list's loading state while the source is still fetching.
+`state` shows the list's loading state while the source is still fetching and its error state when
+fetching failed; the text stays editable in both, and `error` stays the validation message of the
+typed text.
 
 ```cpp
 static std::string city;
@@ -267,7 +269,7 @@ facet::Autocomplete("Place", &city, static_cast<int>(results.size()),
                         out->label = (*static_cast<std::vector<std::string>*>(user))[index].c_str();
                         return true;
                     },
-                    &results, {.loading = searchRunning});
+                    &results, {.state = searchState});  // facet::DataState of the search
 if (const int picked = facet::AutocompleteAcceptedItem(); picked >= 0)
     Select(picked);
 ```
