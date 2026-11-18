@@ -319,4 +319,64 @@ int FindMatches(const char* text, const char* textEnd, const char* query, std::s
     return count;
 }
 
+int FormatTokens(char* out, std::size_t outSize, const char* format, std::span<const TextToken> tokens)
+{
+    if (out == nullptr || outSize == 0)
+        return 0;
+    std::size_t length = 0;
+    // Appends [begin, end) as far as it fits, never splitting a UTF-8 character.
+    bool full = false;
+    const auto append = [&](const char* begin, const char* end) {
+        if (full)
+            return;
+        std::size_t count = static_cast<std::size_t>(end - begin);
+        if (length + count > outSize - 1)
+        {
+            count = outSize - 1 - length;
+            while (count > 0 && (static_cast<unsigned char>(begin[count]) & 0xC0) == 0x80)
+                --count;
+            full = true;
+        }
+        std::memcpy(out + length, begin, count);
+        length += count;
+    };
+    const char* p = format != nullptr ? format : "";
+    while (*p != '\0' && !full)
+    {
+        if (*p == '{')
+        {
+            const char* close = std::strchr(p + 1, '}');
+            const TextToken* match = nullptr;
+            if (close != nullptr)
+            {
+                const std::size_t nameLength = static_cast<std::size_t>(close - (p + 1));
+                for (const TextToken& token : tokens)
+                {
+                    if (token.name != nullptr && std::strlen(token.name) == nameLength &&
+                        std::memcmp(token.name, p + 1, nameLength) == 0)
+                    {
+                        match = &token;
+                        break;
+                    }
+                }
+            }
+            if (match != nullptr)
+            {
+                char number[24];
+                const int digits = ImFormatString(number, sizeof(number), "%lld", match->value);
+                append(number, number + digits);
+                p = close + 1;
+                continue;
+            }
+        }
+        const char* run = p + 1;
+        while (*run != '\0' && *run != '{')
+            ++run;
+        append(p, run);
+        p = run;
+    }
+    out[length] = '\0';
+    return static_cast<int>(length);
+}
+
 } // namespace facet::internal

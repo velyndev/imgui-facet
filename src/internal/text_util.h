@@ -76,4 +76,18 @@ float DrawHighlightedText(ImDrawList* drawList, ImFont* font, float size, ImVec2
 // ranges.size() of them and returns how many exist. An empty query matches nothing.
 int FindMatches(const char* text, const char* textEnd, const char* query, std::span<TextRange> ranges);
 
+// A number for a template of the Strings table: "{name}" in the template becomes `value`.
+struct TextToken
+{
+    const char* name = nullptr;  // without braces, for example "count"
+    long long value = 0;
+};
+
+// Writes `format` (a Strings template, which may come from a translation) into `out` with each
+// "{name}" of `tokens` replaced by its decimal value. Everything else is copied as written:
+// '%', unknown "{...}" and lone braces included, so no input can cause undefined behaviour.
+// `out` is always zero terminated and cut at a whole UTF-8 character when it is too small.
+// Returns the bytes written without the terminator. A null format writes "".
+int FormatTokens(char* out, std::size_t outSize, const char* format, std::span<const TextToken> tokens);
+
 } // namespace facet::internal

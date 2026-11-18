@@ -731,7 +731,8 @@ struct ThemeModeControlOptions
     bool readOnly = false;
 };
 
-// A segmented control for Light, Dark and System. Returns true when *mode was written. The
+// A segmented control for Light, Dark and System, its segments named by Strings::themeLight,
+// Strings::themeDark and Strings::themeSystem. Returns true when *mode was written. The
 // visible label part is drawn in front of the segments inside the width (rule 6); use "##name"
 // in settings rows.
 bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {});

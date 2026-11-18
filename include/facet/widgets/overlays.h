@@ -373,7 +373,8 @@ enum class UnsavedChangesAction
 
 struct UnsavedChangesBarOptions
 {
-    const char* message = nullptr;     // text before the buttons; null formats Strings::unsavedChanges
+    const char* message = nullptr;     // text before the buttons; null fills Strings::unsavedChange
+                                       // (one change) or Strings::unsavedChanges
     const char* applyLabel = nullptr;  // null uses Strings::apply
     const char* revertLabel = nullptr; // null uses Strings::revert
     bool applyShortcut = true;         // Ctrl+S applies while the window has focus
@@ -381,8 +382,8 @@ struct UnsavedChangesBarOptions
 
 // A bar that slides in at the bottom of the current window while changeCount > 0, with Apply
 // and Revert buttons; Escape reverts while it has focus. Returns the action of this frame; the
-// caller applies or reverts its settings, which brings changeCount to 0. Strings::unsavedChanges
-// is a printf format that takes changeCount as its one %d.
+// caller applies or reverts its settings, which brings changeCount to 0. changeCount replaces
+// "{count}" in the Strings template.
 UnsavedChangesAction UnsavedChangesBar(const char* id, int changeCount, const UnsavedChangesBarOptions& options = {});
 
 } // namespace facet

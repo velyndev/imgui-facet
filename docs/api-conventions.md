@@ -79,6 +79,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - **Loading:** `loading` exists on actions and on widgets that wait (fetching lists, async fields). It keeps the widget size, shows the spinner, and ignores input.
 - **Mixed:** `mixed` shows the indeterminate look until the first edit writes a definite value. It is equivalent to a caller-pushed `ImGuiItemFlags_MixedValue`. Checkboxes use the `CheckState` overload instead.
 - **Data views** take `DataState { Ready, Loading, Error }` plus `emptyText` and `errorText`. A count of 0 in `Ready` shows the empty state, so there is one source for "empty". Built-in English strings come from the `Strings` table, which `SetStrings` replaces.
+- **Built-in text** that a widget shows or uses as a name (a button, a segment, a heading) comes from a `Strings` member, never from a literal in the widget, and the header names the member in full (`Strings::minimize`, not "minimize"). A member with numbers in it is a template with named tokens (`"Page {page} of {count}"`), not a printf format: a translation can reorder the tokens, and nothing it contains can break the formatting. A count that needs a singular form has a second member (`unsavedChange`, `unsavedChanges`). A test checks that every `Strings::` name in the headers and docs exists.
 
 ## 8. Containers and popups
 

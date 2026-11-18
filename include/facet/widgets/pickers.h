@@ -288,6 +288,8 @@ struct DatePickerOptions
 
 // A segmented date field (each part typed or stepped with Up and Down) with a calendar in a
 // popover: month and year views, today marked (local time), days outside [min, max] disabled.
+// Month names come from Strings::monthJanuary to Strings::monthDecember, the weekday column
+// headings from Strings::weekdayMonday to Strings::weekdaySunday, starting at firstWeekday.
 // Arrow keys move the day in the calendar, Page Up and Page Down the month, Enter picks.
 // Returns true when *date was written. An invalid date (31 February) is shown as typed and
 // written only after correction.
@@ -338,7 +340,7 @@ struct TimeOfDay
 
 struct TimePickerOptions
 {
-    bool twelveHour = false;            // shows 1 to 12 with an AM and PM segment
+    bool twelveHour = false;            // shows 1 to 12 with a Strings::am and Strings::pm segment
     bool showSeconds = false;
     int minuteStep = 1;                 // the popover columns and Up and Down step minutes by this
     bool inlineColumns = false;         // the columns are drawn in place instead of in a popover

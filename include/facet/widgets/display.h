@@ -411,8 +411,9 @@ struct LogViewOptions
 
 // A virtualized log with level colors and an optional time column. Every row is one line of
 // the Body height and a long line is cut at the view edge (hovering shows it whole), so rows
-// have equal heights and only the visible entries are read. When the user scrolls up, following stops and a "jump to latest" button appears;
-// it and End resume. The view is one Tab stop; arrows and Page Up and Down scroll. Filtering
+// have equal heights and only the visible entries are read. When the user scrolls up, following
+// stops and a Strings::jumpToLatest button appears; it and End resume. The view is one Tab
+// stop; arrows and Page Up and Down scroll. Filtering
 // is the caller's: pass a getter over the filtered indices. Keeps the scroll state under its id.
 void LogView(const char* id, std::span<const LogEntry> entries, const LogViewOptions& options = {});
 void LogView(const char* id, int entryCount, LogGetter getter, void* user, const LogViewOptions& options = {});

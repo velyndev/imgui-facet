@@ -181,7 +181,10 @@ bool IsItemEditCommitted();
 bool IsItemEditCanceled();
 
 // Built-in UI strings, English by default. Every member is UTF-8 text a widget shows or uses
-// as an accessible name.
+// as an accessible name. Members with a number in them are templates, not printf formats:
+// "{page}" and "{count}" are replaced by the numbers, and anything else (including '%' and
+// unknown "{...}") is shown as written, so no translation can break the formatting. Each
+// template names the tokens it may use. New members are appended at the end.
 struct Strings
 {
     const char* mixed = "Mixed";
@@ -217,6 +220,48 @@ struct Strings
     const char* bindToggle = "Toggle";  // BindMode::Toggle
     const char* bindAlways = "Always";  // BindMode::Always
     const char* bindOff = "Off";        // BindMode::Off
+    const char* minimize = "Minimize";  // window buttons (TitleBar)
+    const char* maximize = "Maximize";
+    const char* restore = "Restore";
+    const char* pin = "Pin";            // MiniWindow pin button
+    const char* unpin = "Unpin";
+    const char* apply = "Apply";        // UnsavedChangesBar buttons
+    const char* revert = "Revert";
+    const char* pageOf = "Page {page} of {count}";           // Pagination; {page} counts from 1
+    const char* unsavedChange = "{count} unsaved change";    // UnsavedChangesBar with one change
+    const char* unsavedChanges = "{count} unsaved changes";  // UnsavedChangesBar otherwise
+    const char* themeLight = "Light";   // ThemeModeControl segments
+    const char* themeDark = "Dark";
+    const char* themeSystem = "System";
+    const char* monthJanuary = "January";  // DatePicker and DateRangePicker headers
+    const char* monthFebruary = "February";
+    const char* monthMarch = "March";
+    const char* monthApril = "April";
+    const char* monthMay = "May";
+    const char* monthJune = "June";
+    const char* monthJuly = "July";
+    const char* monthAugust = "August";
+    const char* monthSeptember = "September";
+    const char* monthOctober = "October";
+    const char* monthNovember = "November";
+    const char* monthDecember = "December";
+    const char* weekdayMonday = "Mo";   // calendar column headings, as short as the cells
+    const char* weekdayTuesday = "Tu";
+    const char* weekdayWednesday = "We";
+    const char* weekdayThursday = "Th";
+    const char* weekdayFriday = "Fr";
+    const char* weekdaySaturday = "Sa";
+    const char* weekdaySunday = "Su";
+    const char* am = "AM";              // TimePicker with twelveHour
+    const char* pm = "PM";
+    const char* matchCase = "Match case";   // FilterField toggles
+    const char* wholeWord = "Whole word";
+    const char* aspectLock = "Keep aspect ratio";  // SizeInput lock button
+    const char* swap = "Swap";              // SizeInput swap button
+    const char* linkValues = "Link values"; // VectorInput lock button
+    const char* increase = "Increase";      // steppers (NumberInput and the fields built on it)
+    const char* decrease = "Decrease";
+    const char* jumpToLatest = "Jump to latest";  // LogView while it no longer follows new entries
 };
 
 // Replaces the table. Every string is copied; a null member keeps the English default.

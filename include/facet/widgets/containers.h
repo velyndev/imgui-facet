@@ -200,7 +200,8 @@ struct TitleBarOptions
 // BeginTitleBar and EndTitleBar sit at the trailing end, right-aligned with their widths from
 // the last frame. The free area of the bar is the drag region (Caption in AppFrameHitTest).
 // EndTitleBar is always called. A window button press is read with TitleBarPressedButton. The
-// window buttons are named by Strings::minimize, maximize, restore and close.
+// window buttons are named by Strings::minimize, Strings::maximize, Strings::restore and
+// Strings::close.
 void BeginTitleBar(const char* label, const TitleBarOptions& options = {});
 void EndTitleBar();
 

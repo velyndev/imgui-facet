@@ -211,7 +211,7 @@ int Breadcrumbs(const char* id, std::span<const char* const> path, const Breadcr
 
 struct PaginationOptions
 {
-    bool compact = false;              // previous, the page and count in Strings::pageOf, and next only
+    bool compact = false;              // previous, Strings::pageOf ({page} from 1, {count}), and next only
     ControlSize size = ControlSize::Inherit;
 };
 

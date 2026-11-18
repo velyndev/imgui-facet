@@ -146,7 +146,8 @@ struct FilterFieldOptions
 // A compact search-style field for filtering a list. The query is the caller's text, in a
 // std::string or a char buffer as with TextField, written per keystroke. With non-null
 // `settings`, match case and whole word toggle buttons sit at the end of the field (each a Tab
-// stop, Space or Enter flips it) and write *settings at once; a null `settings` hides them.
+// stop, Space or Enter flips it; named by Strings::matchCase and Strings::wholeWord) and write
+// *settings at once; a null `settings` hides them.
 // Escape clears a non-empty query, then ends the session. The visible label part is drawn in
 // front of the field. Returns true when the query or *settings was written. Keeps only Dear
 // ImGui's text input state under its id.
@@ -295,7 +296,8 @@ struct NumberInputOptions
     const char* helpText = nullptr;
 };
 
-// A number field with - and + steppers. Typed text is written on Enter, Tab or focus loss and
+// A number field with - and + steppers (named by Strings::decrease and Strings::increase; not Tab
+// stops, the arrow keys step instead). Typed text is written on Enter, Tab or focus loss and
 // clamped to [min, max]; steppers (held: repeating) and Up and Down write at once. Returns true
 // when *value was written.
 bool NumberInput(const char* label, int* value, const NumberInputOptions& options = {});
@@ -377,7 +379,7 @@ struct VectorInputOptions
     double max = std::numeric_limits<double>::infinity();
     double speed = 0.0;                 // as DragNumberOptions::speed
     std::span<const char* const> axisLabels = {};  // read during the call; empty: X, Y, Z, W
-    bool linkToggle = false;            // a lock button; while locked an edit scales every component alike
+    bool linkToggle = false;            // a lock button (Strings::linkValues); while locked an edit scales every component alike
     bool normalize = false;             // float: an edit rescales the vector to length 1
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                 // units; 0 fills; when narrow the fields stack
@@ -403,8 +405,8 @@ struct SizeInputOptions
     ImVec2 min = {0.0f, 0.0f};
     ImVec2 max = {FLT_MAX, FLT_MAX};
     double step = 1.0;
-    bool aspectLock = true;             // a lock button keeping the ratio while locked
-    bool swapButton = false;            // a button that exchanges width and height
+    bool aspectLock = true;             // a lock button (Strings::aspectLock) keeping the ratio while locked
+    bool swapButton = false;            // a button (Strings::swap) that exchanges width and height
     std::span<const ImVec2> presets = {};  // read during the call; offered in a menu
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;

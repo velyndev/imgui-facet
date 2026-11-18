@@ -62,7 +62,18 @@ constexpr const char* Strings::*kStringMembers[] = {
     &Strings::reset,      &Strings::back,       &Strings::next,      &Strings::previous,
     &Strings::finish,     &Strings::skip,       &Strings::browse,    &Strings::today,
     &Strings::capsLock,   &Strings::bindHold,   &Strings::bindToggle, &Strings::bindAlways,
-    &Strings::bindOff,
+    &Strings::bindOff,    &Strings::minimize,   &Strings::maximize,  &Strings::restore,
+    &Strings::pin,        &Strings::unpin,      &Strings::apply,     &Strings::revert,
+    &Strings::pageOf,     &Strings::unsavedChange, &Strings::unsavedChanges,
+    &Strings::themeLight, &Strings::themeDark,  &Strings::themeSystem,
+    &Strings::monthJanuary, &Strings::monthFebruary, &Strings::monthMarch, &Strings::monthApril,
+    &Strings::monthMay,   &Strings::monthJune,  &Strings::monthJuly, &Strings::monthAugust,
+    &Strings::monthSeptember, &Strings::monthOctober, &Strings::monthNovember, &Strings::monthDecember,
+    &Strings::weekdayMonday, &Strings::weekdayTuesday, &Strings::weekdayWednesday, &Strings::weekdayThursday,
+    &Strings::weekdayFriday, &Strings::weekdaySaturday, &Strings::weekdaySunday,
+    &Strings::am,         &Strings::pm,         &Strings::matchCase, &Strings::wholeWord,
+    &Strings::aspectLock, &Strings::swap,       &Strings::linkValues, &Strings::increase,
+    &Strings::decrease,   &Strings::jumpToLatest,
 };
 constexpr size_t kStringCount = std::size(kStringMembers);
 static_assert(sizeof(Strings) == kStringCount * sizeof(const char*), "kStringMembers misses a Strings member");
