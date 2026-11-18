@@ -21,10 +21,15 @@
 // control's text style and the label color, with its baseline on the baseline of the text of a
 // control of options.size, so label and control text line up. A label too long for its column
 // ends in an ellipsis, and resting the pointer on it shows the full text as a tooltip, as does
-// keyboard focus on the row's control (the tooltip then sits under the label). The
-// optional description is a second line under the label (footnote, labelSecondary, wrapped in
-// the column). Under the control come the help text (footnote, labelSecondary) or, replacing
-// it, the error message with the error icon in the destructive color, wrapped in the slot.
+// keyboard focus on the row's control (the tooltip then sits under the label). An optional
+// icon sits before the label, one text line square, in labelSecondary; the label column counts
+// it, and in a group where any row has an icon every row keeps the icon's room free (measured
+// in the previous frame), so the label texts start in one line. The optional description is a second line under the label (footnote, labelSecondary). It wraps
+// across the label column and the control slot when nothing else sits under the control (no
+// help text, no error, a control no taller than one control height), and in the label column
+// otherwise, so a short label never squeezes it into a narrow column next to an empty row.
+// Under the control come the help text (footnote, labelSecondary) or, replacing it, the error
+// message with the error icon in the destructive color, wrapped in the slot.
 // A row begun inside ImGui::BeginDisabled draws its label, marker, description and help text in
 // labelTertiary like its disabled control (the error keeps its color: it still applies).
 // `modified` puts a marker dot after the label; `resettable` reserves a square reset button at
@@ -43,6 +48,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "facet/core/icons.h"
 #include "facet/widgets/common.h"
 
 namespace facet::internal
@@ -57,6 +63,7 @@ inline constexpr int kMaxRowGroupDepth = 4;
 
 struct RowOptions
 {
+    Icon icon;                          // before the label; none by default
     const char* description = nullptr;  // second line under the label; null for none
     const char* error = nullptr;        // message under the control with the error icon; replaces helpText
     const char* helpText = nullptr;     // message under the control in labelSecondary

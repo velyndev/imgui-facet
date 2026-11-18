@@ -39,6 +39,8 @@ struct RowFrame
     float resetSize = 0.0f;    // 0 without a reset slot
     float gap = 0.0f;
     bool navSeenBefore = false;  // the focused item was submitted before the row began
+    float textLeft = 0.0f;       // x where the label text and the description start
+    float columnRight = 0.0f;    // the right edge of the label text room (before the gap)
     char fullLabel[kLabelBuffer] = {};  // the label's text, for the keyboard tooltip of a cut label
 };
 
@@ -56,6 +58,8 @@ struct GroupFrame
     float measuredUnits = 0.0f;  // the widest label plus marker of this frame
     float resetUnits = 0.0f;     // this frame's reset slot, from the last frame's measurement
     float measuredResetUnits = 0.0f;  // the widest reset slot of this frame
+    float iconUnits = 0.0f;      // this frame's icon room, from the last frame's measurement
+    float measuredIconUnits = 0.0f;   // the widest icon room of this frame
 };
 
 struct GroupStack
@@ -69,6 +73,7 @@ struct RowGroupState
 {
     float widestUnits = 0.0f;
     float resetUnits = 0.0f;
+    float iconUnits = 0.0f;
 };
 
 RowStack& Rows()
@@ -143,6 +148,9 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     const float markerSize = options.modified ? Px(theme.spacing.sm) * kMarkerShare : 0.0f;
     const float markerSpace = options.modified ? markerSize + Px(theme.spacing.xs) : 0.0f;
     const float labelWidth = ImGui::CalcTextSize(label, labelEnd).x;
+    const float lineHeight = ImGui::GetFontSize();
+    const float iconSize = std::round(lineHeight);
+    float iconSpace = options.icon.IsValid() ? iconSize + Px(theme.spacing.xs) : 0.0f;
 
     // The label column: options, then the group's shared column, then the token.
     float columnUnits = options.labelColumn;
@@ -150,7 +158,11 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     if (groups.depth > 0)
     {
         GroupFrame& group = groups.groups[groups.depth - 1];
-        group.measuredUnits = std::max(group.measuredUnits, (labelWidth + markerSpace) / Scale());
+        // Every row of the group keeps the icon room free when one row has an icon, so the
+        // label texts start in one line.
+        group.measuredIconUnits = std::max(group.measuredIconUnits, iconSpace / Scale());
+        iconSpace = std::max(iconSpace, group.iconUnits * Scale());
+        group.measuredUnits = std::max(group.measuredUnits, (iconSpace + labelWidth + markerSpace) / Scale());
         // Every row of the group keeps the widest reset slot free, so the controls end in one line.
         group.measuredResetUnits = std::max(group.measuredResetUnits, resetSlot / Scale());
         resetSlot = std::max(resetSlot, group.resetUnits * Scale());
@@ -168,12 +180,11 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     layout.disabled = (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
     const ImU32 labelColor = Color(layout.disabled ? c.labelTertiary : c.label);
     const ImU32 secondaryColor = Color(layout.disabled ? c.labelTertiary : c.labelSecondary);
-    const float textRoom = std::max(0.0f, columns.labelWidth - markerSpace);
+    const float textRoom = std::max(0.0f, columns.labelWidth - markerSpace - iconSpace);
     char text[kLabelBuffer];
     const TruncateResult truncated =
         TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), label, labelEnd, textRoom, TruncateMode::End, text, sizeof(text));
     layout.truncated = truncated.truncated;
-    const float lineHeight = ImGui::GetFontSize();
     float labelTop = 0.0f;
     float blockTop = row.origin.y;
     if (columns.stacked)
@@ -187,11 +198,16 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
         blockTop = row.origin.y + row.controlHeight;
     }
     layout.baseline = labelTop + Ascent();
-    layout.label = ImRect(row.origin.x, labelTop, row.origin.x + truncated.width, labelTop + lineHeight);
-    drawList->AddText(ImVec2(row.origin.x, labelTop), labelColor, text);
+    row.textLeft = row.origin.x + iconSpace;
+    row.columnRight = row.origin.x + columns.labelWidth;
+    layout.label = ImRect(row.textLeft, labelTop, row.textLeft + truncated.width, labelTop + lineHeight);
+    if (options.icon.IsValid())
+        DrawIcon(drawList, options.icon, Snap(ImVec2(row.origin.x, labelTop + (lineHeight - iconSize) * 0.5f)), iconSize,
+                 secondaryColor);
+    drawList->AddText(ImVec2(row.textLeft, labelTop), labelColor, text);
     if (options.modified)
     {
-        const float x = row.origin.x + truncated.width + Px(theme.spacing.xs);
+        const float x = row.textLeft + truncated.width + Px(theme.spacing.xs);
         const float centerY = labelTop + lineHeight * 0.5f;
         drawList->AddCircleFilled(ImVec2(x + markerSize * 0.5f, centerY), markerSize * 0.5f, secondaryColor);
     }
@@ -213,17 +229,17 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     }
     row.navSeenBefore = GImGui->NavIdIsAlive;
 
-    // The description under the label, wrapped in the column.
+    // A stacked row puts the description under the label now, across the whole width. Beside a
+    // control it waits for EndRow, which knows what sits under the control.
     float blockBottom = columns.stacked ? row.origin.y + lineHeight : row.origin.y + row.controlHeight;
-    if (options.description != nullptr && options.description[0] != '\0')
+    if (columns.stacked && options.description != nullptr && options.description[0] != '\0')
     {
         PushTextStyle(TextStyle::Footnote);
-        const float wrap = std::max(1.0f, columns.labelWidth);
+        const float wrap = std::max(1.0f, row.columnRight - row.textLeft);
         const ImVec2 descSize = ImGui::CalcTextSize(options.description, nullptr, false, wrap);
-        const float top = blockTop;
-        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(row.origin.x, top), secondaryColor,
+        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(row.textLeft, blockTop), secondaryColor,
                           options.description, nullptr, wrap);
-        blockBottom = top + descSize.y;
+        blockBottom = blockTop + descSize.y;
         PopTextStyle();
     }
     row.labelBottom = blockBottom;
@@ -299,6 +315,24 @@ bool EndRow()
         ImGui::Dummy(ImVec2(slotWidth, std::max(textSize.y, lineHeight)));
     }
 
+    // The description of a row beside its control, right under the label line. Nothing under the
+    // control: it wraps across the control slot too. Otherwise it keeps to the label column.
+    const char* description = row.options.description;
+    if (!layout.stacked && description != nullptr && description[0] != '\0')
+    {
+        const bool controlColumnFree = (message == nullptr || message[0] == '\0') && controlBottom <= layout.control.Max.y + 0.5f;
+        const float right = controlColumnFree ? layout.control.Max.x : row.columnRight;
+        const float top = row.origin.y + row.controlHeight;
+        PushTextStyle(TextStyle::Footnote);
+        const float wrap = std::max(1.0f, right - row.textLeft);
+        const ImVec2 descSize = ImGui::CalcTextSize(description, nullptr, false, wrap);
+        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(row.textLeft, top),
+                          Color(layout.disabled ? c.labelTertiary : c.labelSecondary), description, nullptr, wrap);
+        PopTextStyle();
+        ImGui::SetCursorScreenPos(ImVec2(row.textLeft, top));
+        ImGui::Dummy(ImVec2(wrap, descSize.y));
+    }
+
     // The reset button at the end of the row, while the value is modified.
     bool reset = false;
     if (row.resetSize > 0.0f && row.options.modified)
@@ -344,6 +378,7 @@ void BeginRowGroup(const char* id)
     const RowGroupState& state = GetState<RowGroupState>(group.id);
     group.columnUnits = state.widestUnits > 0.0f ? state.widestUnits + T().spacing.sm : 0.0f;
     group.resetUnits = state.resetUnits;
+    group.iconUnits = state.iconUnits;
 }
 
 void EndRowGroup()
@@ -363,6 +398,7 @@ void EndRowGroup()
     RowGroupState& state = GetState<RowGroupState>(group.id);
     state.widestUnits = group.measuredUnits;
     state.resetUnits = group.measuredResetUnits;
+    state.iconUnits = group.measuredIconUnits;
 }
 
 void EndFrameRows()

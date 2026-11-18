@@ -152,6 +152,11 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   label, on keyboard focus of the row's control, so keyboard users can read it too.
 - **Row texts.** Description under the label, help text under the control, and an error
   replaces the help text with the error icon in destructive.
+- **Row descriptions.** A description wraps across the control column when nothing sits under
+  the control, so a short label does not squeeze it into a narrow column beside empty space.
+- **Row icons.** A row's leading icon is labelSecondary, because the label carries the meaning
+  and the icon only helps find the row; a group keeps the icon room in every row so the label
+  texts start in one line.
 - **Disabled rows.** A disabled row draws its label, marker, description and help text in
   labelTertiary; an error keeps destructive, because it still needs to be read.
 - **Series colors.** Hues step around the OKLCH circle from the accent hue, neighbours far

@@ -222,6 +222,59 @@ TEST_CASE("Rows: description, help text and error lines add to the row")
     CHECK(error.control.Min.y == doctest::Approx(error.row.Min.y));
 }
 
+TEST_CASE("Rows: a description beside a free control column wraps across the row")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(800.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    // About 330 pixels of footnote text: two lines or more in the label column, one across the row.
+    const char* text = "The pill then moves at once, and the list keeps its place while you scroll.";
+    RowProbe free;
+    RowProbe withHelp;
+    session.SetUi([&] {
+        facet::internal::BeginRowGroup("group");
+        Row("A", {.description = text}, free);
+        Row("B", {.description = text, .helpText = "Applies after a restart."}, withHelp);
+        facet::internal::EndRowGroup();
+    });
+    session.Frames(3);
+    const facet::Theme& t = facet::T();
+    const float footnote = t.type[facet::TextStyle::Footnote].size;
+    const float control = facet::ControlHeight(facet::ControlSize::Regular);
+    // One footnote line under a control of the regular height.
+    CHECK(free.row.GetHeight() < control + 1.5f * footnote);
+    // With help text under the control, the description keeps to the label column and wraps more.
+    CHECK(withHelp.row.GetHeight() > control + 2.0f * footnote);
+}
+
+TEST_CASE("Rows: a leading icon moves the label, and a group lines up every label")
+{
+    LayoutGuard guard;
+    facet::test::Session session({.displaySize = ImVec2(800.0f, 400.0f)});
+    REQUIRE(session.Ready());
+    RowProbe icon;
+    RowProbe plain;
+    RowProbe outside;
+    float origin = 0.0f;
+    session.SetUi([&] {
+        origin = ImGui::GetCursorScreenPos().x;
+        facet::internal::BeginRowGroup("group");
+        Row("Volume", {.icon = facet::Icon("search")}, icon);
+        Row("Pitch", {}, plain);
+        facet::internal::EndRowGroup();
+        Row("Pitch", {}, outside);
+    });
+    session.Frames(3);
+    const facet::Theme& t = facet::T();
+    const float iconRoom = std::round(t.type[facet::TextStyle::Body].size) + t.spacing.xs;
+    CHECK(icon.layout.label.Min.x == doctest::Approx(origin + iconRoom));
+    CHECK(plain.layout.label.Min.x == doctest::Approx(icon.layout.label.Min.x));
+    CHECK(outside.layout.label.Min.x == doctest::Approx(origin));
+    // The label column holds icon, label and gap, so the label is not cut.
+    CHECK_FALSE(icon.layout.truncated);
+    CHECK(icon.control.Min.x >= icon.layout.label.Max.x + t.spacing.sm - 0.5f);
+}
+
 TEST_CASE("Rows: a disabled row draws its texts in the disabled color")
 {
     LayoutGuard guard;
