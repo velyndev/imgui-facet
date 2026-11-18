@@ -510,8 +510,8 @@ void CallEveryStub(Values& v)
         }
     });
     CHECK_BALANCED(CHECK_FALSE(facet::MenuItem("Item")));
-    CHECK_BALANCED(CHECK_FALSE(facet::MenuItem("Check item", &v.open)));
-    CHECK_BALANCED(CHECK_FALSE(facet::MenuItem("Radio item", &v.index, 0)));
+    CHECK_BALANCED(CHECK_FALSE(facet::MenuCheckItem("Check item", &v.open)));
+    CHECK_BALANCED(CHECK_FALSE(facet::MenuRadioItem("Radio item", &v.index, 0)));
     CHECK_BALANCED(CHECK(facet::Breadcrumbs("Path", kItems) == -1));
     CHECK_BALANCED(CHECK(facet::Breadcrumbs("Path labels", kLabels) == -1));
     CHECK_BALANCED(CHECK_FALSE(facet::Pagination("Pages", &v.page, 10)));
@@ -1060,6 +1060,9 @@ TEST_CASE("An outer list-detail or inspector pane placeholder keeps its state pa
     CHECK_FALSE(innerPane);
     CHECK(outerPane);
 }
+
+// MenuItem has no overload, so MenuItem("Save", {}) cannot bind to a value form with a null pointer.
+static_assert(std::is_same_v<decltype(&facet::MenuItem), bool (*)(const char*, const facet::MenuItemOptions&)>);
 
 TEST_CASE("ApplyReorderMove moves one element and shifts the others")
 {

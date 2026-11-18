@@ -23,13 +23,13 @@ bool MenuItem(const char* label, const MenuItemOptions&)
     return false;
 }
 
-bool MenuItem(const char* label, bool*, const MenuItemOptions&)
+bool MenuCheckItem(const char* label, bool*, const MenuItemOptions&)
 {
     DrawMenuItem(label);
     return false;
 }
 
-bool MenuItem(const char* label, int*, int, const MenuItemOptions&)
+bool MenuRadioItem(const char* label, int*, int, const MenuItemOptions&)
 {
     DrawMenuItem(label);
     return false;

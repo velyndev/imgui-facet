@@ -69,14 +69,14 @@ class MenuScope;
 
 A menu in a menu bar or a submenu that opens to the side with room.
 
-### MenuItem
+### MenuItem, MenuCheckItem, MenuRadioItem
 
 Status: planned
 
 ```cpp
 bool MenuItem(const char* label, const MenuItemOptions& options = {});
-bool MenuItem(const char* label, bool* checked, const MenuItemOptions& options = {});
-bool MenuItem(const char* label, int* selection, int value, const MenuItemOptions& options = {});
+bool MenuCheckItem(const char* label, bool* checked, const MenuItemOptions& options = {});
+bool MenuRadioItem(const char* label, int* selection, int value, const MenuItemOptions& options = {});
 ```
 
 A menu row with icon, shortcut, check or radio mark, destructive tone, and an optional registered
@@ -186,9 +186,9 @@ if (facet::BeginMenuBar("main"))
     if (facet::BeginMenu("File"))
     {
         facet::MenuItem("Save", {.icon = facet::Icon("download"), .command = save});
-        facet::MenuItem("Show hidden files", &showHidden);
-        facet::MenuItem("Sort by name", &sortMode, 0);
-        facet::MenuItem("Sort by date", &sortMode, 1);
+        facet::MenuCheckItem("Show hidden files", &showHidden);
+        facet::MenuRadioItem("Sort by name", &sortMode, 0);
+        facet::MenuRadioItem("Sort by date", &sortMode, 1);
         facet::EndMenu();
     }
     facet::EndMenuBar();

@@ -10,7 +10,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - A widget is a free function named with a noun (`Slider`, `TextField`). Widgets of one domain share its prefix (`InventoryGrid`, `InventoryTile`). The `Item` prefix is kept for functions that act on the last item, as in Dear ImGui (`ItemTooltip`, `IsItemEditCommitted`). Its types take its name: `SliderOptions`, `ButtonVariant`. Value types are separated by overloads (`Slider(float*)`, `Slider(int*)`), never by suffixes such as `SliderFloat`. *Reason: an engineer can guess every name from the widget name.*
 - A container is `BeginX` / `EndX`, and its RAII form is `XScope`. `Push` / `Pop` is used only for style stacks (`PushAccent`, `PushControlSize`). *Reason: one spelling per concept.*
 - There is one header per family, in lower case: `buttons.h`, `selection.h`, `lists.h`, `sliders.h`, `inputs.h`, `pickers.h`, `navigation.h`, `containers.h`, `layout.h`, `overlays.h`, `display.h`, `charts.h`, `media.h`, `composites.h`. Shared types live in `widgets/common.h`; a type that widgets of two or more families take goes there, not into one of the families. Key chords, `Keybind`, `BindMode` and the shortcut registry live in the core header `core/input.h`, and width classes and the labelled row layout in `core/layout.h`. Every header compiles on its own, and a test includes each one alone in a separate translation unit (`tests/headers/`). A family header includes only `imgui.h`, `common.h` and the core headers it needs; `composites.h` alone may also include the family headers whose types its widgets take, because composites are built from the other families. `facet/facet.h` includes every core and widget header, and no Facet header includes `facet.h`. *Reason: one engineer owns one family file, and apps need one include.*
-- A Facet name may equal a Dear ImGui name (`Button`, `Checkbox`, `MenuItem`). Calls are always qualified (`facet::`, `ImGui::`). With both using-directives in effect, such a call is ambiguous and fails to compile; it never binds to the wrong function silently. Where the two libraries pair functions differently, Facet uses its own name (`ItemTooltip`, `BeginRichTooltip` / `EndRichTooltip`; Dear ImGui's `BeginItemTooltip` pairs with `EndTooltip`). *Reason: the obvious name wins, and a Facet Begin can never be closed by a stock End.*
+- A Facet name may equal a Dear ImGui name (`Button`, `Checkbox`, `MenuItem`). Calls are always qualified (`facet::`, `ImGui::`). With both using-directives in effect, such a call is ambiguous and fails to compile; it never binds to the wrong function silently. For the same reason a widget never has a label-plus-options form next to an overload whose second parameter is a pointer: `{}` binds to the pointer as a null value. Such value forms get a name of their own (`MenuCheckItem`), and the `ImageView` texture overload needs `ImageHandle{}` spelled out for an empty image. Where the two libraries pair functions differently, Facet uses its own name (`ItemTooltip`, `BeginRichTooltip` / `EndRichTooltip`; Dear ImGui's `BeginItemTooltip` pairs with `EndTooltip`). *Reason: the obvious name wins, and a Facet Begin can never be closed by a stock End.*
 
 ## 2. Labels and ids
 
@@ -508,7 +508,7 @@ struct MenuItemOptions
 };
 
 bool MenuItem(const char* label, const MenuItemOptions& options = {});
-bool MenuItem(const char* label, bool* checked, const MenuItemOptions& options = {});
+bool MenuCheckItem(const char* label, bool* checked, const MenuItemOptions& options = {});
 
 } // namespace facet
 

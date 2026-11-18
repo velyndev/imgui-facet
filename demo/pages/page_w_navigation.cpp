@@ -84,8 +84,8 @@ void Menus(NavigationState& s)
         if (facet::BeginMenu("Menu 1"))
         {
             facet::MenuItem("Item 1", {.icon = facet::Icon("copy"), .shortcut = ImGuiMod_Ctrl | ImGuiKey_C});
-            facet::MenuItem("Item 2", &s.option);
-            facet::MenuItem("Item 3", &s.radio, 0);
+            facet::MenuCheckItem("Item 2", &s.option);
+            facet::MenuRadioItem("Item 3", &s.radio, 0);
             facet::EndMenu();
         }
         facet::EndMenuBar();
@@ -93,8 +93,8 @@ void Menus(NavigationState& s)
     Paragraph("Menu items inside an open menu: a plain item with an icon and a shortcut, a check "
               "item and a radio item. Shown here outside a menu because menus do not open yet.");
     facet::MenuItem("Item 1", {.icon = facet::Icon("copy"), .shortcut = ImGuiMod_Ctrl | ImGuiKey_C});
-    facet::MenuItem("Item 2", &s.option);
-    facet::MenuItem("Item 3", &s.radio, 1);
+    facet::MenuCheckItem("Item 2", &s.option);
+    facet::MenuRadioItem("Item 3", &s.radio, 1);
 }
 
 void Steps(facet::demo::PageCtx& ctx, NavigationState& s)

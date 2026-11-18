@@ -57,6 +57,7 @@ struct ImageViewOptions
 // by ImageViewRetryPressed, never by the result.
 bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {});
 // An app-owned texture; Facet reads its size and keeps no reference. It never loads or fails.
+// For an empty image pass ImageHandle{}: a bare {} binds to this overload as a null texture.
 bool ImageView(const char* label, ID3D11ShaderResourceView* texture, const ImageViewOptions& options = {});
 // True on the frame the retry button (retryLabel) of the last ImageView call was activated.
 bool ImageViewRetryPressed();

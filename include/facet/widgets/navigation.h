@@ -166,11 +166,12 @@ struct MenuItemOptions
 // the action in the next frame. With a command, run the action in the ShortcutPressed handler
 // only; the result reports the activation, for example to close other UI.
 bool MenuItem(const char* label, const MenuItemOptions& options = {});
-// A row with a check mark; activation flips *checked and returns true.
-bool MenuItem(const char* label, bool* checked, const MenuItemOptions& options = {});
+// A row with a check mark; activation flips *checked and returns true. A name of its own, not a
+// MenuItem overload: MenuItem("Save", {}) would otherwise bind to a null bool* silently.
+bool MenuCheckItem(const char* label, bool* checked, const MenuItemOptions& options = {});
 // A row with a radio mark, shown while *selection == value; activation writes value and
 // returns true.
-bool MenuItem(const char* label, int* selection, int value, const MenuItemOptions& options = {});
+bool MenuRadioItem(const char* label, int* selection, int value, const MenuItemOptions& options = {});
 
 class [[nodiscard]] MenuBarScope
 {
