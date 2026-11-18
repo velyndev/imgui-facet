@@ -16,8 +16,10 @@ void ImageViewStub(const char* label, ImVec2 natural, const ImageViewOptions& op
     const bool unknown = natural.x <= 0.0f || natural.y <= 0.0f;
     if (unknown)
         natural = ImVec2(stub::ControlRows(1.0f, ControlSize::Large), stub::ControlRows(1.0f, ControlSize::Large));
-    float width = options.width > 0.0f ? Px(options.width) : 0.0f;
-    float height = options.height > 0.0f ? Px(options.height) : 0.0f;
+    // 0 keeps the image's own size; any other value (units, kFill, available minus units)
+    // resolves as for every widget.
+    float width = options.width != 0.0f ? stub::ResolveWidth(options.width, 0.0f) : 0.0f;
+    float height = options.height != 0.0f ? stub::ResolveHeight(options.height, 0.0f) : 0.0f;
     if (width <= 0.0f && height <= 0.0f)
     {
         width = unknown ? stub::ContentWidth("ImageView", natural.x) : natural.x;

@@ -59,8 +59,9 @@ inline float ControlRows(float rows, ControlSize size = ControlSize::Inherit)
 // Pixel width of a widget per rule 6 of docs/api-conventions.md: options.width (> 0 units,
 // kFill the available width, < 0 the available width minus that many units), then
 // ImGui::SetNextItemWidth, then ImGui::PushItemWidth, then `fallback` pixels (<= 0: the
-// available width). Never below one pixel.
-inline float ResolveWidth(float optionWidth, float fallback)
+// available width). Never below one pixel. `itemWidth` false skips the two item width steps,
+// for layers (dialogs, panels) that are not items of the caller's layout.
+inline float ResolveWidth(float optionWidth, float fallback, bool itemWidth = true)
 {
     if (!CanSubmit())
         return 1.0f;
@@ -70,8 +71,8 @@ inline float ResolveWidth(float optionWidth, float fallback)
         width = Px(optionWidth);
     else if (optionWidth < 0.0f)
         width = available + Px(optionWidth);
-    else if ((GImGui->NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0 ||
-             GImGui->CurrentWindow->DC.ItemWidthStack.Size > 0)
+    else if (itemWidth && ((GImGui->NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0 ||
+                           GImGui->CurrentWindow->DC.ItemWidthStack.Size > 0))
         width = ImGui::CalcItemWidth();
     return std::max(1.0f, width);
 }

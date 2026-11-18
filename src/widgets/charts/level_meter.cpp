@@ -14,7 +14,7 @@ void LevelMeter(const char* label, std::span<const float> channels, double, doub
     const float rows = static_cast<float>(std::max<std::size_t>(1, channels.size()));
     if (options.orientation == Orientation::Vertical)
     {
-        const float width = options.width > 0.0f ? Px(options.width) : stub::ControlRows(rows);
+        const float width = stub::ResolveWidth(options.width, stub::ControlRows(rows));
         stub::Stub("LevelMeter", label, width, stub::ResolveHeight(options.height, stub::Spans(stub::kChartHeightSpans)));
         return;
     }

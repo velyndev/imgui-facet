@@ -9,7 +9,7 @@ namespace facet
 bool MediaCard(const char* label, ImageHandle, const MediaCardOptions& options)
 {
     namespace stub = internal::content;
-    const float width = options.width > 0.0f ? Px(options.width) : stub::Spans(stub::kCardWidthSpans);
+    const float width = stub::ResolveWidth(options.width, stub::Spans(stub::kCardWidthSpans));
     stub::Stub("MediaCard", label, width, width * stub::kWideAspect + stub::ControlRows(stub::kTallControlRows));
     return false;
 }

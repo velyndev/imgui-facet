@@ -13,7 +13,7 @@ bool BeginOnboarding(const char* label, bool* open, int*, int, const OnboardingO
     namespace stub = internal::content;
     if (open == nullptr || !*open)
         return false;
-    const float width = options.width > 0.0f ? Px(options.width) : stub::Spans(stub::kCardWidthSpans);
+    const float width = stub::ResolveWidth(options.width, stub::Spans(stub::kCardWidthSpans), false);
     stub::Stub("Onboarding", label, width, stub::ControlRows(stub::kZoneControlRows));
     return false;
 }

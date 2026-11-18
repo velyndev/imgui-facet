@@ -252,7 +252,7 @@ enum class Expect
 template <class Call>
 void Check(const char* name, Expect expect, const char* label, Call&& call)
 {
-    INFO("call: " << name);
+    INFO("call: " << std::string(name));
     ImGui::Dummy(ImVec2(0.0f, 0.0f));  // the last item now has a zero size
     const Stacks before = CurrentStacks();
     call();
@@ -781,7 +781,7 @@ TEST_CASE("Stubs without a label submit an item whose id is not the window id")
     REQUIRE(session.Ready());
     int checked = 0;
     const auto first = [&](const char* name, auto&& call) {
-        INFO("call: " << name);
+        INFO("call: " << std::string(name));
         session.SetUi([&] {
             call();
             CHECK(ImGui::GetItemID() != 0);
@@ -833,6 +833,43 @@ TEST_CASE("A column sizing flag set by the caller replaces the one its width imp
     CHECK(checked == 4);
 }
 
+TEST_CASE("Stubs follow kFill and widths relative to the available width")
+{
+    // Rule 6: kFill is the available width, any other negative width the available width minus
+    // that many units, for card, dialog, image and vertical meter stubs too.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        using namespace facet;
+        const auto fills = [&](const char* widget, float units, auto&& call) {
+            INFO("widget: " << std::string(widget) << ", width " << units);
+            const float expected = ImGui::GetContentRegionAvail().x + (units == kFill ? 0.0f : Px(units));
+            call(units);
+            CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
+            ++checked;
+        };
+        static const float channels[] = {0.5f};
+        for (const float units : {kFill, -10.0f})
+        {
+            fills("ItemDetailCard", units, [](float w) { ItemDetailCard("Item", ImageHandle{}, {.width = w}); });
+            fills("MediaCard", units, [](float w) { MediaCard("Card", ImageHandle{}, {.width = w}); });
+            fills("ImageView", units, [](float w) { ImageView("Image", ImageHandle{}, {.width = w}); });
+            fills("LevelMeter", units, [](float w) {
+                LevelMeter("Meter", channels, 0.0, 1.0, {.orientation = Orientation::Vertical, .width = w});
+            });
+            fills("Onboarding", units, [](float w) {
+                bool open = true;
+                int step = 0;
+                if (BeginOnboarding("Welcome", &open, &step, 2, {.width = w}))
+                    EndOnboarding();
+            });
+        }
+    });
+    session.Frame();
+    CHECK(checked == 10);
+}
+
 TEST_CASE("Content-sized stubs are wide enough to name the widget and say planned")
 {
     facet::test::Session session;
@@ -841,7 +878,7 @@ TEST_CASE("Content-sized stubs are wide enough to name the widget and say planne
     session.SetUi([&] {
         using namespace facet;
         const auto wide = [&](const char* widget, auto&& call) {
-            INFO("widget: " << widget);
+            INFO("widget: " << std::string(widget));
             call();
             char text[64];
             ImFormatString(text, sizeof(text), "%s: planned", widget);

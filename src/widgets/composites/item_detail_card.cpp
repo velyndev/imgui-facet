@@ -9,7 +9,7 @@ namespace facet
 int ItemDetailCard(const char* label, ImageHandle, const ItemDetailCardOptions& options)
 {
     namespace stub = internal::content;
-    const float width = options.width > 0.0f ? Px(options.width) : stub::Spans(stub::kCardWidthSpans);
+    const float width = stub::ResolveWidth(options.width, stub::Spans(stub::kCardWidthSpans));
     stub::Stub("ItemDetailCard", label, width, stub::Spans(stub::kChartHeightSpans));
     return -1;
 }
