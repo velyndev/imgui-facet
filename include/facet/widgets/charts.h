@@ -202,9 +202,10 @@ struct LevelMeterOptions
 
 // A meter with one bar per channel (audio level, load). Each bar follows its value with
 // exponential smoothing and the peak marks are kept under the id. `min` and `max` bound the
-// values (for audio in dB, for example -60 and 0). The visible label part is drawn in front.
-// Not interactive.
-void LevelMeter(const char* label, std::span<const float> channels, float min, float max,
+// values (for audio in dB, for example -60 and 0); they are double like every range bound of
+// the chart family, while the channel values stay float. The visible label part is drawn in
+// front. Not interactive.
+void LevelMeter(const char* label, std::span<const float> channels, double min, double max,
                 const LevelMeterOptions& options = {});
 
 struct FrameTimeGraphOptions

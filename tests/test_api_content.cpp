@@ -145,6 +145,9 @@ static_assert(HasReadOnly<facet::UiScaleControlOptions>);
 // Chart x values are doubles like ChartPoint, ChartAxis and the range brush: a float near
 // 1.7e9 seconds steps by 128 s.
 static_assert(std::is_same_v<decltype(facet::ChartSeries::x), std::span<const double>>);
+// Range bounds are double across the chart family (Gauge, LevelMeter, ChartRangeBrush).
+static_assert(std::is_same_v<decltype(&facet::LevelMeter), void (*)(const char*, std::span<const float>, double,
+                                                                    double, const facet::LevelMeterOptions&)>);
 
 // One alignment enum for styled text and table columns.
 static_assert(std::is_same_v<decltype(facet::StyledTextOptions::align), facet::ColumnAlign>);

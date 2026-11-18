@@ -8,7 +8,7 @@
 namespace facet
 {
 
-void LevelMeter(const char* label, std::span<const float> channels, float, float, const LevelMeterOptions& options)
+void LevelMeter(const char* label, std::span<const float> channels, double, double, const LevelMeterOptions& options)
 {
     namespace stub = internal::content;
     const float rows = static_cast<float>(std::max<std::size_t>(1, channels.size()));

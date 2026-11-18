@@ -35,7 +35,7 @@ result.
 | BarChart | `void BarChart(const char* id, std::span<const ChartSeries> series, std::span<const char* const> categories, const BarChartOptions& options = {})` | Grouped or stacked bars per category | planned |
 | DonutChart | `void DonutChart(const char* id, std::span<const DonutSlice> slices, const DonutChartOptions& options = {})` | Ring or pie of proportional slices with a center total | planned |
 | Gauge | `void Gauge(const char* label, double value, double min, double max, const GaugeOptions& options = {})` | Radial gauge with zones and a readout | planned |
-| LevelMeter | `void LevelMeter(const char* label, std::span<const float> channels, float min, float max, const LevelMeterOptions& options = {})` | Smoothed bar per channel with zones and peak hold | planned |
+| LevelMeter | `void LevelMeter(const char* label, std::span<const float> channels, double min, double max, const LevelMeterOptions& options = {})` | Smoothed bar per channel with zones and peak hold | planned |
 | FrameTimeGraph | `void FrameTimeGraph(const char* id, const FrameTimeGraphOptions& options = {})`, overload with caller frame times | Rolling frame time graph with the frame rate and a target line | planned |
 | Legend | `bool Legend(const char* id, std::span<LegendItem> items, const LegendOptions& options = {})` | Swatches with labels that toggle series; Alt isolates one | planned |
 | ChartRangeBrush | `bool ChartRangeBrush(const char* label, double* low, double* high, double min, double max, std::span<const ChartSeries> overview, const ChartRangeBrushOptions& options = {})` | Overview with a two-handle window that selects the x range of a larger chart | planned |
