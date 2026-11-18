@@ -59,6 +59,7 @@ TEST_CASE("Values that mean none default to NaN, outside every value range")
     // -1 would be a valid x or time for a range or clock that includes it.
     CHECK(std::isnan(facet::CurveEditorOptions{}.marker));
     CHECK(std::isnan(facet::LogEntry{}.time));
+    CHECK(std::isnan(facet::TimelineScrubberOptions{}.buffered));
 }
 
 // Entries that can change order carry a stable id (rule 2 of the conventions).

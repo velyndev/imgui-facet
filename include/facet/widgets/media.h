@@ -17,6 +17,7 @@
 // Every function is for the thread that runs the Dear ImGui frame.
 
 #include <cstdint>
+#include <limits>
 #include <span>
 
 #include <imgui.h>
@@ -199,7 +200,7 @@ struct TimelineScrubberOptions
     const char* format = nullptr;          // printf for times in seconds; null: minutes and seconds
     FormatFn formatter = nullptr;          // used instead of format when set
     void* formatterUser = nullptr;
-    double buffered = -1.0;                // seconds already loaded, drawn as a lighter band; < 0 none
+    double buffered = std::numeric_limits<double>::quiet_NaN();  // seconds already loaded, drawn as a lighter band; NaN none
     double step = 0.0;                     // seconds per arrow key step; 0 for a hundredth of the duration
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for twice the control height
