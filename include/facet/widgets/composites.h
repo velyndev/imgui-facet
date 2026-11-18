@@ -772,11 +772,14 @@ bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const A
 struct UiScaleControlOptions
 {
     float step = 0.25f;                    // scale steps between min and max
-    bool keyboardZoom = false;             // Ctrl+=, Ctrl+-, Ctrl+0 and Ctrl+wheel change the scale anywhere
+    ShortcutId zoomInShortcut = {};        // registered shortcuts (core/input.h) that change the scale by one step
+    ShortcutId zoomOutShortcut = {};       // or reset it to 1, wherever the focus is; invalid for none
+    ShortcutId zoomResetShortcut = {};
+    bool wheelZoom = false;                // Ctrl+wheel changes the scale anywhere
     bool apply = true;                     // calls SetUiScale when written
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                    // units; 0 fills the available width
-    bool readOnly = false;                 // also turns keyboardZoom off
+    bool readOnly = false;                 // also turns the zoom shortcuts and wheelZoom off
 };
 
 // A stepped control for the user UI scale between `min` and `max` (1 is 100 percent), shown as

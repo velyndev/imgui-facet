@@ -113,7 +113,7 @@ struct SearchFieldOptions
 {
     const char* placeholder = nullptr;  // null uses Strings::search
     std::span<const char* const> recent = {};  // read during the call; listed under the empty focused field
-    ImGuiKeyChord focusShortcut = ImGuiKey_None;  // focuses the field from anywhere in its window; none by default
+    ShortcutId focusShortcut = {};      // a registered shortcut (core/input.h) that focuses the field; invalid for none
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;
     bool readOnly = false;

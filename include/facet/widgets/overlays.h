@@ -319,7 +319,7 @@ public:
 struct CommandPaletteOptions
 {
     const char* placeholder = nullptr; // placeholder of the search field; null uses Strings::search
-    ImGuiKeyChord openChord = ImGuiKey_None;   // a press writes *open = true; none by default
+    ShortcutId openShortcut = {};      // a registered shortcut (core/input.h) whose press writes *open = true; invalid for none
     int maxVisibleRows = 0;            // list height in rows at most; fewer entries shrink it; 0 for the token default
     bool recentFirst = true;           // recently picked entries come first while the field is empty
     const char* emptyText = nullptr;   // null uses Strings::noResults
@@ -378,7 +378,7 @@ struct UnsavedChangesBarOptions
                                        // (one change) or Strings::unsavedChanges
     const char* applyLabel = nullptr;  // null uses Strings::apply
     const char* revertLabel = nullptr; // null uses Strings::revert
-    bool applyShortcut = true;         // Ctrl+S applies while the window has focus
+    ShortcutId applyShortcut = {};     // a registered shortcut (for example Ctrl+S) that applies; invalid for none
 };
 
 // A bar that slides in at the bottom of the current window while changeCount > 0, with Apply

@@ -224,7 +224,8 @@ queries:
 ```cpp
 static bool menuVisible = true, statsPinned = false, settingsOpen = true;
 facet::NewFrame();
-if (facet::BeginOverlay("overlay", &menuVisible, {.toggleKey = {.primary = ImGuiKey_Insert}}))
+static const facet::ShortcutId toggleMenu = facet::RegisterShortcut("app.menu", ImGuiKey_Insert, {.label = "Show menu"});
+if (facet::BeginOverlay("overlay", &menuVisible, {.toggleShortcut = toggleMenu}))
 {
     if (facet::BeginShell("Settings###settings", &settingsOpen,
                           {.minSize = {320.0f, 240.0f}, .closeOnEscape = true}))

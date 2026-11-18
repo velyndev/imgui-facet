@@ -221,7 +221,7 @@ public:
 
 struct OverlayOptions
 {
-    Keybind toggleKey;                 // a press of either chord flips *visible; the mode is not used; unbound by default
+    ShortcutId toggleShortcut = {};    // a registered shortcut (core/input.h) whose press flips *visible; invalid for none
     bool scrim = false;                // dims the host's scene behind the menu while it is visible
 };
 
@@ -230,7 +230,7 @@ struct OverlayOptions
 // *visible becomes true and fade out when it becomes false (motion.durationStandard; at once
 // with reduced motion), and take no input while fading out. Mini windows outside the pair
 // stay visible while pinned and let input through while the menu is hidden. `visible` is the
-// caller's: write it to show or hide the menu; Facet writes it when toggleKey is pressed.
+// caller's: write it to show or hide the menu; Facet writes it when toggleShortcut fires.
 // Returns false once the menu is fully hidden, and when `visible` is null; call EndOverlay only
 // after true. Call it outside any window, once per frame: the menu's windows are top-level.
 // Where input goes is read with OverlayWantsMouse, OverlayWantsKeyboard, OverlayHitTest and

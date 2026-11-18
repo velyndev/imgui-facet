@@ -231,7 +231,9 @@ shortcut, so the same handler runs as for the key chord:
 ```cpp
 static bool paletteOpen = false;
 facet::ShortcutId picked;
-facet::CommandPalette("Commands", &paletteOpen, &picked, {.openChord = ImGuiMod_Ctrl | ImGuiKey_K});
+static const facet::ShortcutId openPalette = facet::RegisterShortcut("app.palette", ImGuiMod_Ctrl | ImGuiKey_K,
+                                                                   {.label = "Command palette"});
+facet::CommandPalette("Commands", &paletteOpen, &picked, {.openShortcut = openPalette});
 ```
 
 An unsaved changes bar at the bottom of a settings page:

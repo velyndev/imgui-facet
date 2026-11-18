@@ -633,7 +633,7 @@ void ToolCalls()
     CHECK_FALSE(themeDefault);
     float scale = 1.25f;
     Check("UiScaleControl", Expect::Item, "Scale",
-          [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.keyboardZoom = true})); });
+          [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.wheelZoom = true})); });
     CHECK(scale == 1.25f);
 }
 

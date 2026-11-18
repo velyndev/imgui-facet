@@ -122,6 +122,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - A widget leaves the id stack, style stack, item width and font as it found them.
 - Moving focus between items is Dear ImGui navigation and needs the host to enable `NavEnableKeyboard`. Keys inside a focused widget (arrows, Home, End, Escape) are read by Facet through key routing. Facet draws its own focus ring after keyboard input and never the stock highlight.
 - After a mouse click, Dear ImGui shows the keyboard focus on the first Tab instead of moving it; Facet keeps this.
+- A key that triggers a widget action from outside the focused widget (focus a search field, open the command palette, toggle the overlay, apply changes, zoom) is an option `ShortcutId <verb>Shortcut`, a shortcut the host registered in the registry of `core/input.h`; an invalid id means none. The user can then rebind it, and it appears in `KeybindList` and `ShortcutSheet`. Facet never registers shortcuts of its own. *Reason: one spelling, and no key the user cannot change.*
 - A hit target grown to `minHitTarget` around a small visual never takes a click that lands on a neighbour's visible rectangle.
 - A label or title that a widget cuts with an ellipsis shows its full text on keyboard focus as well as on hover.
 - Facet never changes io flags and reads input only from `ImGuiIO`, so scripted input drives every widget.
