@@ -148,6 +148,41 @@ TEST_CASE("Item behaviour: the hit rectangle grows to the minimum hit target")
     CHECK(facet::internal::HitRect(ImRect(0.0f, 0.0f, 50.0f, 30.0f), minimum).GetWidth() == 50.0f);
 }
 
+TEST_CASE("Item behaviour: the grown margin never takes a click from the next item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetTheme(facet::Theme::Light(), false);
+    facet::SetUiScale(1.0f);
+    int smallPresses = 0;
+    int nextPresses = 0;
+    ImRect box;
+    session.SetUi([&] {
+        const ItemState state = ItemBehavior(ImGui::GetID("small"), ImVec2(12.0f, 12.0f));
+        smallPresses += state.pressed ? 1 : 0;
+        box = state.rect;
+        session.Track("small");
+        // Closer than the half of the grown margin: the margins reach into the button.
+        ImGui::SameLine(0.0f, 4.0f);
+        nextPresses += ImGui::Button("next") ? 1 : 0;
+        session.Track("next");
+    });
+    session.Frames(2);
+    const ImRect next = session.ItemRect("next");
+    REQUIRE(next.Min.x < box.Max.x + (facet::T().metrics.minHitTarget - 12.0f) * 0.5f);
+    // One pixel inside the button's visible edge: the button's click.
+    session.Click(ImVec2(next.Min.x + 1.0f, next.GetCenter().y));
+    CHECK(nextPresses == 1);
+    CHECK(smallPresses == 0);
+    // The margin on the free side still presses the small item.
+    session.Click(ImVec2(box.Min.x - 4.0f, box.GetCenter().y));
+    CHECK(smallPresses == 1);
+    CHECK(nextPresses == 1);
+    // And its own visible rectangle presses it at once, before any neighbour.
+    session.Click(box.GetCenter());
+    CHECK(smallPresses == 2);
+}
+
 TEST_CASE("Item behaviour: disabled items do nothing and show the not-allowed cursor")
 {
     facet::test::Session session;

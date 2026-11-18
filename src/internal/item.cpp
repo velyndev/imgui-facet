@@ -78,6 +78,17 @@ ItemState RunBehavior(ImGuiID id, const ImRect& rect, const ItemOptions& options
         extra |= ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop;
     if (options.allowOverlap)
         extra |= ImGuiItemFlags_AllowOverlap;
+    // The grown margin yields to every other item: while the pointer is in the margin and not on
+    // the visible rectangle, the item is in Dear ImGui's overlap mode, so a later item whose own
+    // rectangle is under the pointer takes the hover (an earlier one already has it). The margin
+    // then only catches clicks no neighbour claims, a frame after the pointer arrives.
+    if (state.hitRect.Min.x != rect.Min.x || state.hitRect.Min.y != rect.Min.y || state.hitRect.Max.x != rect.Max.x ||
+        state.hitRect.Max.y != rect.Max.y)
+    {
+        const ImVec2 mouse = g.IO.MousePos;
+        if (g.ActiveId != id && state.hitRect.Contains(mouse) && !rect.Contains(mouse))
+            extra |= ImGuiItemFlags_AllowOverlap;
+    }
 
     // The hit rectangle takes the mouse; the visible one is the navigation rectangle.
     state.visible = ImGui::ItemAdd(state.hitRect, id, &rect, extra);
