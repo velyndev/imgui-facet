@@ -440,7 +440,20 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     if (session.id == id && g.ActiveId != id)
         session = {};
     if (item.disabled || item.forced != ForcedItemState::None)
+    {
+        // A key or wheel session of this item that is still running ends here. Its active id
+        // has no input source, so Dear ImGui would never release it, and every other item in
+        // the app would stay blocked. A mouse drag is released by the button behaviour.
+        if (session.id == id)
+        {
+            if (session.keyboard && g.ActiveId == id && g.ActiveIdSource == ImGuiInputSource_None)
+                ImGui::ClearActiveID();
+            session = {};
+        }
+        if (CurrentWheelRest().id == id)
+            CurrentWheelRest() = {};
         return result;
+    }
 
     const auto write = [&](double next) {
         if (readOnly || std::isnan(next))

@@ -50,6 +50,11 @@ struct TestSlider
     TestSlider() { options.grabRadius = 10.0f; }
 
     bool leadingButton = false;  // a stock button before the slider takes the window's first focus
+    bool trailingButton = false; // a stock button under the slider, counted in `otherPresses`
+    bool focusTrailing = false;  // moves keyboard focus to the trailing button in the next frame
+    int otherPresses = 0;
+    int deactivations = 0;
+    facet::internal::ForcedItemState forced = facet::internal::ForcedItemState::None;
     std::vector<int> cancelFrames;
 
     void Ui(facet::test::Session& session)
@@ -58,6 +63,8 @@ struct TestSlider
             ImGui::Button("first");
         if (disabled)
             ImGui::BeginDisabled();
+        if (forced != facet::internal::ForcedItemState::None)
+            facet::internal::ForceNextItemState(forced);
         ItemOptions item;
         item.press = PressMode::Click;
         const facet::internal::ItemState state = facet::internal::ItemBehavior(ImGui::GetID("slider"), ImVec2(200.0f, 24.0f), item);
@@ -71,9 +78,21 @@ struct TestSlider
         }
         activations += ImGui::IsItemActivated() ? 1 : 0;
         afterEdit += ImGui::IsItemDeactivatedAfterEdit() ? 1 : 0;
+        deactivations += ImGui::IsItemDeactivated() ? 1 : 0;
         session.Track("slider");
         if (disabled)
             ImGui::EndDisabled();
+        if (trailingButton)
+        {
+            otherPresses += ImGui::Button("other", ImVec2(200.0f, 24.0f)) ? 1 : 0;
+            session.Track("other");
+            if (focusTrailing)
+            {
+                // Focus moves without Dear ImGui clearing the active id (SetFocusID leaves it).
+                ImGui::SetFocusID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+                focusTrailing = false;
+            }
+        }
     }
 
     // The screen point at `fraction` of the track, on its centre line.
@@ -721,4 +740,67 @@ TEST_CASE("Value drag: disabled and read-only controls never write")
     session.KeyPress(ImGuiKey_RightArrow);
     CHECK(slider.value == 0.5);
     CHECK(slider.changes == 0);
+}
+
+namespace
+{
+
+// Starts a held Right key session on the slider, then ends the session from outside with
+// `interrupt` while the key is still down, releases the key, and checks that the slider no
+// longer holds the active id and that a click reaches the stock button under it.
+template <typename Interrupt>
+void CheckKeySessionReleased(Interrupt interrupt)
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.trailingButton = true;
+    Install(session, slider);
+    session.Click(TestSlider::At(session, 0.5));
+    // The pointer away from both items: hovering a disabled item would release it in Dear ImGui.
+    session.MouseMove(ImVec2(600.0f, 500.0f));
+    session.KeyDown(ImGuiKey_RightArrow);
+    REQUIRE(slider.value == doctest::Approx(0.51));
+    REQUIRE(ImGui::GetActiveID() == session.ItemId("slider"));
+    interrupt(slider);
+    session.Frames(2);
+    session.KeyUp(ImGuiKey_RightArrow);
+    session.Frames(30);
+    CHECK(ImGui::GetActiveID() == 0);
+    session.Click(session.ItemCenter("other"));
+    CHECK(slider.otherPresses == 1);
+}
+
+} // namespace
+
+TEST_CASE("Value drag: a control disabled during a key session releases the active id")
+{
+    CheckKeySessionReleased([](TestSlider& slider) { slider.disabled = true; });
+}
+
+TEST_CASE("Value drag: a control forced into a state during a key session releases the active id")
+{
+    CheckKeySessionReleased([](TestSlider& slider) { slider.forced = facet::internal::ForcedItemState::Hovered; });
+}
+
+TEST_CASE("Value drag: a key session ends when focus leaves while the key is held")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.trailingButton = true;
+    Install(session, slider);
+    session.Click(TestSlider::At(session, 0.5));
+    session.KeyDown(ImGuiKey_RightArrow);
+    REQUIRE(ImGui::GetActiveID() == session.ItemId("slider"));
+    const int deactivations = slider.deactivations;
+    slider.focusTrailing = true;
+    session.Frames(3);
+    CHECK(ImGui::GetFocusID() == session.ItemId("other"));
+    CHECK(ImGui::GetActiveID() != session.ItemId("slider"));
+    CHECK(slider.deactivations == deactivations + 1);
+    const double value = slider.value;
+    session.Frames(30);  // the key still repeats, but the slider is no longer focused
+    CHECK(slider.value == value);
+    session.KeyUp(ImGuiKey_RightArrow);
 }

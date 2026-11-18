@@ -297,6 +297,8 @@ struct TestRange
     {
         const ImGuiID id = ImGui::GetID("range");
         widgetId = id;
+        if (disabled)
+            ImGui::BeginDisabled();
         const ImVec2 pos = ImGui::GetCursorScreenPos();
         const ImRect rect(pos, ImVec2(pos.x + 300.0f, pos.y + 24.0f));
         ImGui::BeginGroup();
@@ -310,7 +312,18 @@ struct TestRange
         widgetHovered = ImGui::IsItemHovered();
         lastItemId = ImGui::GetItemID();
         session.Track("range");
+        if (disabled)
+            ImGui::EndDisabled();
+        if (trailingButton)
+        {
+            otherPresses += ImGui::Button("other", ImVec2(200.0f, 24.0f)) ? 1 : 0;
+            session.Track("other");
+        }
     }
+
+    bool disabled = false;
+    bool trailingButton = false;  // a stock button under the widget, counted in `otherPresses`
+    int otherPresses = 0;
 
     static ImVec2 At(const facet::test::Session& session, double value)
     {
@@ -665,6 +678,27 @@ TEST_CASE("Multi-handle behaviour: each handle is a Tab stop moved by the arrows
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() != range.last.span.id);
     CHECK(ImGui::GetFocusID() != range.last.track.id);
+}
+
+TEST_CASE("Multi-handle behaviour: a handle disabled during a key session releases the active id")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestRange range;
+    range.trailingButton = true;
+    Install(session, range);
+    session.Click(TestRange::At(session, 20.0));
+    REQUIRE(ImGui::GetFocusID() == range.handles[0].id);
+    session.MouseMove(ImVec2(600.0f, 500.0f));
+    session.KeyDown(ImGuiKey_RightArrow);
+    REQUIRE(ImGui::GetActiveID() == range.handles[0].id);
+    range.disabled = true;
+    session.Frames(2);
+    session.KeyUp(ImGuiKey_RightArrow);
+    session.Frames(30);
+    CHECK(ImGui::GetActiveID() == 0);
+    session.Click(session.ItemCenter("other"));
+    CHECK(range.otherPresses == 1);
 }
 
 TEST_CASE("Multi-handle behaviour: the item queries describe the whole widget")
