@@ -148,8 +148,9 @@ bool FileBrowser(const char* label, std::string* path, const FileBrowserOptions&
 bool FileBrowser(const char* label, char* buffer, std::size_t bufferSize, const FileBrowserOptions& options = {});
 ```
 
-A file browser drawn inside the app, for overlays and hosts that cannot show a system dialog. Its
-label is the accessible name and is not drawn. Status: planned.
+A file browser drawn inside the app, for overlays and hosts that cannot show a system dialog. Like
+the other panels, it does not draw its label beside it but shows it as its tooltip on hover and
+keyboard focus. Status: planned.
 
 ## Usage
 

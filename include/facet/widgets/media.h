@@ -11,6 +11,10 @@
 // Every widget that writes a value or a selection has `readOnly` (rule 7): the widget shows
 // its value and can be focused, but writes nothing and returns false.
 //
+// The strips, viewers and rulers here are canvases and panels (rule 6): their visible label part
+// is not drawn beside them, so they keep the whole width, but it is their tooltip on hover and
+// on keyboard focus. A settings row gives them a visible label.
+//
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families. Every widget here is declared and planned: its body draws a
 // placeholder until Phase 2 implements it (docs/widgets/media.md lists the status of each).
@@ -93,7 +97,8 @@ struct AvatarGroupOptions
 };
 
 // Overlapping avatars with a "+N" chip for the rest; hovering the group lists every name in a
-// tooltip. The group is one Tab stop and the visible label part its accessible name. Returns
+// tooltip under the visible label part as its heading. The group is one Tab stop; keyboard focus
+// shows the same tooltip. Returns
 // true on the frame the group was activated (click, Enter, Space), for example to open a member
 // list.
 bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const AvatarGroupOptions& options = {});
@@ -126,7 +131,7 @@ struct ThumbnailStripOptions
 // A horizontally scrolling row of thumbnails with the chosen one ringed. One Tab stop; Left
 // and Right move the selection, Home and End jump; the wheel scrolls. *selected -1 means none.
 // Returns true when *selected was written. Scroll position kept under the id. The visible label
-// part is the accessible name and is not drawn; put the strip in a settings row for a visible label.
+// part is the strip's tooltip (see the top of this file).
 bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem> items,
                     const ThumbnailStripOptions& options = {});
 bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGetter getter, void* user,
@@ -149,7 +154,7 @@ struct CarouselOptions
 // One slide at a time with previous and next buttons and page dots. The slide follows a
 // horizontal drag and snaps by velocity with the standard spring. One Tab stop for the slides
 // (Left and Right page) plus the buttons. Returns true when *index was written. The visible label
-// part is the accessible name and is not drawn; slide captions come from the items.
+// part is the carousel's tooltip (see the top of this file); slide captions come from the items.
 bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, const CarouselOptions& options = {});
 
 // The view of an ImageViewer, owned by the caller so it can be saved or reset.
@@ -171,8 +176,9 @@ struct ImageViewerOptions
 // A zoom and pan viewport. The wheel zooms around the cursor, a drag pans with inertia, a
 // double click toggles between fit and 100 percent; while focused, + and - zoom, arrows pan
 // and 0 fits. 100 percent is one image pixel per design unit (zoom 1), so it follows the UI
-// scale like every other length. The visible label part is the alt text and is not drawn.
-// Returns true when *view was written.
+// scale like every other length. The visible label part is the alt text: the tooltip of the
+// viewport (see the top of this file) and the text of its failed state. Returns true when
+// *view was written.
 bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {});
 
 struct ImageCompareOptions
@@ -189,7 +195,7 @@ struct ImageCompareOptions
 // Two images of the same size on top of each other with a divider at *split (0 to 1). The
 // divider is a handle: drag it, or focus it and use arrows (Shift fine, Ctrl coarse), Home and
 // End. A click elsewhere moves it there. Returns true when *split was written. The visible
-// label part is the accessible name and is not drawn; the corner captions come from the options.
+// label part is the tooltip (see the top of this file); the corner captions come from the options.
 bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after,
                   const ImageCompareOptions& options = {});
 
@@ -211,7 +217,7 @@ struct TimelineScrubberOptions
 // writes *playhead while dragging; the wheel zooms around the cursor and Shift+wheel pans
 // (zoom kept under the id). The playhead is a Tab stop; arrows step, Home and End jump. A
 // duration <= 0 draws the ruler read-only. Returns true when a value was written. The visible
-// label part is the accessible name and is not drawn, so the ruler keeps the whole width.
+// label part is the tooltip (see the top of this file), so the ruler keeps the whole width.
 bool TimelineScrubber(const char* label, double* playhead, double duration, const TimelineScrubberOptions& options = {});
 // With loop markers: *loopIn and *loopOut are two more handles, each a Tab stop, that never
 // cross (loopIn <= loopOut).
@@ -240,7 +246,8 @@ struct DropZoneOptions
 // A dashed area that accepts Dear ImGui drag and drop payloads whose type is in `acceptTypes`
 // (each at most 32 bytes, read during the call). While a payload is dragged over it, the zone
 // is tinted in the accent for an accepted type and in the destructive token otherwise. The
-// visible label part is the accessible name. Files dragged in from the operating system reach
+// visible label part is the text in the zone unless `hint` replaces it; then it is the zone's
+// tooltip. Files dragged in from the operating system reach
 // it only when the host submits them as a payload (the host owns the window messages).
 DropZoneResult DropZone(const char* label, std::span<const char* const> acceptTypes,
                         const DropZoneOptions& options = {});

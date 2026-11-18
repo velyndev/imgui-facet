@@ -15,9 +15,9 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 ## 2. Labels and ids
 
 - The first parameter of every widget that keeps state across frames is `const char* label` or `const char* id`, and it follows Dear ImGui exactly. The whole string is hashed on the current id stack. Text after `##` is hidden. `###` makes only the suffix the id. *Reason: users already know these rules, so Facet adds no second id system.*
-- The parameter is called `label` when its visible part is drawn or used as a tooltip or alt text. It is called `id` when it is never shown (`BeginCard`, `TabBar`, `BeginDataTable`). *Reason: the parameter name tells the caller whether the text appears.*
+- The parameter is called `label` when its visible part is drawn or used as a tooltip or alt text. It is called `id` when it is never shown (`BeginCard`, `TabBar`, `BeginDataTable`). Being an accessible name alone does not make it a `label`: Dear ImGui has no accessibility output, so text that is only a name would never be seen. *Reason: the parameter name tells the caller whether the text appears.*
 - A label whose visible text changes from frame to frame must use `###` to keep a stable id. In loops, the caller uses `ImGui::PushID(i)` exactly as with stock widgets. Facet never makes ids unique on its own. *Reason: the id must not depend on display text.*
-- Icon-only controls take a label whose visible part is required. It is the tooltip and the accessible name. An empty visible part asserts. *Reason: every control has a name.*
+- Icon-only controls take a label whose visible part is required. It is the tooltip and the accessible name. An empty visible part asserts. The one exception is `CopyButton`, whose empty visible part falls back to `Strings::copy`, because its purpose is the same everywhere. *Reason: every control has a name.*
 - Parts and entries inside a widget (handles, segments, tabs, rows) get ids under the widget id. The id is `item.id` when that is non-zero, and the index otherwise. Item labels in a list do not need to be unique. *Reason: one id per widget for the caller, and stable state for entries that can be reordered.*
 - `BeginSettingsRow` pushes its label on the id stack until `EndSettingsRow`, so the control in every row can use the same `"##value"`. Two rows with the same visible text need `###` like any other duplicate label. A control decides whether to draw a label only from its own label string; there is no implicit row context. *Reason: explicit `##` is the only switch, so there is nothing hidden to learn.*
 
@@ -68,6 +68,12 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
   
   Field widgets (sliders, text, numbers, dropdowns, pickers, progress bars) default to the available content width. Compact controls (buttons, toggles, checkboxes, segmented controls) default to their content.
 - The visible label of a field widget is drawn in front of the control and inside the widget width; it takes its measured text width plus `spacing.sm`. Unlike stock widgets, `SetNextItemWidth(-FLT_MIN)` therefore gives a widget that ends at the right edge with its label included. Aligned label columns come from `SettingsRow` (and `LayoutLabeledRow` in `core/layout.h`), not from field widgets. Toggle, checkbox and radio labels follow the mark. In table cells and settings rows, callers pass `"##name"`. *Reason: a field with its label fits a table cell at one control height.*
+- Every other value widget draws its visible label by its shape, so widgets of one shape agree:
+  - one-line compact controls (`SegmentedControl`, `ToggleButtonGroup`, `KeybindModeSelector`, `CycleSelector`, `ThemeModeControl`, `AccentPicker`) draw it in front, inside the width, like fields;
+  - groups that wrap into rows (`RadioGroup`, `CheckboxGroup`, `ChipGroup`, `OptionCardGroup`) draw it above;
+  - canvases and panels (pickers such as `ColorPicker` and `FileBrowser`, the curve, easing and gradient editors, `ChartRangeBrush`, the media strips, viewers and rulers) do not draw it beside them, so they keep the whole width, and show it as their tooltip on hover and keyboard focus.
+  
+  *Reason: a label that is never drawn tells the user nothing, and the same call reads the same way across widgets of one shape.*
 - `options.size` is `ControlSize { Inherit, Small, Regular, Large }`, mapped to the controlHeight tokens (`ControlHeight` in `common.h`). `Inherit` takes the innermost `PushControlSize`, or `Regular` (`ResolveControlSize`). `Small` draws its text in Footnote, `Regular` and `Large` in Body (`ControlTextStyle`).
 - Every widget advances the cursor like one item, so `SameLine`, `Indent`, groups and tables work unchanged. `SettingsRow` lays out within the available width (also inside a table cell) and never creates table columns.
 
@@ -287,8 +293,8 @@ struct SegmentedControlOptions
     bool mixed = false;                // no segment highlighted
 };
 
-// Segments with the sliding selection pill. Arrow keys move the selection. Returns true when
-// *index was written.
+// Segments with the sliding selection pill; the visible label part is drawn in front (rule 6).
+// Arrow keys move the selection. Returns true when *index was written.
 bool SegmentedControl(const char* label, int* index, std::span<const ChoiceItem> items,
                       const SegmentedControlOptions& options = {});
 bool SegmentedControl(const char* label, int* index, std::span<const char* const> items,

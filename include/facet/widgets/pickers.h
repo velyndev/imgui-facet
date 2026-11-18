@@ -28,8 +28,8 @@
 //   - The visible label part is drawn in front of the control, inside the widget width, by the
 //     field-like widgets (ColorWell, ColorInputs, ColorChannelSlider, ColorModeEditor,
 //     DatePicker, DateRangePicker, TimePicker, AnglePicker, IconPicker). The panels
-//     (ColorPicker, SwatchPalette, SatValSquare, ThumbnailPicker, FileBrowser) do not draw it;
-//     for them it is the accessible name and the tooltip of the whole panel.
+//     (ColorPicker, SwatchPalette, SatValSquare, ThumbnailPicker, FileBrowser) do not draw it
+//     beside them; it is the tooltip of the whole panel on hover and keyboard focus (rule 6).
 
 #include <cstddef>
 #include <span>
@@ -100,7 +100,7 @@ struct ColorPickerOptions
 
 // An inline picker for *color: the square or wheel, a hue bar and an alpha bar, each its own Tab
 // stop, moved by drags and arrow keys. Writes while dragging. Returns true when *color was
-// written. The visible label part is the accessible name and is not drawn.
+// written. The visible label part is the panel's tooltip (see the top of this file).
 bool ColorPicker(const char* label, ImVec4* color, const ColorPickerOptions& options = {});
 
 // --- ColorInputs ------------------------------------------------------------------------------
@@ -467,7 +467,7 @@ struct FileBrowserOptions
 // Reading a folder shows the loading state, an unreadable folder the error state with
 // Strings::loadFailed, an empty one the empty state. Double click or Enter on a file (or the
 // confirm button) writes its full UTF-8 path. Returns true when the path was written. The
-// visible label part is the browser's accessible name and is not drawn; the modal or panel
+// visible label part is the panel's tooltip (see the top of this file); the modal or panel
 // around it carries the title. Arrow keys move in the list, Enter opens a folder or confirms a
 // file, Backspace goes to the parent folder. Usually shown inside a modal from overlays.h after
 // PathFieldBrowsePressed.

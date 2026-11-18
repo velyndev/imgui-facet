@@ -10,6 +10,11 @@ Every widget here returns true on the frame it wrote its value or selection. Ite
 `ChoiceItem` (label first, so `{"Option 1"}` works) or of `const char* const` for label-only lists.
 Dropdowns, list boxes and trees are in [lists](lists.md).
 
+The visible label part is drawn by the widget's shape (rule 6): in front of one-line controls
+(segmented control, cycle selector, key bind mode selector), above groups that wrap into rows
+(checkbox and radio groups, chip groups, option cards), and after the mark for toggles and
+checkboxes. `"##name"` hides it, as in settings rows.
+
 ## Widgets
 
 ### Toggle

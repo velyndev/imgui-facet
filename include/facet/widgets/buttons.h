@@ -113,8 +113,9 @@ struct ToggleButtonGroupOptions
 
 // A row of latched toolbar buttons joined into one group, one button per item. Each button is
 // its own Tab stop; Space or Enter toggles the focused one. Items with `disabled` are drawn
-// disabled and skipped. The visible label part is the group's accessible name and is not
-// drawn. The item queries describe the whole group (docs/api-conventions.md, rule 11).
+// disabled and skipped. The visible label part is drawn in front of the buttons inside the
+// width (docs/api-conventions.md, rule 6); "##name" hides it, for example in a toolbar. The item
+// queries describe the whole group (rule 11).
 //
 // Independent latches: `selected` holds one flag per item. Extra flags are ignored; items
 // without a flag read as off and their buttons are drawn disabled. Activating a button flips

@@ -327,7 +327,8 @@ struct CommandPaletteOptions
 
 // A floating launcher at the top center of the display with a search field and the entries
 // fuzzy matched as one types; ChoiceItem::group groups them, detail shows a hint at the end.
-// Shown while *open is true; the visible label part is its accessible name. Up and Down move,
+// Shown while *open is true; the visible label part is a small heading above the search field
+// ("##name" for none). Up and Down move,
 // Enter picks, Escape closes. On a pick it writes *picked and *open = false and returns true.
 // A null `open` shows nothing and returns false. Recent picks are kept under the id.
 bool CommandPalette(const char* label, bool* open, int* picked, std::span<const ChoiceItem> commands,

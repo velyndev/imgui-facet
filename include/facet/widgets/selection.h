@@ -19,6 +19,11 @@
 //     entries get ids under the widget id (ChoiceItem::id, or the index).
 //   - Overloads taking std::span<const char* const> behave like the ChoiceItem ones with only
 //     labels set.
+//   - The visible label part is drawn by shape (docs/api-conventions.md, rule 6): in front of
+//     one-line controls inside their width (SegmentedControl, CycleSelector,
+//     KeybindModeSelector), above groups that wrap into rows (CheckboxGroup, RadioGroup,
+//     ChipGroup, OptionCardGroup), after the mark for Toggle and Checkbox. "##name" hides it,
+//     as in settings rows.
 
 #include <span>
 
@@ -125,8 +130,8 @@ struct SegmentedControlOptions
 
 // Joined segments with the sliding selection pill. One Tab stop; arrow keys, a click or a drag
 // across the segments move the selection. Labels collapse to icons when the width is too small
-// and every item has one. The visible label part is the accessible name and is not drawn.
-// Returns true when *index was written. Keeps the pill position under its id.
+// and every item has one. The visible label part is drawn in front of the segments inside the
+// width (rule 6). Returns true when *index was written. Keeps the pill position under its id.
 bool SegmentedControl(const char* label, int* index, std::span<const ChoiceItem> items,
                       const SegmentedControlOptions& options = {});
 bool SegmentedControl(const char* label, int* index, std::span<const char* const> items,
@@ -166,7 +171,7 @@ struct ChipGroupOptions
 };
 
 // Chips that wrap into rows, one per item; ChoiceItem::detail shows as a count after the label.
-// Each chip is a Tab stop. The visible label part is the accessible name and is not drawn.
+// Each chip is a Tab stop. The visible label part is drawn above the chips.
 //
 // Filter (multi) form: `selected` holds one flag per item; activating a chip flips its flag.
 // Returns true when a flag was written.
@@ -199,7 +204,8 @@ struct CycleSelectorOptions
     const char* helpText = nullptr;
 };
 
-// The visible label, then a value between previous and next arrow buttons. Left and Right (or
+// The visible label (in front, inside the width), then a value between previous and next arrow
+// buttons. Left and Right (or
 // the buttons, or the wheel while hovered) step *index and write at once; disabled items are
 // skipped. Returns true when *index was written. A value out of range shows the placeholder
 // Strings::select.
@@ -224,8 +230,8 @@ struct KeybindModeSelectorOptions
 
 // Chooses how a key bind activates (BindMode in core/input.h): Hold, Toggle, Always and Off
 // with the Strings bind* names, drawn as a segmented control. Keyboard as SegmentedControl. The
-// visible label part is the accessible name and is not drawn.
-// Returns true when *mode was written. A mode that is not offered is shown but cannot be
+// visible label part is drawn in front of the segments inside the width (rule 6). Returns true
+// when *mode was written. A mode that is not offered is shown but cannot be
 // chosen again once left.
 bool KeybindModeSelector(const char* label, BindMode* mode, const KeybindModeSelectorOptions& options = {});
 
@@ -256,7 +262,7 @@ struct OptionCardGroupOptions
 // Large selectable cards in a grid, for choices that need a picture or a description. The
 // selected card shows the accent outline and a check. The single form is one Tab stop with
 // arrow-key movement (like RadioGroup); the multi form makes each card a Tab stop that Space
-// flips (like CheckboxGroup). The visible label part is the accessible name and is not drawn.
+// flips (like CheckboxGroup). The visible label part is drawn above the cards.
 bool OptionCardGroup(const char* label, int* index, std::span<const OptionCard> cards,
                      const OptionCardGroupOptions& options = {});
 bool OptionCardGroup(const char* label, std::span<bool> selected, std::span<const OptionCard> cards,

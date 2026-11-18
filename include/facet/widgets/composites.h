@@ -69,8 +69,9 @@ struct CurveEditorOptions
 // click on a point removes it (never below two). Each point is a Tab stop with a focus ring;
 // arrows move it (Shift fine, Ctrl coarse) and it never passes its neighbours. Writes while
 // dragging. Returns true when points or *count were written. min > max is swapped per axis.
-// The visible label part is the accessible name and is not drawn (the editors are canvases;
-// a settings or property row gives them a visible label).
+// The editors are canvases: the visible label part is not drawn beside them but is the tooltip
+// of the canvas on hover and keyboard focus (rule 6); a settings or property row gives them a
+// visible label.
 bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max,
                  const CurveEditorOptions& options = {});
 
@@ -94,7 +95,7 @@ struct BezierEditorOptions
 
 // An easing editor with the two control points as handles, each a Tab stop moved with arrows.
 // x stays in 0 to 1. Writes while dragging. Returns true when *curve was written. The visible
-// label part is the accessible name and is not drawn.
+// label part is the canvas tooltip, as for CurveEditor.
 bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {});
 
 // One color stop of a gradient; color is sRGB with straight alpha.
@@ -117,7 +118,7 @@ struct GradientEditorOptions
 // the bar adds a stop with the color at that point; dragging a stop off the bar or Delete
 // removes it (never below one). Activating a stop opens a popover with a color picker. Each
 // stop is a Tab stop; arrows move it. Returns true when stops or *count were written. The
-// visible label part is the accessible name and is not drawn.
+// visible label part is the canvas tooltip, as for CurveEditor.
 bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count,
                     const GradientEditorOptions& options = {});
 
@@ -753,9 +754,9 @@ struct AccentPickerOptions
 // color writes *accent and *themeDefault = false. While *themeDefault is true the first swatch
 // is marked, otherwise the swatch equal to *accent (or the custom well). A null themeDefault
 // offers no theme default: the first preset is a color like the others. A null accent draws the
-// picker read-only. The visible label part is the accessible name and is not drawn; put the
-// picker in a settings row for a visible label. Returns true when *themeDefault or *accent was
-// written. Keeps no state; the default width fits the swatches.
+// picker read-only. The visible label part is drawn in front of the swatches inside the width
+// (rule 6); use "##name" in settings rows. Returns true when *themeDefault or *accent was
+// written. Keeps no state; the default width fits the label and the swatches.
 bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {});
 
 struct UiScaleControlOptions
