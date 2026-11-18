@@ -554,7 +554,8 @@ bool CopyField(const char* label, const char* text, const CopyFieldOptions& opti
 
 struct KeybindCaptureOptions
 {
-    bool allowMouse = true;
+    bool allowMouse = true;             // right, middle, 4 and 5 can be bound; a left click never
+                                        // binds, it ends listening and reaches what it lands on
     bool allowGamepad = false;
     bool allowModifierOnly = false;
     bool showMode = false;              // adds the BindMode selector
@@ -570,7 +571,8 @@ struct KeybindCaptureOptions
 // Records a key bind (Keybind in core/input.h) and shows its chords as key caps. A click or
 // Enter starts listening (Strings::listening); the next chord is written. While listening the
 // widget owns every key and stays active, so io.WantCaptureKeyboard is true. Escape cancels (so
-// Escape cannot be bound); Backspace or Delete while focused and not listening clears the slot.
+// Escape cannot be bound), and so does a left click anywhere, including on the widget's own clear
+// button, which then clears; Backspace or Delete while focused and not listening clears the slot.
 // Returns true when *bind was written.
 bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOptions& options = {});
 

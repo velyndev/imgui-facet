@@ -442,10 +442,11 @@ struct CaptureHarness
         }
         session.Track("capture");
         if (ImGui::Button("next"))
-        {
-        }
+            ++nextPresses;
         session.Track("next");
     }
+
+    int nextPresses = 0;
 };
 
 } // namespace
@@ -552,6 +553,86 @@ TEST_CASE("Chord capture: modifiers alone, mouse buttons only when allowed")
     session.KeyUp(ImGuiMod_Ctrl);
     CHECK(harness.lastEvent == ChordCaptureEvent::Captured);
     CHECK(harness.capture.Result() == (ImGuiMod_Ctrl | ImGuiKey_MouseX1));
+}
+
+TEST_CASE("Chord capture: a left click cancels and reaches the item under the pointer")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CaptureHarness harness;
+    harness.options.allowMouse = true;
+    session.SetUi([&] { harness.Draw(session); });
+    session.Frame();
+    session.Click(session.ItemCenter("capture"));
+    REQUIRE(harness.capture.Listening());
+    const ImGuiID owner = harness.capture.Owner();
+
+    // A click on another item: the session ends with nothing recorded, the left button is not
+    // locked to the capture, and the item takes the click.
+    session.MouseMove(session.ItemCenter("next"));
+    session.MouseDown();
+    CHECK(harness.lastEvent == ChordCaptureEvent::Canceled);
+    CHECK(harness.capture.Result() == 0);
+    CHECK(ImGui::GetKeyOwner(ImGuiKey_MouseLeft) != owner);
+    session.MouseUp();
+    session.Frame();
+    CHECK(harness.nextPresses == 1);
+
+    // The right button is still a chord key under allowMouse.
+    harness.startNow = true;
+    session.Frame();
+    session.MouseDown(ImGuiMouseButton_Right);
+    session.MouseUp(ImGuiMouseButton_Right);
+    CHECK(harness.lastEvent == ChordCaptureEvent::Captured);
+    CHECK(harness.capture.Result() == ImGuiKey_MouseRight);
+}
+
+TEST_CASE("Chord capture: a session whose widget missed a frame ends as canceled")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CaptureHarness harness;
+    bool shown = true;
+    session.SetUi([&] {
+        if (shown)
+            harness.Draw(session);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("capture"));
+    REQUIRE(harness.capture.Listening());
+    // The window with the widget closes for a few frames, then opens again.
+    shown = false;
+    session.Frames(3);
+    shown = true;
+    session.Frame();
+    CHECK(harness.lastEvent == ChordCaptureEvent::Canceled);
+    CHECK_FALSE(harness.capture.Listening());
+    // Tab is navigation again: nothing is recorded.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(harness.capture.Result() == 0);
+}
+
+TEST_CASE("Chord capture: facet::Shutdown forgets the listening session")
+{
+    ChordCapture kept;
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        session.SetUi([&] { (void)kept.Update(); });
+        session.Frame();
+        kept.Start(ImHashStr("kept"));
+        session.Frame();
+        REQUIRE(facet::internal::ActiveChordCaptureOwner() == ImHashStr("kept"));
+    }
+    CHECK(facet::internal::ActiveChordCaptureOwner() == 0);
+    // A session kept across the restart ends at its first update in the new context.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ChordCaptureEvent event = ChordCaptureEvent::None;
+    session.SetUi([&] { event = kept.Update(); });
+    session.Frame();
+    CHECK(event == ChordCaptureEvent::Canceled);
+    CHECK(facet::internal::ActiveChordCaptureOwner() == 0);
 }
 
 TEST_CASE("Chord capture: a new session ends the one listening before it")

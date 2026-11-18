@@ -188,7 +188,7 @@ void DrawCaptureField(const facet::Theme& theme, const facet::demo::PageCtx& ctx
     if (listening)
     {
         const ImGuiKeyChord held = page.capture.Held();
-        label = held != 0 ? ChordText(held) + "..." : "Press a chord; Esc cancels";
+        label = held != 0 ? ChordText(held) + "..." : "Press a chord; Esc or a click cancels";
         color = c.labelSecondary;
     }
     else if (page.captured != ImGuiKey_None)

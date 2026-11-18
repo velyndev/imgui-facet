@@ -110,7 +110,8 @@ When several scopes want a chord in the same frame, the innermost wins: the focu
 `src/internal/keys.h` has the capture session that the `KeybindCapture` and `KeybindList` widgets are built on; the keys demo page uses it as a prototype.
 
 - `Start(owner, options)` begins listening for the item `owner`, which should be the active item while it listens. Keys that are already down are ignored until released, so the click or Enter that started it is not recorded.
-- `Update()` runs once per frame while listening. The chord is reported (`Captured`) when its last key is released: the modifiers held when the main key went down plus that key, the last non-modifier key pressed. Escape cancels on its press, so Escape cannot be captured. Options accept mouse buttons, gamepad buttons, and modifiers alone; without mouse buttons a mouse press cancels.
+- `Update()` runs once per frame while listening. The chord is reported (`Captured`) when its last key is released: the modifiers held when the main key went down plus that key, the last non-modifier key pressed. Escape cancels on its press, so Escape cannot be captured. Options accept mouse buttons (right, middle, 4 and 5), gamepad buttons, and modifiers alone; without mouse buttons any mouse press cancels. The left button is never captured: its press cancels and is not locked, so it still reaches the item under the pointer, such as the widget's clear button.
+- A session whose widget was not submitted for a frame (its window closed) ends as `Canceled` on the next `Update()`, so a field that comes back is no longer listening. `facet::Shutdown` forgets the listening session as well.
 - `Clear()` and `Cancel()` end the session from the widget.
 - Only one session listens at a time. Starting one ends every older session: its next `Update()` returns `Canceled` and records nothing, also when both use the same owner id.
 

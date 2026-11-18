@@ -17,10 +17,12 @@
 //         switch (capture.Update())
 //         {
 //         case ChordCaptureEvent::Captured: bind->primary = capture.Result(); written = true; break;
-//         case ChordCaptureEvent::Canceled: break;          // Escape: keep the old chord
+//         case ChordCaptureEvent::Canceled: break;          // Escape or a left click: keep the old chord
 //         default: break;                                   // still listening; draw capture.Held()
 //         }
 //     }
+//     // A left press cancels the session without taking the press, so the clear button
+//     // receives the click even while the field listens:
 //     if (clearClicked) { capture.Clear(); bind->primary = ImGuiKey_None; written = true; }
 //
 // While a capture listens, its keys belong to it: every key it accepts that is down is locked
@@ -72,7 +74,8 @@ ImGuiKey FindKeyByName(const char* begin, const char* end);
 
 struct ChordCaptureOptions
 {
-    bool allowMouse = false;         // mouse buttons (left, right, middle, 4, 5) can be the key
+    bool allowMouse = false;         // the right, middle, 4 and 5 buttons can be the key; the
+                                     // left button never is: it cancels
     bool allowGamepad = false;       // gamepad buttons and stick directions can be the key
     bool allowModifierOnly = false;  // a chord of modifiers alone ("Ctrl+Shift") is accepted
 };
@@ -81,8 +84,8 @@ enum class ChordCaptureEvent
 {
     None,      // not listening, or still listening
     Captured,  // the last key of a chord was released; Result() holds the chord
-    Canceled,  // Escape was pressed, a mouse button while mouse buttons are not accepted, or
-               // another session started
+    Canceled,  // Escape was pressed, the left button or a mouse button that is not accepted,
+               // another session started, or a frame passed without an Update
     Cleared,   // Clear() ended the session
 };
 
@@ -97,8 +100,9 @@ public:
     // Enter that started the capture is not recorded.
     void Start(ImGuiID owner, const ChordCaptureOptions& options = {});
 
-    // Call once per frame while Listening(), inside the frame, before the widget draws.
-    // Returns Captured, Canceled or Cleared on the frame the session ends, None otherwise.
+    // Call once per frame while Listening(), inside the frame, before the widget draws. A
+    // session that missed a frame (its widget was not submitted) ends as Canceled on the next
+    // call. Returns Captured, Canceled or Cleared on the frame the session ends, None otherwise.
     // A chord is captured when its last key is released: the modifiers held when the main key
     // went down, plus that key (the last non-modifier key pressed). With allowModifierOnly, a
     // press and release of modifiers alone captures their flags (ImGuiMod_Ctrl | ImGuiMod_Shift,
@@ -127,6 +131,7 @@ private:
     ChordCaptureOptions options;
     bool listening = false;
     std::uint32_t generation = 0;       // the Start count of this session (see keys.cpp)
+    int lastFrame = -1;                 // ImGui frame of the last Start or Update
     ChordCaptureEvent pendingEnd = ChordCaptureEvent::None;
     ChordCaptureEvent last = ChordCaptureEvent::None;
     ImGuiKeyChord held = 0;
@@ -141,6 +146,10 @@ private:
 
 // The owner of the session listening this frame (or the last one), 0 when none: for tests.
 ImGuiID ActiveChordCaptureOwner();
+
+// Forgets the listening session (facet::Shutdown): no owner, and every existing session ends
+// as Canceled on its next Update.
+void ResetChordCaptureState();
 
 // Called by the input module in facet::NewFrame: repeats the locks of the session that
 // listened in the previous frame, and forgets a session that was not updated then.

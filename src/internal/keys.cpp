@@ -139,7 +139,9 @@ bool Accepts(const ChordCaptureOptions& options, ImGuiKey key)
 {
     if (key >= ImGuiKey_Keyboard_BEGIN && key < ImGuiKey_Keyboard_END)
         return true;
-    if (key >= ImGuiKey_MouseLeft && key <= ImGuiKey_MouseX2)
+    // The left button is never a chord key: it is how the user clicks away from a listening
+    // field or on its clear button, so it cancels instead (ChordCapture::Update).
+    if (key > ImGuiKey_MouseLeft && key <= ImGuiKey_MouseX2)
         return options.allowMouse;
     if (key >= ImGuiKey_Gamepad_BEGIN && key < ImGuiKey_Gamepad_END)
         return options.allowGamepad;
@@ -308,8 +310,10 @@ void ChordCapture::Start(ImGuiID ownerId, const ChordCaptureOptions& captureOpti
     generation = ++state.generation;
     state.owner = owner;
     state.options = options;
+    lastFrame = -1;
     if (GImGui == nullptr)
         return;
+    lastFrame = GImGui->FrameCount;
     for (int i = 0; i < kNamedKeyCount; ++i)
     {
         if (ImGui::GetKeyData(static_cast<ImGuiKey>(ImGuiKey_NamedKey_BEGIN + i))->Down)
@@ -364,9 +368,18 @@ ChordCaptureEvent ChordCapture::Update()
         Finish(ChordCaptureEvent::Canceled);
         return ChordCaptureEvent::Canceled;
     }
+    const int frame = GImGui->FrameCount;
+    if (lastFrame >= 0 && lastFrame < frame - 1)
+    {
+        // The widget was not submitted for a frame or more (its window closed): the active
+        // item that kept Tab and the arrows from navigation is gone, so the session ends.
+        Finish(ChordCaptureEvent::Canceled);
+        return ChordCaptureEvent::Canceled;
+    }
+    lastFrame = frame;
     state.owner = owner;
     state.options = options;
-    state.frame = GImGui->FrameCount;
+    state.frame = frame;
     LockHeldKeys(owner, options);
 
     const auto isIgnored = [&](int i) { return (ignored[i / 64] >> (i % 64)) & 1ull; };
@@ -389,7 +402,9 @@ ChordCaptureEvent ChordCapture::Update()
             Finish(ChordCaptureEvent::Canceled);
             return ChordCaptureEvent::Canceled;
         }
-        if (isMouseButton && !options.allowMouse && pressed)
+        // A mouse button the capture does not take ends it. It is not locked, so the same press
+        // still reaches the item under the pointer (the widget's clear button, another field).
+        if (isMouseButton && pressed && (!options.allowMouse || key == ImGuiKey_MouseLeft))
         {
             Finish(ChordCaptureEvent::Canceled);
             return ChordCaptureEvent::Canceled;
@@ -445,6 +460,17 @@ ChordCaptureEvent ChordCapture::Update()
 ImGuiID ActiveChordCaptureOwner()
 {
     return Capture().owner;
+}
+
+void ResetChordCaptureState()
+{
+    CaptureState& state = Capture();
+    state.owner = 0;
+    state.options = {};
+    state.frame = -1;
+    // A ChordCapture that outlives the restart (kept by the host) is older than every session
+    // from now on: its next Update returns Canceled.
+    ++state.generation;
 }
 
 void ChordCaptureNewFrame()

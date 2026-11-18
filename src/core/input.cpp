@@ -785,6 +785,8 @@ void InputEndFrame()
 void InputShutdown()
 {
     Shortcuts().inFrame = false;
+    Flips() = {};
+    ResetChordCaptureState();
 }
 
 } // namespace
