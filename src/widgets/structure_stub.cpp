@@ -12,8 +12,8 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "facet/widgets/common.h"
+#include "internal/planned_widget.h"
 #include "internal/scope_stack.h"
-#include "internal/text_util.h"
 
 namespace facet::internal
 {
@@ -64,31 +64,13 @@ void ComposeText(const char* widget, const char* label, char* out, std::size_t o
         std::snprintf(out, outSize, "%s: planned", widget);
 }
 
-bool Disabled()
-{
-    return (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
-}
-
 // Draws the placeholder text into `box`, inset by spacing.sm on both sides, vertically
-// centered in the first `lineHeight` pixels of the box, truncated with an ellipsis.
+// centered in the first `lineHeight` pixels of the box, shortened to what fits.
 void DrawStubText(ImDrawList* drawList, const ImRect& box, float lineHeight, const char* widget, const char* label)
 {
-    const Theme& theme = T();
-    char text[160];
-    ComposeText(widget, label, text, sizeof(text));
-
-    PushTextStyle(TextStyle::Footnote);
-    const float inset = Px(theme.spacing.sm);
-    char shown[160];
-    TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), text, nullptr, box.GetWidth() - 2.0f * inset,
-                 TruncateMode::End, shown, sizeof(shown));
-    if (shown[0] != '\0')
-    {
-        const ImVec4& color = Disabled() ? theme.colors.labelTertiary : theme.colors.labelSecondary;
-        const ImVec2 at(box.Min.x + inset, CenteredTextY(box.Min.y, lineHeight));
-        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, ToU32(color), shown);
-    }
-    PopTextStyle();
+    // The caption every planned widget shares, on the first `lineHeight` pixels of the box.
+    DrawPlannedCaption(drawList, ImRect(box.Min, ImVec2(box.Max.x, box.Min.y + lineHeight)), widget, label,
+                       ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(box.Min, box.Max));
 }
 
 // A dashed hairline rectangle with square corners: dashes and gaps of spacing.xs. Rounded,

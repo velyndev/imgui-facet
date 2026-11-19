@@ -8,10 +8,10 @@
 //
 // The placeholder is one Dear ImGui item under the widget's id, not interactive and not a Tab
 // stop, so a page of stubs never looks or acts like working controls. It draws the faintest
-// fill wash with a hairline outline in the separator color, and the text "<Widget>: planned
-// (<visible label>)" in Footnote and labelSecondary (labelTertiary inside BeginDisabled). When
-// the box is too narrow the label part is dropped first, then the widget name, then the word
-// "planned" is shortened with an ellipsis; hovering the box shows the whole text in a tooltip.
+// fill wash with a hairline outline in the separator color, and the caption every planned
+// widget shares (internal::DrawPlannedCaption in src/internal/planned_widget.h): "<Widget>:
+// planned (<visible label>)", shortened to what fits as described there; hovering the box
+// shows the whole text in a tooltip.
 //
 // Usage in a stub:
 //
@@ -40,7 +40,7 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "facet/widgets/common.h"
-#include "internal/text_util.h"
+#include "internal/planned_widget.h"
 
 namespace facet::internal::controls
 {
@@ -183,37 +183,12 @@ inline ImVec2 StubPadSize(float widthUnits, float heightUnits)
     return ImVec2(width, heightUnits > 0.0f ? Px(heightUnits) : width);
 }
 
-inline constexpr int kStubCaptionSize = 192;
+inline constexpr int kStubCaptionSize = kPlannedCaptionSize;
 
-// Writes the placeholder text for a box `room` pixels wide, measured in the current font: the
-// longest of "<widget>: planned (<visible label>)", "<widget>: planned" and "planned" that fits,
-// or "planned" shortened with an ellipsis. The name goes before the word "planned", because that
-// word is what tells a placeholder from a control; the tooltip still shows the whole text.
-// Empty when `room` is 0 or less or not even the ellipsis fits. `out` is always zero terminated
-// (outSize > 0). Returns true when anything had to be left out.
+// The placeholder text for a box `room` pixels wide (internal::PlannedCaption).
 inline bool StubCaption(const char* widget, const char* label, float room, char* out, std::size_t outSize)
 {
-    if (outSize == 0)
-        return false;
-    out[0] = '\0';
-    if (room <= 0.0f || !StubCanDraw())
-        return true;
-    if (widget == nullptr)
-        widget = "";
-    if (label == nullptr)
-        label = "";
-    const char* labelEnd = ImGui::FindRenderedTextEnd(label);
-    if (labelEnd > label)
-    {
-        std::snprintf(out, outSize, "%s: planned (%.*s)", widget, static_cast<int>(labelEnd - label), label);
-        if (ImGui::CalcTextSize(out).x <= room)
-            return false;
-    }
-    std::snprintf(out, outSize, "%s: planned", widget);
-    if (ImGui::CalcTextSize(out).x <= room)
-        return labelEnd > label;
-    TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), "planned", nullptr, room, TruncateMode::End, out, outSize);
-    return true;
+    return PlannedCaption(widget, label, room, out, outSize);
 }
 
 // Draws the placeholder look into `box` (pixels): the fill wash, the hairline outline and the
@@ -221,46 +196,12 @@ inline bool StubCaption(const char* widget, const char* label, float room, char*
 // Submits no item; ControlStub and MessageStub decide what the box is.
 inline void DrawStub(const ImRect& box, const char* widget, const char* label, bool hovered)
 {
-    if (label == nullptr)
-        label = "";
-    if (widget == nullptr)
-        widget = "";
     const Theme& theme = T();
-    const float width = box.GetWidth();
-    const float height = box.GetHeight();
-    const bool disabled = (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
-
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float radius = Px(theme.radii.control);
     FillRect(drawList, box.Min, box.Max, ToU32(theme.colors.fill[3]), radius);
     StrokeRect(drawList, box.Min, box.Max, ToU32(theme.colors.separator), radius, HairlineThickness());
-
-    PushTextStyle(TextStyle::Footnote);
-    const float inset = Px(theme.spacing.sm);
-    const float room = width - 2.0f * inset;
-    char text[kStubCaptionSize];
-    const bool shortened = StubCaption(widget, label, room, text, sizeof(text));
-    if (text[0] != '\0')
-    {
-        const ImVec4& color = disabled ? theme.colors.labelTertiary : theme.colors.labelSecondary;
-        const float textHeight = ImGui::GetTextLineHeight();
-        // One line of text centered in a single-line box, or at the top of a taller one.
-        const float lineBox = height < 2.0f * textHeight + 2.0f * inset ? height : textHeight + 2.0f * inset;
-        drawList->PushClipRect(box.Min, box.Max, true);
-        drawList->AddText(ImVec2(box.Min.x + inset, CenteredTextY(box.Min.y, lineBox)), ToU32(color), text);
-        drawList->PopClipRect();
-    }
-    PopTextStyle();
-
-    // The whole text in a tooltip when the box had to shorten it.
-    if (shortened && hovered)
-    {
-        const char* labelEnd = ImGui::FindRenderedTextEnd(label);
-        if (labelEnd > label)
-            ImGui::SetTooltip("%s: planned (%.*s)", widget, static_cast<int>(labelEnd - label), label);
-        else
-            ImGui::SetTooltip("%s: planned", widget);
-    }
+    DrawPlannedCaption(drawList, box, widget, label, hovered);
 }
 
 // Submits the placeholder item of `widget` (the public function name) with the id of `label`

@@ -247,9 +247,12 @@ The dose caps in Direction apply. The choices behind each effect:
   with a separator hairline in the control radius; structure widgets (lists, navigation,
   containers, layout, overlays) draw a dashed separator hairline with square corners, so a
   container placeholder reads as a frame around the caller's content.
-- **Narrow placeholders.** A narrow controls placeholder drops the label part first, then the
-  widget name, before the word "planned" is shortened, so the box still says that it is a
-  placeholder.
+- **Placeholder captions.** Every placeholder group shares one caption rule: a box too narrow
+  for "Name: planned (label)" shows "Name: planned", then the label alone, then the widget name,
+  then the label shortened with an ellipsis, and the whole text on hover. The label comes
+  before the name because boxes side by side in a row differ by their labels, while the box
+  look and the row already say that the widget is planned. The caption sits on the first line
+  of a tall box, level with the row label beside it.
 - **Field messages.** The FieldValidation placeholder is spacing.xs taller than its text, so its
   hairline never crosses the text.
 - **Placeholder sizes.** Pads, cell rows and the inline calendar shrink to the available width

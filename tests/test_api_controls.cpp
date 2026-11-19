@@ -4,6 +4,7 @@
 // stacks as it found them, returns the neutral result and writes nothing. Also the placeholder
 // helper the stubs share (src/widgets/controls_stub.h).
 
+#include <algorithm>
 #include <array>
 #include <cfloat>
 #include <concepts>
@@ -22,6 +23,7 @@
 
 #include "support/options_check.h"
 #include "support/session.h"
+#include "internal/planned_widget.h"
 #include "widgets/controls_stub.h"
 
 namespace
@@ -865,51 +867,100 @@ TEST_CASE("AnglePicker fits a short row and follows the width rules")
     CHECK(radians == 0.5f);
 }
 
-TEST_CASE("The placeholder text drops the label, then the name, and keeps the word planned")
+TEST_CASE("The placeholder text keeps what tells boxes apart: the label, then the widget name")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     std::string wide;
     std::string medium;
-    std::string narrow;
+    std::string label;
     std::string tiny;
     std::string none;
+    std::string name;
+    std::string nameTiny;
     bool shortened[5] = {};
     session.SetUi([&] {
         namespace stub = facet::internal::controls;
         facet::PushTextStyle(facet::TextStyle::Footnote);
         char text[stub::kStubCaptionSize];
-        const float fullWidth = ImGui::CalcTextSize("RangeSlider: planned (Price)").x;
+        const float fullWidth = ImGui::CalcTextSize("RangeSlider: planned (Destructive)").x;
         const float shortWidth = ImGui::CalcTextSize("RangeSlider: planned").x;
-        const float wordWidth = ImGui::CalcTextSize("planned").x;
-        shortened[0] = stub::StubCaption("RangeSlider", "Price##range", fullWidth + 1.0f, text, sizeof(text));
+        const float labelWidth = ImGui::CalcTextSize("Destructive").x;
+        const float nameWidth = ImGui::CalcTextSize("RangeSlider").x;
+        shortened[0] = stub::StubCaption("RangeSlider", "Destructive##range", fullWidth + 1.0f, text, sizeof(text));
         wide = text;
-        shortened[1] = stub::StubCaption("RangeSlider", "Price##range", shortWidth + 1.0f, text, sizeof(text));
+        shortened[1] = stub::StubCaption("RangeSlider", "Destructive##range", shortWidth + 1.0f, text, sizeof(text));
         medium = text;
-        // Room for the word but not for the name: the word stays, the name goes.
-        shortened[2] = stub::StubCaption("RangeSlider", "Price##range", wordWidth + 1.0f, text, sizeof(text));
-        narrow = text;
-        shortened[3] = stub::StubCaption("RangeSlider", "Price##range", wordWidth * 0.6f, text, sizeof(text));
+        // No room for "planned": the label alone, so boxes side by side stay distinct.
+        shortened[2] = stub::StubCaption("RangeSlider", "Destructive##range", labelWidth + 1.0f, text, sizeof(text));
+        label = text;
+        shortened[3] = stub::StubCaption("RangeSlider", "Destructive##range", labelWidth * 0.6f, text, sizeof(text));
         tiny = text;
-        shortened[4] = stub::StubCaption("RangeSlider", "Price##range", 0.0f, text, sizeof(text));
+        shortened[4] = stub::StubCaption("RangeSlider", "Destructive##range", 0.0f, text, sizeof(text));
         none = text;
+        // Without a visible label: the widget name, then the name shortened.
+        stub::StubCaption("RangeSlider", "##range", nameWidth + 1.0f, text, sizeof(text));
+        name = text;
+        stub::StubCaption("RangeSlider", "##range", nameWidth * 0.6f, text, sizeof(text));
+        nameTiny = text;
         facet::PopTextStyle();
     });
     session.Frame();
 
-    CHECK(wide == "RangeSlider: planned (Price)");
+    CHECK(wide == "RangeSlider: planned (Destructive)");
     CHECK(medium == "RangeSlider: planned");
-    CHECK(narrow == "planned");
-    // Narrower than the word: its start with the ellipsis, never a cut-off widget name.
+    CHECK(label == "Destructive");
     CHECK(tiny.size() > 0);
-    CHECK(tiny.compare(0, 2, "pl") == 0);
-    CHECK(tiny.find("Ran") == std::string::npos);
+    CHECK(tiny.compare(0, 3, "Des") == 0);
+    CHECK(tiny.size() < std::string("Destructive").size());
     CHECK(none.empty());
+    CHECK(name == "RangeSlider");
+    CHECK(nameTiny.compare(0, 3, "Ran") == 0);
+    CHECK(nameTiny.size() < std::string("RangeSlider").size());
     CHECK_FALSE(shortened[0]);
     CHECK(shortened[1]);
     CHECK(shortened[2]);
     CHECK(shortened[3]);
     CHECK(shortened[4]);
+}
+
+TEST_CASE("Every placeholder group shortens its caption with the shared rule and keeps it on the first line")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetTheme(facet::Theme::Light(), false);
+    float textRight = 0.0f;
+    float textTop = 0.0f;
+    float boxTop = 0.0f;
+    float boxRight = 0.0f;
+    session.SetUi([&] {
+        // A narrow, tall content placeholder: its caption may not run past the box and sits on
+        // the first line.
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const int from = drawList->VtxBuffer.Size;
+        facet::internal::PlannedWidget("ImageView", "Placeholder image##view", 100.0f, 120.0f);
+        boxTop = pos.y;
+        boxRight = pos.x + 100.0f;
+        float top = 1e9f;
+        float right = -1e9f;
+        // The box is drawn first (fill and hairline); the caption glyphs come after them.
+        const ImU32 caption = facet::ToU32(facet::T().colors.labelSecondary);
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        {
+            const ImDrawVert& v = drawList->VtxBuffer[i];
+            if (v.col != caption)
+                continue;
+            top = std::min(top, v.pos.y);
+            right = std::max(right, v.pos.x);
+        }
+        textTop = top;
+        textRight = right;
+    });
+    session.Frame();
+    const float line = facet::ControlHeight(facet::ControlSize::Small);
+    CHECK(textTop < boxTop + line);
+    CHECK(textRight <= boxRight - facet::Px(facet::T().spacing.sm) + 0.5f);
 }
 
 TEST_CASE("FieldValidation sits under the validated item and keeps it as the last item")
