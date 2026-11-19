@@ -49,6 +49,9 @@ constexpr float kSpinnerStrokeShare = 0.125f;
 constexpr int kTextFieldRequestSlots = 8;
 constexpr int kTextFieldRequestFrames = 2;
 
+// How far, in ems, glyphs must reach left of the text area to count as text continuing there.
+constexpr float kFadeOverflowEm = 0.5f;
+
 // The bullet that stands for one masked character.
 constexpr ImWchar kMaskBullet = 0x2022;
 
@@ -538,7 +541,9 @@ void FadeTextFieldEdges(ImDrawList* drawList, int vertexStart, float left, float
     }
     if (minX == FLT_MAX)
         return;
-    fadeLeft = fadeLeft || minX < left - 0.5f;
+    // Glyph quads reach a pixel or so past their pen position; text that really starts before
+    // the area (scrolled, or right-aligned and longer) reaches further.
+    fadeLeft = fadeLeft || minX < left - ImGui::GetFontSize() * kFadeOverflowEm;
     fadeRight = fadeRight || maxX > right - 0.5f;
     if (!fadeLeft && !fadeRight)
         return;

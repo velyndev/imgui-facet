@@ -34,7 +34,8 @@
 //    the field shows the value again when the edit ends.
 //    Stepping writes at once, through the value drag core (value_drag.h): Up and Down while the
 //    field has the keyboard (Shift a tenth of a step for non-integer fields, Ctrl or Page Up and
-//    Down stepFast), the mouse wheel over the field while it has the keyboard or Alt is held, and
+//    Down stepFast), the mouse wheel over the field while it has the keyboard (in drag mode while
+//    it is focused or Alt is held, as the value drag core does), and
 //    the optional - and + steppers at the end (held: repeating; named by Strings::decrease and
 //    Strings::increase; not Tab stops). A step while typing starts from the typed number when it
 //    parses. Escape restores the value from the start of the edit, steps included, and reports a

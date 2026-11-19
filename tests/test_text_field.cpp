@@ -1407,3 +1407,44 @@ TEST_CASE("Text field: a read-only field reports caret and selection in the fram
     CHECK(rects == 1);
     CHECK(field.result.caret.Min.x > field.result.text.Min.x);
 }
+TEST_CASE("Text field: text that continues past an edge fades out there, and only glyphs fade")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestField field;
+    field.text = "a sample line that is much longer than the narrow field it is shown in";
+    field.params.width = 120.0f;
+    float rightAlpha = -1.0f;
+    float leftAlpha = -1.0f;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int before = drawList->VtxBuffer.Size;
+        field.Run("##fade");
+        // The lowest glyph alpha in the last and the first few pixels of the text area.
+        // Text glyphs only: textured and in the label color (the frame's rounded corners are
+        // textured too, in a fill color).
+        const ImVec2 white = drawList->_Data->TexUvWhitePixel;
+        const ImU32 textRgb = facet::ToU32(facet::T().colors.label) & ~IM_COL32_A_MASK;
+        rightAlpha = leftAlpha = 1.0f;
+        for (int i = before; i < drawList->VtxBuffer.Size; ++i)
+        {
+            const ImDrawVert& v = drawList->VtxBuffer[i];
+            if ((v.uv.x == white.x && v.uv.y == white.y) || (v.col & ~IM_COL32_A_MASK) != textRgb)
+                continue;
+            const float alpha = static_cast<float>((v.col >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+            if (v.pos.x > field.result.text.Max.x - 3.0f && v.pos.x <= field.result.text.Max.x + 1.0f)
+                rightAlpha = std::min(rightAlpha, alpha);
+            // Scrolled glyphs reach left of the area (clipped there), so the window starts before it.
+            if (v.pos.x >= field.result.text.Min.x - 20.0f && v.pos.x < field.result.text.Min.x + 3.0f)
+                leftAlpha = std::min(leftAlpha, alpha);
+        }
+    });
+    session.Frame();
+    CHECK(rightAlpha < 0.3f);  // continues on the right: faded
+    CHECK(leftAlpha > 0.9f);   // starts at the left edge: not faded
+    // With the caret at the end the text scrolls: now it continues on the left.
+    session.Click(field.TextPoint());
+    session.KeyPress(ImGuiKey_End);
+    session.Frame();
+    CHECK(leftAlpha < 0.3f);
+}
