@@ -38,6 +38,7 @@ enum CaptureState
     kDefault,
     kHovered,
     kFocused,
+    kLower,
 };
 
 constexpr int kVirtualRows = 1000000;
@@ -254,7 +255,7 @@ void MultiList(facet::demo::PageCtx& ctx)
     desc.boxSelect = true;
     desc.entry = &MultiEntry;
     desc.fadeSurface = t.colors.bgSecondary;
-    ForceRow(ctx, 2);
+    ForceRow(ctx, 3);
     if (fi::BeginListView(ImGui::GetID("multi"), desc))
     {
         facet::RowRange rows;
@@ -524,7 +525,8 @@ int SelectedIds(char* out, size_t size)
 
 } // namespace
 
-FACET_DEMO_PAGE("list-core", "List core", "Blocks", 130, "default", "row hovered", "keyboard focus")
+FACET_DEMO_PAGE("list-core", "List core", "Blocks", 130, "default", "row hovered", "keyboard focus",
+                "tree and states")
 {
     // Every captured look starts from one known selection.
     if (!page.initialized || (ctx.capture && ctx.captureState != page.preparedState))
@@ -552,7 +554,7 @@ FACET_DEMO_PAGE("list-core", "List core", "Blocks", 130, "default", "row hovered
     else
         Note("Rows submitted this frame: %d of %d, built in %.0f us (measured this frame).", page.virtualSubmitted,
              kVirtualRows, page.virtualMicros);
-    Note("Selected: %d rows. Ctrl+A selects all of them; a drag from a row selects the rows it covers.",
+    Note("Selected rows: %d. Ctrl+A selects all of them; a drag from a row selects the rows it covers.",
          page.virtualSelection.Size);
 
     SectionHeader("Multiple selection");
@@ -581,6 +583,8 @@ FACET_DEMO_PAGE("list-core", "List core", "Blocks", 130, "default", "row hovered
 
     SectionHeader("Tree");
     Tree(ctx);
+    if (ctx.capture && ctx.captureState == kLower)
+        ctx.RevealInCapture(0.45f);
     Note("The groups, pages and capture states of this gallery. Right opens and enters, Left closes and goes to the "
          "parent. Selected nodes: %d.",
          page.treeSelection.Size);

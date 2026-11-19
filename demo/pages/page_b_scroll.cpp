@@ -232,8 +232,9 @@ void BothAxes(facet::demo::PageCtx& ctx)
             for (int column = 0; column < kGridColumns; ++column)
             {
                 std::snprintf(text, sizeof(text), "%d, %d", row + 1, column + 1);
+                const float line = ImGui::GetTextLineHeightWithSpacing();
                 ImGui::SetCursorScreenPos(ImVec2(origin.x + cell * static_cast<float>(column),
-                                                 origin.y + ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(row)));
+                                                 origin.y + line * static_cast<float>(row)));
                 ImGui::TextUnformatted(text);
             }
         }
@@ -325,7 +326,7 @@ FACET_DEMO_PAGE("scroll", "Scroll", "Blocks", 120, "default", "bar hovered", "th
 
     SectionHeader("Long page with edge fades");
     LongPage(ctx);
-    if (ctx.capture && ctx.captureState != kDefault)
+    if (ctx.capture && (ctx.captureState == kHovered || ctx.captureState == kDragging))
         ctx.RevealInCapture(0.5f);
     Note("Offset %.0f of %.0f px%s. Tab reaches the prototype buttons inside; the area follows the focus. %s",
          static_cast<double>(page.longScroll), static_cast<double>(page.longMax), page.longScrolling ? ", moving" : "",
@@ -345,6 +346,8 @@ FACET_DEMO_PAGE("scroll", "Scroll", "Blocks", 120, "default", "bar hovered", "th
 
     SectionHeader("Edge fades on every surface");
     Surfaces(ctx);
+    if (ctx.capture && ctx.captureState == kScrolled)
+        ctx.RevealInCapture(0.5f);
     Note("Each fade blends into the surface under its area, so it reads as content running out of sight on every "
          "surface token in both themes.");
 
