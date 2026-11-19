@@ -871,9 +871,11 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, scrollbarSize);
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, Px(t.radii.element));
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarPadding, Px(t.scroll.barInset));
-        // Facet picks the disabled colors itself, so the alpha of BeginDisabled is undone.
-        if (disabled)
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, g.DisabledAlphaBackup);
+        // Facet picks the disabled colors itself, so the factor BeginDisabled applied to the alpha
+        // (once, however deep the nesting) is undone, and an alpha the host pushed inside it stays.
+        // A disabled flag pushed without BeginDisabled changed no alpha, so none is pushed then.
+        if (disabled && g.DisabledStackSize > 0 && g.Style.DisabledAlpha > 0.0f)
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImMin(1.0f, g.Style.Alpha / g.Style.DisabledAlpha));
         g.Style.InputTextCursorSize = caretWidth;
         if (hooks.liveEdit >= 0)
             ImGui::PushItemFlag(ImGuiItemFlags_LiveEditOnInputText, hooks.liveEdit != 0);

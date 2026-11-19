@@ -2,6 +2,7 @@
 // editing that stays Dear ImGui's, the buffers, the edit sessions, the adornments, the geometry
 // for other blocks, the requests, number parsing and formatting, and the number field.
 
+#include <algorithm>
 #include <atomic>
 #include <cfloat>
 #include <clocale>
@@ -443,6 +444,72 @@ TEST_CASE("Text field: a char buffer cuts the text to fit and stays zero termina
     session.Type("abcdefghij");
     CHECK(std::string(buffer) == "abcde");
     CHECK(buffer[5] == 0);
+}
+
+namespace
+{
+
+// The highest vertex alpha drawn strictly inside `rect` in the session window's draw list, and how
+// many such vertices there are: the glyphs of a field's text.
+int TextVertexAlpha(const ImRect& rect, int* count)
+{
+    const ImGuiWindow* window = ImGui::FindWindowByName("test");
+    int best = 0;
+    *count = 0;
+    if (window == nullptr)
+        return 0;
+    for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+    {
+        if (vertex.pos.x <= rect.Min.x || vertex.pos.x >= rect.Max.x || vertex.pos.y <= rect.Min.y ||
+            vertex.pos.y >= rect.Max.y)
+            continue;
+        const int alpha = static_cast<int>((vertex.col >> IM_COL32_A_SHIFT) & 0xFF);
+        if (alpha > 0)
+            ++*count;
+        best = std::max(best, alpha);
+    }
+    return best;
+}
+
+} // namespace
+
+TEST_CASE("Text field: a disabled field draws its text whether the flag comes from BeginDisabled or not")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text = "Sample";
+    TextFieldResult result;
+    int mode = 0;  // 0: a pushed item flag, 1: BeginDisabled, 2: BeginDisabled and a host alpha of half
+    session.SetUi([&] {
+        if (mode == 0)
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        else
+            ImGui::BeginDisabled();
+        if (mode == 2)
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+        result = TextFieldBehavior("##disabled", &text);
+        if (mode == 2)
+            ImGui::PopStyleVar();
+        if (mode == 0)
+            ImGui::PopItemFlag();
+        else
+            ImGui::EndDisabled();
+    });
+    int count = 0;
+    session.Frames(2);
+    const int pushedFlag = TextVertexAlpha(result.text, &count);
+    CHECK(count > 0);
+    CHECK(pushedFlag > 0);
+    mode = 1;
+    session.Frames(2);
+    const int disabled = TextVertexAlpha(result.text, &count);
+    CHECK(count > 0);
+    CHECK(disabled == pushedFlag);
+    mode = 2;
+    session.Frames(2);
+    const int halved = TextVertexAlpha(result.text, &count);
+    CHECK(count > 0);
+    CHECK(halved == doctest::Approx(disabled * 0.5).epsilon(0.05));
 }
 
 TEST_CASE("Text field: a zero-size or null buffer shows an empty read-only field")
