@@ -7,8 +7,12 @@ control size stack, the edit session queries and the built-in strings). Every de
 follows [the API conventions](api-conventions.md).
 
 **Status: planned.** No widget is implemented yet. Every family header declares its widgets
-with documentation comments, and every declared function links: its body draws a placeholder
-at the widget's default size ("Name: planned"), returns the neutral result and writes nothing.
+with documentation comments, and every declared function links. A widget function draws a
+placeholder at the widget's default size ("Name: planned"), returns the neutral result and
+writes nothing; End functions, queries and helpers such as `PassesFilter` draw nothing and
+return neutral values. The exceptions: `ApplyReorderMove` works, the built-in strings and the
+edit session queries in `common.h` work, and the `BeginDataTable` placeholder opens a plain
+Dear ImGui table so the caller's cells land in it.
 The widgets themselves are built in Phase 2. Each family page under `docs/widgets/` gives the
 status of every entry. The demo gallery has one page per family under
 Widgets.

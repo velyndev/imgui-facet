@@ -5,9 +5,13 @@ a consistent set of custom widgets, a light and a dark theme, icon rendering and
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
 **Status: early development.** No Facet widget is implemented yet. The fourteen widget family
-headers in `include/facet/widgets/` declare the planned widgets with documentation comments;
-every declared function links and draws a placeholder that says "planned", returns the neutral
-result and writes nothing (see `docs/widgets.md` and the family pages under `docs/widgets/`).
+headers in `include/facet/widgets/` declare the planned widgets with documentation comments,
+and every declared function links. Each widget function draws a placeholder that says
+"planned", returns the neutral result and writes nothing; End functions, queries and helpers
+such as `PassesFilter` draw nothing and return neutral values. The exceptions: `ApplyReorderMove`
+works, the built-in strings and the edit session queries in `common.h` work, and the
+`BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it (see
+`docs/widgets.md` and the family pages under `docs/widgets/`).
 The building blocks the widgets will be made of exist inside the library. What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
@@ -99,8 +103,9 @@ The building blocks the widgets will be made of exist inside the library. What e
     - Fuzzy matching: the built-in icon names ranked as you type, with the matched letters
       highlighted, an empty state, and the time one key press takes over 10000 generated
       names.
-    - Keys and shortcuts: chord capture, three registered shortcuts in different scopes, a
-      conflict message, and one key bind per mode with a live indicator.
+    - Keys and shortcuts: chord capture, three registered shortcuts (two global, one bound to
+      the page's window, one of them a plain letter that a text field keeps), a conflict
+      message, and one key bind per mode with a live indicator.
     - Chart core: generated functions with nice ticks, a crosshair that follows the mouse or
       the arrow keys after Tab, a logarithmic axis, a 100000 sample series drawn through
       decimation, the series colors with their contrast, and an empty state.
