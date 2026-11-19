@@ -8,7 +8,8 @@
 // widgets open them and drive their selection through it. The rows themselves (placement, look,
 // keyboard, typeahead, the selection pill, data states) and trees are in list_view.h, built on
 // this file and the scroll core; DataTable and ItemGrid, whose rows are table rows and tiles, use
-// the two pairs below directly.
+// the two pairs below directly and run their rows through the row block of list_view.h
+// (ListRowGroup, ListJumpToEnd, ListTypeahead), so they look and behave like list rows.
 //
 // Row ranges: a container opens them before its row loop and closes them after it; the caller's
 // loop in between is the one facet::NextVisibleRows documents:

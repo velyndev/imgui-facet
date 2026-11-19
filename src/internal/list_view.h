@@ -4,7 +4,8 @@
 // row ranges and selection of list_core.h, the scroll area of scroll.h and the item behaviour,
 // focus ring and selection pill blocks. ListBox, SelectableList, VirtualList, LogView and the
 // open lists of Dropdown, MultiDropdown and Autocomplete use BeginListView; TreeView,
-// CheckboxTree and LayerList use BeginListTree.
+// CheckboxTree and LayerList use BeginListTree; DataTable, ItemGrid and other containers that
+// place their own rows use the row block (ListRowGroup) further down.
 //
 //     ListViewDesc desc{.rowCount = count, .size = options.size, .selection = selection,
 //                       .entry = &EntryOf, .user = &items, .state = options.state};
@@ -147,6 +148,103 @@ ListViewResult EndListView();
 // single character, or of one character repeated, starts after `from` (so typing it again moves
 // on); a longer text starts at `from`. -1 when nothing matches or `typed` is empty.
 int ListTypeaheadFind(const char* typed, int count, int from, ListEntryFn entry, void* user);
+
+// ---- Row block ------------------------------------------------------------------------------------
+//
+// The rows, keys and typeahead of the view on their own, for containers that place their rows
+// themselves: DataTable rows in a Dear ImGui table, ItemGrid tiles, LogView lines. Such a
+// container opens BeginListRows and BeginListSelection (list_core.h) itself and runs every row
+// through one ListRowGroup, so its rows look and behave as a list view's: the hover and selection
+// fills, no hover while the area scrolls, the focus ring drawn over every row, Home and End to the
+// first and last enabled entry with Shift ranges (ListJumpToEnd), and typeahead (ListTypeahead).
+//
+//     ListRowGroup group;
+//     group.Begin(focused);                      // the list holds the keyboard focus
+//     RowRange rows;
+//     while (NextListRows(&rows))
+//         for (int i = rows.first; i < rows.last; ++i)
+//         {
+//             const ListRowState row = group.Row(RowIdOf(i), RowRectOf(i),
+//                                                {.selection = i, .selected = IsListEntrySelected(sel, i)});
+//             ... draw the cells inside row.content ...
+//         }
+//     group.End();                               // the focus ring of the focused row
+
+// The typed text of a list and its search, as the view and the tree keep it under their id.
+struct ListTypeahead
+{
+    static constexpr int kCapacity = 64;
+    char text[kCapacity] = {};
+    int length = 0;
+    double time = -1.0e9;
+
+    // Adds this frame's typed characters (call while the list has focus). A pause of
+    // list.typeaheadTimeout starts a new text; a space counts only inside a text, so Space alone
+    // still activates the focused row. Returns true when the text changed.
+    bool Update();
+    // ListTypeaheadFind with the text gathered so far.
+    int Find(int count, int from, ListEntryFn entry, void* user) const;
+};
+
+struct ListRowDesc
+{
+    // The entry's selection data (usually its index) inside a selection scope (BeginListSelection
+    // or ImGui::BeginMultiSelect): the row then runs Dear ImGui's multi-select hooks. Invalid
+    // outside one.
+    ImGuiSelectionUserData selection = ImGuiSelectionUserData_Invalid;
+    bool selected = false;     // shown selected (inside a scope, a request of this frame may change it)
+    bool disabled = false;     // shown, not focusable, skipped by the arrows
+    bool tabStop = false;      // the row Tab lands on (one per list)
+    float indent = 0.0f;       // pixels before row.content (a tree depth)
+    int part = -1;             // the part of the group's forced state this row answers to (captures)
+};
+
+// The rows of one list in one window, between Begin and End.
+class ListRowGroup
+{
+public:
+    // `listFocused`: the list holds the keyboard focus (selected rows are accentSubtle, else
+    // fill[1]). `forced`: a capture's forced state (TakeForcedItemState), applied to the row whose
+    // part matches; null for none.
+    void Begin(bool listFocused, const ForcedItemRequest* forced = nullptr);
+    // Places row `id` at `rect` (screen pixels, the whole row), runs its item behaviour and the
+    // selection hooks, and draws its fill. The cursor is left at row.content on the row's line.
+    ListRowState Row(ImGuiID id, const ImRect& rect, const ListRowDesc& desc);
+    // Draws the focus ring of the focused row over every row.
+    void End();
+
+private:
+    ImGuiWindow* window = nullptr;
+    const ForcedItemRequest* forced = nullptr;
+    bool listFocused = false;
+    bool hasRing = false;
+    ItemState ring;
+};
+
+struct ListJumpDesc
+{
+    int rowCount = 0;
+    ListSelection* selection = nullptr;  // the list's multiple selection; null for none
+    bool single = false;
+    bool readOnly = false;
+    ListEntryFn entry = nullptr;         // disabled entries are skipped
+    void* user = nullptr;
+    ImGuiID focusScope = 0;              // the selection scope (the id stack top at BeginListSelection)
+    int focusIndex = -1;                 // the focused entry: the range start when Dear ImGui has none
+};
+
+// Home (`end` false) and End for a list that places its own rows: the first or last enabled
+// entry, -1 when there is none. With Shift held and a multiple selection the selection becomes the
+// range from the range start to it (Ctrl keeps the rest), as navigation would; otherwise a
+// multiple selection holds only it, as after a plain arrow key. *changed (may be null) tells
+// whether the selection changed. The caller moves the focus there (ListFocusRow) and scrolls the
+// row into view. Owners read Home and End themselves: Dear ImGui's navigation measures the ends in
+// float window coordinates, which lose whole rows at the end of a million rows.
+int ListJumpToEnd(const ListJumpDesc& desc, bool end, bool* changed);
+
+// Moves the keyboard focus to row `id` of `focusScope` at `rect` (screen pixels) in `window`,
+// also when the row is not submitted this frame, as navigation would, and shows the focus ring.
+void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImRect& rect);
 
 // ---- Trees ----------------------------------------------------------------------------------------
 

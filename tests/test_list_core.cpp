@@ -995,3 +995,163 @@ TEST_CASE("List selection: a grid wraps the arrows at the end of a line")
     CHECK(selection.Size == 1);
     CHECK(selection.Contains(3));
 }
+
+// ---- Row block ------------------------------------------------------------------------------------
+
+namespace
+{
+
+// A two-column Dear ImGui table whose rows run through the row block, as DataTable will: row ranges
+// and selection from the list core, the look and keys from ListRowGroup, ListJumpToEnd and
+// ListTypeahead. Every tenth entry from the eighth on is named "Other", the rest "Entry".
+struct TableUi
+{
+    static constexpr int kRows = 60;
+    static constexpr float kRowHeight = 24.0f;
+    Items items;
+    fi::ListSelection selection;
+    fi::ListTypeahead typed;
+    int focusIndex = -1;
+    ImGuiWindow* window = nullptr;
+    ImGuiID scope = 0;
+    ImGuiID seed = 0;
+    double rowsTop = 0.0;
+    float rowsLeft = 0.0f;
+    float rowsRight = 0.0f;
+    bool focused = false;
+
+    TableUi()
+    {
+        char label[32];
+        for (int i = 0; i < kRows; ++i)
+        {
+            std::snprintf(label, sizeof(label), "%s %02d", i % 10 == 7 ? "Other" : "Entry", i);
+            items.labels.push_back(label);
+        }
+    }
+
+    ImGuiID RowId(int index) const { return ImHashData(&index, sizeof(index), seed); }
+    ImRect RowRect(int index) const
+    {
+        const float top = static_cast<float>(rowsTop + static_cast<double>(index) * kRowHeight);
+        return ImRect(rowsLeft, top, rowsRight, top + kRowHeight);
+    }
+    void FocusRow(int index)
+    {
+        fi::ListFocusRow(window, RowId(index), scope, RowRect(index));
+        fi::ScrollAreaRevealRect(window, RowRect(index), fi::ScrollAlign::Nearest, false);
+        focusIndex = index;
+    }
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4.0f, 0.0f));
+        if (ImGui::BeginTable("table", 2, ImGuiTableFlags_ScrollY, ImVec2(300.0f, 200.0f)))
+        {
+            ImGuiContext& g = *GImGui;
+            window = ImGui::GetCurrentWindow();
+            seed = ImGui::GetID("rows");
+            scope = window->IDStack.back();
+            focused = g.NavId != 0 && g.NavWindow == window;
+            if (focused && typed.Update())
+            {
+                const int target = typed.Find(kRows, focusIndex, &ItemsEntry, &items);
+                if (target >= 0)
+                    FocusRow(target);
+            }
+            if (focused)
+            {
+                ImGui::SetKeyOwner(ImGuiKey_Home, seed);
+                ImGui::SetKeyOwner(ImGuiKey_End, seed);
+                const bool home = ImGui::IsKeyPressed(ImGuiKey_Home, ImGuiInputFlags_None, seed);
+                const bool end = ImGui::IsKeyPressed(ImGuiKey_End, ImGuiInputFlags_None, seed);
+                if (home != end)
+                {
+                    fi::ListJumpDesc jump;
+                    jump.rowCount = kRows;
+                    jump.selection = &selection;
+                    jump.entry = &ItemsEntry;
+                    jump.user = &items;
+                    jump.focusScope = scope;
+                    jump.focusIndex = focusIndex;
+                    const int target = fi::ListJumpToEnd(jump, end, nullptr);
+                    if (target >= 0)
+                        FocusRow(target);
+                }
+            }
+            fi::BeginListSelection(&selection, kRows);
+            fi::BeginListRows({.rowCount = kRows, .rowHeight = kRowHeight, .keepAlive = focusIndex});
+            fi::ListRowGroup group;
+            group.Begin(focused);
+            facet::RowRange rows;
+            char name[16];
+            while (fi::NextListRows(&rows))
+                for (int i = rows.first; i < rows.last; ++i)
+                {
+                    ImGui::TableNextRow(ImGuiTableRowFlags_None, kRowHeight);
+                    ImGui::TableSetColumnIndex(0);
+                    const ImVec2 at = ImGui::GetCursorScreenPos();
+                    const ImRect rect(at, ImVec2(at.x + ImGui::GetContentRegionAvail().x, at.y + kRowHeight));
+                    rowsTop = static_cast<double>(at.y) - static_cast<double>(i) * kRowHeight;
+                    rowsLeft = rect.Min.x;
+                    rowsRight = rect.Max.x;
+                    const fi::ListRowState row =
+                        group.Row(RowId(i), rect,
+                                  {.selection = i, .selected = fi::IsListEntrySelected(&selection, i),
+                                   .tabStop = i == std::max(focusIndex, 0)});
+                    if (row.focused)
+                        focusIndex = i;
+                    ImGui::TextUnformatted(items.labels[static_cast<size_t>(i)].c_str());
+                    std::snprintf(name, sizeof(name), "row%d", i);
+                    session.Track(name);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted("Placeholder");
+                }
+            group.End();
+            fi::EndListRows();
+            fi::EndListSelection();
+            ImGui::EndTable();
+        }
+        ImGui::PopStyleVar();
+    }
+};
+
+} // namespace
+
+TEST_CASE("Row block: a table runs its rows through the list look, Home and End and typeahead")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TableUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    // A click selects the row and gives it the keyboard focus.
+    session.Click(session.ItemCenter("row3"));
+    CHECK(ui.selection.Size == 1);
+    CHECK(ui.selection.Contains(3));
+    CHECK(ui.focused);
+    CHECK(ui.focusIndex == 3);
+    // End: the last row gets the focus and the selection and scrolls into view.
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(2);
+    CHECK(ui.focusIndex == TableUi::kRows - 1);
+    CHECK(GImGui->NavId == ui.RowId(TableUi::kRows - 1));
+    CHECK(ui.selection.Size == 1);
+    CHECK(ui.selection.Contains(TableUi::kRows - 1));
+    CHECK(session.ItemVisible("row59"));
+    // Shift+Home selects the range up to the first row.
+    session.KeyPress(ImGuiKey_Home | ImGuiMod_Shift);
+    session.Frames(2);
+    CHECK(ui.focusIndex == 0);
+    CHECK(ui.selection.Size == TableUi::kRows);
+    CHECK(session.ItemVisible("row0"));
+    // Typing jumps to the next row whose label starts with the text.
+    session.Type("o");
+    session.Frames(2);
+    CHECK(ui.focusIndex == 7);
+    CHECK(GImGui->NavId == ui.RowId(7));
+    session.Type("o");
+    session.Frames(2);
+    CHECK(ui.focusIndex == 17);
+}

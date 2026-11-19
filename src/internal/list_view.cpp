@@ -37,45 +37,13 @@ namespace facet::internal
 namespace
 {
 
-constexpr int kTypedCapacity = 64;
-
 // ---- Typeahead ------------------------------------------------------------------------------------
 
-struct TypeaheadState
-{
-    char text[kTypedCapacity] = {};
-    int length = 0;
-    double time = -1.0e9;
-};
+using TypeaheadState = ListTypeahead;
 
-// Adds this frame's typed characters. A pause of list.typeaheadTimeout starts a new text; a space
-// counts only inside a text, so Space alone still activates the focused row. Returns true when the
-// text changed.
 bool UpdateTypeahead(TypeaheadState& typed)
 {
-    const ImGuiIO& io = ImGui::GetIO();
-    if (io.InputQueueCharacters.Size == 0 || io.KeyCtrl || io.KeyAlt || io.KeySuper)
-        return false;
-    const double now = ImGui::GetTime();
-    if (now - typed.time > static_cast<double>(T().list.typeaheadTimeout))
-        typed.length = 0;
-    bool changed = false;
-    for (const ImWchar c : io.InputQueueCharacters)
-    {
-        if (c < 0x20 || c == 0x7F || (c == ' ' && typed.length == 0))
-            continue;
-        char utf8[5] = {};
-        const int bytes = ImTextCharToUtf8(utf8, c);
-        if (typed.length + bytes >= kTypedCapacity)
-            break;
-        std::memcpy(typed.text + typed.length, utf8, static_cast<size_t>(bytes));
-        typed.length += bytes;
-        changed = true;
-    }
-    typed.text[typed.length] = '\0';
-    if (changed)
-        typed.time = now;
-    return changed;
+    return typed.Update();
 }
 
 char FoldAscii(char c)
@@ -360,49 +328,29 @@ void MoveViewFocus(ViewFrame& frame, int target, bool animate)
     ScrollAreaRevealRect(frame.window, rect, ScrollAlign::Nearest, animate);
 }
 
-// Home and End. The view moves the focus itself: Dear ImGui's navigation measures the ends in
-// float window coordinates, which lose whole rows at the end of a million rows. Shift extends the
-// selection from the range start as navigation would, Ctrl keeps the rest of it.
+// Home and End, through the row block's ListJumpToEnd (see there why the view moves the focus
+// itself). A single choice follows the focus as after an arrow key.
 void JumpToEnd(ViewFrame& frame, bool end)
 {
     const ListViewDesc& desc = frame.desc;
-    const int step = end ? -1 : 1;
-    int target = end ? desc.rowCount - 1 : 0;
-    while (target >= 0 && target < desc.rowCount && EntryOf(desc, target).disabled)
-        target += step;
-    if (target < 0 || target >= desc.rowCount)
+    ListJumpDesc jump;
+    jump.rowCount = desc.rowCount;
+    jump.selection = frame.multi ? desc.selection : nullptr;
+    jump.single = desc.single;
+    jump.readOnly = desc.readOnly;
+    jump.entry = desc.entry;
+    jump.user = desc.user;
+    jump.focusScope = frame.focusScope;
+    jump.focusIndex = frame.state->focusIndex;
+    bool changed = false;
+    const int target = ListJumpToEnd(jump, end, &changed);
+    if (target < 0)
         return;
-    const ImGuiIO& io = ImGui::GetIO();
-    if (!frame.multi || !io.KeyShift || desc.single || desc.readOnly)
+    frame.changed |= changed;
+    if (!frame.multi && !desc.readOnly && desc.choice != nullptr && *desc.choice != target)
     {
-        MoveViewFocus(frame, target, false);
-        return;
-    }
-    ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(frame.focusScope);
-    ImS64 anchor = target;
-    if (multi != nullptr && multi->RangeSrcItem >= 0 && multi->RangeSrcItem < desc.rowCount)
-        anchor = multi->RangeSrcItem;
-    else if (frame.state->focusIndex >= 0)
-        anchor = frame.state->focusIndex;
-    static ImGuiMultiSelectIO requests;
-    requests.Requests.resize(0);
-    requests.ItemsCount = desc.rowCount;
-    if (!io.KeyCtrl)
-        requests.Requests.push_back({ImGuiSelectionRequestType_SetAll, false, 0, 0, 0});
-    ImGuiSelectionRequest range;
-    range.Type = ImGuiSelectionRequestType_SetRange;
-    range.Selected = true;
-    range.RangeDirection = static_cast<ImS8>(target >= anchor ? 1 : -1);
-    range.RangeFirstItem = std::min<ImS64>(anchor, target);
-    range.RangeLastItem = std::max<ImS64>(anchor, target);
-    requests.Requests.push_back(range);
-    const std::uint64_t before = ListSelectionFingerprint(*desc.selection);
-    ApplyListRequests(desc.selection, &requests, desc.rowCount, desc.entry, desc.user);
-    frame.changed |= ListSelectionFingerprint(*desc.selection) != before;
-    if (multi != nullptr)
-    {
-        multi->RangeSrcItem = anchor;
-        multi->NavIdItem = target;
+        *desc.choice = target;
+        frame.changed = true;
     }
     const ListEntryInfo info = EntryOf(desc, target);
     const ImGuiID id = RowId(frame, KeyOf(desc, info, target));
@@ -661,6 +609,141 @@ int ListTypeaheadFind(const char* typed, int count, int from, ListEntryFn entry,
             return index;
     }
     return -1;
+}
+
+// ---- Row block ------------------------------------------------------------------------------------
+
+bool ListTypeahead::Update()
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.InputQueueCharacters.Size == 0 || io.KeyCtrl || io.KeyAlt || io.KeySuper)
+        return false;
+    const double now = ImGui::GetTime();
+    if (now - time > static_cast<double>(T().list.typeaheadTimeout))
+        length = 0;
+    bool changed = false;
+    for (const ImWchar c : io.InputQueueCharacters)
+    {
+        if (c < 0x20 || c == 0x7F || (c == ' ' && length == 0))
+            continue;
+        char utf8[5] = {};
+        const int bytes = ImTextCharToUtf8(utf8, c);
+        if (length + bytes >= kCapacity)
+            break;
+        std::memcpy(text + length, utf8, static_cast<size_t>(bytes));
+        length += bytes;
+        changed = true;
+    }
+    text[length] = '\0';
+    if (changed)
+        time = now;
+    return changed;
+}
+
+int ListTypeahead::Find(int count, int from, ListEntryFn entry, void* user) const
+{
+    return ListTypeaheadFind(text, count, from, entry, user);
+}
+
+void ListRowGroup::Begin(bool focused, const ForcedItemRequest* forcedRequest)
+{
+    window = ImGui::GetCurrentContext() != nullptr ? GImGui->CurrentWindow : nullptr;
+    forced = forcedRequest;
+    listFocused = focused;
+    hasRing = false;
+    ring = {};
+}
+
+ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc& desc)
+{
+    if (window == nullptr || GImGui->CurrentWindow != window)
+    {
+        ReportUsageError("ListRowGroup::Row outside its Begin and End, or in another window");
+        return {};
+    }
+    static const ForcedItemRequest kNoForce;
+    RowEnv env;
+    env.window = window;
+    env.multi = desc.selection != ImGuiSelectionUserData_Invalid;
+    env.listFocused = listFocused;
+    env.forced = forced != nullptr ? forced : &kNoForce;
+    env.ring = &ring;
+    env.hasRing = &hasRing;
+    return RunRow(env, id, rect, desc.selection, desc.selected, desc.disabled, desc.tabStop, desc.part, desc.indent);
+}
+
+void ListRowGroup::End()
+{
+    if (window != nullptr && hasRing && GImGui->CurrentWindow == window)
+        DrawItemFocusRing(ring, Px(T().radii.control));
+    window = nullptr;
+    hasRing = false;
+}
+
+int ListJumpToEnd(const ListJumpDesc& desc, bool end, bool* changed)
+{
+    if (changed != nullptr)
+        *changed = false;
+    if (ImGui::GetCurrentContext() == nullptr)
+        return -1;
+    const auto disabledAt = [&](int index) {
+        ListEntryInfo info;
+        if (desc.entry != nullptr)
+            desc.entry(desc.user, index, &info);
+        return info.disabled;
+    };
+    const int step = end ? -1 : 1;
+    int target = end ? desc.rowCount - 1 : 0;
+    while (target >= 0 && target < desc.rowCount && disabledAt(target))
+        target += step;
+    if (target < 0 || target >= desc.rowCount)
+        return -1;
+    ListSelection* selection = desc.selection;
+    if (selection == nullptr || desc.readOnly)
+        return target;
+    const ImGuiIO& io = ImGui::GetIO();
+    if (!io.KeyShift || desc.single)
+    {
+        const bool moved = SelectOnly(selection, selection->GetStorageIdFromIndex(target), desc.focusScope, target);
+        if (changed != nullptr)
+            *changed = moved;
+        return target;
+    }
+    ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(desc.focusScope);
+    ImS64 anchor = target;
+    if (multi != nullptr && multi->RangeSrcItem >= 0 && multi->RangeSrcItem < desc.rowCount)
+        anchor = multi->RangeSrcItem;
+    else if (desc.focusIndex >= 0 && desc.focusIndex < desc.rowCount)
+        anchor = desc.focusIndex;
+    static ImGuiMultiSelectIO requests;
+    requests.Requests.resize(0);
+    requests.ItemsCount = desc.rowCount;
+    if (!io.KeyCtrl)
+        requests.Requests.push_back({ImGuiSelectionRequestType_SetAll, false, 0, 0, 0});
+    ImGuiSelectionRequest range;
+    range.Type = ImGuiSelectionRequestType_SetRange;
+    range.Selected = true;
+    range.RangeDirection = static_cast<ImS8>(target >= anchor ? 1 : -1);
+    range.RangeFirstItem = std::min<ImS64>(anchor, target);
+    range.RangeLastItem = std::max<ImS64>(anchor, target);
+    requests.Requests.push_back(range);
+    const std::uint64_t before = ListSelectionFingerprint(*selection);
+    ApplyListRequests(selection, &requests, desc.rowCount, desc.entry, desc.user);
+    if (changed != nullptr)
+        *changed = ListSelectionFingerprint(*selection) != before;
+    if (multi != nullptr)
+    {
+        multi->RangeSrcItem = anchor;
+        multi->NavIdItem = target;
+    }
+    return target;
+}
+
+void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImRect& rect)
+{
+    if (window == nullptr || ImGui::GetCurrentContext() == nullptr || id == 0)
+        return;
+    FocusRowAt(window, id, focusScope, rect);
 }
 
 bool BeginListView(ImGuiID id, const ListViewDesc& desc)
