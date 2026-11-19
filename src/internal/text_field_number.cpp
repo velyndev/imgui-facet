@@ -499,7 +499,9 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
 
     ItemState dragItem;
     ItemState labelItem;
+    bool frameClicked = false;
     TextFieldHooks hooks;
+    hooks.frameClicked = &frameClicked;
     hooks.liveEdit = liveScalar ? 1 : 0;
     hooks.trackExternalChanges = false;
     hooks.activate = params.drag && state.activationPending;
@@ -587,6 +589,12 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
             };
             run(dragItem, true);
             run(labelItem, false);
+            if (frameClicked && !readOnly && !disabled)
+            {
+                // The suffix strip types too, as a click on the number does.
+                state.typing = true;
+                state.activationPending = true;
+            }
         }
     }
 

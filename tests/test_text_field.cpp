@@ -1246,6 +1246,36 @@ TEST_CASE("Number field: dragging goes by the pointer travel without drift; a cl
     CHECK(number.value == doctest::Approx(17.0));
 }
 
+TEST_CASE("Number field: a click on a drag field types at every scale")
+{
+    TextFieldThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    for (const float scale : {0.75f, 1.0f, 2.0f})
+    {
+        CAPTURE(scale);
+        facet::SetUiScale(scale);
+        TestNumber number;
+        number.value = 12.0;
+        number.params.format = "%.1f";
+        number.params.min = -100.0;
+        number.params.max = 100.0;
+        number.params.step = 0.5;
+        number.params.steppers = true;
+        number.params.drag = true;
+        number.params.unit = "ms";
+        number.params.width = 220.0f;
+        session.SetUi([&] { number.Run("##scaled"); });
+        session.Frames(2);
+        session.Click(number.result.field.frame.GetCenter());
+        session.Frame();
+        CHECK(number.result.typing);
+        session.Type("250");
+        session.KeyPress(ImGuiKey_Enter);
+        CHECK(number.value == 100.0);
+    }
+}
+
 TEST_CASE("Number field: drag mode steps with Left and Right while focused and types on Enter")
 {
     facet::test::Session session;
@@ -1272,4 +1302,108 @@ TEST_CASE("Number field: drag mode steps with Left and Right while focused and t
     session.Type("12");
     session.KeyPress(ImGuiKey_Enter);
     CHECK(number.value == 12.0);
+}
+
+TEST_CASE("Text field: a click in the frame where no part is gives the text the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestField field;
+    field.text = "12";
+    field.params.suffix = "units";
+    TestNumber number;
+    number.params.drag = true;
+    number.params.unit = "units";
+    session.SetUi([&] {
+        field.Run("##suffix");
+        number.Run("##dragsuffix");
+    });
+    session.Frame();
+    // Between the end of the text area and the end of the frame: the suffix strip.
+    session.Click(ImVec2(field.result.text.Max.x + 4.0f, field.result.frame.GetCenter().y));
+    session.Frame();
+    CHECK(field.result.active);
+    CHECK(ActiveSelection(field.result.id) == Selection{2, 2, 2});
+    session.KeyPress(ImGuiKey_Escape);
+    session.Click(ImVec2(number.result.field.text.Max.x + 4.0f, number.result.field.frame.GetCenter().y));
+    session.Frame();
+    CHECK(number.result.typing);
+}
+TEST_CASE("Text field: options for composite widgets: frameless, hidden text, leading spinner, line count")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestField frameless;
+    frameless.params.frameless = true;
+    TestField hidden;
+    hidden.params.hideText = true;
+    TestField plain;
+    plain.params.icon = facet::Icon("search");
+    TestField spinner;
+    spinner.params.icon = facet::Icon("search");
+    spinner.params.loading = true;
+    spinner.params.spinnerReplacesIcon = true;
+    TestField area;
+    area.params.multiline = true;
+    area.params.width = 200.0f;
+    area.text = "one\ntwo\nthree";
+    int hiddenGlyphs = -1;
+    session.SetUi([&] {
+        frameless.Run("##frameless");
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int before = drawList->VtxBuffer.Size;
+        hidden.Run("##hidden");
+        // Glyph vertices inside the hidden field's text area: none may be drawn. (The frame's
+        // rounded corners are textured quads too; their inner corner lies one pixel past the
+        // padding, so the test stays two pixels inside the area.)
+        hiddenGlyphs = 0;
+        const ImVec2 white = drawList->_Data->TexUvWhitePixel;
+        ImRect inside = hidden.result.text;
+        inside.Expand(-2.0f);
+        for (int i = before; i < drawList->VtxBuffer.Size; ++i)
+        {
+            const ImDrawVert& v = drawList->VtxBuffer[i];
+            if ((v.uv.x != white.x || v.uv.y != white.y) && inside.Contains(v.pos))
+                ++hiddenGlyphs;
+        }
+        plain.Run("##plainicon");
+        spinner.Run("##spinner");
+        area.Run("##lines");
+    });
+    session.Frame();
+    // No frame, no padding: the text starts at the frame edge.
+    CHECK(frameless.result.text.Min.x == frameless.result.frame.Min.x);
+    // The spinner takes the icon's place: the text area is the same as without it.
+    CHECK(spinner.result.text.Min.x == plain.result.text.Min.x);
+    CHECK(spinner.result.text.Max.x == plain.result.text.Max.x);
+    CHECK(area.result.lineCount == 3);
+    area.text = "one long line of words that has to wrap at least once in a field this narrow";
+    session.Frame();
+    CHECK(area.result.lineCount >= 2);
+    // Hidden text still edits, and the widget gets the caret to draw its own.
+    session.Click(hidden.TextPoint());
+    session.Type("1234");
+    CHECK(hidden.text == "1234");
+    CHECK(hiddenGlyphs == 0);
+    CHECK(hidden.result.caret.Min.x > hidden.result.text.Min.x);
+}
+
+TEST_CASE("Text field: a read-only field reports caret and selection in the frame of its call")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestField field;
+    field.text = "copy me";
+    field.params.readOnly = true;
+    int rects = -1;
+    session.SetUi([&] {
+        field.Run("##copyfield");
+        ImRect out[2];
+        rects = facet::internal::TextFieldSelectionRects(field.result.id, out);
+    });
+    session.Frame();
+    session.Click(field.TextPoint());
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    CHECK(rects == 1);
+    CHECK(field.result.caret.Min.x > field.result.text.Min.x);
 }

@@ -33,6 +33,9 @@ struct TextFieldHooks
     // *labelItem receives its state. Without a visible label it stays empty.
     bool dragLabel = false;
     ItemState* labelItem = nullptr;
+    // Drag mode: set when the frame was clicked where no part is (the suffix strip); the caller
+    // starts typing. In text mode such a click gives the text the keyboard by itself.
+    bool* frameClicked = nullptr;
 };
 
 // Both TextFieldBehavior overloads end here: `text` for the string form, otherwise `buffer`

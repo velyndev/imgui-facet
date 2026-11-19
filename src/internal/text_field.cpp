@@ -139,6 +139,9 @@ struct TextFieldGeometry
     float caretWidth = 1.0f;
     float maskAdvance = 0.0f;  // > 0: masked, every code point this wide
     bool multiline = false;
+    // A read-only field edits the caller's text directly; Dear ImGui keeps no copy. Used only in
+    // the frame of the call.
+    const char* readOnlyText = nullptr;
     // External change detection while the field has the keyboard: the text after the last call.
     ImGuiID textHash = 0;
     int textLength = 0;
@@ -288,8 +291,12 @@ public:
         while (g.ItemFlagsStack.Size > itemFlags)
             ImGui::PopItemFlag();
         g.Style.InputTextCursorSize = caretWidth;
-        g.InputTextReactivateId = reactivateId;
+        if (restoreReactivation)
+            g.InputTextReactivateId = reactivateId;
     }
+    // The call did not touch the reactivation request: whatever Dear ImGui sets during it
+    // (io.ConfigInputTextEnterKeepActive) stays.
+    void KeepReactivation() { restoreReactivation = false; }
     TextFieldStyleScope(const TextFieldStyleScope&) = delete;
     TextFieldStyleScope& operator=(const TextFieldStyleScope&) = delete;
 
@@ -300,6 +307,7 @@ private:
     int itemFlags;
     float caretWidth;
     ImGuiID reactivateId;
+    bool restoreReactivation = true;
 };
 
 class TextFieldFontScope
@@ -668,7 +676,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     }
 
     // ---- Geometry ----
-    const float pad = Px(t.field.padding);
+    const float pad = params.frameless ? 0.0f : Px(t.field.padding);
     const float gapXs = Px(t.spacing.xs);
     const float gapSm = Px(t.spacing.sm);
     const float controlHeight = ControlHeight(size);
@@ -692,15 +700,18 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
 
     const float labelWidth = (hasLabel && !floating) ? std::round(ImGui::CalcTextSize(label, labelEnd).x + gapSm) : 0.0f;
     const float leftInset = pad + (params.icon.IsValid() ? iconSize + gapSm : 0.0f);
-    const bool trailingButtons = params.trailingWidth > 0.0f || params.clearButton || params.loading;
+    const bool leadingSpinner = params.loading && params.spinnerReplacesIcon && params.icon.IsValid();
+    const bool trailingSpinner = params.loading && !leadingSpinner;
+    const bool trailingButtons = params.trailingWidth > 0.0f || params.clearButton || trailingSpinner;
     float rightInset = trailingButtons ? gapXs : pad;
     const float slotWidth = params.trailingWidth > 0.0f ? std::round(Px(params.trailingWidth)) : 0.0f;
     if (slotWidth > 0.0f)
         rightInset += slotWidth + gapXs;
     if (params.clearButton)
         rightInset += buttonSide + gapXs;
-    if (params.loading)
+    if (trailingSpinner)
         rightInset += buttonSide + gapXs;
+    const float buttonsInset = rightInset;  // the buttons and the end padding, the suffix not included
     float suffixWidth = 0.0f;
     if (params.suffix != nullptr && params.suffix[0] != 0)
     {
@@ -729,9 +740,12 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     const bool nonEmptyBefore = stateBefore != nullptr ? stateBefore->TextLen > 0 : buf[0] != 0;
 
     // ---- Frame, under the text ----
+    const bool pointerOverFrame = ImGui::IsMouseHoveringRect(frame.Min, frame.Max) && g.HoveredWindow == window &&
+                                  (g.ActiveId == 0 || g.ActiveId == id || g.ActiveIdAllowOverlap);
     const float hoverAmount =
-        Tween(id, kFieldAnimHover, (!disabled && (g.HoveredIdPreviousFrame == id || forcedHover)) ? 1.0f : 0.0f,
+        Tween(id, kFieldAnimHover, (!disabled && ((pointerOverFrame && forced.state == ForcedItemState::None) || forcedHover)) ? 1.0f : 0.0f,
               t.motion.durationFast);
+    if (!params.frameless)
     {
         ImVec4 fill = disabled ? c.fill[3] : (readOnly ? WithAlpha(c.fill[3], 0.0f) : Mix(c.fill[2], c.fill[1], hoverAmount));
         FillRect(drawList, frame.Min, frame.Max, U32(fill), radius);
@@ -748,14 +762,17 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         drawList->AddText(ImVec2(origin.x, textTop), U32(disabled ? c.labelTertiary : c.label), label, labelEnd);
 
     // ---- Text ----
-    const bool showDisplayText = params.displayText != nullptr && !activeBefore && !hooks.activate;
-    const bool showMixed = mixed && !activeBefore && !hooks.activate;
+    const bool showDisplayText = params.displayText != nullptr && !activeBefore && !hooks.activate && !params.hideText;
+    const bool showMixed = mixed && !activeBefore && !hooks.activate && !params.hideText;
     const ImVec4 textColor = disabled ? c.labelTertiary : c.label;
     const ImVec4 placeholderColor = disabled ? c.labelTertiary : c.labelSecondary;
     const float floatTarget = (activeBefore || nonEmptyBefore || forcedFocus || hooks.activate) ? 1.0f : 0.0f;
     const float floatAmount = floating ? Spring(id, kFieldAnimFloat, floatTarget, t.motion.quick) : 1.0f;
     const char* hint = params.placeholder;
-    if (floating && floatTarget < 0.5f)
+    // The placeholder shows once the floating label has made room for it.
+    if (floating && (floatTarget < 0.5f || floatAmount < 0.9f))
+        hint = nullptr;
+    if (params.hideText)
         hint = nullptr;
     if (showMixed)
         hint = GetStrings().mixed;
@@ -823,10 +840,11 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     // visible character still shows.
     const ImVec2 clipMin(textLeft, frame.Min.y);
     const ImVec2 clipMax(textRight + caretWidth, frame.Max.y);
+    const float scrollbarSize = Px(t.scroll.barThickness) + Px(t.scroll.barInset) * 2.0f;
     {
         TextFieldStyleScope scope;
         const ImU32 clear = 0;
-        const bool hideText = masked || showDisplayText || showMixed;
+        const bool hideText = masked || showDisplayText || showMixed || params.hideText;
         ImGui::PushStyleColor(ImGuiCol_FrameBg, clear);
         ImGui::PushStyleColor(ImGuiCol_Border, clear);
         ImGui::PushStyleColor(ImGuiCol_BorderShadow, clear);
@@ -834,8 +852,8 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         ImGui::PushStyleColor(ImGuiCol_ChildBg, clear);
         ImGui::PushStyleColor(ImGuiCol_Text, hideText ? WithAlpha(textColor, 0.0f) : textColor);
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, showMixed ? WithAlpha(placeholderColor, 0.0f) : placeholderColor);
-        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, c.accentSubtle);
-        ImGui::PushStyleColor(ImGuiCol_InputTextCursor, c.label);
+        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, params.hideText ? WithAlpha(c.accentSubtle, 0.0f) : c.accentSubtle);
+        ImGui::PushStyleColor(ImGuiCol_InputTextCursor, params.hideText ? WithAlpha(c.label, 0.0f) : c.label);
         ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, clear);
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, c.scrollThumb);
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, c.scrollThumbHover);
@@ -845,7 +863,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(leftInset, padY));
         // The label InputTextEx draws after its frame lands beyond the text clip, out of sight.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(caretWidth + gapXs, g.Style.ItemInnerSpacing.y));
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, Px(t.scroll.barThickness) + Px(t.scroll.barInset) * 2.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, scrollbarSize);
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, Px(t.radii.element));
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarPadding, Px(t.scroll.barInset));
         // Facet picks the disabled colors itself, so the alpha of BeginDisabled is undone.
@@ -856,9 +874,14 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
             ImGui::PushItemFlag(ImGuiItemFlags_LiveEditOnInputText, hooks.liveEdit != 0);
         if ((next.itemFlags & ImGuiItemFlags_MixedValue) != 0)
             ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, false);  // Facet shows mixed itself
+        // A focus request rides on Dear ImGui's reactivation path (a click would do the same).
+        // The scope puts the previous value back; nothing can have set it during an activation
+        // frame, which ignores Enter.
         const bool wantFocus = !disabled && !activeBefore && (hooks.activate || (request != nullptr && request->focus));
         if (wantFocus)
             g.InputTextReactivateId = id;
+        else
+            scope.KeepReactivation();
 
         window->DC.CursorPos = textFrame.Min;
         drawList->PushClipRect(clipMin, clipMax, true);
@@ -870,14 +893,22 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
             options.handCursor = false;
             options.hitTarget = false;
             options.forced = &forced;
-            dragItem = PartBehavior(id, textFrame, options);
+            // The suffix drags too: the whole frame up to the buttons is the handle.
+            const ImRect dragFrame(frame.Min.x, frame.Min.y, std::max(textRight, frame.Max.x - buttonsInset), frame.Max.y);
+            dragItem = PartBehavior(id, dragFrame, options);
             if (hooks.dragItem != nullptr)
                 *hooks.dragItem = dragItem;
             if ((dragItem.hovered || dragItem.held) && !dragItem.disabled)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-            const char* shown = params.displayText != nullptr ? params.displayText : buf;
-            drawList->AddText(ImVec2(textLeft, textTop), U32(textColor), shown);
-            if (buf[0] == 0 && params.displayText == nullptr && hint != nullptr)
+            if (params.hideText)
+            {
+                // The widget draws the text.
+            }
+            else if (showMixed)
+                drawList->AddText(ImVec2(textLeft, textTop), U32(placeholderColor), GetStrings().mixed);
+            else if (params.displayText != nullptr || buf[0] != 0)
+                drawList->AddText(ImVec2(textLeft, textTop), U32(textColor), params.displayText != nullptr ? params.displayText : buf);
+            else if (hint != nullptr)
                 drawList->AddText(ImVec2(textLeft, textTop), U32(placeholderColor), hint);
         }
         else
@@ -891,13 +922,14 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
 
         ImGuiInputTextState* state = g.ActiveId == id ? ImGui::GetInputTextState(id) : nullptr;
         // What InputTextEx could not draw: the display text, the mixed text, the dots.
+        float maskedWidth = 0.0f;
         if (!hooks.dragMode)
         {
             if (showDisplayText)
                 drawList->AddText(ImVec2(textLeft, textTop), U32(textColor), params.displayText);
             else if (showMixed)
                 drawList->AddText(ImVec2(textLeft, textTop), U32(placeholderColor), GetStrings().mixed);
-            else if (masked)
+            else if (masked && !params.hideText)
             {
                 const char* shown = state != nullptr && state->TextA.Data != nullptr ? state->TextA.Data : buf;
                 const int length = state != nullptr ? state->TextLen : static_cast<int>(std::strlen(buf));
@@ -908,6 +940,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
                 if (star != nullptr && count > 0)
                 {
                     const float advance = star->AdvanceX;
+                    maskedWidth = advance * static_cast<float>(count);
                     const ImWchar glyph = bullet != nullptr ? kMaskBullet : static_cast<ImWchar>('*');
                     const float glyphAdvance = bullet != nullptr ? bullet->AdvanceX : advance;
                     const float scroll = state != nullptr ? state->Scroll.x : 0.0f;
@@ -920,11 +953,12 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
                     }
                 }
             }
-            if (forcedFocus && state == nullptr)
+            if (forcedFocus && state == nullptr && !params.hideText)
             {
                 // The focused look of a capture: a caret after the text, where typing would go.
-                const char* shown = showDisplayText ? params.displayText : (masked ? "" : buf);
-                const float x = std::min(std::round(textLeft + ImGui::CalcTextSize(shown).x), textRight);
+                const char* shown = showDisplayText ? params.displayText : (showMixed || masked ? "" : buf);
+                const float width = masked && !showDisplayText ? maskedWidth : ImGui::CalcTextSize(shown).x;
+                const float x = std::min(std::round(textLeft + width), textRight);
                 drawList->AddRectFilled(ImVec2(x, textTop), ImVec2(x + caretWidth, textTop + fontSize), U32(c.label));
             }
         }
@@ -939,6 +973,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         geometry.fontSize = fontSize;
         geometry.caretWidth = caretWidth;
         geometry.multiline = multiline;
+        geometry.readOnlyText = !writable ? "" : (readOnly ? buf : nullptr);
         geometry.maskAdvance = 0.0f;
         if (masked && g.FontBaked != nullptr)
             if (const ImFontGlyph* star = g.FontBaked->FindGlyph('*'))
@@ -981,7 +1016,11 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     const ImVec4 secondary = disabled ? c.labelTertiary : c.labelSecondary;
 
     // ---- Leading icon, suffix, spinner ----
-    if (params.icon.IsValid())
+    const float spinnerThickness = std::max(HairlineThickness(), std::round(iconSize * kSpinnerStrokeShare));
+    if (leadingSpinner)
+        DrawSpinner(drawList, ImVec2(std::round(frame.Min.x + pad + iconSize * 0.5f), std::round(frame.GetCenter().y)),
+                    iconSize * 0.5f - spinnerThickness * 0.5f, U32(secondary), spinnerThickness);
+    else if (params.icon.IsValid())
         DrawIcon(drawList, params.icon, ImVec2(frame.Min.x + pad, std::round(frame.GetCenter().y - iconSize * 0.5f)),
                  iconSize, U32(secondary));
     float trailingX = frame.Max.x - (trailingButtons ? gapXs : pad);
@@ -996,11 +1035,10 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         clearRect = TextFieldSlotButtonRect(ImRect(trailingX - buttonSide, frame.Min.y, trailingX, frame.Max.y), size, 0);
         trailingX -= buttonSide + gapXs;
     }
-    if (params.loading)
+    if (trailingSpinner)
     {
         const ImVec2 center(std::round(trailingX - buttonSide * 0.5f), std::round(frame.GetCenter().y));
-        const float thickness = std::max(HairlineThickness(), std::round(iconSize * kSpinnerStrokeShare));
-        DrawSpinner(drawList, center, iconSize * 0.5f - thickness * 0.5f, U32(secondary), thickness);
+        DrawSpinner(drawList, center, iconSize * 0.5f - spinnerThickness * 0.5f, U32(secondary), spinnerThickness);
         trailingX -= buttonSide + gapXs;
     }
     if (suffixWidth > 0.0f)
@@ -1084,15 +1122,33 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         params.trailingSlot(slot, params.trailingUser);
     }
 
-    // Disabled fields show the not-allowed cursor over the frame.
-    if (disabled && ImGui::IsMouseHoveringRect(frame.Min, frame.Max) && g.HoveredWindow == window)
+    // The whole frame takes the pointer: where no part is (the suffix strip, the padding at the
+    // end), a click gives the text the keyboard, as a click on the text would.
+    const bool overFrame = ImGui::IsMouseHoveringRect(frame.Min, frame.Max) && g.HoveredWindow == window;
+    result.hovered = overFrame;
+    if (overFrame && disabled)
         SetNotAllowedCursor();
-    result.hovered = ImGui::IsMouseHoveringRect(frame.Min, frame.Max) && g.HoveredWindow == window;
+    else if (overFrame && g.HoveredId == 0 && forced.state == ForcedItemState::None)
+    {
+        ImGui::SetMouseCursor(hooks.dragMode ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_TextInput);
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            if (hooks.dragMode)
+            {
+                if (hooks.frameClicked != nullptr)
+                    *hooks.frameClicked = true;
+            }
+            else
+            {
+                TextFieldRequestFocus(id, TextFieldFocus::End);
+            }
+        }
+    }
 
     // ---- Focus ring ----
     const bool focusVisible = (!disabled && g.NavId == id && KeyboardModality()) || forcedFocus;
     const float focusAmount = Tween(id, kFieldAnimFocus, focusVisible ? 1.0f : 0.0f, t.motion.durationFast);
-    if (focusAmount > 0.0f)
+    if (focusAmount > 0.0f && !params.frameless)
         DrawFocusRing(drawList, frame, radius, focusAmount);
 
     // ---- Message line ----
@@ -1115,8 +1171,27 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         result.edited = true;
         result.clearPressed = true;
     }
-    result.length = state != nullptr ? CountCodePoints(state->TextA.Data != nullptr ? state->TextA.Data : "", state->TextLen)
-                                     : CountCodePoints(buf, static_cast<int>(std::strlen(buf)));
+    const char* finalText = state != nullptr && state->TextA.Data != nullptr && !readOnly ? state->TextA.Data : buf;
+    const int finalLength = state != nullptr && !readOnly ? state->TextLen : static_cast<int>(std::strlen(buf));
+    result.length = CountCodePoints(finalText, finalLength);
+    if (multiline)
+    {
+        // The visual lines as InputTextEx lays them out: its wrap width is the area without
+        // the padding and the room it keeps for the scrollbar.
+        TextFieldLayout layout;
+        layout.text = finalText;
+        layout.length = finalLength;
+        layout.font = geometry.font;
+        layout.size = fontSize;
+        layout.multiline = true;
+        layout.wrap = params.wordWrap ? std::max(1.0f, textFrame.GetWidth() - leftInset - scrollbarSize) : 0.0f;
+        int lines = 0;
+        layout.ForEachLine([&](int, int, int) {
+            ++lines;
+            return true;
+        });
+        result.lineCount = std::max(1, lines);
+    }
     if (!TextFieldCaretRect(id, &result.caret))
         result.caret = ImRect(textLeft, textTop, textLeft, textTop + fontSize);
     result.committed = IsItemEditCommitted();
@@ -1209,8 +1284,19 @@ bool ActiveTextFieldLayout(ImGuiID id, ImGuiInputTextState** stateOut, const Tex
     const TextFieldGeometry& geometry = GetState<TextFieldGeometry>(id);
     if (geometry.font == nullptr || geometry.frame < ImGui::GetFrameCount() - 1)
         return false;
-    layout->text = state->TextSrc != nullptr ? state->TextSrc : (state->TextA.Data != nullptr ? state->TextA.Data : "");
-    layout->length = state->TextLen;
+    if ((state->Flags & ImGuiInputTextFlags_ReadOnly) != 0)
+    {
+        // The caller's text, only while it is the text of this frame's call.
+        if (geometry.readOnlyText == nullptr || geometry.frame != ImGui::GetFrameCount())
+            return false;
+        layout->text = geometry.readOnlyText;
+        layout->length = std::min(state->TextLen, static_cast<int>(std::strlen(geometry.readOnlyText)));
+    }
+    else
+    {
+        layout->text = state->TextA.Data != nullptr ? state->TextA.Data : "";
+        layout->length = state->TextLen;
+    }
     layout->font = geometry.font;
     layout->size = geometry.fontSize;
     layout->wrap = geometry.multiline ? state->WrapWidth : 0.0f;

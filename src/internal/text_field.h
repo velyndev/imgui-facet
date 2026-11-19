@@ -113,6 +113,15 @@ struct TextFieldParams
     float trailingWidth = 0.0f;          // units reserved at the end of the frame for the trailing slot; 0 for none
     TextFieldSlotFn trailingSlot = nullptr;  // fills the slot (unit menu, steppers, reveal toggle); null for none
     void* trailingUser = nullptr;
+    // No frame: no fill, outline, hover look or focus ring, and no padding at the sides, for a
+    // field inside a surface the widget draws itself (tag input, pin code cells, inline rename,
+    // the search row of a list popup). The widget draws the focus indication.
+    bool frameless = false;
+    // The core draws nothing of the text: no text, placeholder, selection, caret or dots. Editing,
+    // IME and the item queries stay; the widget draws from the geometry functions below (pin code
+    // cells, a skeleton while loading).
+    bool hideText = false;
+    bool spinnerReplacesIcon = false;    // while loading, the spinner sits where the leading icon is (search fields)
 };
 
 // What a field did this frame, and where it is.
@@ -135,6 +144,7 @@ struct TextFieldResult
     ImRect trailing;            // the trailing slot while reserved; empty otherwise
     // The forced state the field took (captures); Open is for widgets that show a popup.
     ForcedItemState forced = ForcedItemState::None;
+    int lineCount = 1;          // multiline: visual lines of the text as laid out (wrapping included), for growing areas
 };
 
 // The field: the visible label part in front of the frame (rule 6), the frame and the text.
