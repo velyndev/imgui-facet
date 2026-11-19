@@ -537,7 +537,7 @@ private:
 
 struct VirtualListOptions
 {
-    float rowHeight = 0.0f;            // units; 0 for the control height
+    float rowHeight = 0.0f;            // units; 0 for the list row height of the inherited control size
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;   // null uses Strings::empty
     const char* errorText = nullptr;   // null uses Strings::loadFailed

@@ -478,7 +478,7 @@ struct InventoryGridOptions
 };
 
 // A fixed grid of slots. Drag an item onto an empty slot to move it, onto another item to swap
-// or merge; Ctrl+drag moves half a stack. One Tab stop: arrows move the selection, Enter
+// or merge; Shift+drag moves half a stack. One Tab stop: arrows move the selection, Enter
 // activates, Ctrl+arrows move the selected item. *selected -1 means none and is written when
 // the selection moves. The caller applies the returned action to its slots.
 InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots,
@@ -693,8 +693,9 @@ struct LayerListOptions
 };
 
 // Ordered layer rows, topmost first, with visibility and lock toggles; dragging across the
-// toggles paints them. Rows reorder by drag (with a drop line) or Alt+Up and Alt+Down. One Tab
-// stop for the rows (arrows move the selection) plus each focused row's toggles.
+// toggles paints them. Rows reorder by drag (with a drop line) or Alt+Up and Alt+Down; Space
+// also picks the focused row up, the arrows move it, Space or Enter drops it and Escape puts it
+// back. One Tab stop for the rows (arrows move the selection) plus each focused row's toggles.
 LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> layers,
                           const LayerListOptions& options = {});
 

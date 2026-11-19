@@ -246,7 +246,8 @@ struct DropZoneOptions
 
 // A dashed area that accepts Dear ImGui drag and drop payloads whose type is in `acceptTypes`
 // (each at most 32 bytes, read during the call). While a payload is dragged over it, the zone
-// is tinted in the accent for an accepted type and in the destructive token otherwise. The
+// is highlighted for an accepted type; another type gets no highlight and the not-allowed
+// cursor, so refusal does not rest on color alone. The
 // visible label part is the text in the zone unless `hint` replaces it; then it is the zone's
 // tooltip. Files dragged in from the operating system reach
 // it only when the host submits them as a payload (the host owns the window messages).

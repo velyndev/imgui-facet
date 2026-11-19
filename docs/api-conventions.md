@@ -570,7 +570,7 @@ public:
 
 struct VirtualListOptions
 {
-    float rowHeight = 0.0f;            // units; 0 for the control height
+    float rowHeight = 0.0f;            // units; 0 for the list row height of the inherited control size
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;
     const char* errorText = nullptr;
@@ -726,7 +726,7 @@ struct DataTableOptions
     bool reorderable = false;
     bool hideable = false;
     int frozenColumns = 0;
-    float rowHeight = 0.0f;            // units; 0 for the control height
+    float rowHeight = 0.0f;            // units; 0 for the list row height of the inherited control size
     DataState state = DataState::Ready;
     const char* emptyText = nullptr;
     const char* errorText = nullptr;
