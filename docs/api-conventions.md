@@ -100,7 +100,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
 - A Begin whose content is always laid out (`Card`, `SettingsRow`, `Stack`, `Grid`) returns `void`, and its End is always called. *Reason: layout containers never skip content, so keyboard navigation reaches rows scrolled out of view and a row needs no if block.*
 - Every pair has a non-copyable, non-movable `[[nodiscard]] XScope` in the same header. The scope of a bool Begin has `explicit operator bool` and ends only when Begin returned true.
 - Layers the caller opens (Shell, Modal, ConfirmDialog, Popover, Drawer) take `bool* open`. The caller writes true to open; Facet writes false on dismissal. Layers opened by input (dropdown lists, context menus, tooltips) open themselves. Results are polled from return values or query functions, never delivered by callback.
-- Escape acts on one thing at a time, in this order: it cancels the active edit, then closes the topmost popup, then the modal, then a shell that set `closeOnEscape`. Facet routes Escape itself through key ownership, so this does not depend on `ImGuiConfigFlags_NavEnableKeyboard`.
+- Escape acts on one thing at a time, in this order: it cancels the active edit, then closes the topmost popup, then the modal, then a shell that set `closeOnEscape`. A field whose completion list is open gives Escape to that list first; the next Escape cancels the edit (`docs/input.md` has the details). Facet routes Escape itself through key ownership, so this does not depend on `ImGuiConfigFlags_NavEnableKeyboard`.
 
 ## 9. Icons and images
 
