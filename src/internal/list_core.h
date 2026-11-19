@@ -77,6 +77,7 @@ struct ListSelectionOptions
     bool single = false;     // at most one selected entry
     bool boxSelect = true;   // a drag from empty space selects the entries it covers
     bool readOnly = false;   // the selection shows but requests leave the storage alone
+    bool grid = false;       // tiles in rows and columns (ItemGrid): box selection in two dimensions, arrows wrap
 };
 
 // Starts multi-selection over `itemCount` index-keyed entries written to `selection` (null: the

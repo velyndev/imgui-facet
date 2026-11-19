@@ -945,7 +945,8 @@ ListTreeNodeState ListTreeNode(const char* label, const ListTreeNodeOptions& opt
     const ImRect expander(rect.Min.x + Px(theme.spacing.xs) + indent, rect.Min.y,
                           rect.Min.x + Px(theme.spacing.xs) + indent + indentStep, rect.Max.y);
 
-    bool open = options.leaf ? false : ImGui::TreeNodeUpdateNextOpen(id, options.defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+    const ImGuiTreeNodeFlags openFlags = options.defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+    bool open = options.leaf ? false : ImGui::TreeNodeUpdateNextOpen(id, openFlags);
     if (open && depth >= kListTreeDepth)
     {
         if (!frame.deepReported)

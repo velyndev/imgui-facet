@@ -125,8 +125,10 @@ void FilterRequests(ImGuiMultiSelectIO* io, int count, ListEntryFn entry, void* 
         }
         else if (request.Type == ImGuiSelectionRequestType_SetRange && request.Selected)
         {
-            const int first = static_cast<int>(std::max<ImS64>(0, std::min(request.RangeFirstItem, request.RangeLastItem)));
-            const int last = static_cast<int>(std::min<ImS64>(count - 1, std::max(request.RangeFirstItem, request.RangeLastItem)));
+            const ImS64 low = std::min(request.RangeFirstItem, request.RangeLastItem);
+            const ImS64 high = std::max(request.RangeFirstItem, request.RangeLastItem);
+            const int first = static_cast<int>(std::max<ImS64>(0, low));
+            const int last = static_cast<int>(std::min<ImS64>(count - 1, high));
             if (first <= last)
                 PushEnabledRuns(out, request, first, last, true, entry, user, true);
         }
@@ -176,7 +178,9 @@ void OpenSelection(ListSelection* selection, int itemCount, const ListSelectionO
     if (options.single)
         flags |= ImGuiMultiSelectFlags_SingleSelect;
     else if (options.boxSelect)
-        flags |= ImGuiMultiSelectFlags_BoxSelect1d;
+        flags |= options.grid ? ImGuiMultiSelectFlags_BoxSelect2d : ImGuiMultiSelectFlags_BoxSelect1d;
+    if (options.grid)
+        flags |= ImGuiMultiSelectFlags_NavWrapX;
     scope.io = ImGui::BeginMultiSelect(flags, selection->Size, scope.itemCount);
     // With a clipper, requests from Begin (select all, clear) are applied before the rows.
     ApplyRequests(scope, scope.io);

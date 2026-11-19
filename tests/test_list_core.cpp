@@ -278,7 +278,8 @@ TEST_CASE("List view: the row height follows the control size")
     ui.desc.entry = &ItemsEntry;
     ui.desc.user = &items;
     session.SetUi([&] { ui.Ui(session); });
-    for (const facet::ControlSize size : {facet::ControlSize::Small, facet::ControlSize::Regular, facet::ControlSize::Large})
+    using facet::ControlSize;
+    for (const ControlSize size : {ControlSize::Small, ControlSize::Regular, ControlSize::Large})
     {
         ui.desc.size = size;
         session.Frames(2);
@@ -700,11 +701,12 @@ TEST_CASE("List view: a visible list allocates nothing per frame in the steady s
 #ifdef _DEBUG
     static long crtAllocations = 0;
     crtAllocations = 0;
-    const _CRT_ALLOC_HOOK previous = _CrtSetAllocHook([](int type, void*, size_t, int, long, const unsigned char*, int) -> int {
-        if (type == _HOOK_ALLOC || type == _HOOK_REALLOC)
-            ++crtAllocations;
-        return 1;
-    });
+    const _CRT_ALLOC_HOOK previous =
+        _CrtSetAllocHook([](int type, void*, size_t, int, long, const unsigned char*, int) -> int {
+            if (type == _HOOK_ALLOC || type == _HOOK_REALLOC)
+                ++crtAllocations;
+            return 1;
+        });
 #endif
     session.Frames(20);
 #ifdef _DEBUG
@@ -953,4 +955,43 @@ TEST_CASE("Tree: Left on a closed child node goes to its parent inside a scrolli
     CHECK(GImGui->NavId == session.ItemId("Root A"));
     session.KeyPress(ImGuiKey_RightArrow);  // Root A is open: to its first child
     CHECK(GImGui->NavId == session.ItemId("Leaf A1"));
+}
+
+TEST_CASE("List selection: a grid wraps the arrows at the end of a line")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    session.SetUi([&] {
+        if (!fi::BeginScrollAreaCore("grid", {.size = ImVec2(400.0f, 300.0f)}))
+            return;
+        fi::BeginListSelection(&selection, 9, {.boxSelect = true, .grid = true});
+        fi::BeginListRows({.rowCount = 9, .rowHeight = 40.0f, .columns = 3});
+        facet::RowRange range;
+        char name[16];
+        while (fi::NextListRows(&range))
+        {
+            for (int i = range.first; i < range.last; ++i)
+            {
+                if (i % 3 != 0)
+                    ImGui::SameLine();
+                ImGui::SetNextItemSelectionUserData(i);
+                std::snprintf(name, sizeof(name), "tile%d", i);
+                ImGui::Selectable(name, fi::IsListEntrySelected(&selection, i), 0,
+                                  ImVec2(80.0f, 40.0f - ImGui::GetStyle().ItemSpacing.y));
+                session.Track(name);
+            }
+        }
+        fi::EndListRows();
+        fi::EndListSelection();
+        fi::EndScrollAreaCore();
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("tile2"));
+    REQUIRE(selection.Contains(2));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frames(2);
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(3));
 }
