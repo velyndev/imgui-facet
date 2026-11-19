@@ -1,14 +1,14 @@
 #pragma once
 
 // List and selection core: the visible row ranges of long lists, grids and tables (virtualized
-// through ImGuiListClipper), the selection storage of the frozen list and table signatures,
-// typeahead and the selection pill of list rows.
+// through ImGuiListClipper) and the selection storage of the frozen list and table signatures.
 //
 // This header holds what the other blocks and the Phase 2 containers call: facet::NextVisibleRows
 // (common.h) reads the row ranges opened here, and VirtualList, ItemGrid, DataTable and the list
-// widgets open them and drive their selection through it. The list core owns the rest
-// (typeahead, row drawing, reordering through the drag and drop core, scrolling rows into view
-// through the scroll core) and adds it to this file and to further list_* files.
+// widgets open them and drive their selection through it. The rows themselves (placement, look,
+// keyboard, typeahead, the selection pill, data states) and trees are in list_view.h, built on
+// this file and the scroll core; DataTable and ItemGrid, whose rows are table rows and tiles, use
+// the two pairs below directly.
 //
 // Row ranges: a container opens them before its row loop and closes them after it; the caller's
 // loop in between is the one facet::NextVisibleRows documents:
@@ -22,8 +22,13 @@
 //
 // Ranges open on the current window and nest (a list inside a table cell) up to kListRowsDepth.
 // The rows before and after the visible ones are skipped with their height, so the scroll range
-// and the scrollbar stay right; keepAlive is handed out as an extra range even when it is out of
-// view, so the keyboard focus and an active row survive scrolling.
+// and the scrollbar stay right. Besides the visible lines the ranges hold keepAlive, the line of
+// the keyboard focus and of a navigation request (Dear ImGui's clipper adds those), the box
+// selection, and the range start of a selection opened with BeginListSelection in the same window,
+// so the focus, an active row and Shift ranges survive scrolling. Ranges come in top-to-bottom
+// order and never overlap, so no entry is handed out twice. Rows must advance exactly rowHeight
+// (ListViewRow places them so); positions are computed in double precision, so a million rows
+// stay exact.
 //
 // Selection: every multi-select list, grid and table takes the caller's
 // ImGuiSelectionBasicStorage (lists.h, containers.h, display.h and layout.h freeze it) and drives
@@ -58,9 +63,9 @@ struct ListRowsDesc
 // the loop stops early. Deeper than kListRowsDepth is reported and hands out nothing.
 void BeginListRows(const ListRowsDesc& desc);
 
-// The next range of entries of the innermost open BeginListRows: the visible ones, then
-// keepAlive. Returns false when every range was handed out, and when none is open (rows is then
-// {0, 0}). facet::NextVisibleRows forwards here.
+// The next range of entries of the innermost open BeginListRows, in top-to-bottom order (see the
+// top of this file). Returns false when every range was handed out, and when none is open (rows is
+// then {0, 0}). facet::NextVisibleRows forwards here.
 bool NextListRows(RowRange* rows);
 
 // Closes the innermost BeginListRows and lays out the space of the entries that were not handed
@@ -76,7 +81,10 @@ struct ListSelectionOptions
 
 // Starts multi-selection over `itemCount` index-keyed entries written to `selection` (null: the
 // entries are not selectable, and the pair does nothing). Between the two calls every entry calls
-// ImGui::SetNextItemSelectionUserData(index) before its item.
+// ImGui::SetNextItemSelectionUserData(index) before its item (ListViewRow does). Escape and a
+// click in empty space clear the selection; Ctrl+A selects all. The requests of Begin (select
+// all, clear) are applied at once, so rows drawn afterwards show them; call it before
+// BeginListRows. Pairs nest four deep.
 void BeginListSelection(ListSelection* selection, int itemCount, const ListSelectionOptions& options = {});
 
 // Applies the selection requests of the frame to the storage. Returns true when the selection

@@ -12,6 +12,10 @@
 // is stepped there, and the positions it writes with ImGui::SetScrollX/Y are applied by each
 // window's Begin in the same frame. A target that someone else wrote in between (a stock call,
 // keyboard navigation) or a position that changed by more than rounding cancels the motion.
+//
+// The module's end-of-frame hook also checks the list core's open row ranges
+// (list_view.h, ListCoreEndFrame), because the list core has no entry of its own in the
+// subsystem table.
 
 #include "internal/scroll.h"
 
@@ -30,6 +34,7 @@
 #include "facet/core/theme.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/list_view.h"
 #include "internal/subsystem.h"
 
 namespace facet::internal
@@ -410,11 +415,13 @@ void ScrollEndFrame()
                          surfaces);
     core.surfaceDepth = 0;
     core.surfaceOverflow = 0;
+    ListCoreEndFrame();
 }
 
 void ScrollShutdown()
 {
     ResetCore(nullptr);
+    ListCoreShutdown();
 }
 
 ImVec4 ResolveSurface(const ImVec4& requested, const ImGuiWindow* parent)
@@ -935,8 +942,8 @@ void PopScrollFadeSurface()
     --core.surfaceDepth;
 }
 
-// Routes the wheel and steps the smooth scrolls in NewFrame, checks open areas and fade surfaces in
-// EndFrame.
+// Routes the wheel and steps the smooth scrolls in NewFrame, checks open areas, fade surfaces and
+// the list core's row ranges in EndFrame.
 Subsystem ScrollSubsystem()
 {
     Subsystem subsystem;
