@@ -17,6 +17,7 @@
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/popup_host.h"
+#include "internal/popup_menu.h"
 #include "internal/selection_pill.h"
 #include "pages/pages.h"
 
@@ -62,9 +63,7 @@ struct PopupPageState
     int kept = 0;
     int scrimClicks = 0;
     fi::PopupCloseReason lastReason = fi::PopupCloseReason::None;
-    // Submenu hover timing, one per menu level.
-    ImGuiID hoverRow[3] = {};
-    double hoverSince[3] = {};
+    int align = 0;  // the alignment chosen in the third menu level
     bool closingStarted = false;
     ImGuiID toolIds[4] = {};  // the tooltip buttons, for the selftest
 };
@@ -221,12 +220,10 @@ fi::ItemState ProtoAnchor(PageCtx& ctx, const char* label, const char* probe, bo
 struct RowLook
 {
     bool selected = false;  // the chosen entry: the selection pill and a semibold label
-    bool submenu = false;   // a chevron at the end
-    bool open = false;      // its submenu is open: the hover fill stays
 };
 
-// A list or menu row: full width of the level, the hover fill, the label, the focus ring inside the
-// row (the level's padding is too narrow for a ring outside it).
+// A list row: full width of the level, the hover fill, the label, the focus ring inside the row
+// (the level's padding is too narrow for a ring outside it). Menu rows come from popup_menu.h.
 fi::ItemState ProtoRow(PageCtx& ctx, const char* label, const char* probe, const RowLook& look,
                        fi::SelectionPill* pill = nullptr)
 {
@@ -236,8 +233,7 @@ fi::ItemState ProtoRow(PageCtx& ctx, const char* label, const char* probe, const
     fi::PushPillLabelStyle(facet::TextStyle::Body, look.selected);
     const float padding = facet::Px(t.spacing.sm);
     const float height = facet::ControlHeight(facet::ControlSize::Regular);
-    const float iconSize = facet::Px(t.type[facet::TextStyle::Body].size);
-    const float natural = ImGui::CalcTextSize(label, end).x + padding * 2.0f + (look.submenu ? iconSize + padding : 0.0f);
+    const float natural = ImGui::CalcTextSize(label, end).x + padding * 2.0f;
     const float width = std::max(natural, ImGui::GetContentRegionAvail().x);
     fi::ItemOptions options;
     options.hitTarget = false;
@@ -249,7 +245,7 @@ fi::ItemState ProtoRow(PageCtx& ctx, const char* label, const char* probe, const
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const float radius = facet::Px(t.radii.element);
-        const float feedback = std::max({item.hoverAmount, item.pressAmount, look.open ? 1.0f : 0.0f});
+        const float feedback = std::max(item.hoverAmount, item.pressAmount);
         if (feedback > 0.0f && !look.selected)
         {
             const ImVec4 fill = facet::Mix(c.fill[2], c.fill[1], item.pressAmount);
@@ -257,10 +253,6 @@ fi::ItemState ProtoRow(PageCtx& ctx, const char* label, const char* probe, const
         }
         drawList->AddText(ImVec2(item.rect.Min.x + padding, facet::CenteredTextY(item.rect.Min.y, height)),
                           Col(item.disabled ? c.labelTertiary : c.label), label, end);
-        if (look.submenu)
-            facet::DrawIcon(drawList, facet::FindIcon("chevron-right"),
-                            ImVec2(item.rect.Max.x - padding - iconSize, item.rect.Min.y + (height - iconSize) * 0.5f),
-                            iconSize, Col(c.labelSecondary));
         ImRect ring = item.rect;
         ring.Expand(-fi::FocusRingOutset());
         fi::DrawFocusRing(drawList, ring, std::max(0.0f, radius - fi::FocusRingOutset()), item.focusAmount);
@@ -400,82 +392,71 @@ struct MenuEntry
 {
     const char* label;
     const char* probe;
-    int child;  // the menu level this row opens, or -1
+    int child;                  // the menu level this row opens, or -1
+    ImGuiKeyChord chord = 0;    // the shortcut that also runs it (the page registers it), 0 for none
 };
 
-const MenuEntry kMenu1[] = {{"Cut", "menu.cut", -1}, {"Copy", "menu.copy", -1}, {"Paste", "menu.paste", -1},
+const MenuEntry kMenu1[] = {{"Cut", "menu.cut", -1, ImGuiMod_Ctrl | ImGuiKey_X},
+                            {"Copy", "menu.copy", -1, ImGuiMod_Ctrl | ImGuiKey_C},
+                            {"Paste", "menu.paste", -1, ImGuiMod_Ctrl | ImGuiKey_V},
                             {"Arrange", "menu.arrange", 1}};
 const MenuEntry kMenu2[] = {{"Bring forward", "menu.forward", -1}, {"Send backward", "menu.backward", -1},
                             {"Align", "menu.align", 2}};
+// The alignment is a choice: the current one carries the check mark.
 const MenuEntry kMenu3[] = {{"Left", "menu.left", -1}, {"Center", "menu.center", -1}, {"Right", "menu.right", -1}};
 
 void SubmitMenuLevel(PageCtx& ctx, int depth);
 
-// One row of menu level `depth`: hover opens its submenu after overlay.submenuDelay, as do Enter,
-// Space and the Right arrow; a leaf runs its action and closes the menu.
-void MenuRow(PageCtx& ctx, int depth, const MenuEntry& entry)
+void RunMenuAction(const char* label)
 {
-    const bool forcedOpen = entry.child >= 0 && Capturing(ctx, kMenu);
-    if (forcedOpen)
+    std::snprintf(page.lastAction, sizeof(page.lastAction), "%s", label);
+}
+
+// One row of menu level `depth`, through the menu row block (popup_menu.h): it opens submenus
+// after the rest delay or by key, keeps them open while the pointer aims at them, and closes the
+// chain after an action.
+void MenuRow(PageCtx& ctx, int depth, int index, const MenuEntry& entry)
+{
+    if (entry.child >= 0 && Capturing(ctx, kMenu))
         ctx.ForceNextItemState(ForcedItemState::Open);
-    RowLook look;
-    look.submenu = entry.child >= 0;
-    look.open = forcedOpen || (entry.child >= 0 && fi::IsPopupLevelOpen(ids.menu[entry.child]));
-    const fi::ItemState row = ProtoRow(ctx, entry.label, entry.probe, look);
-    const double now = ImGui::GetTime();
-    const float delay = facet::T().overlay.submenuDelay * facet::T().motion.scale;
-    // The rest starts when the pointer moves onto the row, so a submenu closed by a key while the
-    // pointer happens to lie on its row stays closed until the pointer moves.
-    if (entry.child >= 0 && fi::PopupLevelClosedReason(ids.menu[entry.child]) == fi::PopupCloseReason::Escape)
-        page.hoverRow[depth] = 0;
-    const ImVec2 delta = ImGui::GetIO().MouseDelta;
-    if (row.hovered && page.hoverRow[depth] != row.id && (delta.x != 0.0f || delta.y != 0.0f))
+    char shortcut[32] = "";
+    if (entry.chord != 0)
+        facet::ChordToText(entry.chord, shortcut, sizeof(shortcut));
+    fi::MenuRowDesc desc;
+    desc.shortcut = entry.chord != 0 ? shortcut : nullptr;
+    desc.submenu = entry.child >= 0 ? ids.menu[entry.child] : 0;
+    desc.checked = depth == 2 && page.align == index;
+    const fi::MenuRowResult row = fi::MenuRow(ids.menu[depth], entry.label, desc);
+    ctx.Probe(entry.probe);
+    if (row.pressed)
     {
-        page.hoverRow[depth] = row.id;
-        page.hoverSince[depth] = now;
+        RunMenuAction(entry.label);
+        if (depth == 2)
+            page.align = index;
     }
-    const bool rested = row.hovered && page.hoverRow[depth] == row.id && now - page.hoverSince[depth] >= delay;
     if (entry.child >= 0)
-    {
-        const ImGuiID child = ids.menu[entry.child];
-        fi::PopupAnchor anchor = AnchorOf(row.rect, fi::PopupSide::After);
-        // The child's first row lines up with this row: offset by the level padding.
-        anchor.rect.Min.y -= facet::Px(facet::T().spacing.xs);
-        const bool keyOpen = row.focused && ImGui::IsKeyPressed(ImGuiKey_RightArrow, false);
-        if (row.open || ((row.pressed || keyOpen || rested) && !look.open))
-            OpenOrForce(row, child, anchor, {.minWidth = facet::Px(facet::T().overlay.menuMinWidth)});
-        fi::SetPopupLevelAnchor(child, anchor);
         SubmitMenuLevel(ctx, entry.child);
-    }
-    else
-    {
-        // Resting on a leaf closes an open submenu of this level, unless the pointer is on its way there.
-        if (rested && depth + 1 < 3 && fi::IsPopupLevelOpen(ids.menu[depth + 1]) &&
-            !fi::PopupPointerAimsAt(fi::PopupLevelRect(ids.menu[depth + 1])))
-            fi::ClosePopupLevel(ids.menu[depth + 1]);
-        if (row.pressed)
-        {
-            std::snprintf(page.lastAction, sizeof(page.lastAction), "%s", entry.label);
-            fi::ClosePopupLevelChain(ids.menu[depth]);
-        }
-    }
 }
 
 void SubmitMenuLevel(PageCtx& ctx, int depth)
 {
     if (!fi::BeginPopupLevel(ids.menu[depth]))
         return;
-    // The Left arrow inside a submenu closes it; the focus goes back to its row.
-    if (depth > 0 && ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false))
-    {
-        fi::ClosePopupLevel(ids.menu[depth]);
-        page.hoverRow[depth - 1] = 0;
-    }
+    fi::MenuLevelBegin(ids.menu[depth]);
     const MenuEntry* entries = depth == 0 ? kMenu1 : (depth == 1 ? kMenu2 : kMenu3);
     const int count = depth == 0 ? IM_COUNTOF(kMenu1) : (depth == 1 ? IM_COUNTOF(kMenu2) : IM_COUNTOF(kMenu3));
     for (int i = 0; i < count; ++i)
-        MenuRow(ctx, depth, entries[i]);
+        MenuRow(ctx, depth, i, entries[i]);
     fi::EndPopupLevel();
+}
+
+// The shortcuts the menu shows run its actions while the page is shown; a focused text field or
+// any other owner of the chord takes it first (global route).
+void MenuShortcuts()
+{
+    for (const MenuEntry& entry : kMenu1)
+        if (entry.chord != 0 && ImGui::Shortcut(entry.chord, ImGuiInputFlags_RouteGlobal))
+            RunMenuAction(entry.label);
 }
 
 void MenuSection(PageCtx& ctx)
@@ -498,6 +479,7 @@ void MenuSection(PageCtx& ctx)
     }
     fi::SetPopupLevelAnchor(ids.menu[0], where);
     SubmitMenuLevel(ctx, 0);
+    MenuShortcuts();
     if (Capturing(ctx, kClosing) && ctx.captureFramesLeft == 5)
         fi::ClosePopupLevel(ids.menu[0]);
     ImGui::SameLine();
@@ -505,7 +487,7 @@ void MenuSection(PageCtx& ctx)
     Note("Hover a row with a chevron for %.1f s, or press Enter, Space or the Right arrow on it, to open its submenu; "
          "Left closes a submenu. Escape closes one level per press and gives the focus back to the row or button that "
          "opened it. A click on a row of an open level is meant for that row; a click anywhere else closes the menu "
-         "and presses nothing.",
+         "and presses nothing. The shortcuts shown run the same actions while the menu is closed.",
          facet::T().overlay.submenuDelay);
     if (forced || Capturing(ctx, kClosing))
         ctx.RevealInCapture(0.2f);
@@ -549,14 +531,14 @@ void ContextSection(PageCtx& ctx)
     }
     if (fi::BeginPopupLevel(ids.context))
     {
+        fi::MenuLevelBegin(ids.context);
         const MenuEntry entries[] = {{"Copy", "ctx.copy", -1}, {"Rename", "ctx.rename", -1}, {"Delete", "ctx.delete", -1}};
         for (const MenuEntry& entry : entries)
         {
-            if (ProtoRow(ctx, entry.label, entry.probe, {}).pressed)
-            {
-                std::snprintf(page.lastAction, sizeof(page.lastAction), "%s", entry.label);
-                fi::ClosePopupLevelChain(ids.context);
-            }
+            const bool pressed = fi::MenuRow(ids.context, entry.label).pressed;
+            ctx.Probe(entry.probe);
+            if (pressed)
+                RunMenuAction(entry.label);
         }
         fi::EndPopupLevel();
     }
@@ -942,6 +924,7 @@ FACET_DEMO_SELFTEST("popup")
     test.Expect("a click on a leaf runs it and closes the whole menu", [] {
         return std::string(page.lastAction) == "Center" && !seen.menu[0] && !seen.menu[1] && !seen.menu[2];
     });
+    test.Expect("the chosen alignment is the checked row", [] { return page.align == 1; });
     test.ExpectFocused("menu.anchor");
     // By keyboard, then Escape level by level with the focus going back each time.
     test.KeyPress(ImGuiKey_Tab);
@@ -971,6 +954,9 @@ FACET_DEMO_SELFTEST("popup")
     test.Wait(2);
     test.Expect("nothing owns Escape once every level is closed",
                 [] { return ImGui::GetKeyOwner(ImGuiKey_Escape) == ImGuiKeyOwner_NoOwner; });
+    // The shortcut a row shows runs its action with the menu closed.
+    test.KeyPress(ImGuiKey_X | ImGuiMod_Ctrl);
+    test.Expect("Ctrl+X runs Cut", [] { return std::string(page.lastAction) == "Cut"; });
 
     // Context menu: right click, then the Menu key and Shift+F10 on the focused target.
     test.Click("ctx.target", ImGuiMouseButton_Right);

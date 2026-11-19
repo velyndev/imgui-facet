@@ -205,6 +205,10 @@ Popup host:
   Dear ImGui's own dim is not used, so the dim and the dialog arrive together.
 - **Rows in menus** draw the focus ring inside the row, because the menu padding is narrower
   than the ring.
+- **Menu shortcuts** sit right-aligned at the row's end in labelSecondary, so the labels stay
+  the first thing read and every shortcut lines up in one column.
+- **Menu leading slot.** An icon (labelSecondary) or a check mark (label) sits in a slot that every
+  row of the level keeps once one row uses it, so the labels start in one line.
 
 Scroll core:
 
