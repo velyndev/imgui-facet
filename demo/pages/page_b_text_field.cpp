@@ -6,6 +6,7 @@
 // sizes. Each shows its value and its edit sessions.
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 #include <imgui.h>
@@ -105,6 +106,9 @@ void Fill(bool longText)
     page.validated = "ab";
     page.floating = kSampleShort;
     page.limited = kSampleShort;
+    // The counter shows the length of the previous frame, and a capture resets the page every
+    // frame, so the filled length is set here (the sample is ASCII: one code point per byte).
+    page.limitedLength = static_cast<int>(std::strlen(kSampleShort));
     page.loading = kSampleShort;
     page.area = "First sample line\nSecond sample line that is long enough to wrap inside the area";
     page.small = kSampleShort;
