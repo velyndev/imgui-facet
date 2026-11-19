@@ -738,6 +738,44 @@ TEST_CASE("A structure placeholder dims its text inside BeginDisabled")
     CHECK(disabledTertiary > 0);
 }
 
+TEST_CASE("Menu item placeholders name their own function in the caption")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 secondary = facet::ToU32(facet::T().colors.labelSecondary);
+    // One glyph quad (4 vertices) per character that is not a space.
+    const auto glyphVertices = [](const char* text) {
+        int count = 0;
+        for (const char* c = text; *c != '\0'; ++c)
+            count += *c != ' ' ? 4 : 0;
+        return count;
+    };
+    bool checked = false;
+    int selection = 0;
+    int plain = 0;
+    int check = 0;
+    int radio = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        int from = drawList->VtxBuffer.Size;
+        facet::MenuItem("Item 1");
+        plain = VerticesWithColor(drawList, from, secondary);
+        from = drawList->VtxBuffer.Size;
+        facet::MenuCheckItem("Item 2", &checked);
+        check = VerticesWithColor(drawList, from, secondary);
+        from = drawList->VtxBuffer.Size;
+        facet::MenuRadioItem("Item 3", &selection, 1);
+        radio = VerticesWithColor(drawList, from, secondary);
+    });
+    session.Frame();
+    facet::SetTheme(saved, false);
+    CHECK(plain == glyphVertices("MenuItem: planned (Item 1)"));
+    CHECK(check == glyphVertices("MenuCheckItem: planned (Item 2)"));
+    CHECK(radio == glyphVertices("MenuRadioItem: planned (Item 3)"));
+}
+
 TEST_CASE("Tab skips structure placeholders and a click on one activates nothing")
 {
     facet::test::Session session;
