@@ -867,7 +867,7 @@ TEST_CASE("AnglePicker fits a short row and follows the width rules")
     CHECK(radians == 0.5f);
 }
 
-TEST_CASE("The placeholder text keeps what tells boxes apart: the label, then the widget name")
+TEST_CASE("The placeholder text keeps the label once the whole caption does not fit")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
