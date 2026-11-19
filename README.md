@@ -63,7 +63,9 @@ The building blocks the widgets will be made of exist inside the library. What e
   delta mappings with one edit session per drag or key press), the multi-handle model, the
   selection pill, fuzzy matching with ranked match ranges, chord capture, and the chart core
   (scales, ticks and labels, hover snapping, decimation and series colors). The popup host,
-  scroll core, list and selection core, drag and drop core and text field core are planned.
+  scroll core, list and selection core, drag and drop core and text field core are planned:
+  the calls they offer each other are declared in `src/internal/` and link, but do nothing
+  yet, so `NextVisibleRows` still hands out no rows.
 - `facet::EndFrame` reports a `PushAccent`, `PushControlSize` or Facet scope left open
   through Dear ImGui's recoverable error path and clears it.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware

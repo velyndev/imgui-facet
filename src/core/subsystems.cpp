@@ -19,9 +19,9 @@
 //                      bookkeeping that the later blocks may read
 //   focus              keyboard modality (whether focus rings show), decided before any
 //                      widget draws; EndFrame drops forced item states no widget took
-//   popup host         planned (Phase 1c part B): the open popups and the closing ones it
-//                      replays, and the Escape routing between layers; before scroll, so a
-//                      wheel turn over a popup belongs to the popup
+//   popup host         the open popups and the closing ones it replays, and the Escape and
+//                      context menu key routing between layers (src/internal/popup_host.h);
+//                      before scroll, so a wheel turn over a popup belongs to the popup
 //   scroll             smooth wheel and overlay scrollbars; before drag and drop, which
 //                      scrolls a list while a drag rests near its edge
 //   drag and drop      the drag in progress; at EndFrame its preview is drawn after the

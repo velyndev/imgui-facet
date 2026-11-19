@@ -1,5 +1,6 @@
 // Behaviour behind widgets/common.h: the control size stack, the built-in strings, the edit
-// session queries (fed by the item behaviour and the value drag core) and the visible row ranges.
+// session queries (fed by the item behaviour and the value drag core) and the visible row ranges
+// (handed out by the list core, src/internal/list_core.h).
 
 #include "facet/widgets/common.h"
 
@@ -10,6 +11,7 @@
 
 #include "core/core_internal.h"
 #include "facet/core/scale.h"
+#include "internal/list_core.h"
 #include "internal/row_layout.h"
 #include "internal/subsystem.h"
 #include "internal/value_drag.h"
@@ -95,10 +97,7 @@ StringTable& Table()
 
 bool NextVisibleRows(RowRange* rows)
 {
-    // Stub until the list and selection core exists (Phase 1c part B).
-    if (rows != nullptr)
-        *rows = {};
-    return false;
+    return internal::NextListRows(rows);
 }
 
 void PushControlSize(ControlSize size)
