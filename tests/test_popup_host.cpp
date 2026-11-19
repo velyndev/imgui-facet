@@ -1261,6 +1261,51 @@ TEST_CASE("popup host: tooltip delay, grace between items, hiding on input, keyb
     CHECK(G().NavId == idA);
 }
 
+TEST_CASE("popup host: tooltips of many items reuse a bounded set of windows")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    constexpr int kColumns = 20;
+    constexpr int kItems = 200;
+    int shownItem = -1;
+    session.SetUi([&] {
+        shownItem = -1;
+        for (int i = 0; i < kItems; ++i)
+        {
+            if (i % kColumns != 0)
+                ImGui::SameLine();
+            ImGui::PushID(i);
+            ImGui::Button("##item", ImVec2(30.0f, 30.0f));
+            session.Track("item" + std::to_string(i));
+            if (fi::BeginPopupTooltip(ImGui::GetItemID(), LastItemRect(), ImGui::IsItemHovered(), false))
+            {
+                shownItem = i;
+                ImGui::Text("tooltip %d", i);
+                fi::EndPopupTooltip();
+            }
+            ImGui::PopID();
+        }
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("item0"));
+    session.Seconds(0.6f);
+    REQUIRE(shownItem == 0);
+    int windowsAfterFirstRow = 0;
+    int shownCount = 1;
+    for (int i = 1; i < kItems; ++i)
+    {
+        // Moving straight to the next item keeps the tooltips coming at once.
+        session.MouseMove(session.ItemCenter("item" + std::to_string(i)));
+        session.Frame();
+        shownCount += shownItem == i ? 1 : 0;
+        if (i == kColumns * 2)
+            windowsAfterFirstRow = G().Windows.Size;
+    }
+    CHECK(shownCount == kItems);
+    CHECK(G().Windows.Size == windowsAfterFirstRow);
+}
+
 TEST_CASE("popup host: placement at the screen edges at scale 0.75 and 2, following the anchor and the display size")
 {
     for (const float scale : {0.75f, 2.0f})

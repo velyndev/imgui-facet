@@ -79,6 +79,7 @@ struct Level
     // This frame's submission.
     ImGuiWindow* window = nullptr;
     bool plainWindow = false;    // a tooltip or forced level: a plain window, not a Dear ImGui popup
+    ImGuiID windowOwner = 0;     // the level that last drew in this slot's plain window (kept across ids)
     int surfaceCommands = 0;     // commands at the front of the root draw list that are the surface
     int scrimCommands = 0;       // of those, the scrim's (a Modal)
     int scrimVertexBegin = 0;
@@ -1281,9 +1282,23 @@ bool BeginPopupLevel(ImGuiID id)
     const PopupKind kind = level->options.kind;
     const bool plain = forced || kind == PopupKind::Tooltip;
 
+    // A plain level (a tooltip or a forced level) draws in the window of its record's slot, not
+    // in a window per id: Dear ImGui never destroys windows, so a window per hovered item would
+    // grow the window list without limit. When the slot's window last showed another level,
+    // it is reset the way Dear ImGui recycles its own tooltip windows: hidden for one frame
+    // while it measures the new content, so nothing shows at the old size.
     char name[40];
-    std::snprintf(name, sizeof(name), "##FacetPopupLevel_%08X", id);
+    std::snprintf(name, sizeof(name), "##FacetPopupPlain%02d", static_cast<int>(level - s.levels));
     ImGuiWindow* existing = plain ? ImGui::FindWindowByName(name) : nullptr;
+    if (existing != nullptr && level->windowOwner != id)
+    {
+        existing->HiddenFramesCannotSkipItems = 1;
+        existing->Size = existing->SizeFull = ImVec2(0.0f, 0.0f);
+        existing->ContentSize = existing->ContentSizeIdeal = ImVec2(0.0f, 0.0f);
+        existing = nullptr;
+    }
+    if (plain)
+        level->windowOwner = id;
     if (!plain)
     {
         std::snprintf(name, sizeof(name), "##Popup_%08x", id);
@@ -1321,7 +1336,7 @@ bool BeginPopupLevel(ImGuiID id)
         flags |= ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing;
         if (kind == PopupKind::Tooltip)
             flags |= ImGuiWindowFlags_Tooltip;
-        std::snprintf(name, sizeof(name), "##FacetPopupLevel_%08X", id);
+        std::snprintf(name, sizeof(name), "##FacetPopupPlain%02d", static_cast<int>(level - s.levels));
         shown = ImGui::Begin(name, nullptr, flags);
         if (!shown)
             ImGui::End();
