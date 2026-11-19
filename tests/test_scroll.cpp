@@ -155,6 +155,27 @@ TEST_CASE("Scroll area: the wheel moves a target that the position follows smoot
     CHECK(ui.area.ScrollY() == doctest::Approx(Notch() * 1.25f).epsilon(0.02));
 }
 
+TEST_CASE("Scroll area: Shutdown in the middle of a wheel scroll gives the wheel back to Dear ImGui")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SingleArea ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Wheel(ui.area.Center(), -1.0f);
+    REQUIRE(fi::IsScrollAreaScrolling(ui.area.Window()));
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    const ImGuiKeyOwnerData* wheelY = ImGui::GetKeyOwnerData(g, ImGuiKey_MouseWheelY);
+    const ImGuiKeyOwnerData* wheelX = ImGui::GetKeyOwnerData(g, ImGuiKey_MouseWheelX);
+    REQUIRE(wheelY->OwnerNext != ImGuiKeyOwner_NoOwner);
+    facet::Shutdown();
+    CHECK(wheelY->OwnerCurr == ImGuiKeyOwner_NoOwner);
+    CHECK(wheelY->OwnerNext == ImGuiKeyOwner_NoOwner);
+    CHECK(wheelX->OwnerCurr == ImGuiKeyOwner_NoOwner);
+    CHECK(wheelX->OwnerNext == ImGuiKeyOwner_NoOwner);
+}
+
 TEST_CASE("Scroll area: the same smooth scroll at 30 and 240 frames per second")
 {
     MotionGuard guard;

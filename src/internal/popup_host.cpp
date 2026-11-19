@@ -29,6 +29,7 @@
 #include "facet/core/theme.h"
 #include "internal/device.h"
 #include "internal/focus.h"
+#include "internal/keys.h"
 #include "internal/popup_place.h"
 #include "internal/popup_replay.h"
 #include "internal/subsystem.h"
@@ -936,17 +937,8 @@ void ReleaseKeysWeOwn()
     ImGuiContext* g = ImGui::GetCurrentContext();
     if (g == nullptr || g != State().context)
         return;
-    const ImGuiKey keys[] = {ImGuiKey_Escape, ImGuiKey_MouseLeft, ImGuiKey_Menu, ImGuiKey_F10};
-    for (const ImGuiKey key : keys)
-    {
-        ImGuiKeyOwnerData* owner = ImGui::GetKeyOwnerData(g, key);
-        if (owner->OwnerCurr == kEscapeOwner || owner->OwnerCurr == kMouseOwner || owner->OwnerCurr == kContextOwner ||
-            owner->OwnerNext == kEscapeOwner || owner->OwnerNext == kMouseOwner || owner->OwnerNext == kContextOwner)
-        {
-            owner->OwnerCurr = owner->OwnerNext = ImGuiKeyOwner_NoOwner;
-            owner->LockThisFrame = owner->LockUntilRelease = false;
-        }
-    }
+    const ImGuiID owners[] = {kEscapeOwner, kMouseOwner, kContextOwner};
+    ReleaseKeyOwners(owners);
 }
 
 void EndAllMotion()

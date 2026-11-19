@@ -230,6 +230,25 @@ const char* KeyConfigName(ImGuiKey key)
     return kConfigNames[key - ImGuiKey_NamedKey_BEGIN];
 }
 
+void ReleaseKeyOwners(std::span<const ImGuiID> owners)
+{
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    if (g == nullptr || owners.empty())
+        return;
+    const auto ours = [&](ImGuiID owner) {
+        return owner != ImGuiKeyOwner_NoOwner && std::find(owners.begin(), owners.end(), owner) != owners.end();
+    };
+    for (int key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; ++key)
+    {
+        ImGuiKeyOwnerData* data = ImGui::GetKeyOwnerData(g, static_cast<ImGuiKey>(key));
+        if (ours(data->OwnerCurr) || ours(data->OwnerNext))
+        {
+            data->OwnerCurr = data->OwnerNext = ImGuiKeyOwner_NoOwner;
+            data->LockThisFrame = data->LockUntilRelease = false;
+        }
+    }
+}
+
 } // namespace facet::internal
 
 namespace facet

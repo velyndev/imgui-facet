@@ -1063,6 +1063,67 @@ TEST_CASE("A click ends a keyboard drag without a drop")
     CHECK_FALSE(list.delivered);
 }
 
+TEST_CASE("Shutdown in the middle of a drag leaves no drag and no key owner behind")
+{
+    const auto noOwner = [](ImGuiKey key) {
+        const ImGuiKeyOwnerData* data = ImGui::GetKeyOwnerData(ImGui::GetCurrentContext(), key);
+        return data->OwnerCurr == ImGuiKeyOwner_NoOwner && data->OwnerNext == ImGuiKeyOwner_NoOwner &&
+               !data->LockUntilRelease;
+    };
+    SUBCASE("a pointer drag")
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        TestList list;
+        session.SetUi([&] { list.Ui(session, "a"); });
+        session.Frame();
+        session.MouseMove(list.RowCenter(1));
+        session.MouseDown();
+        session.MouseMove(list.GapPoint(4));
+        session.MouseMove(list.GapPoint(4));
+        REQUIRE(list.active);
+        REQUIRE(ImGui::GetCurrentContext()->DragDropActive);
+        REQUIRE_FALSE(noOwner(ImGuiKey_Escape));
+        facet::Shutdown();
+        CHECK_FALSE(ImGui::GetCurrentContext()->DragDropActive);
+        CHECK(noOwner(ImGuiKey_Escape));
+    }
+    SUBCASE("a keyboard drag")
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        TestList list;
+        session.SetUi([&] { list.Ui(session, "a"); });
+        session.Frames(2);
+        list.focusKey = 1;
+        session.Frames(2);
+        session.KeyPress(ImGuiKey_Space);
+        REQUIRE(list.active);
+        REQUIRE_FALSE(noOwner(ImGuiKey_DownArrow));
+        facet::Shutdown();
+        for (const ImGuiKey key : {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_Enter, ImGuiKey_Escape})
+            CHECK(noOwner(key));
+    }
+    SUBCASE("a canceled drag whose button is still down")
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        TestList list;
+        session.SetUi([&] { list.Ui(session, "a"); });
+        session.Frame();
+        session.MouseMove(list.RowCenter(1));
+        session.MouseDown();
+        session.MouseMove(list.GapPoint(4));
+        session.MouseMove(list.GapPoint(4));
+        REQUIRE(list.active);
+        session.KeyPress(ImGuiKey_Escape);
+        REQUIRE_FALSE(list.active);
+        REQUIRE_FALSE(noOwner(ImGuiKey_MouseLeft));
+        facet::Shutdown();
+        CHECK(noOwner(ImGuiKey_MouseLeft));
+    }
+}
+
 TEST_CASE("A source without the keyboard pick-up leaves Space to the item")
 {
     facet::test::Session session;

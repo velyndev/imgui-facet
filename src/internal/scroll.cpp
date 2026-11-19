@@ -34,6 +34,7 @@
 #include "facet/core/theme.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/keys.h"
 #include "internal/list_view.h"
 #include "internal/subsystem.h"
 
@@ -420,6 +421,12 @@ void ScrollEndFrame()
 
 void ScrollShutdown()
 {
+    // The wheel claimed for the next frame goes back to Dear ImGui.
+    if (Core().context != nullptr && Core().context == ImGui::GetCurrentContext())
+    {
+        const ImGuiID owners[] = {WheelOwner()};
+        ReleaseKeyOwners(owners);
+    }
     ResetCore(nullptr);
     ListCoreShutdown();
 }

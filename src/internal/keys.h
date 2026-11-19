@@ -35,6 +35,7 @@
 // the locks for keys pressed since the last frame before any app code runs.
 
 #include <cstdint>
+#include <span>
 
 #include <imgui.h>
 
@@ -63,6 +64,11 @@ const char* KeyDisplayName(ImGuiKey key);
 // same in every release ("LeftCtrl", "PageUp", "Semicolon", "Num0", "MouseX1",
 // "GamepadFaceDown"). "" for ImGuiKey_None and keys without a name.
 const char* KeyConfigName(ImGuiKey key);
+
+// Clears the owner, locks included, of every named key whose current or next owner is one of
+// `owners`. The Shutdown hooks of the blocks that set key owners of their own call it, so
+// facet::Shutdown in the middle of an interaction leaves no Facet owner in the host's context.
+void ReleaseKeyOwners(std::span<const ImGuiID> owners);
 
 // facet::ChordToConfigText (input.h) writes chords with these names.
 

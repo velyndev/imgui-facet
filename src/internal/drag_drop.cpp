@@ -28,6 +28,7 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "internal/focus.h"
+#include "internal/keys.h"
 #include "internal/scroll.h"
 #include "internal/subsystem.h"
 #include "internal/text_util.h"
@@ -922,6 +923,16 @@ void DragDropEndFrame()
 void DragDropShutdown()
 {
     ModuleState& s = State();
+    if (ImGuiContext* g = ImGui::GetCurrentContext())
+    {
+        // A drag in progress ends in Dear ImGui too, and the keys the core owns (Escape, the carry
+        // keys, the held mouse buttons) go back to it.
+        const ImGuiID source = s.drag.sourceId;
+        if (s.drag.kind == DragKind::Pointer && g->DragDropActive && g->DragDropPayload.SourceId == source)
+            ImGui::ClearDragDrop();
+        const ImGuiID owners[] = {LockOwner(), CancelHandlerOwner(), source};
+        ReleaseKeyOwners(std::span<const ImGuiID>(owners, source != 0 ? 3 : 2));
+    }
     s.drag = DragState{};
     s.sourceOpen = false;
     s.imguiSourceOpen = false;
