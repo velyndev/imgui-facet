@@ -93,8 +93,12 @@ FACET_DEMO_PAGE("focus", "Focus", "Blocks", 20, "default", "focused", "clipped")
                             "Where the keyboard focus is, shown only to keyboard users: the ring appears after Tab, "
                             "the arrows, Space, Enter or Escape, and goes away after a mouse click. It follows the "
                             "control's corners just outside its edge.");
-    Note("Prototype buttons built only from the item behaviour and focus ring blocks. Keyboard modality: %s.",
-         facet::internal::KeyboardModality() ? "on" : "off");
+    if (ctx.capture && ctx.captureState != kDefault)
+        Note("Prototype buttons built only from the item behaviour and focus ring blocks. A focused state is forced "
+             "for this image, so the rings show without the keyboard input that turns the modality on.");
+    else
+        Note("Prototype buttons built only from the item behaviour and focus ring blocks. Keyboard modality: %s.",
+             facet::internal::KeyboardModality() ? "on" : "off");
 
     SectionHeader("On every surface");
     const float gap = facet::Px(t.spacing.md);

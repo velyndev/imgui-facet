@@ -113,10 +113,17 @@ FACET_DEMO_PAGE("item", "Item behaviour", "Blocks", 10, "default", "hovered", "p
     if (facet::demo::ProtoButton(ctx, "Disabled prototype", "item.disabled"))
         ++page.disabledPresses;
     ImGui::EndDisabled();
-    Note("Pressed %d times. Stock queries on it: IsItemHovered %s, IsItemActive %s, IsItemFocused %s. Keyboard "
-         "modality %s: the focus ring shows only after Tab, the arrows, Space or Enter.",
-         page.presses, page.hovered ? "yes" : "no", page.active ? "yes" : "no", page.focused ? "yes" : "no",
-         facet::internal::KeyboardModality() ? "on" : "off");
+    // A forced capture state draws the look without real input, so the stock queries would
+    // contradict the image: say what was forced instead.
+    if (ctx.capture && ctx.captureState != kDefault)
+        Note("The %s state is forced for this image: the button is drawn as it looks then, while the stock queries and "
+             "the keyboard modality see no real input. The focus ring shows only after Tab, the arrows, Space or Enter.",
+             ctx.captureState == kHovered ? "hovered" : (ctx.captureState == kPressed ? "pressed" : "focused"));
+    else
+        Note("Pressed %d times. Stock queries on it: IsItemHovered %s, IsItemActive %s, IsItemFocused %s. Keyboard "
+             "modality %s: the focus ring shows only after Tab, the arrows, Space or Enter.",
+             page.presses, page.hovered ? "yes" : "no", page.active ? "yes" : "no", page.focused ? "yes" : "no",
+             facet::internal::KeyboardModality() ? "on" : "off");
     ctx.RevealInCapture(0.3f);
 
     SectionHeader("Repeat while held");
