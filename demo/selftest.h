@@ -117,6 +117,7 @@ public:
         ExpectNear,
         ExpectText,
         ExpectVisible,
+        Reveal,
         SelectPage,
         ExpectPage,
     };
@@ -188,6 +189,10 @@ public:
     void ExpectText(std::string_view description, std::function<std::string()> value, std::string_view expected);
     // Records PASS when the center of the probed item lies in the visible part of its window.
     void ExpectVisible(std::string_view probe);
+    // Scrolls the probed item into the middle of its window, as a person scrolls to look at
+    // it, so a following ExpectVisible checks that it is drawn at all in a small viewport.
+    // Records FAIL only when the probe is missing.
+    void Reveal(std::string_view probe);
     // Shows the page with this id, as a click in the navigation or --page would.
     void SelectPage(std::string_view pageId);
     // Records PASS when the page with this id is the one shown.

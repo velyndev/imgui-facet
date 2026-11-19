@@ -542,8 +542,12 @@ FACET_DEMO_SELFTEST("chart-core")
     test.Expect("and back to a logarithmic one", [] { return page.logAxis; });
     test.MouseMove(T::Item("chart.growth", 0.999f, 0.5f));
     test.Wait(1);
-    test.Expect("the right edge of the growth chart reads 10^4",
-                [] { return growthCrosshair.visible && std::abs(growthCrosshair.valueY - 10000.0) < 1.0; });
+    // The pointer position is whole pixels, so in a narrow chart the last pixel column can sit
+    // nearer the sample before the last one: within one sample of 10^4 (0.025 in log10).
+    test.Expect("the right edge of the growth chart reads 10^4", [] {
+        return growthCrosshair.visible && growthCrosshair.valueY > 0.0 &&
+               std::abs(std::log10(growthCrosshair.valueY) - 4.0) <= 0.026;
+    });
 
     // The long series is decimated to a few points per pixel column.
     test.Expect("100000 samples draw as at most four points per column",

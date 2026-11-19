@@ -167,6 +167,7 @@ FACET_DEMO_SELFTEST("overflow")
     test.Drag({T::Item("overflow.width.track", 1.0f), T::Item("overflow.width.track", -0.5f)});
     test.ExpectNear("the width slider reaches its minimum", [] { return page.row; }, kMinRow, 0.0);
     test.Expect("a narrow row hides items", [] { return page.hidden > 0; });
+    test.Reveal("overflow.more");
     test.ExpectVisible("overflow.more");
     test.Expect("the current item stays in the row", [] { return page.visible[page.current]; });
 

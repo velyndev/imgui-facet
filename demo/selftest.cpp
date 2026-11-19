@@ -257,6 +257,15 @@ public:
                                        (probe == nullptr ? std::string(" (probe not found)") : std::string()));
         }
 
+        case SelftestScript::StepKind::Reveal:
+        {
+            if (probes.Find(step.text) == nullptr)
+                return Report(false, "reveal '" + step.text + "': probe not found");
+            probes.RequestReveal(step.text);
+            Frames(kRevealFrames);
+            return true;
+        }
+
         case SelftestScript::StepKind::SelectPage:
         {
             const int index = FindPage(step.text);
@@ -637,6 +646,14 @@ void SelftestScript::ExpectVisible(std::string_view probe)
 {
     Step step;
     step.kind = StepKind::ExpectVisible;
+    step.text = probe;
+    steps.push_back(std::move(step));
+}
+
+void SelftestScript::Reveal(std::string_view probe)
+{
+    Step step;
+    step.kind = StepKind::Reveal;
     step.text = probe;
     steps.push_back(std::move(step));
 }
