@@ -100,6 +100,12 @@ bool IsScrollAreaScrolling(ImGuiWindow* window);
 // windows below them.
 ImGuiWindow* ScrollAreaAt(ImVec2 point);
 
+// True while the area under the pointer (ScrollAreaAt(io.MousePos)) is still scrolling
+// (IsScrollAreaScrolling). Every control that reads the wheel itself (a focused slider, a number
+// field stepping while typing) checks it first and leaves the wheel alone then, so a control that
+// slides under a resting pointer in the middle of a scroll gesture does not take the wheel over.
+bool ScrollWheelBelongsToScroll();
+
 // Edge scroll for a drag held near an edge: asks `window` to scroll this frame because a drag
 // rests at `point` (screen pixels). Inside the band of the drag.autoScrollZone token along an
 // edge, or past it, the area scrolls toward that edge at up to drag.autoScrollSpeed (units per

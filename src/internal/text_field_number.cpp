@@ -17,6 +17,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "internal/state_storage.h"
+#include "internal/scroll.h"
 #include "internal/text_field_detail.h"
 #include "internal/value_drag.h"
 
@@ -412,8 +413,10 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
         const int lines = NumberKeyPresses(ImGuiKey_UpArrow, id) - NumberKeyPresses(ImGuiKey_DownArrow, id);
         const int pages = NumberKeyPresses(ImGuiKey_PageUp, id) - NumberKeyPresses(ImGuiKey_PageDown, id);
         int notches = 0;
+        // Over the field, unless the area under the pointer is still scrolling: the scroll gesture
+        // keeps the wheel until it ends.
         const bool overField = state.frame.GetWidth() > 0.0f && ImGui::IsMouseHoveringRect(state.frame.Min, state.frame.Max) &&
-                               g.HoveredWindow == g.CurrentWindow;
+                               g.HoveredWindow == g.CurrentWindow && !ScrollWheelBelongsToScroll();
         if (overField)
         {
             ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, id);

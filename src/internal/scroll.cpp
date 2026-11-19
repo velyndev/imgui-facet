@@ -599,6 +599,13 @@ bool IsScrollAreaScrolling(ImGuiWindow* window)
            (record->dragAxis >= 0 && record->dragFrame >= frame - 1) || record->edgeFrame == frame;
 }
 
+bool ScrollWheelBelongsToScroll()
+{
+    if (ImGui::GetCurrentContext() == nullptr)
+        return false;
+    return IsScrollAreaScrolling(ScrollAreaAt(ImGui::GetIO().MousePos));
+}
+
 ImGuiWindow* ScrollAreaAt(ImVec2 point)
 {
     if (ImGui::GetCurrentContext() == nullptr)

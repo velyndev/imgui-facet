@@ -20,6 +20,7 @@
 #include <facet/facet.h>
 
 #include "internal/item.h"
+#include "internal/scroll.h"
 #include "internal/text_field.h"
 #include "internal/text_field_number.h"
 #include "support/session.h"
@@ -1180,6 +1181,59 @@ TEST_CASE("Number field: Up, Down and Page keys step with the modifiers; Escape 
     session.KeyPress(ImGuiKey_Enter);
     CHECK(number.value == 41.0);
     CHECK(number.commits == 1);
+}
+
+TEST_CASE("Number field: a typing field that slides under the pointer mid-scroll leaves the wheel to the area")
+{
+    facet::SetFollowSystemMotion(false);
+    facet::SetUiScale(1.0f);
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        TestNumber number;
+        number.value = 10.0;
+        number.params.step = 1.0;
+        ImGuiID areaId = 0;
+        session.SetUi([&] {
+            if (facet::internal::BeginScrollAreaCore("area", {.size = ImVec2(300.0f, 200.0f)}))
+            {
+                areaId = ImGui::GetCurrentWindow()->ID;
+                ImGui::Dummy(ImVec2(10.0f, 120.0f));
+                number.Run("##wheel");
+                ImGui::Dummy(ImVec2(10.0f, 800.0f));
+                facet::internal::EndScrollAreaCore();
+            }
+        });
+        session.Frames(2);
+        session.Click(number.TextPoint());
+        REQUIRE(number.result.typing);
+        ImGuiWindow* area = ImGui::FindWindowByID(areaId);
+        REQUIRE(area != nullptr);
+        // The pointer rests one wheel notch above the field, off it.
+        const float notch = facet::Px(facet::T().scroll.wheelDistance);
+        const ImVec2 at = number.result.field.frame.GetCenter();
+        const ImVec2 rest(at.x, at.y - notch);
+        session.MouseMove(rest);
+        session.Frames(2);
+        session.Wheel(rest, -1.0f);
+        const float firstTarget = facet::internal::ScrollAreaTarget(area).y;
+        CHECK(firstTarget == doctest::Approx(notch));
+        // Most of the way there the field is under the pointer while the area still moves.
+        session.Seconds(0.1f);
+        REQUIRE(facet::internal::IsScrollAreaScrolling(area));
+        REQUIRE(number.result.field.frame.Contains(rest));
+        REQUIRE(number.result.typing);
+        session.Wheel(rest, -1.0f);
+        CHECK(number.value == 10.0);
+        CHECK(facet::internal::ScrollAreaTarget(area).y == doctest::Approx(firstTarget + notch));
+        // Once the area has come to rest, the typing field under the pointer steps with the wheel.
+        session.Seconds(1.5f);
+        REQUIRE_FALSE(facet::internal::IsScrollAreaScrolling(area));
+        REQUIRE(number.result.typing);
+        session.Wheel(number.result.field.frame.GetCenter(), 1.0f);
+        CHECK(number.value == 11.0);
+    }
+    facet::SetFollowSystemMotion(true);
 }
 
 TEST_CASE("Number field: steppers step at once, stop at the ends and commit once per press")

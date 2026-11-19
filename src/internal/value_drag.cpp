@@ -634,7 +634,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     // The wheel, over the item, while it is focused or Alt is held, unless the window under the
     // pointer is still scrolling: the scroll gesture keeps the wheel until it ends.
     const bool wheelEnabled = options.wheel && !readOnly && item.hovered && (focused || io.KeyAlt) &&
-                              !IsScrollAreaScrolling(ScrollAreaAt(io.MousePos));
+                              !ScrollWheelBelongsToScroll();
     WheelRest& wheelRest = CurrentWheelRest();
     if (!wheelEnabled && wheelRest.id == id)
         wheelRest = {};
