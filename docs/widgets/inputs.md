@@ -74,7 +74,12 @@ bool Autocomplete(const char* label, std::string* text, std::span<const char* co
                   const AutocompleteOptions& options = {});
 bool Autocomplete(const char* label, std::string* text, int suggestionCount, ChoiceGetter getter, void* user,
                   const AutocompleteOptions& options = {});
-// and the same three with char* buffer, std::size_t bufferSize in place of std::string* text
+bool Autocomplete(const char* label, char* buffer, std::size_t bufferSize, std::span<const ChoiceItem> suggestions,
+                  const AutocompleteOptions& options = {});
+bool Autocomplete(const char* label, char* buffer, std::size_t bufferSize, std::span<const char* const> suggestions,
+                  const AutocompleteOptions& options = {});
+bool Autocomplete(const char* label, char* buffer, std::size_t bufferSize, int suggestionCount, ChoiceGetter getter,
+                  void* user, const AutocompleteOptions& options = {});
 int AutocompleteAcceptedItem();
 ```
 
