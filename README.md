@@ -4,15 +4,15 @@ Facet is a design framework for Dear ImGui applications on Windows with Direct3D
 a consistent set of custom widgets, a light and a dark theme, icon rendering and proper scaling
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
-**Status: early development.** No Facet widget is implemented yet. The fourteen widget family
+**Status: early development.** Every building block the widgets are made of exists inside the
+library and works; no Facet widget is implemented yet. The fourteen widget family
 headers in `include/facet/widgets/` declare the planned widgets with documentation comments,
 and every declared function links. Each widget function draws a placeholder that says
 "planned", returns the neutral result and writes nothing; End functions, queries and helpers
 such as `PassesFilter` draw nothing and return neutral values. The exceptions: `ApplyReorderMove`
 works, the built-in strings and the edit session queries in `common.h` work, and the
 `BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it (see
-`docs/widgets.md` and the family pages under `docs/widgets/`).
-The building blocks the widgets will be made of exist inside the library. What exists today:
+`docs/widgets.md` and the family pages under `docs/widgets/`). What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -26,8 +26,8 @@ The building blocks the widgets will be made of exist inside the library. What e
     surface), an accent for one region (`PushAccent` / `PopAccent`), animated theme switches, a
     mode that follows the Windows app theme and `ApplyImGuiStyle` for stock Dear ImGui widgets
     (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). The theme
-    also holds the tokens of the planned popups, scrollbars, lists, drag and drop, text fields
-    and containers. See `docs/theming.md` and `docs/scaling.md`.
+    also holds the tokens of popups, scrollbars, lists, drag and drop and text fields, which
+    the blocks below use, and of the planned containers. See `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
     (`layout.h`) work. See `docs/layout.md`.
   - Core, input: key chords as text and back, key binds in the modes Hold, Toggle, Always and
@@ -53,19 +53,36 @@ The building blocks the widgets will be made of exist inside the library. What e
     per-scale atlas work (`icons.h`).
 - `include/facet/widgets/common.h`: the types the widget families share, the control size
   stack (`PushControlSize`), control heights, the built-in strings (`SetStrings`) and the edit
-  session queries (`IsItemEditCommitted`, `IsItemEditCanceled`) work; `NextVisibleRows` is a
-  stub that returns false until the list core exists (planned). `facet/facet.h` includes every
-  core and widget header. The rules for widget declarations are in `docs/api-conventions.md`.
+  session queries (`IsItemEditCommitted`, `IsItemEditCanceled`) work; `NextVisibleRows`
+  forwards to the list core and hands out rows inside the row ranges the list core opens, so
+  inside the placeholder containers, which open none, it returns false. `facet/facet.h`
+  includes every core and widget header. The rules for widget declarations are in `docs/api-conventions.md`.
 - The building blocks of the widgets, internal to the library (`src/internal/`, each header
   starts with a usage sketch): item behaviour (hover, press, focus, disabled and hit targets
   of at least `minHitTarget`), keyboard modality and the focus ring, labelled rows and row
   groups, overflow fitting, the value drag core (linear, logarithmic, stepped, wrapping and
   delta mappings with one edit session per drag or key press), the multi-handle model, the
-  selection pill, fuzzy matching with ranked match ranges, chord capture, and the chart core
-  (scales, ticks and labels, hover snapping, decimation and series colors). The popup host,
-  scroll core, list and selection core, drag and drop core and text field core are planned:
-  the calls they offer each other are declared in `src/internal/` and link, but do nothing
-  yet, so `NextVisibleRows` still hands out no rows.
+  selection pill, fuzzy matching with ranked match ranges, chord capture, the chart core
+  (scales, ticks and labels, hover snapping, decimation and series colors), and:
+  - the popup host (`popup_host.h`, `popup_place.h`): placement beside an anchor with flip and
+    clamp, nested levels on Dear ImGui's popup stack, Escape and the context menu keys through
+    key ownership, focus return, glass or opaque surfaces, an open motion and a close motion
+    that replays the last frame, tooltips with hover intent, and the modal scrim;
+  - the scroll core (`scroll.h`): scroll areas with overlay bars, smooth wheel scrolling that
+    hands over between nested areas, edge fades, revealing a rectangle and edge scrolling;
+  - the list and selection core (`list_core.h`, `list_view.h`): virtualized rows, Dear
+    ImGui's multi-select with box selection, keyboard and typeahead, trees, and the loading,
+    error and empty states;
+  - the drag and drop core (`drag_drop.h`): typed drags that work with stock Dear ImGui
+    sources and targets, ordered and wrapping drop zones with the gap or an insertion line,
+    the drag preview, edge scrolling of scroll areas, and a keyboard path;
+  - the text field core (`text_field.h`, `text_field_number.h`): fields on Dear ImGui's own
+    text editing with the Facet frame, adornments, edit sessions and number editing.
+
+  The blocks call each other through these headers: a list view scrolls in a scroll area and
+  keeps the wheel inside a popup level, a drag edge scrolls the area under it, a drag within a
+  list view reports the move, and a text field hands its list keys to an open completion
+  level (tested in `tests/test_block_combinations.cpp`).
 - `facet::EndFrame` reports a `PushAccent`, `PushControlSize` or Facet scope left open
   through Dear ImGui's recoverable error path and clears it.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
@@ -113,6 +130,21 @@ The building blocks the widgets will be made of exist inside the library. What e
     - Chart core: generated functions with nice ticks, a crosshair that follows the mouse or
       the arrow keys after Tab, a logarithmic axis, a 100000 sample series drawn through
       decimation, the series colors with their contrast, and an empty state.
+    - Popup host: a dropdown list and a long list that shrinks to the room it has, a menu with
+      submenus, a context menu, a glass popover, tooltips, a modal with a confirm level, and
+      levels placed near the display edges; a capture state shows a level in its close motion.
+    - Scroll: a long area with edge fades, nested areas that hand the wheel over, an area that
+      scrolls on both axes, the edge fades on every surface, content that fits, and a reduce
+      motion switch.
+    - List core: a virtual list of one million generated rows, a multiple selection, a sorted
+      and filtered list that keeps its selection by id, a single choice on the selection pill,
+      a tree of this gallery's pages, and the loading, error and empty states.
+    - Drag and drop: a reorderable list, two lists that exchange rows (Ctrl copies) and a zone
+      that takes list rows only, a grid of slots that moves, stacks, swaps and splits, a tree
+      with drops before, after and into a group, and a long list that edge scrolls.
+    - Text field core: plain, narrow, search, password, validated, floating label, limited and
+      loading fields, a number field with steppers and drag, a multiline area, a read-only
+      field, and the three control sizes.
   - Widgets: one page per widget family (Buttons, Selection, Sliders, Inputs, Pickers, Lists,
     Navigation, Containers, Layout, Overlays, Display, Charts, Media, Composites). Every widget
     on them is a placeholder of its declared size that cannot be operated.
