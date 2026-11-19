@@ -830,8 +830,8 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     // The list keys go to an open completion level first.
     if (params.completionPopup != 0 && activeBefore && IsPopupLevelOpen(params.completionPopup))
     {
-        const ImGuiKey listKeys[] = {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Enter, ImGuiKey_KeypadEnter,
-                                     ImGuiKey_Tab, ImGuiKey_Escape};
+        const ImGuiKey listKeys[] = {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_PageUp, ImGuiKey_PageDown,
+                                     ImGuiKey_Enter,   ImGuiKey_KeypadEnter, ImGuiKey_Tab, ImGuiKey_Escape};
         for (const ImGuiKey key : listKeys)
             ImGui::SetKeyOwner(key, params.completionPopup, ImGuiInputFlags_LockThisFrame);
     }

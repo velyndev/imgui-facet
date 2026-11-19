@@ -14,8 +14,10 @@
 // Writes follow docs/api-conventions.md rule 3: per keystroke unless the caller pushed
 // ImGuiItemFlags_LiveEditOnInputText off; Escape restores the text from activation, writes it
 // and ends the edit (the active edit takes Escape first, rule 8). While `completionPopup` names
-// an open popup level, Up, Down, Enter, Tab and Escape go to that level first, so a completion
-// list can be operated while typing goes on in the field.
+// an open popup level, Up, Down, Page Up, Page Down, Enter, Tab and Escape go to that level first
+// (owner: the level id), so a completion list can be operated while typing goes on in the field: a
+// BeginListView inside the level with ListViewDesc::keyOwner set to the level id and a highlight
+// reads them. Home and End stay with the caret.
 //
 //     const TextFieldResult field = TextFieldBehavior(label, text, {.placeholder = options.placeholder,
 //                                                                  .completionPopup = listId,

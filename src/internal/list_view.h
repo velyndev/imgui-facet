@@ -53,6 +53,15 @@
 //     the loading, error or empty state (DrawListState) and BeginListView returns false.
 //   - Captures: ForceNextItemState (item.h) right before BeginListView applies to the row whose
 //     index is the request's part (part -1: the first row).
+//   - Driven lists (ListViewDesc::highlight): the keyboard focus stays on the driving item (a text
+//     field typing a filter, a dropdown button), and the view keeps an active row instead, drawn
+//     with the hover fill and the focus ring and scrolled into view when it moves. With keyOwner
+//     it reads Up and Down (from no row: the first or the last), Page Up and Down (a page of
+//     visible rows), Home and End, and Enter, Keypad Enter or Tab (activate the active row) owned
+//     by keyOwner, skipping disabled entries; Escape is the owner's (it closes the level). The
+//     pointer moving over a row makes it the active row, and a click activates it. Activation sets
+//     ListRowState::activated and ListViewResult::activated, and writes `choice` unless readOnly.
+//     Typeahead is off: the driving field has the typed text.
 //
 // State kept under the view id (state_storage.h): the focused row, the typeahead text and its
 // time. The scroll offset is the scroll area's.
@@ -104,6 +113,12 @@ struct ListViewDesc
     const char* emptyText = nullptr;          // null uses Strings::empty
     const char* errorText = nullptr;          // null uses Strings::loadFailed
     int revealRow = -1;                       // scrolled into view at once (SetNextVirtualListScrollTo)
+    // A list driven from an item that keeps the keyboard focus (the open list of Autocomplete, a
+    // searchable Dropdown or a ComboBox; see "Driven lists" above). `highlight` is the active row
+    // (index, -1 for none), written by the view; `keyOwner` is the owner the driving item gives
+    // the list keys to (a text field's completionPopup level id); 0 reads no keys.
+    int* highlight = nullptr;
+    ImGuiID keyOwner = 0;
 };
 
 struct ListRowOptions
@@ -195,6 +210,7 @@ struct ListRowDesc
     bool selected = false;     // shown selected (inside a scope, a request of this frame may change it)
     bool disabled = false;     // shown, not focusable, skipped by the arrows
     bool tabStop = false;      // the row Tab lands on (one per list)
+    bool highlighted = false;  // the active row of a driven list: the hover fill and the focus ring
     float indent = 0.0f;       // pixels before row.content (a tree depth)
     int part = -1;             // the part of the group's forced state this row answers to (captures)
 };

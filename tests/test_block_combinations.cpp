@@ -314,3 +314,121 @@ TEST_CASE("A text field hands its list keys to an open completion level and keep
     CHECK_FALSE(fieldActive);
     CHECK(text.empty());
 }
+
+namespace
+{
+
+// "Entry 0" to "Entry 19", the third one disabled.
+void ComboEntry(void*, int index, fi::ListEntryInfo* out)
+{
+    static char label[16];
+    std::snprintf(label, sizeof(label), "Entry %d", index);
+    out->label = label;
+    out->disabled = index == 2;
+}
+
+} // namespace
+
+TEST_CASE("A text field drives the highlighted row of a list view in its completion level")
+{
+    CombinationGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    bool listOpen = false;
+    bool fieldActive = false;
+    int highlight = -1;
+    int activated = -1;
+    int activations = 0;
+    ImGuiID listWindowId = 0;
+    session.SetUi([&] {
+        fi::TextFieldParams params;
+        params.completionPopup = kComboLevel;
+        const fi::TextFieldResult field = fi::TextFieldBehavior("field", &text, params);
+        session.Track("field");
+        fieldActive = field.active;
+        if (field.edited && !text.empty() && !fi::IsPopupLevelOpen(kComboLevel))
+        {
+            fi::OpenPopupLevel(kComboLevel, fi::TextFieldPopupAnchor(field, fi::TextFieldAnchor::Field),
+                               {.takeFocus = false});
+            highlight = -1;
+        }
+        if (fi::BeginPopupLevel(kComboLevel))
+        {
+            fi::ListViewDesc desc;
+            desc.rowCount = 20;
+            desc.areaSize = ImVec2(220.0f, 120.0f);
+            desc.entry = &ComboEntry;
+            desc.highlight = &highlight;
+            desc.keyOwner = kComboLevel;
+            if (fi::BeginListView(ImGui::GetID("list"), desc))
+            {
+                listWindowId = ImGui::GetCurrentWindow()->ID;
+                facet::RowRange rows;
+                char name[16];
+                while (facet::NextVisibleRows(&rows))
+                    for (int i = rows.first; i < rows.last; ++i)
+                    {
+                        const fi::ListRowState row = fi::ListViewRow(i);
+                        std::snprintf(name, sizeof(name), "row%d", i);
+                        session.Track(name);
+                        if (row.activated)
+                            ++activations;
+                    }
+                const fi::ListViewResult result = fi::EndListView();
+                if (result.activated >= 0)
+                    activated = result.activated;
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, kComboLevel))
+                fi::ClosePopupLevel(kComboLevel);
+            fi::EndPopupLevel();
+        }
+        listOpen = fi::IsPopupLevelOpen(kComboLevel);
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("field"));
+    session.Type("e");
+    session.Frames(2);
+    REQUIRE(listOpen);
+    REQUIRE(fieldActive);
+    CHECK(highlight == -1);
+    // Down from no row goes to the first; the disabled third entry is skipped.
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(highlight == 0);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(highlight == 3);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(highlight == 1);
+    CHECK(fieldActive);
+    CHECK(text == "e");
+    // Page Down moves a page of visible rows and scrolls the row into view.
+    session.KeyPress(ImGuiKey_PageDown);
+    session.Seconds(0.6f);
+    CHECK(highlight > 3);
+    const int paged = highlight;
+    ImGuiWindow* list = ImGui::FindWindowByID(listWindowId);
+    REQUIRE(list != nullptr);
+    CHECK(list->Scroll.y > 0.0f);
+    CHECK(session.ItemVisible("row" + std::to_string(paged)));
+    // Typing goes on in the field; the keyboard focus never left it.
+    session.Type("n");
+    session.Frames(2);
+    CHECK(text == "en");
+    CHECK(highlight == paged);
+    // Enter activates the active row, and the field keeps the edit.
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activated == paged);
+    CHECK(activations == 1);
+    CHECK(fieldActive);
+    CHECK(text == "en");
+    // Tab activates too.
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(activated == paged - 1);
+    CHECK(activations == 2);
+    // The pointer moving over a row makes it the active one.
+    session.MouseMove(session.ItemCenter("row" + std::to_string(paged)));
+    session.Frames(2);
+    CHECK(highlight == paged);
+}

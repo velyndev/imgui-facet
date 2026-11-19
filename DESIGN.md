@@ -222,6 +222,9 @@ List core:
   semibold; rows inset one hairline top and bottom with radii.control, so adjacent selected
   rows stay separate.
 - **Row focus ring** is drawn after all rows, so neighbours never cover it.
+- **Active row of a driven list** (the open list of a field that keeps the keyboard) takes the
+  hover fill and the focus ring, because it is where Enter goes, the same promise the ring makes
+  for a focused row.
 - **Trees.** chevron-right and chevron-down in labelSecondary, one list.indent per level, and
   separator hairlines as indent guides.
 - **Data states.** The spinner and Strings::loading in labelSecondary; the error glyph in

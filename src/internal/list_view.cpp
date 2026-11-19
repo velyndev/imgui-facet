@@ -98,7 +98,7 @@ struct RowEnv
 };
 
 ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSelectionUserData data, bool selected,
-                    bool disabled, bool tabStop, int part, float indent)
+                    bool disabled, bool tabStop, int part, float indent, bool highlighted = false)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = env.window;
@@ -155,16 +155,21 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
         if (selected && env.pill == nullptr)
             FillRect(drawList, fill.Min, fill.Max, ToU32(env.listFocused ? c.accentSubtle : c.fill[1]), radius);
         const bool quiet = IsScrollAreaScrolling(window);
-        const float feedback = item.disabled ? 0.0f : std::max(quiet ? 0.0f : item.hoverAmount, item.pressAmount);
+        float feedback = item.disabled ? 0.0f : std::max(quiet ? 0.0f : item.hoverAmount, item.pressAmount);
+        if (highlighted && !item.disabled)
+            feedback = 1.0f;
         if (!selected && feedback > 0.0f)
         {
             const ImVec4 tint = Mix(c.fill[2], c.fill[1], item.pressAmount);
             FillRect(drawList, fill.Min, fill.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
         }
     }
-    if (item.focusAmount > 0.0f && env.ring != nullptr)
+    if (env.ring != nullptr && (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
     {
+        // The active row of a driven list shows the ring the keyboard focus would.
         *env.ring = item;
+        if (highlighted)
+            env.ring->focusAmount = 1.0f;
         *env.hasRing = true;
     }
 
@@ -244,6 +249,7 @@ struct ViewFrame
     bool hasRing = false;
     bool changed = false;
     int activated = -1;
+    bool driven = false;  // desc.highlight is set
 };
 
 struct ViewStack
@@ -275,6 +281,7 @@ void ResetFrame(ViewFrame& frame)
     frame.hasRing = false;
     frame.changed = false;
     frame.activated = -1;
+    frame.driven = false;
 }
 
 ImRect RowRect(const ViewFrame& frame, int index)
@@ -359,6 +366,81 @@ void JumpToEnd(ViewFrame& frame, bool end)
     frame.state->focusIndex = target;
     frame.state->focusedId = id;
     ScrollAreaRevealRect(frame.window, rect, ScrollAlign::Nearest, false);
+}
+
+// The next enabled entry from `from` (included) in direction `step`, -1 when there is none.
+int EnabledFrom(const ListViewDesc& desc, int from, int step)
+{
+    for (int i = from; i >= 0 && i < desc.rowCount; i += step)
+        if (!EntryOf(desc, i).disabled)
+            return i;
+    return -1;
+}
+
+// Activates the active row of a driven list: the result reports it and a choice takes it.
+void ActivateHighlight(ViewFrame& frame, int index)
+{
+    const ListViewDesc& desc = frame.desc;
+    if (index < 0 || index >= desc.rowCount || EntryOf(desc, index).disabled)
+        return;
+    frame.activated = index;
+    *desc.highlight = index;
+    if (!desc.readOnly && desc.selection == nullptr && desc.choice != nullptr && *desc.choice != index)
+    {
+        *desc.choice = index;
+        frame.changed = true;
+    }
+}
+
+// The keys of a driven list, read through desc.keyOwner (see "Driven lists" in list_view.h).
+void DriveHighlight(ViewFrame& frame)
+{
+    const ListViewDesc& desc = frame.desc;
+    const ImGuiID owner = desc.keyOwner;
+    int& active = *desc.highlight;
+    const auto pressed = [owner](ImGuiKey key) { return ImGui::IsKeyPressed(key, ImGuiInputFlags_Repeat, owner); };
+    const int page = std::max(1, static_cast<int>(frame.window->InnerRect.GetHeight() / frame.rowHeight));
+    int target = active;
+    bool jump = false;
+    if (pressed(ImGuiKey_DownArrow) && !pressed(ImGuiKey_UpArrow))
+    {
+        const int next = EnabledFrom(desc, active < 0 ? 0 : active + 1, 1);
+        target = next >= 0 ? next : active;
+    }
+    else if (pressed(ImGuiKey_UpArrow))
+    {
+        const int next = EnabledFrom(desc, active < 0 ? desc.rowCount - 1 : active - 1, -1);
+        target = next >= 0 ? next : active;
+    }
+    else if (pressed(ImGuiKey_PageDown) || pressed(ImGuiKey_PageUp))
+    {
+        const int step = pressed(ImGuiKey_PageDown) ? 1 : -1;
+        const int from = std::clamp(std::max(active, 0) + step * page, 0, desc.rowCount - 1);
+        int next = EnabledFrom(desc, from, step);
+        if (next < 0)
+            next = EnabledFrom(desc, from, -step);
+        target = next >= 0 ? next : active;
+    }
+    else if (pressed(ImGuiKey_Home) != pressed(ImGuiKey_End))
+    {
+        ListJumpDesc ends;
+        ends.rowCount = desc.rowCount;
+        ends.entry = desc.entry;
+        ends.user = desc.user;
+        const int next = ListJumpToEnd(ends, pressed(ImGuiKey_End), nullptr);
+        target = next >= 0 ? next : active;
+        jump = true;
+    }
+    if (target != active && target >= 0)
+    {
+        active = target;
+        ScrollAreaRevealRect(frame.window, RowRect(frame, target), ScrollAlign::Nearest, !jump);
+    }
+    const bool activate = ImGui::IsKeyPressed(ImGuiKey_Enter, ImGuiInputFlags_None, owner) ||
+                          ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, ImGuiInputFlags_None, owner) ||
+                          ImGui::IsKeyPressed(ImGuiKey_Tab, ImGuiInputFlags_None, owner);
+    if (activate)
+        ActivateHighlight(frame, active);
 }
 
 // Dear ImGui keeps the start of a Shift range as an index. When the caller sorted or filtered since
@@ -669,7 +751,8 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
     env.forced = forced != nullptr ? forced : &kNoForce;
     env.ring = &ring;
     env.hasRing = &hasRing;
-    return RunRow(env, id, rect, desc.selection, desc.selected, desc.disabled, desc.tabStop, desc.part, desc.indent);
+    return RunRow(env, id, rect, desc.selection, desc.selected, desc.disabled, desc.tabStop, desc.part, desc.indent,
+                  desc.highlighted);
 }
 
 void ListRowGroup::End()
@@ -794,7 +877,15 @@ bool BeginListView(ImGuiID id, const ListViewDesc& desc)
     frame.listFocused = g.NavId != 0 && (g.NavId == state.focusedId || g.NavWindow == window ||
                                          ((frame.multi || frame.choiceScope) && g.NavFocusScopeId == frame.focusScope));
 
-    if (frame.listFocused && desc.entry != nullptr && UpdateTypeahead(state.typed))
+    if (desc.highlight != nullptr)
+    {
+        frame.driven = true;
+        if (*desc.highlight < -1 || *desc.highlight >= desc.rowCount)
+            *desc.highlight = -1;
+        if (desc.keyOwner != 0)
+            DriveHighlight(frame);
+    }
+    if (frame.listFocused && !frame.driven && desc.entry != nullptr && UpdateTypeahead(state.typed))
     {
         const int target = ListTypeaheadFind(state.typed.text, desc.rowCount, state.focusIndex, desc.entry, desc.user);
         if (target >= 0 && target != state.focusIndex)
@@ -889,11 +980,24 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
     env.forced = &frame.forced;
     env.ring = &frame.ring;
     env.hasRing = &frame.hasRing;
-    const ListRowState row = RunRow(env, id, RowRect(frame, index), index, selected, disabled, tabStop, index, 0.0f);
+    const bool highlighted = frame.driven && *desc.highlight == index;
+    ListRowState row =
+        RunRow(env, id, RowRect(frame, index), index, selected, disabled, tabStop, index, 0.0f, highlighted);
     if (row.focused)
     {
         frame.state->focusIndex = index;
         frame.state->focusedId = id;
+    }
+    if (frame.driven && !row.disabled)
+    {
+        // The pointer moving over a row makes it the active one; a click activates it.
+        const ImGuiIO& io = ImGui::GetIO();
+        if (row.item.hovered && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f))
+            *desc.highlight = index;
+        if (row.item.pressed && !row.item.keyboardPressed)
+            ActivateHighlight(frame, index);
+        if (frame.activated == index)
+            row.activated = true;
     }
     if (row.activated)
         frame.activated = index;
