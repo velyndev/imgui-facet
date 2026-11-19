@@ -69,6 +69,7 @@ TEST_CASE("The popup host interface links with its frozen signatures")
     CHECK(anchor.align == fi::PopupAlign::Start);
     CHECK(fi::PopupOptions{}.kind == fi::PopupKind::Popup);
     CHECK(fi::PopupOptions{}.takeFocus);
+    CHECK(fi::PopupOptions{}.closeOnEscape);
 }
 
 TEST_CASE("The drag and drop core interface links with its frozen signatures")
@@ -93,6 +94,7 @@ TEST_CASE("The list core interface links with its frozen signatures")
     CHECK(Links<bool()>(&fi::EndListSelection));
     CHECK(Links<bool(fi::ListSelection*, int)>(&fi::IsListEntrySelected));
     CHECK(fi::ListRowsDesc{}.columns == 1);
+    CHECK_FALSE(fi::ListSelectionOptions{}.grid);
     CHECK(fi::ListRowsDesc{}.keepAlive == -1);
 }
 
