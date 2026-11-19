@@ -182,6 +182,101 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   again for 3:1, so lines and areas stay distinguishable from the background with any accent.
 - **Plot edges** sit on whole pixels, so clip edges and grid lines stay crisp at every scale.
 
+Popup host:
+
+- **Surfaces by kind.** Menus, lists and popovers take the popover radius and elevation 2,
+  dialogs the window radius and elevation 3, tooltips the control radius and elevation 1; the
+  height of the layer sets its shadow.
+- **Padding by kind.** spacing.xs for menus and lists, so rows run almost edge to edge;
+  spacing.xl for dialogs; spacing.sm by spacing.xs for tooltips.
+- **Open and close motion.** A level enters with ease-out over popupOpen and leaves with ease-in
+  over popupClose, growing from the edge that faces its anchor and sliding anchorGap toward it,
+  so the layer reads as coming from its control.
+- **Tooltip at the pointer.** It sits after and below the cursor by spacing.lg and spacing.xl,
+  so the cursor never covers the text.
+- **Little room.** A level with less than two control heights of room beside its anchor covers
+  the anchor instead of shrinking further, so it always shows at least two rows.
+- **Sticky side.** A level keeps its side while only its content changes, so a filtered list
+  does not jump between above and below.
+- **Scrim.** The host draws the modal scrim from colors.scrim and fades it with the dialog;
+  Dear ImGui's own dim is not used, so the dim and the dialog arrive together.
+- **Rows in menus** draw the focus ring inside the row, because the menu padding is narrower
+  than the ring.
+
+Scroll core:
+
+- **Overlay bar.** A thumb in scrollThumb and scrollThumbHover with radii.element (at most half
+  its thickness); the fill[3] track shows only while the bar is wide. The position stays
+  visible without taking content width, and the track appears only where the pointer aims.
+- **Edge fades.** A gradient of the surface color over scroll.edgeFade whose strength grows with
+  the content left on that side, so the fade eases in instead of popping.
+- **Track paging.** A press on the track pages by the visible length less one edge fade, so the
+  line at the old edge stays in view.
+- **Wheel gestures** stay with the window they scroll while the pointer rests, so content
+  sliding under the pointer, a focused slider included, does not take the wheel over.
+
+List core:
+
+- **Rows.** Hover fill[2]; the selection accentSubtle while the list has keyboard focus and
+  fill[1] otherwise, so it stays visible but quieter when focus is elsewhere; selected labels
+  semibold; rows inset one hairline top and bottom with radii.control, so adjacent selected
+  rows stay separate.
+- **Row focus ring** is drawn after all rows, so neighbours never cover it.
+- **Trees.** chevron-right and chevron-down in labelSecondary, one list.indent per level, and
+  separator hairlines as indent guides.
+- **Data states.** The spinner and Strings::loading in labelSecondary; the error glyph in
+  destructive with the text in label; the empty text in labelSecondary, centered; all keep the
+  list's size, so the layout does not jump when the data arrives.
+
+Drag and drop core:
+
+- **Ghost.** The source item's size on the level 3 elevated surface with its shadow and
+  hairline, faded to drag.ghostOpacity, so it reads as lifted above the page without hiding
+  where it goes.
+- **Badges** on the ghost (count, copy) are an accent pill with onAccent text at full opacity,
+  because they are information, not part of the faded item.
+- **Insertion line.** The focusRing color at focusRingWidth with round ends, the one mark that
+  reaches 3:1 on every surface.
+- **Drop target.** An accentSubtle fill with a focusRing outline at focusRingWidth and no halo,
+  so it is not mistaken for the focus ring.
+- **Refusal.** No highlight and the not-allowed cursor, so refusal does not rest on color.
+- **Gap.** Rows move apart along the standard spring, keyed by item, to show where the item
+  lands; the landing place gets a fill[2] wash; under reduced motion the rows jump.
+- **Keyboard drag.** The ghost sits spacing.xs above the landing place with the focus ring and
+  springs to each new place, so the keyboard user sees the same lift as the pointer user.
+
+Text field core:
+
+- **Fill.** fill[2] at rest and fill[1] on hover, like the other control fills, with the 3:1
+  boundary hairline against the surface.
+- **Read-only.** No fill, boundary only, because it reads as text that can be selected but not
+  typed.
+- **Disabled.** fill[3], a separator hairline and labelTertiary text.
+- **Active field.** A focusRing-colored hairline even after a mouse click, because typing goes
+  where that outline is; the keyboard focus ring is added only after keyboard input.
+- **Error.** A destructive hairline in place of the boundary, which keeps its color when
+  disabled.
+- **Caret.** The label color, the strongest contrast on every surface, field.caretWidth wide and
+  rounded to whole pixels so it stays crisp.
+- **Selection.** accentSubtle behind label text.
+- **Placeholder.** labelSecondary, the lightest label that still reaches 4.5:1.
+- **Edge fade.** Text that continues past the text area fades out over scroll.edgeFade on that
+  side only; only glyphs fade, the selection and caret keep full alpha.
+- **Password dots.** The font's own bullet, centered in Dear ImGui's password advance, so caret
+  and selection line up with the dots.
+- **Floating label.** It moves from the placeholder position to Caption size at the top with
+  motion.quick; the frame grows to spacing.xs, Caption, the text and spacing.sm, which equals
+  controlHeightLarge at Regular.
+- **Adornment buttons.** The control height less spacing.xs per side, a plain fill on hover and
+  press, radii.element, and the icon at the field's text size; spacing.sm between the icon or
+  suffix and the text, spacing.xs between buttons.
+- **Clear button** is not a Tab stop, because clearing is also Ctrl+A then Delete and a stop on
+  every search field slows Tab.
+- **Message line.** Footnote, spacing.xs under the frame; errors start with the error icon.
+- **Spinner** is drawn with a stroke of an eighth of its size.
+- **Drag fields** show the left-right resize cursor over the field and its label, which says
+  that dragging changes the value.
+
 ### Prototype controls
 
 The Blocks pages operate the blocks through prototype controls in `demo/`. They are not the
