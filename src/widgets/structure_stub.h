@@ -6,13 +6,10 @@
 // a stub's body with the widget and stops calling them; nothing else depends on this file.
 //
 // What a stub does, by kind of widget:
-//   - A widget in the page flow (field, row, bar, button) calls StubItem once: one Dear ImGui
-//     item of the widget's default size, a dashed hairline outline with square corners in the
-//     separator color (real controls are solid and rounded) and "<Widget>: planned" with the
-//     label's visible part on its first line, Footnote style, labelSecondary
-//     (labelTertiary inside ImGui::BeginDisabled), truncated with an ellipsis when narrow. The
-//     item is not interactive and not a Tab stop. The stub returns the neutral result (false,
-//     None, -1, an invalid id) and never writes through a value pointer.
+//   - A widget in the page flow (field, row, bar, button) calls StubItem once: the placeholder
+//     item every planned widget shares (internal::PlannedWidget in
+//     src/internal/planned_widget.h) at the widget's default size. The stub returns the neutral
+//     result (false, None, -1, an invalid id) and never writes through a value pointer.
 //   - A container whose content sits in the page flow calls BeginStubFrame and EndStubFrame:
 //     the same header line, then the caller's content, inside one dashed outline. A bool
 //     Begin of this kind returns true, so the content shows, unless the caller's own arguments
@@ -36,17 +33,18 @@
 namespace facet::internal
 {
 
-// Rows of a list placeholder until the theme has a token for the default visible rows of
-// lists and dropdowns.
-inline constexpr int kStubListRows = 5;
+// Rows of an inline list placeholder whose options leave visibleRows at 0: the list.inlineRows
+// token.
+int StubListRows();
 
-// Whether a stub may draw: inside a frame, with a current window that is not the fallback.
+// Whether a stub may draw: inside a frame, with a current window that is not the fallback
+// (internal::PlannedCanDraw).
 bool StubCanDraw();
 
-// The widget width in pixels by the precedence of rule 6: `widthUnits` from the options
-// (> 0 units, kFill the available width, < 0 the available width minus that many units), then
-// ImGui::SetNextItemWidth, then ImGui::PushItemWidth, then the family default: the available
-// width when `fill`, otherwise `contentWidth` (pixels). At least 1.
+// The widget width in pixels by the precedence of rule 6 (internal::PlannedWidth): `widthUnits`
+// from the options (> 0 units, kFill the available width, < 0 the available width minus that
+// many units), then ImGui::SetNextItemWidth, then ImGui::PushItemWidth, then the family default:
+// the available width when `fill`, otherwise `contentWidth` (pixels). At least 1.
 float StubWidth(float widthUnits, bool fill, float contentWidth = 0.0f);
 
 // Width in pixels of a content-sized placeholder for `widget` and `label`: its text plus the

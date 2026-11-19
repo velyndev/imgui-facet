@@ -12,7 +12,7 @@ namespace
 void DrawSearchableChecklist(const char* label, const SearchableChecklistOptions& options)
 {
     // The filter field plus the list rows.
-    const int rows = 1 + (options.visibleRows > 0 ? options.visibleRows : internal::kStubListRows);
+    const int rows = 1 + (options.visibleRows > 0 ? options.visibleRows : internal::StubListRows());
     internal::StubItem("SearchableChecklist", label, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(ControlSize::Inherit));
 }

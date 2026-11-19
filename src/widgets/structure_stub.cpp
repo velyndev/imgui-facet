@@ -73,28 +73,6 @@ void DrawStubText(ImDrawList* drawList, const ImRect& box, float lineHeight, con
                        ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(box.Min, box.Max));
 }
 
-// A dashed hairline rectangle with square corners: dashes and gaps of spacing.xs. Rounded,
-// solid outlines belong to real controls, so a placeholder cannot be taken for one.
-void DashedOutline(ImDrawList* drawList, ImVec2 min, ImVec2 max)
-{
-    const Theme& theme = T();
-    const ImU32 color = ToU32(theme.colors.separator);
-    const float thickness = HairlineThickness();
-    const float dash = ImMax(Px(theme.spacing.xs), 1.0f);
-    for (float x = min.x; x < max.x; x += 2.0f * dash)
-    {
-        const float end = ImMin(x + dash, max.x);
-        HairlineH(drawList, x, end, min.y, color);
-        HairlineH(drawList, x, end, max.y - thickness, color);
-    }
-    for (float y = min.y; y < max.y; y += 2.0f * dash)
-    {
-        const float end = ImMin(y + dash, max.y);
-        HairlineV(drawList, min.x, y, end, color);
-        HairlineV(drawList, max.x - thickness, y, end, color);
-    }
-}
-
 void CloseFrame(const StubFrame& frame)
 {
     if (frame.window == nullptr)
@@ -111,35 +89,25 @@ void CloseFrame(const StubFrame& frame)
     ImGui::Dummy(ImVec2(frame.right - frame.start.x, frame.inset));
     ImGui::EndGroup();
 
-    DashedOutline(ImGui::GetWindowDrawList(), frame.start, ImVec2(frame.right, ImGui::GetItemRectMax().y));
+    DrawPlannedBox(ImGui::GetWindowDrawList(), ImRect(frame.start, ImVec2(frame.right, ImGui::GetItemRectMax().y)));
 }
 
 } // namespace
 
+int StubListRows()
+{
+    return T().list.inlineRows;
+}
+
 bool StubCanDraw()
 {
-    const ImGuiContext* g = GImGui;
-    return g != nullptr && g->WithinFrameScope && g->CurrentWindow != nullptr && !g->CurrentWindow->IsFallbackWindow;
+    return PlannedCanDraw();
 }
 
 float StubWidth(float widthUnits, bool fill, float contentWidth)
 {
-    if (!StubCanDraw())
-        return 1.0f;
-    float width = 0.0f;
-    const float available = ImGui::GetContentRegionAvail().x;
-    if (widthUnits > 0.0f)
-        width = Px(widthUnits);
-    else if (widthUnits == kFill)
-        width = available;
-    else if (widthUnits < 0.0f)
-        width = available - Px(-widthUnits);
-    else if ((GImGui->NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0 ||
-             GImGui->CurrentWindow->DC.ItemWidthStack.Size > 0)
-        width = ImGui::CalcItemWidth();
-    else
-        width = fill ? available : contentWidth;
-    return width < 1.0f ? 1.0f : width;
+    // A content width of 0 means one pixel, not "fill": only `fill` asks for the available width.
+    return PlannedWidth(widthUnits, fill ? 0.0f : ImMax(contentWidth, 1.0f));
 }
 
 float StubContentWidth(const char* widget, const char* label)
@@ -151,20 +119,9 @@ float StubContentWidth(const char* widget, const char* label)
 
 void StubItem(const char* widget, const char* label, float width, float height)
 {
-    if (!StubCanDraw())
-        return;
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImRect box(pos, ImVec2(pos.x + width, pos.y + height));
-    const ImGuiID id = label != nullptr ? ImGui::GetID(label) : 0;
-    ImGui::ItemSize(box);
-    if (!ImGui::ItemAdd(box, id, nullptr, ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop))
-        return;
-
     // A tall placeholder (a list) keeps its text on the first line, where the finished widget
-    // starts.
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    DashedOutline(drawList, box.Min, box.Max);
-    DrawStubText(drawList, box, ImMin(height, ControlHeight(ControlSize::Regular)), widget, label);
+    // starts; the shared caption does that.
+    PlannedWidget(widget, label, ImMax(width, 1.0f), ImMax(height, 1.0f));
 }
 
 void StubLayer(const char* widget, const char* label, bool visible)

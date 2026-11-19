@@ -11,7 +11,7 @@ namespace
 
 void DrawListBox(const char* label, const ListBoxOptions& options)
 {
-    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::kStubListRows;
+    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::StubListRows();
     internal::StubItem("ListBox", label, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(options.size));
 }

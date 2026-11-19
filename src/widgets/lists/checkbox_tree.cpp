@@ -13,7 +13,7 @@ bool CheckboxTree(const char* id, std::span<CheckState>, std::span<const CheckTr
 {
     const float height = options.height > 0.0f
                              ? Px(options.height)
-                             : static_cast<float>(internal::kStubListRows) * ControlHeight(options.size);
+                             : static_cast<float>(internal::StubListRows()) * ControlHeight(options.size);
     internal::StubItem("CheckboxTree", id, internal::StubWidth(options.width, true), height);
     return false;
 }

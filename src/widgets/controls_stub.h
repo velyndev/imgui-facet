@@ -7,11 +7,10 @@
 // and stops including this header there.
 //
 // The placeholder is one Dear ImGui item under the widget's id, not interactive and not a Tab
-// stop, so a page of stubs never looks or acts like working controls. It draws the faintest
-// fill wash with a hairline outline in the separator color, and the caption every planned
-// widget shares (internal::DrawPlannedCaption in src/internal/planned_widget.h): "<Widget>:
-// planned (<visible label>)", shortened to what fits as described there; hovering the box
-// shows the whole text in a tooltip.
+// stop, so a page of stubs never looks or acts like working controls. It is the item every
+// planned widget shares (internal::PlannedWidget in src/internal/planned_widget.h): a dashed
+// hairline with square corners and "<Widget>: planned (<visible label>)", shortened to what
+// fits as described there; hovering the box shows the whole text in a tooltip.
 //
 // Usage in a stub:
 //
@@ -45,37 +44,21 @@
 namespace facet::internal::controls
 {
 
-// True inside a frame with a current window: the only time a stub draws.
+// True inside a frame with a current window that is not the fallback: the only time a stub
+// draws (internal::PlannedCanDraw).
 inline bool StubCanDraw()
 {
-    return ImGui::GetCurrentContext() != nullptr && GImGui->CurrentWindow != nullptr && GImGui->WithinFrameScope;
+    return PlannedCanDraw();
 }
 
-// The widget width in pixels by docs/api-conventions.md rule 6: `optionWidth` (units; > 0 that
-// width, kFill the available width, other values < 0 the available width minus that many
-// units), else ImGui::SetNextItemWidth, else a pushed ImGui::PushItemWidth, else
-// `defaultWidth` (pixels; 0 or less fills the available width). Never below one pixel.
+// The widget width in pixels by docs/api-conventions.md rule 6 (internal::PlannedWidth):
+// `optionWidth` (units; > 0 that width, kFill the available width, other values < 0 the
+// available width minus that many units), else ImGui::SetNextItemWidth, else a pushed
+// ImGui::PushItemWidth, else `defaultWidth` (pixels; 0 or less fills the available width).
+// Never below one pixel.
 inline float StubWidth(float optionWidth, float defaultWidth)
 {
-    if (!StubCanDraw())
-        return 0.0f;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    const float available = ImGui::GetContentRegionAvail().x;
-    float width = 0.0f;
-    if (optionWidth > 0.0f)
-        width = Px(optionWidth);
-    else if (optionWidth == kFill)
-        width = available;
-    else if (optionWidth < 0.0f)
-        width = available - Px(-optionWidth);
-    else if ((g.NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0)
-        width = g.NextItemData.Width < 0.0f ? available + g.NextItemData.Width : g.NextItemData.Width;
-    else if (window->DC.ItemWidthStack.Size > 0)
-        width = window->DC.ItemWidth < 0.0f ? available + window->DC.ItemWidth : window->DC.ItemWidth;
-    else
-        width = defaultWidth > 0.0f ? defaultWidth : available;
-    return width < 1.0f ? 1.0f : width;
+    return PlannedWidth(optionWidth, defaultWidth);
 }
 
 // StubWidth for a control that narrows itself when the row is short (labels collapse to icons,
@@ -148,22 +131,19 @@ inline float StubLabelLine(const char* text)
     return MeasureText(TextStyle::Body, "Ag").y + Px(T().spacing.xs);
 }
 
-// Default lengths the theme has no token for yet, as multiples of existing tokens. The widgets
-// of Phase 2 take them from the tokens requested for them.
-inline constexpr float kStubFaderInControls = 5.0f;  // length of a vertical slider, in control heights
-inline constexpr float kStubDialInControls = 2.0f;   // knob and dial diameter, in control heights of its size
-inline constexpr float kStubPadInXxxl = 6.0f;        // side of XYPad and BoxRangePad, in spacing.xxxl
-inline constexpr float kStubPickerInXxxl = 8.0f;     // width of ColorPicker and SatValSquare, in spacing.xxxl
+// Knob and dial diameter in control heights of its size: the theme sizes dials by the control
+// height of the widget, so it has no length token for them.
+inline constexpr float kStubDialInControls = 2.0f;
 
 // Size of a slider-like control: horizontal fills (rule 6) at the control height; vertical is
-// one control height wide and `heightUnits` (0: kStubFaderInControls) high. Plus the message line.
+// one control height wide and `heightUnits` (0: the faderLength token) high. Plus the message line.
 inline ImVec2 StubSliderSize(Orientation orientation, float widthUnits, float heightUnits, ControlSize size,
                              const char* error, const char* helpText)
 {
     const float message = StubMessageHeight(error, helpText);
     if (orientation == Orientation::Vertical)
     {
-        const float length = heightUnits > 0.0f ? Px(heightUnits) : ControlHeight(size) * kStubFaderInControls;
+        const float length = Px(heightUnits > 0.0f ? heightUnits : T().metrics.faderLength);
         return ImVec2(ControlHeight(size), length + message);
     }
     return ImVec2(StubWidth(widthUnits, 0.0f), ControlHeight(size) + message);
@@ -179,7 +159,7 @@ inline float StubDial(float diameterUnits, ControlSize size)
 // available width), and `heightUnits` or square.
 inline ImVec2 StubPadSize(float widthUnits, float heightUnits)
 {
-    const float width = StubFittedWidth(widthUnits, Px(T().spacing.xxxl) * kStubPadInXxxl);
+    const float width = StubFittedWidth(widthUnits, Px(T().metrics.padSize));
     return ImVec2(width, heightUnits > 0.0f ? Px(heightUnits) : width);
 }
 
@@ -191,34 +171,22 @@ inline bool StubCaption(const char* widget, const char* label, float room, char*
     return PlannedCaption(widget, label, room, out, outSize);
 }
 
-// Draws the placeholder look into `box` (pixels): the fill wash, the hairline outline and the
-// caption, and the whole text in a tooltip when `hovered` and the caption had to be shortened.
-// Submits no item; ControlStub and MessageStub decide what the box is.
+// Draws the placeholder look into `box` (pixels): the outline and the caption, and the whole
+// text in a tooltip when `hovered` and the caption had to be shortened. Submits no item;
+// MessageStub decides what the box is.
 inline void DrawStub(const ImRect& box, const char* widget, const char* label, bool hovered)
 {
-    const Theme& theme = T();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const float radius = Px(theme.radii.control);
-    FillRect(drawList, box.Min, box.Max, ToU32(theme.colors.fill[3]), radius);
-    StrokeRect(drawList, box.Min, box.Max, ToU32(theme.colors.separator), radius, HairlineThickness());
+    DrawPlannedBox(drawList, box);
     DrawPlannedCaption(drawList, box, widget, label, hovered);
 }
 
 // Submits the placeholder item of `widget` (the public function name) with the id of `label`
-// (Dear ImGui rules; null counts as "") and the size in pixels. Does nothing outside a frame.
+// (Dear ImGui rules; null counts as "") and the size in pixels (at least one), through
+// internal::PlannedWidget. Does nothing outside a frame.
 inline void ControlStub(const char* widget, const char* label, float width, float height)
 {
-    if (!StubCanDraw())
-        return;
-    if (label == nullptr)
-        label = "";
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImRect box(pos, ImVec2(pos.x + (width < 1.0f ? 1.0f : width), pos.y + (height < 1.0f ? 1.0f : height)));
-    const ImGuiID id = ImGui::GetID(label);
-    ImGui::ItemSize(box);
-    if (!ImGui::ItemAdd(box, id, nullptr, ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop))
-        return;
-    DrawStub(box, widget, label, ImGui::IsItemHovered());
+    PlannedWidget(widget, label != nullptr ? label : "", width < 1.0f ? 1.0f : width, height < 1.0f ? 1.0f : height);
 }
 
 // True when the last item is an item in the content of the current window. Its id does not

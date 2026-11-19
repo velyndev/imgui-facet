@@ -11,7 +11,7 @@ namespace
 
 void DrawTransferList(const char* id, const TransferListOptions& options)
 {
-    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::kStubListRows;
+    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::StubListRows();
     internal::StubItem("TransferList", id, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(ControlSize::Inherit));
 }

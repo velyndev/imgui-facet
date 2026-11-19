@@ -259,12 +259,12 @@ The dose caps in Direction apply. The choices behind each effect:
   other pages keep this simpler row, so the Foundations and Media pages stay on stock controls.
 - **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
   caption names them, so nothing that cannot be operated looks like a control.
-- **Planned widgets.** A declared widget without its implementation draws a box at the size the
-  widget will take with "Name: planned" in footnote labelSecondary; it is not focusable, so a
-  page of placeholders never looks operable. Controls and content widgets draw a fill[3] box
-  with a separator hairline in the control radius; structure widgets (lists, navigation,
-  containers, layout, overlays) draw a dashed separator hairline with square corners, so a
-  container placeholder reads as a frame around the caller's content.
+- **Planned widgets.** A declared widget without its implementation draws a dashed separator
+  hairline with square corners at the size the widget will take, with "Name: planned" in
+  footnote labelSecondary; it is not focusable, so a page of placeholders never looks operable.
+  Every widget group draws this one look: real controls are solid and rounded, so no
+  placeholder can be taken for one, and a container placeholder reads as a frame around the
+  caller's content.
 - **Placeholder captions.** Every placeholder group shares one caption rule: a box too narrow
   for "Name: planned (label)" shows the label alone, shortened with an ellipsis when needed,
   and the whole text on hover; a box without a label shows "Name: planned" or the name. A

@@ -9,6 +9,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
+#include "facet/widgets/common.h"
 #include "internal/text_util.h"
 
 namespace facet::internal
@@ -18,10 +19,61 @@ namespace
 
 bool CanDraw()
 {
-    return ImGui::GetCurrentContext() != nullptr && GImGui->CurrentWindow != nullptr && GImGui->WithinFrameScope;
+    return PlannedCanDraw();
 }
 
 } // namespace
+
+bool PlannedCanDraw()
+{
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    return g != nullptr && g->WithinFrameScope && g->CurrentWindow != nullptr && !g->CurrentWindow->IsFallbackWindow;
+}
+
+float PlannedWidth(float optionWidth, float fallback, bool itemWidth)
+{
+    if (!PlannedCanDraw())
+        return 1.0f;
+    ImGuiContext& g = *GImGui;
+    const float available = ImGui::GetContentRegionAvail().x;
+    float width = 0.0f;
+    if (optionWidth > 0.0f)
+        width = Px(optionWidth);
+    else if (optionWidth == kFill)
+        width = available;
+    else if (optionWidth < 0.0f)
+        width = available - Px(-optionWidth);
+    else if (itemWidth && ((g.NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0 ||
+                           g.CurrentWindow->DC.ItemWidthStack.Size > 0))
+        width = ImGui::CalcItemWidth();
+    else
+        width = fallback > 0.0f ? fallback : available;
+    return width < 1.0f ? 1.0f : width;
+}
+
+void DrawPlannedBox(ImDrawList* drawList, const ImRect& box)
+{
+    if (drawList == nullptr)
+        return;
+    const Theme& theme = T();
+    const ImU32 color = ToU32(theme.colors.separator);
+    const float thickness = HairlineThickness();
+    const float dash = ImMax(Px(theme.spacing.xs), 1.0f);
+    const ImVec2 min = box.Min;
+    const ImVec2 max = box.Max;
+    for (float x = min.x; x < max.x; x += 2.0f * dash)
+    {
+        const float end = ImMin(x + dash, max.x);
+        HairlineH(drawList, x, end, min.y, color);
+        HairlineH(drawList, x, end, max.y - thickness, color);
+    }
+    for (float y = min.y; y < max.y; y += 2.0f * dash)
+    {
+        const float end = ImMin(y + dash, max.y);
+        HairlineV(drawList, min.x, y, end, color);
+        HairlineV(drawList, max.x - thickness, y, end, color);
+    }
+}
 
 bool PlannedCaption(const char* widget, const char* label, float room, char* out, std::size_t outSize)
 {
@@ -95,25 +147,21 @@ void DrawPlannedCaption(ImDrawList* drawList, const ImRect& box, const char* wid
 
 void PlannedWidget(const char* widget, const char* label, float width, float height)
 {
-    if (ImGui::GetCurrentContext() == nullptr || GImGui->CurrentWindow == nullptr)
+    if (!PlannedCanDraw())
         return;
     const Theme& theme = T();
-    if (label == nullptr)
-        label = "";
 
     const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const float w = width > 0.0f ? width : ImGui::GetContentRegionAvail().x;
+    const float w = width > 0.0f ? width : ImMax(ImGui::GetContentRegionAvail().x, 1.0f);
     const float h = height > 0.0f ? height : Px(theme.metrics.controlHeight);
     const ImRect box(pos, ImVec2(pos.x + w, pos.y + h));
-    const ImGuiID id = ImGui::GetID(label);
+    const ImGuiID id = label != nullptr ? ImGui::GetID(label) : 0;
     ImGui::ItemSize(box);
     if (!ImGui::ItemAdd(box, id, nullptr, ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop))
         return;
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const float radius = Px(theme.radii.control);
-    FillRect(drawList, box.Min, box.Max, ToU32(theme.colors.fill[3]), radius);
-    StrokeRect(drawList, box.Min, box.Max, ToU32(theme.colors.separator), radius, HairlineThickness());
+    DrawPlannedBox(drawList, box);
     DrawPlannedCaption(drawList, box, widget, label, ImGui::IsItemHovered());
 }
 

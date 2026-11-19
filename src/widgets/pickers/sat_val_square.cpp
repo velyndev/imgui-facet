@@ -14,7 +14,7 @@ bool SatValSquare(const char* label, ImVec4*, const SatValSquareOptions& options
 {
     namespace stub = internal::controls;
     const float available = stub::StubWidth(kFill, 0.0f);
-    const float preferred = Px(T().spacing.xxxl) * stub::kStubPickerInXxxl;
+    const float preferred = Px(T().metrics.pickerWidth);
     const float side = stub::StubWidth(options.width, available < preferred ? available : preferred);
     stub::ControlStub("SatValSquare", label, side, side);
     return false;

@@ -11,7 +11,7 @@ namespace
 
 void DrawSelectableList(const char* label, const SelectableListOptions& options)
 {
-    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::kStubListRows;
+    const int rows = options.visibleRows > 0 ? options.visibleRows : internal::StubListRows();
     internal::StubItem("SelectableList", label, internal::StubWidth(options.width, true),
                        static_cast<float>(rows) * ControlHeight(options.size));
 }

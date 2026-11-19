@@ -3,16 +3,17 @@
 // The placeholder of the content widget families (display, charts, media, composites) while
 // their widgets are declared but not implemented. Every stub in src/widgets/<family>/ is one
 // call to these helpers: it submits one item of the size the finished widget will have, drawn
-// by internal::PlannedWidget (a hairline box with "<Widget>: planned" in labelSecondary,
-// Footnote, cut off where the box ends), and returns the neutral result. Phase 2 replaces a
+// by internal::PlannedWidget (the dashed placeholder every planned widget shares, with
+// "<Widget>: planned" in labelSecondary, Footnote), and returns the neutral result. Phase 2 replaces a
 // stub body with the widget and drops the include. Two placeholder-only exceptions to "the
 // size the finished widget will have": a placeholder is never narrower than its text
 // (ContentWidth) and never lower than the small control height (Stub), so the text is not cut
 // and the box does not turn into a pill around one line of text.
 //
-// Sizes come from the theme tokens through Px(). Where the theme has no token for a default
-// yet (chart height, panel height, card width), the default is a named multiple of a spacing
-// or control height token below, so it still follows the theme and the scale.
+// Sizes come from the theme tokens through Px(). The placeholder defaults below are named
+// multiples of the spacing or control height tokens, so they follow the theme and the scale; at
+// the default spacing the spans equal the metrics tokens the finished widgets read (chartHeight,
+// panelHeight, cardWidth, slotSize, thumbnailSize in T().metrics).
 //
 // Begin and End pairs: StubBegin pushes the Facet scope (internal::PushScope) and opens a
 // Dear ImGui group after the placeholder, so the caller's content follows it; StubEnd closes
@@ -43,10 +44,11 @@ inline constexpr float kTallControlRows = 2.0f;    // scrubbers, brushes, gradie
 inline constexpr float kZoneControlRows = 4.0f;    // drop zones and empty states: 4 x control height
 inline constexpr float kWideAspect = 9.0f / 16.0f; // carousels: height per width
 
-// True inside a frame with a current window, where an item can be submitted.
+// True inside a frame with a current window that is not the fallback, where a placeholder is
+// submitted (internal::PlannedCanDraw).
 inline bool CanSubmit()
 {
-    return ImGui::GetCurrentContext() != nullptr && GImGui->CurrentWindow != nullptr;
+    return PlannedCanDraw();
 }
 
 inline float Spans(float spans)
@@ -66,18 +68,7 @@ inline float ControlRows(float rows, ControlSize size = ControlSize::Inherit)
 // for layers (dialogs, panels) that are not items of the caller's layout.
 inline float ResolveWidth(float optionWidth, float fallback, bool itemWidth = true)
 {
-    if (!CanSubmit())
-        return 1.0f;
-    const float available = ImGui::GetContentRegionAvail().x;
-    float width = fallback > 0.0f ? fallback : available;
-    if (optionWidth > 0.0f)
-        width = Px(optionWidth);
-    else if (optionWidth < 0.0f)
-        width = available + Px(optionWidth);
-    else if (itemWidth && ((GImGui->NextItemData.HasFlags & ImGuiNextItemDataFlags_HasWidth) != 0 ||
-                           GImGui->CurrentWindow->DC.ItemWidthStack.Size > 0))
-        width = ImGui::CalcItemWidth();
-    return std::max(1.0f, width);
+    return PlannedWidth(optionWidth, fallback, itemWidth);
 }
 
 // Pixel height from options.height (> 0 units, < 0 the available height minus that many

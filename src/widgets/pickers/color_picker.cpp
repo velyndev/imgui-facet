@@ -15,7 +15,7 @@ bool ColorPicker(const char* label, ImVec4*, const ColorPickerOptions& options)
     namespace stub = internal::controls;
     const Theme& t = T();
     const float available = stub::StubWidth(kFill, 0.0f);
-    const float preferred = Px(t.spacing.xxxl) * stub::kStubPickerInXxxl;
+    const float preferred = Px(t.metrics.pickerWidth);
     const float width = stub::StubWidth(options.width, available < preferred ? available : preferred);
     const float control = ControlHeight(ControlSize::Inherit);
     // The square, then the hue and alpha bars, the inputs and the swatches, each on its own row.
