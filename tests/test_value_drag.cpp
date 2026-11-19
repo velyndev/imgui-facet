@@ -13,6 +13,7 @@
 #include <facet/facet.h>
 
 #include "internal/item.h"
+#include "internal/scroll.h"
 #include "internal/value_drag.h"
 #include "support/session.h"
 
@@ -575,6 +576,59 @@ TEST_CASE("Value drag: the wheel steps only when focused or with Alt")
     session.Click(knob);
     session.Wheel(knob, -2.0f);
     CHECK(slider.value == doctest::Approx(0.49));
+}
+
+TEST_CASE("Value drag: a focused control that slides under the pointer mid-scroll leaves the wheel to the area")
+{
+    facet::SetFollowSystemMotion(false);
+    facet::SetUiScale(1.0f);
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        TestSlider slider;
+        ImGuiID areaId = 0;
+        session.SetUi([&] {
+            if (facet::internal::BeginScrollAreaCore("area", {.size = ImVec2(300.0f, 200.0f)}))
+            {
+                areaId = ImGui::GetCurrentWindow()->ID;
+                ImGui::Dummy(ImVec2(10.0f, 120.0f));
+                slider.Ui(session);
+                ImGui::Dummy(ImVec2(10.0f, 800.0f));
+                facet::internal::EndScrollAreaCore();
+            }
+        });
+        session.Frames(2);
+        session.Click(TestSlider::At(session, 0.5));
+        REQUIRE(ImGui::GetFocusID() == session.ItemId("slider"));
+        REQUIRE(slider.value == 0.5);
+        ImGuiWindow* area = ImGui::FindWindowByID(areaId);
+        REQUIRE(area != nullptr);
+        // The pointer rests one wheel notch above the slider, off the control.
+        const float notch = facet::Px(facet::T().scroll.wheelDistance);
+        const ImVec2 knob = TestSlider::At(session, 0.5);
+        const ImVec2 rest(knob.x, knob.y - notch);
+        session.MouseMove(rest);
+        session.Frames(2);
+        session.Wheel(rest, -1.0f);
+        const float firstTarget = facet::internal::ScrollAreaTarget(area).y;
+        CHECK(firstTarget == doctest::Approx(notch));
+        // Most of the way there the slider is under the pointer while the area still moves (the
+        // spring settles after about durationStandard).
+        session.Seconds(0.1f);
+        REQUIRE(facet::internal::IsScrollAreaScrolling(area));
+        REQUIRE(session.ItemRect("slider").Contains(rest));
+        session.Wheel(rest, -1.0f);
+        CHECK(slider.value == 0.5);
+        CHECK(facet::internal::ScrollAreaTarget(area).y == doctest::Approx(firstTarget + notch));
+        // Once the area has come to rest, the focused control under the pointer takes the wheel.
+        session.Seconds(1.5f);
+        REQUIRE_FALSE(facet::internal::IsScrollAreaScrolling(area));
+        session.MouseMove(TestSlider::At(session, 0.5));
+        session.Frames(2);
+        session.Wheel(TestSlider::At(session, 0.5), 1.0f);
+        CHECK(slider.value == doctest::Approx(0.51));
+    }
+    facet::SetFollowSystemMotion(true);
 }
 
 TEST_CASE("Value drag: a pointer that is lost mid-drag keeps the value and the offset")

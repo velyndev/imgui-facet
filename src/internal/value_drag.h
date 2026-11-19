@@ -39,8 +39,10 @@
 //    the control is focused; the other arrows keep moving the focus.
 //    Wheel: one step per notch when the pointer is over the control and the control is
 //    focused or Alt is held. Otherwise the wheel scrolls the window as usual, so a page full of
-//    sliders still scrolls. Fractions of a notch (touchpads) add up while the pointer stays on
-//    the control and the wheel keeps its direction.
+//    sliders still scrolls. While the window under the pointer is still scrolling from earlier
+//    wheel turns (scroll.h), the wheel stays with that window, so a focused control that slides
+//    under a resting pointer does not take over in the middle of a scroll. Fractions of a notch
+//    (touchpads) add up while the pointer stays on the control and the wheel keeps its direction.
 //    Escape during a drag or a held key restores the value from the start of the edit, writes
 //    it and ends the edit.
 //
