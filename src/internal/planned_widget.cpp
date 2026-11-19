@@ -43,23 +43,15 @@ bool PlannedCaption(const char* widget, const char* label, float room, char* out
         std::snprintf(out, outSize, "%s: planned (%.*s)", widget, labelLength, label);
         if (fits())
             return false;
+        // Once the whole text does not fit, only the label is kept, so every box of a row that
+        // has a label shows it, whatever its width.
+        TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), label, labelEnd, room, TruncateMode::End, out, outSize);
+        return true;
     }
     std::snprintf(out, outSize, "%s: planned", widget);
     if (fits())
-        return hasLabel;
-    if (hasLabel)
-    {
-        std::snprintf(out, outSize, "%.*s", labelLength, label);
-        if (fits())
-            return true;
-    }
-    std::snprintf(out, outSize, "%s", widget);
-    if (widget[0] != '\0' && fits())
-        return true;
-    if (hasLabel)
-        TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), label, labelEnd, room, TruncateMode::End, out, outSize);
-    else
-        TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), widget, nullptr, room, TruncateMode::End, out, outSize);
+        return false;
+    TruncateText(ImGui::GetFont(), ImGui::GetFontSize(), widget, nullptr, room, TruncateMode::End, out, outSize);
     return true;
 }
 

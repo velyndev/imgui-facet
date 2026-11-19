@@ -25,13 +25,14 @@ namespace facet::internal
 
 inline constexpr int kPlannedCaptionSize = 192;
 
-// Writes the placeholder text for a box `room` pixels wide, measured in the current font. The
-// first that fits, in this order: "<widget>: planned (<visible label>)", "<widget>: planned",
-// the visible label alone, the widget name alone; else the visible label (or, without one, the
-// widget name) shortened with an ellipsis. The label comes before the name because boxes side
-// by side in one row differ by their labels, while the row and the box look already say which
-// widget is planned. Empty when `room` is 0 or less or not even the ellipsis fits. `out` is
-// always zero terminated (outSize > 0). Returns true when anything had to be left out.
+// Writes the placeholder text for a box `room` pixels wide, measured in the current font. With
+// a visible label: "<widget>: planned (<visible label>)" when it fits, else the visible label
+// alone, shortened with an ellipsis when needed. Without one: "<widget>: planned" when it fits,
+// else the widget name, shortened when needed. A labelled box never falls back to the name,
+// because boxes side by side in one row differ by their labels, while the row and the box look
+// already say which widget is planned. Empty when `room` is 0 or less or not even the ellipsis
+// fits. `out` is always zero terminated (outSize > 0). Returns true when anything had to be
+// left out.
 bool PlannedCaption(const char* widget, const char* label, float room, char* out, std::size_t outSize);
 
 // Draws the caption of `widget` and `label` into `box` (pixels), inset by spacing.sm: centered in

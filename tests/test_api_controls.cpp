@@ -878,6 +878,10 @@ TEST_CASE("The placeholder text keeps what tells boxes apart: the label, then th
     std::string none;
     std::string name;
     std::string nameTiny;
+    std::string low;
+    std::string unlabelled;
+    float lowNameWidth = 0.0f;
+    float lowCaptionWidth = 0.0f;
     bool shortened[5] = {};
     session.SetUi([&] {
         namespace stub = facet::internal::controls;
@@ -889,11 +893,19 @@ TEST_CASE("The placeholder text keeps what tells boxes apart: the label, then th
         const float nameWidth = ImGui::CalcTextSize("RangeSlider").x;
         shortened[0] = stub::StubCaption("RangeSlider", "Destructive##range", fullWidth + 1.0f, text, sizeof(text));
         wide = text;
+        // Room for "RangeSlider: planned" but not the whole text: still the label, so boxes side
+        // by side in one row all show their labels.
         shortened[1] = stub::StubCaption("RangeSlider", "Destructive##range", shortWidth + 1.0f, text, sizeof(text));
         medium = text;
-        // No room for "planned": the label alone, so boxes side by side stay distinct.
         shortened[2] = stub::StubCaption("RangeSlider", "Destructive##range", labelWidth + 1.0f, text, sizeof(text));
         label = text;
+        // A label narrower than the widget name, with room for the name: the label wins.
+        lowNameWidth = nameWidth;
+        lowCaptionWidth = ImGui::CalcTextSize("RangeSlider: planned (Low)").x;
+        stub::StubCaption("RangeSlider", "Low##range", nameWidth + 1.0f, text, sizeof(text));
+        low = text;
+        stub::StubCaption("RangeSlider", "##range", shortWidth + 1.0f, text, sizeof(text));
+        unlabelled = text;
         shortened[3] = stub::StubCaption("RangeSlider", "Destructive##range", labelWidth * 0.6f, text, sizeof(text));
         tiny = text;
         shortened[4] = stub::StubCaption("RangeSlider", "Destructive##range", 0.0f, text, sizeof(text));
@@ -908,8 +920,11 @@ TEST_CASE("The placeholder text keeps what tells boxes apart: the label, then th
     session.Frame();
 
     CHECK(wide == "RangeSlider: planned (Destructive)");
-    CHECK(medium == "RangeSlider: planned");
+    CHECK(medium == "Destructive");
     CHECK(label == "Destructive");
+    REQUIRE(lowCaptionWidth > lowNameWidth + 1.0f);
+    CHECK(low == "Low");
+    CHECK(unlabelled == "RangeSlider: planned");
     CHECK(tiny.size() > 0);
     CHECK(tiny.compare(0, 3, "Des") == 0);
     CHECK(tiny.size() < std::string("Destructive").size());

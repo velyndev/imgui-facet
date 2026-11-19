@@ -248,11 +248,11 @@ The dose caps in Direction apply. The choices behind each effect:
   containers, layout, overlays) draw a dashed separator hairline with square corners, so a
   container placeholder reads as a frame around the caller's content.
 - **Placeholder captions.** Every placeholder group shares one caption rule: a box too narrow
-  for "Name: planned (label)" shows "Name: planned", then the label alone, then the widget name,
-  then the label shortened with an ellipsis, and the whole text on hover. The label comes
-  before the name because boxes side by side in a row differ by their labels, while the box
-  look and the row already say that the widget is planned. The caption sits on the first line
-  of a tall box, level with the row label beside it.
+  for "Name: planned (label)" shows the label alone, shortened with an ellipsis when needed,
+  and the whole text on hover; a box without a label shows "Name: planned" or the name. A
+  labelled box never falls back to the name, because boxes side by side in a row differ by
+  their labels, while the box look and the row already say that the widget is planned. The
+  caption sits on the first line of a tall box, level with the row label beside it.
 - **Field messages.** The FieldValidation placeholder is spacing.xs taller than its text, so its
   hairline never crosses the text.
 - **Placeholder sizes.** Pads, cell rows and the inline calendar shrink to the available width
