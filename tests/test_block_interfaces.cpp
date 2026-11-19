@@ -12,9 +12,12 @@
 
 #include "internal/drag_drop.h"
 #include "internal/list_core.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
+#include "internal/popup_menu.h"
 #include "internal/scroll.h"
 #include "internal/text_field.h"
+#include "internal/text_field_number.h"
 
 namespace
 {
@@ -83,6 +86,24 @@ TEST_CASE("The drag and drop core interface links with its frozen signatures")
     CHECK(Links<int(std::span<const ImRect>, facet::Orientation, ImVec2)>(&fi::DragDropInsertIndex));
     CHECK(fi::DragDropZoneResult{}.insertIndex == -1);
     CHECK(fi::DragDropZoneOptions{}.axis == facet::Orientation::Vertical);
+    // The keyboard pick-up is opt-in, with Space unless a source names another chord.
+    CHECK_FALSE(fi::DragDropPreview{}.keyboard);
+    CHECK(fi::DragDropPreview{}.pickUpChord == ImGuiKey_Space);
+}
+
+TEST_CASE("The appended members of the list view, the number core and the menu rows keep their defaults")
+{
+    CHECK(fi::ListViewDesc{}.highlight == nullptr);
+    CHECK(fi::ListViewDesc{}.keyOwner == 0);
+    CHECK_FALSE(fi::ListRowDesc{}.highlighted);
+    CHECK(fi::ListRowDesc{}.selection == ImGuiSelectionUserData_Invalid);
+    CHECK(fi::NumberFieldParams{}.scale == facet::ValueScale::Linear);
+    CHECK(fi::NumberFieldParams{}.parser == nullptr);
+    CHECK(fi::MenuRowDesc{}.submenu == 0);
+    CHECK(Links<fi::MenuRowResult(ImGuiID, const char*, const fi::MenuRowDesc&)>(&fi::MenuRow));
+    CHECK(Links<void(ImGuiID)>(&fi::MenuLevelBegin));
+    CHECK(Links<bool()>(&fi::ScrollWheelBelongsToScroll));
+    CHECK(Links<int(const fi::ListJumpDesc&, bool, bool*)>(&fi::ListJumpToEnd));
 }
 
 TEST_CASE("The list core interface links with its frozen signatures")
