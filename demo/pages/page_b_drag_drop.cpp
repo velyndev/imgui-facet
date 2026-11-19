@@ -978,11 +978,13 @@ FACET_DEMO_SELFTEST("drag-drop")
     test.MouseUp();
     test.Expect("a right click cancels", [] { return ListKey(page.list, 4) == 5 && ListKey(page.list, 1) == 3; });
 
-    // Escape puts it back too.
-    test.MouseMove(T::Item("dd.list.4"));
+    // Escape puts it back too. The drag stays on the middle rows: on a small screen the first and
+    // last rows sit in the edge band of the page, where a held drag scrolls the page.
+    test.Reveal("dd.list.2");
+    test.MouseMove(T::Item("dd.list.3"));
     test.MouseDown();
     test.MouseMove(T::Item("dd.list.2"));
-    test.MouseMove(T::Item("dd.list.0", 0.5f, 0.2f));
+    test.MouseMove(T::Item("dd.list.1", 0.5f, 0.2f));
     test.KeyPress(ImGuiKey_Escape);
     test.MouseUp();
     test.Expect("Escape cancels", [] { return ListKey(page.list, 4) == 5 && ListKey(page.list, 0) == 2; });
@@ -1060,6 +1062,10 @@ FACET_DEMO_SELFTEST("drag-drop")
     test.MouseMove(T::Item("dd.long", 0.5f, 0.97f));
     test.WaitSeconds(0.3f);
     test.Expect("the drag asks the list to scroll", [] { return fi::DragDropRequestedEdgeScroll(page.longWindow); });
+    test.Expect("the scroll core moved the list", [] {
+        const ImGuiWindow* window = ImGui::FindWindowByID(page.longWindow);
+        return window != nullptr && window->Scroll.y > 0.0f;
+    });
     test.MouseUp();
     test.Expect("the row lands in the shown gap", [] {
         return page.longDroppedAt >= kLongVisibleRows - 2 && ListKey(page.longList, page.longDroppedAt) == 1;
