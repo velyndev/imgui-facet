@@ -93,6 +93,10 @@
 //     if (drop.delivered && source >= 0)
 //         move = DragDropReorderMove(source, drop.insertIndex);   // the caller applies it
 //
+// A virtualized list passes the rects of the rows it submitted and adds the index of the first one
+// to insertIndex. A list that keeps the dragged row submitted while it scrolls away (ListRowsDesc::
+// keepAlive) keeps it a source, but the drag goes on without it too.
+//
 // Captures: a widget passes a forced Dragging state of its item behaviour on with
 // DragDropForceNextSource, and the next source then shows a drag without input (see there).
 
@@ -175,6 +179,8 @@ struct DragDropZoneOptions
                                                  // child): it reports `rejected` and takes nothing
     bool allowCopy = false;                      // Ctrl held reports DragDropEffect::Copy
     bool allowSplit = false;                     // Shift held reports DragDropEffect::Split
+    bool wrap = false;                           // ordered zone: the slots wrap into lines across the axis
+                                                 // (a swatch or item grid); see DragDropInsertIndexWrapped
 };
 
 // What a drop on a zone would do, for this frame.
@@ -200,11 +206,21 @@ struct DragDropZoneResult
 DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, const char* type,
                                 const DragDropZoneOptions& options = {});
 
+// The same zone taking payloads of any of `types` (the media DropZone): it takes the drag when its
+// type is one of them, and reports `rejected` only when it is none of them.
+DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, std::span<const char* const> types,
+                                const DragDropZoneOptions& options = {});
+
 // Where in an ordered zone a payload at `point` lands: the index of the slot it goes before
 // (slots.size() after the last one). A point before the middle of a slot along `axis` goes before
 // it. -1 for no slots. Uses the slots as laid out, never as drawn, so rows that move apart under
 // the pointer cannot make the index flicker.
 int DragDropInsertIndex(std::span<const ImRect> slots, Orientation axis, ImVec2 point);
+
+// The same for slots that wrap into lines (a grid filled line by line along `axis`, the lines
+// stacked across it): the line under `point` (or the nearest one) is found across the axis, then
+// the slot it goes before along the axis within that line. -1 for no slots.
+int DragDropInsertIndexWrapped(std::span<const ImRect> slots, Orientation axis, ImVec2 point);
 
 // True on the frame a drag started by DragDropBeginSource ended without a drop (Escape, a right
 // click, a click during a keyboard drag, or a release where no zone took it). An owner undoes what
@@ -232,6 +248,12 @@ ReorderMove DragDropReorderMove(int source, int insertIndex);
 // dragged entry's place stays open while the pointer is outside the zone. `extent` is the
 // dragged item's size along the axis plus the spacing between entries (pixels).
 float DragDropGapShift(int index, int source, int insertIndex, float extent);
+
+// The slot entry `index` is drawn in while a drag hovers at `insertIndex`, for zones whose entries
+// do not line up on one axis (wrapped grids): index - 1, index or index + 1, by the same rule as
+// DragDropGapShift. index + 1 may be one past the last slot (the next place of the grid); animate
+// each axis with DragDropAnimatedPosition under its own key.
+int DragDropGapSlot(int index, int source, int insertIndex);
 
 // Where the dragged entry would land, as drawn with DragDropGapShift: the open gap (screen
 // pixels, `size` long along the axis, the cross size of the slots), which is also where the entry

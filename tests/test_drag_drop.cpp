@@ -266,6 +266,93 @@ TEST_CASE("Every gap shown during a drag is the layout the reported drop gives")
     CHECK(fi::DragDropGapShift(3, 1, -1, 20.0f) == 0.0f);
 }
 
+TEST_CASE("In a wrapped grid a drop lands in the line under the point")
+{
+    // Three slots per line, two lines and one more slot: a swatch grid along the horizontal axis.
+    std::vector<ImRect> slots;
+    for (int i = 0; i < 7; ++i)
+    {
+        const float x = static_cast<float>(i % 3) * 40.0f;
+        const float y = static_cast<float>(i / 3) * 40.0f;
+        slots.emplace_back(x, y, x + 32.0f, y + 32.0f);
+    }
+    const auto at = [&](float x, float y) {
+        return fi::DragDropInsertIndexWrapped(slots, facet::Orientation::Horizontal, ImVec2(x, y));
+    };
+    CHECK(at(5.0f, 10.0f) == 0);
+    CHECK(at(20.0f, 10.0f) == 1);
+    CHECK(at(100.0f, 10.0f) == 3);   // past the end of the first line: before the second line's first
+    CHECK(at(5.0f, 50.0f) == 3);
+    CHECK(at(60.0f, 50.0f) == 5);
+    CHECK(at(20.0f, 90.0f) == 7);    // after the last slot of the last line
+    CHECK(at(5.0f, 300.0f) == 6);    // below everything: the nearest line
+    CHECK(fi::DragDropInsertIndexWrapped({}, facet::Orientation::Horizontal, ImVec2(0, 0)) == -1);
+
+    // The slots entries are drawn in during a drag are the order the reported move gives.
+    for (int source = 0; source < 7; ++source)
+    {
+        for (int insert = 0; insert <= 7; ++insert)
+        {
+            CAPTURE(source);
+            CAPTURE(insert);
+            std::vector<int> model = {0, 1, 2, 3, 4, 5, 6};
+            facet::ApplyReorderMove(model, fi::DragDropReorderMove(source, insert));
+            std::vector<int> shown(7, -1);
+            for (int i = 0; i < 7; ++i)
+            {
+                if (i == source)
+                    continue;
+                const int slot = fi::DragDropGapSlot(i, source, insert);
+                REQUIRE(slot >= 0);
+                REQUIRE(slot < 7);
+                shown[static_cast<std::size_t>(slot)] = i;
+            }
+            const int landing = insert > source ? insert - 1 : insert;
+            shown[static_cast<std::size_t>(std::min(landing, 6))] = source;
+            CHECK(shown == model);
+        }
+    }
+    // From elsewhere, entries from the gap on move one slot on.
+    CHECK(fi::DragDropGapSlot(2, -1, 2) == 3);
+    CHECK(fi::DragDropGapSlot(1, -1, 2) == 1);
+    CHECK(fi::DragDropGapSlot(4, 1, -1) == 4);
+}
+
+TEST_CASE("A zone of several types takes any of them and rejects the others")
+{
+    for (const char* type : {"test.a", "test.b", "test.c"})
+    {
+        CAPTURE(type);
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        bool delivered = false;
+        bool rejected = false;
+        ImRect zoneRect;
+        session.SetUi([&] {
+            ImGui::Button("stock source", ImVec2(200.0f, 30.0f));
+            session.Track("source");
+            if (ImGui::BeginDragDropSource())
+            {
+                const int value = 1;
+                ImGui::SetDragDropPayload(type, &value, sizeof(value));
+                ImGui::EndDragDropSource();
+            }
+            const ImVec2 pos = ImGui::GetCursorScreenPos();
+            zoneRect = ImRect(pos, ImVec2(pos.x + 200.0f, pos.y + 80.0f));
+            ImGui::Dummy(zoneRect.GetSize());
+            const char* const types[] = {"test.a", "test.b"};
+            const DragDropZoneResult zone = fi::DragDropZone(ImGui::GetID("zone"), zoneRect, types);
+            delivered = delivered || zone.delivered;
+            rejected = rejected || zone.rejected;
+        });
+        session.Frame();
+        session.DragAndHold({session.ItemCenter("source"), zoneRect.GetCenter()}, 8, 2);
+        const bool accepted = std::string(type) != "test.c";
+        CHECK(delivered == accepted);
+        CHECK(rejected == !accepted);
+    }
+}
+
 TEST_CASE("The insertion line and the into part of a tree row")
 {
     facet::test::Session session;

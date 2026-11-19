@@ -5,6 +5,7 @@
 #include "internal/drag_drop.h"
 
 #include <algorithm>
+#include <cfloat>
 
 #include "facet/core/anim.h"
 #include "facet/core/color.h"
@@ -76,6 +77,62 @@ int DragDropInsertIndex(std::span<const ImRect> slots, Orientation axis, ImVec2 
             return i;
     }
     return count;
+}
+
+int DragDropInsertIndexWrapped(std::span<const ImRect> slots, Orientation axis, ImVec2 point)
+{
+    if (slots.empty())
+        return -1;
+    const Orientation cross = Vertical(axis) ? Orientation::Horizontal : Orientation::Vertical;
+    const float along = Vertical(axis) ? point.y : point.x;
+    const float across = Vertical(axis) ? point.x : point.y;
+    const int count = static_cast<int>(slots.size());
+    // Lines: a slot that starts no further along the axis than the one before it begins a new line.
+    int bestBegin = 0;
+    int bestEnd = 0;
+    float bestDistance = FLT_MAX;
+    int begin = 0;
+    while (begin < count)
+    {
+        int end = begin + 1;
+        while (end < count && AxisMin(slots[end], axis) > AxisMin(slots[end - 1], axis))
+            ++end;
+        float lineMin = FLT_MAX;
+        float lineMax = -FLT_MAX;
+        for (int i = begin; i < end; ++i)
+        {
+            lineMin = std::min(lineMin, AxisMin(slots[i], cross));
+            lineMax = std::max(lineMax, AxisMax(slots[i], cross));
+        }
+        const float distance = across < lineMin ? lineMin - across : (across > lineMax ? across - lineMax : 0.0f);
+        if (distance < bestDistance)
+        {
+            bestDistance = distance;
+            bestBegin = begin;
+            bestEnd = end;
+        }
+        begin = end;
+    }
+    for (int i = bestBegin; i < bestEnd; ++i)
+    {
+        const float middle = (AxisMin(slots[i], axis) + AxisMax(slots[i], axis)) * 0.5f;
+        if (along < middle)
+            return i;
+    }
+    return bestEnd;
+}
+
+int DragDropGapSlot(int index, int source, int insertIndex)
+{
+    if (insertIndex < 0 || index < 0)
+        return index;
+    if (source < 0)
+        return index >= insertIndex ? index + 1 : index;
+    if (index == source)
+        return index;
+    if (insertIndex > source)
+        return index > source && index < insertIndex ? index - 1 : index;
+    return index >= insertIndex && index < source ? index + 1 : index;
 }
 
 ReorderMove DragDropReorderMove(int source, int insertIndex)

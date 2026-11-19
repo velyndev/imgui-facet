@@ -60,6 +60,7 @@ struct ZoneRecord
     int slotCount = 0;
     Orientation axis = Orientation::Vertical;
     bool accept = true;
+    bool wrap = false;
 };
 
 // A place a keyboard drag can land: a gap of an ordered zone or a single zone.
@@ -321,6 +322,7 @@ void RecordZone(ImGuiID id, const ImRect& rect, const char* type, const DragDrop
     zone.slotCount = static_cast<int>(options.slots.size());
     zone.axis = options.axis;
     zone.accept = options.accept;
+    zone.wrap = options.wrap;
     for (const ImRect& slot : options.slots)
         pool.push_back(slot);
     CurrentZones().push_back(zone);
@@ -392,6 +394,21 @@ bool SmallerZoneHolds(ImGuiID id, const ImRect& rect, const char* type, ImVec2 p
     return false;
 }
 
+int ZoneInsertIndex(const DragDropZoneOptions& options, ImVec2 point)
+{
+    return options.wrap ? DragDropInsertIndexWrapped(options.slots, options.axis, point)
+                        : DragDropInsertIndex(options.slots, options.axis, point);
+}
+
+// The payload of the drag in progress, whoever started it; null without one.
+const ImGuiPayload* CurrentPayload()
+{
+    const DragState& drag = State().drag;
+    if (drag.kind == DragKind::Keyboard || drag.kind == DragKind::Forced)
+        return &drag.payload;
+    return ImGui::GetDragDropPayload();
+}
+
 bool ContainsClipped(const ImRect& rect, ImVec2 point)
 {
     ImRect visible = rect;
@@ -410,9 +427,18 @@ void OwnCarryKeys(ImGuiID owner)
         ImGui::SetKeyOwner(key, owner);
 }
 
-ImVec2 GapPoint(std::span<const ImRect> slots, int insert, Orientation axis)
+ImVec2 GapPoint(std::span<const ImRect> slots, int insert, Orientation axis, bool wrap)
 {
     const int count = static_cast<int>(slots.size());
+    if (wrap)
+    {
+        // In a wrapped grid a place is the leading edge of its slot (the trailing edge of the last).
+        const ImRect& slot = slots[std::min(insert, count - 1)];
+        const bool end = insert >= count;
+        if (Vertical(axis))
+            return ImVec2(slot.GetCenter().x, end ? slot.Max.y : slot.Min.y);
+        return ImVec2(end ? slot.Max.x : slot.Min.x, slot.GetCenter().y);
+    }
     const ImRect& cross = slots[std::min(insert, count - 1)];
     float along = 0.0f;
     if (insert == 0)
@@ -450,7 +476,7 @@ void BuildPlaces()
             // Before and after the item's own slot are the same place.
             if (zone.id == drag.carrySourceZone && k == drag.carrySource + 1)
                 continue;
-            s.places.push_back(CarryPlace{z, k, GapPoint(slots, k, zone.axis)});
+            s.places.push_back(CarryPlace{z, k, GapPoint(slots, k, zone.axis, zone.wrap)});
         }
     }
 }
@@ -478,7 +504,7 @@ void PlaceCarry()
                 drag.carrySource = i;
                 drag.carryZone = zone.id;
                 drag.carryInsert = i;
-                drag.carryPoint = GapPoint(slots, i, zone.axis);
+                drag.carryPoint = GapPoint(slots, i, zone.axis, zone.wrap);
                 drag.placed = true;
             }
         }
@@ -1123,7 +1149,16 @@ DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, const char* type
         {
             const int source = drag.carrySourceZone == id ? drag.carrySource : -1;
             const float size = options.axis == Orientation::Vertical ? drag.sourceSize.y : drag.sourceSize.x;
-            drag.anchor = DragDropGapRect(options.slots, source, result.insertIndex, options.axis, size);
+            if (options.wrap)
+            {
+                // Where the entry is laid out after the move.
+                const int to = source >= 0 && result.insertIndex > source ? result.insertIndex - 1 : result.insertIndex;
+                drag.anchor = options.slots[static_cast<std::size_t>(std::min(to, slotCount - 1))];
+            }
+            else
+            {
+                drag.anchor = DragDropGapRect(options.slots, source, result.insertIndex, options.axis, size);
+            }
         }
         else
         {
@@ -1162,7 +1197,7 @@ DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, const char* type
         {
             result.hovered = true;
             result.payload = &drag.payload;
-            result.insertIndex = DragDropInsertIndex(options.slots, options.axis, drag.pointer);
+            result.insertIndex = ZoneInsertIndex(options, drag.pointer);
         }
         return result;
     }
@@ -1192,7 +1227,7 @@ DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, const char* type
         result.hovered = true;
         result.payload = accepted;
         result.effect = EffectFromKeys(options);
-        result.insertIndex = DragDropInsertIndex(options.slots, options.axis, g.IO.MousePos);
+        result.insertIndex = ZoneInsertIndex(options, g.IO.MousePos);
         result.hoverOpen = HoverSeconds(id) >= T().drag.hoverOpenDelay;
         const bool ours = drag.kind == DragKind::Pointer && drag.sourceId == accepted->SourceId;
         if (ours)
@@ -1213,6 +1248,27 @@ DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, const char* type
     }
     ImGui::EndDragDropTarget();
     return result;
+}
+
+DragDropZoneResult DragDropZone(ImGuiID id, const ImRect& rect, std::span<const char* const> types,
+                                const DragDropZoneOptions& options)
+{
+    if (!FrameReady() || types.empty())
+        return {};
+    // The zone stands for the type of the drag when it is one of `types`, else for the first.
+    const char* type = types[0];
+    if (const ImGuiPayload* payload = CurrentPayload())
+    {
+        for (const char* candidate : types)
+        {
+            if (candidate != nullptr && payload->IsDataType(candidate))
+            {
+                type = candidate;
+                break;
+            }
+        }
+    }
+    return DragDropZone(id, rect, type, options);
 }
 
 bool DragDropCanceled()
