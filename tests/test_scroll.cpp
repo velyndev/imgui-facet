@@ -482,7 +482,8 @@ TEST_CASE("Scroll area: revealing rows above and below, at once or animated")
     CHECK_FALSE(session.ItemVisible("row2"));
     session.Seconds(1.0f);
     CHECK(session.ItemVisible("row2"));
-    CHECK(session.ItemRect("row2").Min.y == doctest::Approx(window->InnerRect.Min.y + window->WindowPadding.y).epsilon(0.01));
+    const float top = window->InnerRect.Min.y + window->WindowPadding.y;
+    CHECK(session.ItemRect("row2").Min.y == doctest::Approx(top).epsilon(0.01));
     // Center and End.
     reveal = 25;
     align = fi::ScrollAlign::Center;
@@ -712,4 +713,40 @@ TEST_CASE("Scroll area: a gesture stays with its window while an area slides und
     session.Wheel(at, -1.0f);
     session.Seconds(0.6f);
     CHECK(inner.ScrollY() == doctest::Approx(Notch()));
+}
+
+TEST_CASE("Scroll area: fades and bars are drawn above child windows inside the area")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImVec4 surface(0.75f, 0.5f, 0.25f, 1.0f);
+    const ImU32 solid = facet::ToU32(surface);
+    AreaProbe area;
+    ImGuiID child = 0;
+    int inChild = 0;
+    int inArea = 0;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("area", {.size = ImVec2(300.0f, 200.0f), .fadeSurface = surface}))
+        {
+            area.Capture();
+            ImGui::Dummy(ImVec2(10.0f, 100.0f));
+            ImGui::BeginChild("child", ImVec2(200.0f, 400.0f));
+            child = ImGui::GetCurrentWindow()->ID;
+            ImGui::TextUnformatted("Child window content");
+            ImGui::EndChild();
+            fi::EndScrollAreaCore();
+        }
+        inChild = 0;
+        inArea = 0;
+        if (ImGuiWindow* window = ImGui::FindWindowByID(child))
+            for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+                inChild += vertex.col == solid ? 1 : 0;
+        if (ImGuiWindow* window = area.Window())
+            for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+                inArea += vertex.col == solid ? 1 : 0;
+    });
+    session.Frames(3);
+    CHECK(inChild > 0);
+    CHECK(inArea == 0);
 }

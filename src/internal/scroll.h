@@ -141,7 +141,8 @@ struct ScrollAreaDesc
 inline constexpr int kScrollAreaDepth = 16;
 [[nodiscard]] bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc = {});
 [[nodiscard]] bool BeginScrollAreaCore(const char* id, const ScrollAreaDesc& desc = {});
-// Draws the edge fades and the bars over the content and closes the area.
+// Draws the edge fades and the bars over the content, child windows of the area included, and
+// closes the area.
 void EndScrollAreaCore();
 
 // The bar of `axis` of a scroll area as drawn in the latest frame: the track it runs in and its

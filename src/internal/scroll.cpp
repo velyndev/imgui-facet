@@ -860,12 +860,16 @@ void EndScrollAreaCore()
         ReportUsageError("EndScrollAreaCore called in another window than its BeginScrollAreaCore");
         return;
     }
-    ImDrawList* drawList = window->DrawList;
+    // Fades and bars go on top of everything in the area, child windows included: into the draw
+    // list of its front-most visible child window (its own one when it has none), which Dear ImGui
+    // renders last, clipped to the area.
+    ImDrawList* drawList = ImGui::FindFrontMostVisibleChildWindow(window)->DrawList;
     ImRect clip = window->Rect();
     if (window->ParentWindow != nullptr)
         clip.ClipWithFull(window->ParentWindow->ClipRect);
     if (open.edgeFades)
         DrawFades(drawList, window, clip, open);
+    drawList->PushClipRect(clip.Min, clip.Max, false);
 
     ScrollRecord& record = Record(window);
     const Theme& theme = T();
@@ -893,6 +897,7 @@ void EndScrollAreaCore()
         const ImVec4 thumb = Mix(theme.colors.scrollThumb, theme.colors.scrollThumbHover, open.active[axis]);
         FillRect(drawList, bar.thumb.Min, bar.thumb.Max, ToU32(WithAlpha(thumb, thumb.w * open.alpha)), radius);
     }
+    drawList->PopClipRect();
     if (open.clipPushed)
         ImGui::PopClipRect();
     ImGui::EndChild();
