@@ -116,3 +116,12 @@ When several scopes want a chord in the same frame, the innermost wins: the focu
 - Only one session listens at a time. Starting one ends every older session: its next `Update()` returns `Canceled` and records nothing, also when both use the same owner id.
 
 While it listens, every accepted key that is down is locked to the owner with Dear ImGui's key ownership (`SetKeyOwner` with `ImGuiInputFlags_LockUntilRelease`), so `ImGui::Shortcut`, the registry, key binds and the stock `IsKeyPressed` see nothing. When the owner is the active item it also claims every keyboard key (`SetActiveIdUsingAllKeyboardKeys`), which keeps Tab, the arrows and Escape away from keyboard navigation. `facet::NewFrame` repeats the locks for keys pressed since the last frame, before app code runs. Code that queries keys between `ImGui::NewFrame` and `facet::NewFrame` can still see the frame in which a key goes down.
+
+## Escape and the context menu keys (for widget authors)
+
+Escape acts on one thing at a time, in the order of `docs/api-conventions.md`: the active edit first, then the topmost popup level, then the modal, then a shell. The blocks in `src/internal/` keep this order through Dear ImGui's key ownership, so it does not depend on `ImGuiConfigFlags_NavEnableKeyboard`:
+
+- The popup host (`popup_host.h`) owns `ImGuiKey_Escape` in frames where one of its levels is on top or a shell claimed it (`ClaimEscape`), unless an item is active. A press it acts on is locked for the rest of that frame, so nothing else sees it. When a popup of the host application is on top, Escape is left to Dear ImGui.
+- An active text field takes Escape before the popup host. While its `completionPopup` level is open, the field gives Up, Down, Enter, Tab and Escape to that level first (owner: the level id), so a completion list is operated while typing goes on.
+- A drag of the drag and drop core owns Escape while it lasts, so Escape cancels the drag before it reaches any popup.
+- The Menu key and Shift+F10 open the focused item's context menu (`ContextMenuRequested`) when no other owner holds them; a right click does the same for the item under the pointer.
