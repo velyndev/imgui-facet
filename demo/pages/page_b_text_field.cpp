@@ -5,6 +5,7 @@
 // number field with steppers and drag, a multi-line area, read-only text, and the three control
 // sizes. Each shows its value and its edit sessions.
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -82,6 +83,8 @@ struct TextFieldPage
     Sessions areaSessions;
     int clears = 0;
     int submits = 0;
+    float plainRight = 0.0f;   // right edges of the plain and the narrow field frames (pixels)
+    float narrowRight = 0.0f;
     int limitedLength = 0;
     bool numberTyping = false;
     bool initialized = false;
@@ -187,18 +190,20 @@ FACET_DEMO_PAGE("text-field", "Text field core", "Blocks", 150, "default", "focu
         page.plainSessions.Count();
         page.submits += field.submitted ? 1 : 0;
         ProbeField(ctx, "tf.plain", field);
+        page.plainRight = field.frame.Max.x;
         facet::internal::EndRow();
         if (ctx.captureState == kFocused)
             ctx.RevealInCapture(0.3f);
     }
     {
         // Narrow on purpose (the pad size token): a long text scrolls inside and fades out where
-        // it continues.
+        // it continues. Never wider than the row's control column (units).
         facet::internal::BeginRow("Narrow");
+        const float narrowWidth = std::min(facet::T().metrics.padSize, ImGui::GetContentRegionAvail().x / facet::Px(1.0f));
         const TextFieldResult field = TextFieldBehavior(
-            "##value", &page.narrow,
-            {.placeholder = "Placeholder", .width = facet::T().metrics.padSize, .readOnly = readOnly});
+            "##value", &page.narrow, {.placeholder = "Placeholder", .width = narrowWidth, .readOnly = readOnly});
         ProbeField(ctx, "tf.narrow", field);
+        page.narrowRight = field.frame.Max.x;
         facet::internal::EndRow();
     }
     {
@@ -396,6 +401,8 @@ FACET_DEMO_SELFTEST("text-field")
     test.Type("a sample line longer than the narrow field");
     test.ExpectText("the narrow field takes text longer than itself", [] { return page.narrow; },
                     "a sample line longer than the narrow field");
+    test.Expect("the narrow field ends inside the row, as the plain field does",
+                [] { return page.narrowRight > 0.0f && page.narrowRight <= page.plainRight + 0.5f; });
     test.KeyPress(ImGuiKey_Tab);
     test.ExpectFocused("tf.search");
     test.Type("query");
