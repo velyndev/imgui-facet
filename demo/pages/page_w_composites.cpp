@@ -109,6 +109,8 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
         if (facet::BeginPropertyRow("Property 1", {.tooltip = "Placeholder description"}))
         {
             ImGui::Checkbox("##value", &ui.option);
+            facet::ItemCursor();
+            ctx.Probe("composites.property");
             facet::EndPropertyRow();
         }
         facet::EndPropertyCategory();
@@ -212,4 +214,13 @@ FACET_DEMO_SELFTEST("composites")
     test.Expect("Space on the focused button hides it again", [] { return !ui.onboarding; });
     test.ExpectFocused("composites.onboarding");
     test.Do([] { ui.onboarding = false; });
+
+    // The checkbox inside the property row, by mouse and by keyboard.
+    test.Do([] { ui.option = false; });
+    test.Click("composites.property");
+    test.Expect("a click checks the property checkbox", [] { return ui.option; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.property");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on it clears it again", [] { return !ui.option; });
 }

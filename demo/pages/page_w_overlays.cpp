@@ -1,5 +1,5 @@
 // Demo page: Overlays. Calls every v1 widget of facet/widgets/overlays.h once, grouped by how
-// the layer opens. Layers the caller opens start closed, and a switch per layer sets its open
+// the layer opens. Layers the caller opens start closed, and a checkbox per layer sets its open
 // flag, so a finished modal or drawer never opens over the gallery by itself and never stacks on
 // another one; each has a capture state that shows it alone. While the widgets are planned, an
 // open layer shows one placeholder line in the page flow; layers opened by input (context menus,
@@ -64,16 +64,17 @@ OverlaysState& State()
     return state;
 }
 
-// A labelled switch for a layer's open flag. In capture runs the flag follows the capture state,
-// so each layer state shows that layer alone; the switch sits right before the layer call and is
+// A labelled checkbox for a layer's open flag. In capture runs the flag follows the capture state,
+// so each layer state shows that layer alone; the checkbox sits right before the layer call and is
 // the popover's anchor.
-void LayerSwitch(facet::demo::PageCtx& ctx, const char* label, const char* id, const char* probe, bool* open,
+void LayerCheckbox(facet::demo::PageCtx& ctx, const char* label, const char* id, const char* probe, bool* open,
                  int captureState)
 {
     if (ctx.capture)
         *open = ctx.captureState == captureState;
     LabeledRow(label);
     ImGui::Checkbox(id, open);
+    facet::ItemCursor();
     ctx.Probe(probe);
 }
 
@@ -86,34 +87,34 @@ void RevealLayer(const facet::demo::PageCtx& ctx, int captureState)
 void CallerOpened(facet::demo::PageCtx& ctx, OverlaysState& s)
 {
     SectionHeader("Layers the caller opens");
-    Paragraph("Each of these takes the caller's open flag; the switch beside its name sets it, and dismissing "
+    Paragraph("Each of these takes the caller's open flag; the checkbox beside its name sets it, and dismissing "
               "the finished layer clears it. A planned layer shows one placeholder line while its "
               "flag is on.");
-    LayerSwitch(ctx, "Modal", "##modal", "overlays.modal", &s.modal, kCaptureModal);
+    LayerCheckbox(ctx, "Modal", "##modal", "overlays.modal", &s.modal, kCaptureModal);
     if (facet::BeginModal("Modal", &s.modal))
     {
         Note("Modal content.");
         facet::EndModal();
     }
     RevealLayer(ctx, kCaptureModal);
-    LayerSwitch(ctx, "Confirm dialog", "##confirm", "overlays.confirm", &s.confirm, kCaptureConfirm);
+    LayerCheckbox(ctx, "Confirm dialog", "##confirm", "overlays.confirm", &s.confirm, kCaptureConfirm);
     facet::ConfirmDialog("Confirm", &s.confirm, "Message of the dialog.", {.destructive = true});
     RevealLayer(ctx, kCaptureConfirm);
-    LayerSwitch(ctx, "Popover", "##popover", "overlays.popover", &s.popover, kCapturePopover);
+    LayerCheckbox(ctx, "Popover", "##popover", "overlays.popover", &s.popover, kCapturePopover);
     if (facet::BeginPopover("popover", &s.popover, {.placement = facet::PopoverPlacement::Below}))
     {
         Note("Popover content.");
         facet::EndPopover();
     }
     RevealLayer(ctx, kCapturePopover);
-    LayerSwitch(ctx, "Drawer", "##drawer", "overlays.drawer", &s.drawer, kCaptureDrawer);
+    LayerCheckbox(ctx, "Drawer", "##drawer", "overlays.drawer", &s.drawer, kCaptureDrawer);
     if (facet::BeginDrawer("Drawer", &s.drawer, {.side = facet::DrawerSide::End}))
     {
         Note("Drawer content.");
         facet::EndDrawer();
     }
     RevealLayer(ctx, kCaptureDrawer);
-    LayerSwitch(ctx, "Command palette", "##palette", "overlays.palette", &s.palette, kCapturePalette);
+    LayerCheckbox(ctx, "Command palette", "##palette", "overlays.palette", &s.palette, kCapturePalette);
     facet::CommandPalette("Commands", &s.palette, &s.picked, kCommands);
     RevealLayer(ctx, kCapturePalette);
 }
@@ -137,7 +138,7 @@ void InputOpened()
     }
 }
 
-void Notifications(OverlaysState& s)
+void Notifications(facet::demo::PageCtx& ctx, OverlaysState& s)
 {
     SectionHeader("Notifications and status");
     LabeledRow("Toast");
@@ -146,6 +147,8 @@ void Notifications(OverlaysState& s)
         s.toast = facet::ShowToast("Toast text", {.tone = facet::Tone::Success});
         s.toastShown = true;
     }
+    facet::ItemCursor();
+    ctx.Probe("overlays.toast");
     if (s.toastShown)
         Note("ShowToast returned %s.", s.toast.IsValid() ? "a toast id" : "an invalid id: the toast stack is planned");
     facet::BeginLoadingOverlay("loading", {.message = "Loading", .loading = true});
@@ -171,11 +174,11 @@ FACET_DEMO_PAGE("overlays", "Overlays", "Widgets", 100, "default", "modal", "con
     OverlaysState& s = State();
     CallerOpened(ctx, s);
     InputOpened();
-    Notifications(s);
+    Notifications(ctx, s);
 }
 
 // Every caller-opened layer starts closed, so finished layers never open over the gallery by
-// themselves, and each switch opens and closes its own layer only.
+// themselves, and each checkbox opens and closes its own layer only.
 FACET_DEMO_SELFTEST("overlays")
 {
     test.Expect("every layer starts closed", [] { return !OverlaysState{}.AnyLayerOpen(); });
@@ -205,5 +208,23 @@ FACET_DEMO_SELFTEST("overlays")
         });
         test.Click(layer.probe);
         test.Expect(std::string(layer.probe) + " closes its layer", [] { return !State().AnyLayerOpen(); });
+        // By keyboard: after the clicks the first Tab shows the focus on the checkbox, and
+        // Space flips it.
+        test.KeyPress(ImGuiKey_Tab);
+        test.ExpectFocused(layer.probe);
+        test.KeyPress(ImGuiKey_Space);
+        test.Expect(std::string(layer.probe) + " opens with Space", [flag = layer.flag] { return State().*flag; });
+        test.KeyPress(ImGuiKey_Space);
+        test.Expect(std::string(layer.probe) + " closes with Space", [] { return !State().AnyLayerOpen(); });
     }
+
+    // The toast button, by mouse and by keyboard.
+    test.Do([] { State().toastShown = false; });
+    test.Click("overlays.toast");
+    test.Expect("the toast button calls ShowToast", [] { return State().toastShown; });
+    test.Do([] { State().toastShown = false; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("overlays.toast");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused toast button calls it too", [] { return State().toastShown; });
 }

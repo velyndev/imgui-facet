@@ -1,7 +1,7 @@
 // Demo page: Navigation. Calls every v1 widget of facet/widgets/navigation.h once, grouped by
 // purpose. The widgets are planned, so each call draws its placeholder; Phase 2 replaces them
 // one by one on this page. Sample entries are neutral ("Page 1") with built-in icons. The
-// shortcut sheet is a modal layer: it starts closed and a switch opens it; the capture state
+// shortcut sheet is a modal layer: it starts closed and a checkbox opens it; the capture state
 // "shortcuts" shows it open.
 
 #include <imgui.h>
@@ -106,12 +106,13 @@ void Steps(facet::demo::PageCtx& ctx, NavigationState& s)
     Note("Content of step %d.", s.wizardStep + 1);
     facet::WizardFooter({.canAdvance = true});
     facet::EndWizard();
-    Paragraph("The shortcut sheet lists the registered shortcuts in a modal sheet. The switch sets "
+    Paragraph("The shortcut sheet lists the registered shortcuts in a modal sheet. The checkbox sets "
               "its open flag; a planned sheet shows one placeholder line while the flag is on.");
     if (ctx.capture)
         s.shortcutSheet = ctx.captureState == kCaptureShortcuts;
     LabeledRow("Shortcut sheet");
     ImGui::Checkbox("##shortcuts", &s.shortcutSheet);
+    facet::ItemCursor();
     ctx.Probe("navigation.shortcuts");
     facet::ShortcutSheet("Shortcuts", &s.shortcutSheet);
     if (ctx.capture && ctx.captureState == kCaptureShortcuts)
@@ -136,13 +137,19 @@ FACET_DEMO_PAGE("navigation", "Navigation", "Widgets", 70, "default", "shortcuts
 }
 
 // The shortcut sheet starts closed, so a finished sheet never opens over the gallery by itself,
-// and the switch opens and closes it.
+// and the checkbox opens and closes it.
 FACET_DEMO_SELFTEST("navigation")
 {
     test.Expect("the shortcut sheet starts closed", [] { return !NavigationState{}.shortcutSheet; });
     test.Do([] { State().shortcutSheet = false; });
     test.Click("navigation.shortcuts");
-    test.Expect("the switch opens the shortcut sheet", [] { return State().shortcutSheet; });
+    test.Expect("the checkbox opens the shortcut sheet", [] { return State().shortcutSheet; });
     test.Click("navigation.shortcuts");
-    test.Expect("the switch closes the shortcut sheet", [] { return !State().shortcutSheet; });
+    test.Expect("the checkbox closes the shortcut sheet", [] { return !State().shortcutSheet; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("navigation.shortcuts");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused checkbox opens the sheet", [] { return State().shortcutSheet; });
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("and closes it again", [] { return !State().shortcutSheet; });
 }

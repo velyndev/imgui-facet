@@ -1,6 +1,6 @@
 // Demo page: Containers. Calls the v1 widgets of facet/widgets/containers.h, grouped by purpose.
 // The widgets are planned, so each call draws its placeholder; Phase 2 replaces them one by one
-// on this page. The shell is a layer: it starts closed and a switch opens it, so a finished
+// on this page. The shell is a layer: it starts closed and a checkbox opens it, so a finished
 // shell never covers the gallery uninvited; the capture state "shell" shows it open. The app
 // frame, the overlay controller and mini windows are root containers that a host calls outside
 // every window, so they are not called inside this page; the page says so and the family doc
@@ -54,13 +54,14 @@ ContainersState& State()
 void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Windows and frames");
-    Paragraph("The floating shell is a window of its own that a page opens; the switch sets its "
+    Paragraph("The floating shell is a window of its own that a page opens; the checkbox sets its "
               "open flag, and its close button or Escape will clear it. A planned shell shows one "
               "placeholder line while the flag is on.");
     if (ctx.capture)
         s.shellOpen = ctx.captureState == kCaptureShell;
     LabeledRow("Shell");
     ImGui::Checkbox("##shell", &s.shellOpen);
+    facet::ItemCursor();
     ctx.Probe("containers.shell");
     if (facet::BeginShell("Shell###shell", &s.shellOpen, {.icon = facet::Icon("settings"), .closeOnEscape = true}))
     {
@@ -171,13 +172,19 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell")
 }
 
 // The shell starts closed, so a finished shell never opens over the gallery by itself, and the
-// switch opens and closes it.
+// checkbox opens and closes it.
 FACET_DEMO_SELFTEST("containers")
 {
     test.Expect("the shell starts closed", [] { return !ContainersState{}.shellOpen; });
     test.Do([] { State().shellOpen = false; });
     test.Click("containers.shell");
-    test.Expect("the switch opens the shell", [] { return State().shellOpen; });
+    test.Expect("the checkbox opens the shell", [] { return State().shellOpen; });
     test.Click("containers.shell");
-    test.Expect("the switch closes the shell", [] { return !State().shellOpen; });
+    test.Expect("the checkbox closes the shell", [] { return !State().shellOpen; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("containers.shell");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused checkbox opens the shell", [] { return State().shellOpen; });
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("and closes it again", [] { return !State().shellOpen; });
 }
