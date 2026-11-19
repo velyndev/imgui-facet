@@ -369,7 +369,12 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
     mapping.max = std::max(params.min, params.max);
     mapping.integer = params.integer;
     mapping.wrap = params.wrap;
+    mapping.scale = params.scale;
+    mapping.logZero = params.logZero;
     mapping = NormalizeMapping(mapping);
+    const auto parse = [&params](const char* text, double* out) {
+        return params.parser != nullptr ? params.parser(params.parserUser, text, out) : ParseNumber(text, out);
+    };
     const bool stepping = params.step > 0.0 && std::isfinite(params.step) && !readOnly && !disabled;
     const double stepFast = params.stepFast > 0.0 && std::isfinite(params.stepFast) ? params.stepFast : params.step;
 
@@ -438,7 +443,7 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
             // From the typed number when it reads as one, else from the value.
             double base = current;
             double typed = 0.0;
-            if (ParseNumber(text->TextA.Data, &typed) == NumberParse::Ok)
+            if (parse(text->TextA.Data, &typed) == NumberParse::Ok)
                 base = typed;
             double next = base;
             const StepSize stepSize = CurrentStepSize(io);
@@ -484,8 +489,11 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
     field.placeholder = params.placeholder;
     field.suffix = params.unit;
     field.selectAllOnFocus = true;
-    field.flags = ImGuiInputTextFlags_CallbackCharFilter;
-    field.callback = params.integer ? NumberCharFilterInteger : NumberCharFilterReal;
+    if (params.parser == nullptr)
+    {
+        field.flags = ImGuiInputTextFlags_CallbackCharFilter;
+        field.callback = params.integer ? NumberCharFilterInteger : NumberCharFilterReal;
+    }
     field.size = params.size;
     field.width = params.width;
     field.readOnly = readOnly;
@@ -522,7 +530,7 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
     if (typingMode && result.field.edited && !hooks.dragMode)
     {
         double typed = 0.0;
-        const NumberParse parsed = ParseNumber(state.edit, &typed);
+        const NumberParse parsed = parse(state.edit, &typed);
         if (parsed == NumberParse::Ok)
             write(typed);
         else if (!result.field.active)
@@ -561,7 +569,11 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
             ValueDragOptions drag;
             drag.mapping = mapping;
             drag.grabRadius = -1.0f;
-            drag.speed = speed;
+            // A logarithmic range maps the travel across the frame onto the range (track mode with
+            // the frame as the track), so equal travel multiplies by equal factors.
+            const bool logarithmic = mapping.scale == ValueScale::Logarithmic && params.speed <= 0.0;
+            drag.speed = logarithmic ? 0.0 : speed;
+            drag.dragLength = logarithmic ? std::max(1.0f, result.field.frame.GetWidth()) : 0.0f;
             drag.keyStep = params.step > 0.0 ? params.step : 0.0;
             drag.readOnly = readOnly;
             const auto run = [&](ItemState item, bool keyboard) {

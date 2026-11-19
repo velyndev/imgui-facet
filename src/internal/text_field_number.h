@@ -45,6 +45,12 @@
 //    (Shift a tenth, Ctrl ten times, as the value drag core does), after the pointer moved
 //    T().drag.startThreshold; Left and Right step while it is focused. A click without a drag,
 //    Enter or Space types a value instead; Tab reaches the field once.
+//
+// Widgets with their own grammar (DurationInput, UnitInput) pass a NumberParseFn and a FormatFn;
+// DragNumber's logarithmic scale is NumberFieldParams::scale. HexInput is not built here: its
+// std::uint32_t and std::uint64_t values do not fit the double this core edits (integer
+// conversions are rounded into the int range, and a double holds 53 bits exactly), so it edits
+// its digits with overtype on TextFieldBehavior (text_field.h) and parses them itself.
 
 #include <limits>
 
@@ -80,6 +86,12 @@ NumberParse ParseNumber(const char* text, double* out);
 int FormatNumber(char* buffer, int bufferSize, double value, const char* format, FormatFn formatter,
                  void* formatterUser, bool integer, bool bare);
 
+// Reads a typed text in a field's own grammar ("1m30" or "01:30:00" for DurationInput, "12 ms"
+// with a unit suffix for UnitInput). Returns Ok and writes *out, or Empty or Invalid as
+// ParseNumber does. It must also read the plain numbers the field writes as its editable form
+// (call ParseNumber for those).
+using NumberParseFn = NumberParse (*)(void* user, const char* text, double* out);
+
 // ---- Behaviour -----------------------------------------------------------------------------
 
 struct NumberFieldParams
@@ -105,6 +117,18 @@ struct NumberFieldParams
     bool mixed = false;                 // empty with Strings::mixed until the first edit writes
     const char* error = nullptr;
     const char* helpText = nullptr;
+    // Members below were added for the frozen number widgets.
+    // Drag mode over a finite range: Logarithmic maps the pointer travel across the frame width
+    // onto the range through the value drag core's mapping (DragNumberOptions::scale), so equal
+    // travel multiplies the value by equal factors; logZero as ValueMapping::logZero. Keys, the
+    // wheel and the steppers still step by `step`. Linear, a range the mapping cannot take
+    // logarithmically (see NormalizeMapping) or a `speed` above 0 keeps the delta drag.
+    ValueScale scale = ValueScale::Linear;
+    double logZero = 0.0;
+    // Reads typed text instead of ParseNumber; with a parser every printable character can be
+    // typed (the number filter is off), so its grammar can use letters and separators.
+    NumberParseFn parser = nullptr;
+    void* parserUser = nullptr;
 };
 
 struct NumberFieldResult

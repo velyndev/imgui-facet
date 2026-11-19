@@ -26,6 +26,7 @@
 #include "internal/text_field_number.h"
 #include "support/session.h"
 
+using facet::ValueScale;
 using facet::internal::NumberFieldBehavior;
 using facet::internal::NumberFieldParams;
 using facet::internal::NumberFieldResult;
@@ -1328,6 +1329,82 @@ TEST_CASE("Number field: steppers step at once, stop at the ends and commit once
     session.Click(minus);
     CHECK(number.value == 2.0);
     CHECK(number.commits == 3);  // the third + was disabled at the maximum: no edit
+}
+
+TEST_CASE("Number field: a logarithmic drag multiplies the value by equal factors for equal travel")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestNumber number;
+    number.value = 1.0;
+    number.params.drag = true;
+    number.params.min = 1.0;
+    number.params.max = 10000.0;
+    number.params.scale = ValueScale::Logarithmic;
+    session.SetUi([&] { number.Run("##log"); });
+    session.Frame();
+    const ImRect frame = number.result.field.frame;
+    const float quarter = frame.GetWidth() * 0.25f;
+    const ImVec2 start(frame.Min.x + 4.0f, frame.GetCenter().y);
+    // A quarter of the frame width is a quarter of the four decades: one decade.
+    session.Drag({start, ImVec2(start.x + quarter, start.y)}, 6);
+    CHECK(number.value == doctest::Approx(10.0).epsilon(0.02));
+    session.Drag({start, ImVec2(start.x + quarter, start.y)}, 6);
+    CHECK(number.value == doctest::Approx(100.0).epsilon(0.02));
+    // A linear field over the same range moves by a quarter of the range instead.
+    number.params.scale = ValueScale::Linear;
+    number.value = 1.0;
+    session.Frame();
+    session.Drag({start, ImVec2(start.x + quarter, start.y)}, 6);
+    CHECK(number.value > 1000.0);
+}
+
+namespace
+{
+
+// "1m30" style text: minutes before an "m", seconds after it; a plain number is seconds.
+NumberParse ParseMinutes(void*, const char* text, double* out)
+{
+    const char* m = std::strchr(text, 'm');
+    if (m == nullptr)
+        return ParseNumber(text, out);
+    const std::string minutes(text, m);
+    double whole = 0.0;
+    double rest = 0.0;
+    if (ParseNumber(minutes.c_str(), &whole) != NumberParse::Ok)
+        return NumberParse::Invalid;
+    if (m[1] != '\0' && ParseNumber(m + 1, &rest) != NumberParse::Ok)
+        return NumberParse::Invalid;
+    *out = whole * 60.0 + rest;
+    return NumberParse::Ok;
+}
+
+} // namespace
+
+TEST_CASE("Number field: a parser reads the field's own grammar and letters can be typed")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestNumber number;
+    number.value = 5.0;
+    number.params.parser = &ParseMinutes;
+    session.SetUi([&] { number.Run("##duration"); });
+    session.Frame();
+    session.Click(number.TextPoint());
+    session.Type("1m30");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(number.value == 90.0);
+    // The plain editable form still reads back.
+    session.Click(number.TextPoint());
+    session.Type("45");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(number.value == 45.0);
+    // Text the parser rejects writes nothing.
+    session.Click(number.TextPoint());
+    session.Type("xm");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(number.value == 45.0);
+    CHECK(number.parseFailures == 1);
 }
 
 TEST_CASE("Number field: dragging goes by the pointer travel without drift; a click types")
