@@ -24,10 +24,11 @@
 // keyboard focus on the row's control (the tooltip then sits under the label). An optional
 // icon sits before the label, one text line square, in labelSecondary; the label column counts
 // it, and in a group where any row has an icon every row keeps the icon's room free (measured
-// in the previous frame), so the label texts start in one line. The optional description is a second line under the label (footnote, labelSecondary). It wraps
-// across the label column and the control slot when nothing else sits under the control (no
-// help text, no error, a control no taller than one control height), and in the label column
-// otherwise, so a short label never squeezes it into a narrow column next to an empty row.
+// in the previous frame), so the label texts start in one line. The optional description is a
+// second line under the label (footnote, labelSecondary). It wraps across the label column and
+// the control slot when nothing else sits under the control (no help text, no error, a control
+// no taller than one control height), and in the label column otherwise, so a short label never
+// squeezes it into a narrow column next to an empty row.
 // Under the control come the help text (footnote, labelSecondary) or, replacing it, the error
 // message with the error icon in the destructive color, wrapped in the slot.
 // A row begun inside ImGui::BeginDisabled draws its label, marker, description and help text in
