@@ -15,6 +15,7 @@
 
 #include "gallery.h"
 #include "internal/keys.h"
+#include "internal/row_layout.h"
 #include "pages/pages.h"
 
 namespace
@@ -127,7 +128,7 @@ void DrawCaptureField(const facet::Theme& theme, const facet::demo::PageCtx& ctx
     const facet::Colors& c = theme.colors;
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     const ImGuiID id = ImGui::GetID("##capture");
-    const float width = std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * kCaptureWidthEm);
+    const float width = std::min(ImGui::CalcItemWidth(), ImGui::GetFontSize() * kCaptureWidthEm);
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const ImRect bb(pos, ImVec2(pos.x + width, pos.y + ImGui::GetFrameHeight()));
     ImGui::ItemSize(bb, ImGui::GetStyle().FramePadding.y);
@@ -214,11 +215,11 @@ void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& c
     facet::demo::Paragraph("A prototype of the capture that KeybindCapture will use. While it listens it owns "
                            "every key, so shortcuts, key binds and keyboard navigation stay quiet; the chord "
                            "is taken when its last key is released.");
+    facet::internal::BeginRowGroup("capture");
+    facet::internal::BeginRow("Chord");
     const float right = facet::demo::ContentRight();
-    facet::demo::LabeledRow("Chord");
     DrawCaptureField(theme, ctx);
-    if (!facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear")))
-        facet::demo::LabeledRow("");
+    facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear"));
     if (ImGui::Button("Clear"))
     {
         page.capture.Clear();
@@ -229,20 +230,22 @@ void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& c
     }
     facet::ItemCursor();
     ctx.Probe("keys.clear");
+    facet::internal::EndRow();
 
-    facet::demo::LabeledRow("Accept");
+    // A row that runs out of room continues under its first control, in the control column.
+    facet::internal::BeginRow("Accept");
     const float rowRight = facet::demo::ContentRight();
     ImGui::Checkbox("Mouse buttons", &page.captureOptions.allowMouse);
     facet::ItemCursor();
     ctx.Probe("keys.allowMouse");
-    if (!facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Gamepad buttons")))
-        facet::demo::LabeledRow("");
+    facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Gamepad buttons"));
     ImGui::Checkbox("Gamepad buttons", &page.captureOptions.allowGamepad);
     facet::ItemCursor();
-    if (!facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Modifiers alone")))
-        facet::demo::LabeledRow("");
+    facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Modifiers alone"));
     ImGui::Checkbox("Modifiers alone", &page.captureOptions.allowModifierOnly);
     facet::ItemCursor();
+    facet::internal::EndRow();
+    facet::internal::EndRowGroup();
 
     switch (page.lastEvent)
     {
@@ -294,15 +297,22 @@ void DrawShortcutSection(const facet::Theme& theme, const facet::demo::PageCtx& 
                            "works while this page has the keyboard focus, and Reset is the plain R key, which a "
                            "text field keeps for typing.");
 
-    facet::demo::LabeledRow("Counter");
-    facet::Text(facet::TextStyle::Title2, "%d", page.counter);
+    // The counter in the row's text style, so it shares the baseline of its label and note.
+    facet::internal::BeginRowGroup("shortcuts");
+    facet::internal::BeginRow("Counter");
+    ImGui::AlignTextToFramePadding();
+    facet::Text(facet::TextStyle::Body, "%d", page.counter);
     ctx.Probe("keys.counter");
     if (page.lastShortcut != nullptr)
     {
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, facet::Px(theme.spacing.md));
         ImGui::AlignTextToFramePadding();
-        facet::demo::Note("Last: %s", page.lastShortcut);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.labelSecondary);
+        facet::Text(facet::TextStyle::Body, "Last: %s", page.lastShortcut);
+        ImGui::PopStyleColor();
     }
+    facet::internal::EndRow();
+    facet::internal::EndRowGroup();
 
     if (ImGui::BeginTable("##shortcuts", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg))
     {
@@ -370,10 +380,11 @@ void DrawShortcutSection(const facet::Theme& theme, const facet::demo::PageCtx& 
         }
     }
 
-    facet::demo::LabeledRow("Type here");
-    ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * kFieldWidthEm));
+    facet::internal::BeginRow("Type here");
+    ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), ImGui::GetFontSize() * kFieldWidthEm));
     ImGui::InputTextWithHint("##text", "R types an r here instead of resetting", page.text, sizeof(page.text));
     ctx.Probe("keys.text");
+    facet::internal::EndRow();
 }
 
 // --- Key binds ------------------------------------------------------------------------------------
@@ -382,7 +393,7 @@ void BindRow(const facet::Theme& theme, const char* mode, const facet::Keybind& 
              const char* probe, const facet::demo::PageCtx& ctx)
 {
     const facet::Colors& c = theme.colors;
-    facet::demo::LabeledRow(mode);
+    facet::internal::BeginRow(mode);
     // The indicator: a filled dot when active, a hollow one when not, and the word, so the
     // state never depends on color. Both use neutral label colors: the accent is kept for
     // selection, the primary action and focus.
@@ -402,6 +413,7 @@ void BindRow(const facet::Theme& theme, const char* mode, const facet::Keybind& 
     ImGui::AlignTextToFramePadding();
     std::string chords = bind.primary != ImGuiKey_None ? ChordText(bind.primary) : std::string("no key");
     ImGui::Text("%s  %s", active ? "Active" : "Inactive", chords.c_str());
+    facet::internal::EndRow();
 }
 
 void DrawBindSection(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
@@ -415,14 +427,17 @@ void DrawBindSection(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     page.toggleActive = facet::IsBindActive(page.toggle, &page.toggleLatch);
     page.alwaysActive = facet::IsBindActive(page.always, nullptr);
     page.offActive = facet::IsBindActive(page.off, nullptr);
+    facet::internal::BeginRowGroup("binds");
     BindRow(theme, "Hold", page.hold, page.holdActive, "keys.bind.hold", ctx);
     BindRow(theme, "Toggle", page.toggle, page.toggleActive, "keys.bind.toggle", ctx);
     BindRow(theme, "Always", page.always, page.alwaysActive, "keys.bind.always", ctx);
     BindRow(theme, "Off", page.off, page.offActive, "keys.bind.off", ctx);
-    facet::demo::LabeledRow("Hold bind");
+    facet::internal::BeginRow("Hold bind");
     ImGui::Checkbox("Works while typing", &page.hold.whileTextInput);
     facet::ItemCursor();
     ctx.Probe("keys.whileTyping");
+    facet::internal::EndRow();
+    facet::internal::EndRowGroup();
 }
 
 } // namespace

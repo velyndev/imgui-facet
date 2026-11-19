@@ -20,6 +20,7 @@
 
 #include "gallery.h"
 #include "internal/chart_core.h"
+#include "internal/row_layout.h"
 #include "pages/pages.h"
 
 namespace
@@ -414,10 +415,11 @@ FACET_DEMO_PAGE("chart-core", "Chart core", "Blocks", 100, "default", "crosshair
 
     facet::demo::SectionHeader("Line and area");
     facet::demo::Note("Generated: y = sin x as an area, y = e^(-x/8) cos 2x as a line.");
-    facet::demo::LabeledRow("Data");
+    facet::internal::BeginRow("Data");
     ImGui::Checkbox("Show the empty state", &page.showEmpty);
     facet::ItemCursor();
     ctx.Probe("chart.empty");
+    facet::internal::EndRow();
     if (page.showEmpty)
     {
         DrawEmptyChart(theme, ctx);
@@ -439,7 +441,7 @@ FACET_DEMO_PAGE("chart-core", "Chart core", "Blocks", 100, "default", "crosshair
 
     facet::demo::SectionHeader("Logarithmic axis");
     facet::demo::Note("Generated: y = 10^(x/2) and y = 10^(x/4). On a logarithmic axis both are straight lines.");
-    facet::demo::LabeledRow("Y axis");
+    facet::internal::BeginRow("Y axis");
     int axis = page.logAxis ? 1 : 0;
     ImGui::RadioButton("Linear", &axis, 0);
     facet::ItemCursor();
@@ -448,6 +450,7 @@ FACET_DEMO_PAGE("chart-core", "Chart core", "Blocks", 100, "default", "crosshair
     ImGui::RadioButton("Logarithmic", &axis, 1);
     facet::ItemCursor();
     ctx.Probe("chart.log");
+    facet::internal::EndRow();
     page.logAxis = axis == 1;
     {
         const SeriesView growth[] = {SeriesView{.x = data.growthX, .y = data.fast, .count = kGrowthSamples},
