@@ -86,7 +86,8 @@ The building blocks the widgets will be made of exist inside the library. What e
       a scrolling region; shown only after keyboard input.
     - Rows and width classes: labelled rows with a shared label column, descriptions, help
       and error texts, modified markers and reset buttons, stacking in narrow widths.
-    - Overflow: a row of buttons that moves what does not fit behind a "More" button.
+    - Overflow: a row of buttons that moves what does not fit behind a "More" button; the
+      current item stays in the row on the selection pill.
     - Value drag: linear, whole-number, stepped, logarithmic, snapping, vertical, read-only
       and disabled sliders with their edit sessions, fine and coarse movement, and Escape to
       restore the value.

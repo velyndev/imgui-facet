@@ -25,8 +25,8 @@ Three dials set the character, each from 1 (calm) to 3 (bold):
 the selected entry and springs to the next one when the selection changes (standard spring).
 Tabs, the sidebar, segmented controls and lists are to share this one gesture once they exist,
 so it is recognisably Facet without any ornament; today the selection pill block in
-`src/internal/selection_pill.h` draws it for the demo navigation and the prototypes on the
-Selection pill page.
+`src/internal/selection_pill.h` draws it for the demo navigation, the current item of the
+Overflow page and the prototypes on the Selection pill page.
 
 **Dose caps.** Effects are allowed only where they carry meaning:
 

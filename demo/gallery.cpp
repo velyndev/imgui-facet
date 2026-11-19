@@ -808,12 +808,20 @@ void DrawKnob(ImDrawList* drawList, const ImRect& rect, const facet::internal::I
 
 } // namespace
 
-bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat)
+float ProtoButtonWidth(const char* label, bool selected)
+{
+    facet::internal::PushPillLabelStyle(facet::TextStyle::Body, selected);
+    const float width = ImGui::CalcTextSize(label, nullptr, true).x + facet::Px(facet::T().spacing.md) * 2.0f;
+    facet::PopTextStyle();
+    return width;
+}
+
+bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat, bool selected)
 {
     const facet::Theme& t = facet::T();
     const facet::Colors& c = t.colors;
     const char* end = ImGui::FindRenderedTextEnd(label);
-    facet::PushTextStyle(facet::TextStyle::Body);
+    facet::internal::PushPillLabelStyle(facet::TextStyle::Body, selected);
     const float padding = facet::Px(t.spacing.md);
     const float height = facet::ControlHeight(facet::ControlSize::Regular);
     const ImVec2 size(ImGui::CalcTextSize(label, end).x + padding * 2.0f, height);
@@ -825,7 +833,8 @@ bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const float radius = facet::Px(t.radii.control);
-        facet::FillRect(drawList, item.rect.Min, item.rect.Max, Color(ControlFill(item)), radius);
+        if (!selected)
+            facet::FillRect(drawList, item.rect.Min, item.rect.Max, Color(ControlFill(item)), radius);
         facet::StrokeRect(drawList, item.rect.Min, item.rect.Max,
                           Color(item.disabled ? c.separator : facet::ControlBoundaryColor(c)), radius,
                           facet::HairlineThickness());

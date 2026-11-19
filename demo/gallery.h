@@ -87,8 +87,13 @@ void LabeledRow(const char* label);
 // Lengths are in design units; 0 takes the available width.
 
 // A push button with `label` as its text. Returns true when pressed. `repeat` presses again
-// while held.
-bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat = false);
+// while held. `selected` marks the current entry of a group: the button leaves out its fill, so
+// the group's selection pill (src/internal/selection_pill.h) drawn behind it shows, and draws
+// its label in semibold (PushPillLabelStyle), the cue that does not depend on color. Measure a
+// selected button with ProtoButtonWidth.
+bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat = false, bool selected = false);
+// The width of a ProtoButton with this label, in pixels.
+float ProtoButtonWidth(const char* label, bool selected = false);
 // An on/off switch with the label in front; Space, Enter or a click flips *value. Returns
 // true when *value was written.
 bool ProtoToggle(PageCtx& ctx, const char* label, bool* value, const char* probe);

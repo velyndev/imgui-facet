@@ -1,6 +1,7 @@
 // Demo page: Overflow. A row of prototype buttons fitted into a width that a prototype slider
 // sets: the overflow fitter (internal/overflow.h) decides which stay, the rest go behind a
-// "More" button. The current item has the highest priority, so it never leaves the row.
+// "More" button. The current item has the highest priority, so it never leaves the row, and the
+// selection pill marks it.
 
 #include <algorithm>
 #include <cstdio>
@@ -13,6 +14,7 @@
 #include "gallery.h"
 #include "internal/overflow.h"
 #include "internal/row_layout.h"
+#include "internal/selection_pill.h"
 #include "pages/pages.h"
 
 namespace
@@ -44,17 +46,10 @@ struct OverflowPageState
     int hidden = 0;
     float required = 0.0f;   // units the row needs with every item
     float available = 0.0f;  // units the slider offers at most
+    int marked = -1;         // the item drawn as selected in the last frame; -1 for none
 };
 
 OverflowPageState page;
-
-float ButtonWidth(const char* label)
-{
-    facet::PushTextStyle(facet::TextStyle::Body);
-    const float width = ImGui::CalcTextSize(label, nullptr, true).x + facet::Px(facet::T().spacing.md) * 2.0f;
-    facet::PopTextStyle();
-    return width;
-}
 
 } // namespace
 
@@ -90,10 +85,13 @@ FACET_DEMO_PAGE("overflow", "Overflow", "Blocks", 40, "default", "narrow", "open
     const float gap = facet::Px(t.spacing.sm);
     facet::internal::OverflowItem items[kItemCount];
     for (int i = 0; i < kItemCount; ++i)
-        items[i] = {ButtonWidth(kItems[i]), i == page.current ? kCurrentPriority : 0};
+    {
+        const bool current = i == page.current;
+        items[i] = {facet::demo::ProtoButtonWidth(kItems[i], current), current ? kCurrentPriority : 0};
+    }
     char moreLabel[32];
     std::snprintf(moreLabel, sizeof(moreLabel), "More (%d)###more", kItemCount);
-    const float buttonWidth = ButtonWidth(moreLabel);
+    const float buttonWidth = facet::demo::ProtoButtonWidth(moreLabel);
     const float width = facet::Px(static_cast<float>(page.row));
     const facet::internal::OverflowResult fit =
         facet::internal::FitOverflow(items, width, gap, buttonWidth, facet::Px(t.spacing.lg), &page.fit, page.visible);
@@ -110,6 +108,10 @@ FACET_DEMO_PAGE("overflow", "Overflow", "Blocks", 40, "default", "narrow", "open
                     facet::ToU32(t.colors.fill[3]), facet::Px(t.radii.control) + pad);
     bool first = true;
     char probe[32];
+    // The current item sits on the selection pill, which slides to the next current item.
+    facet::internal::SelectionPill pill;
+    pill.Begin(ImGui::GetID("##row"), drawList, pos);
+    page.marked = -1;
     for (int i = 0; i < kItemCount; ++i)
     {
         if (!page.visible[i])
@@ -118,7 +120,14 @@ FACET_DEMO_PAGE("overflow", "Overflow", "Blocks", 40, "default", "narrow", "open
             ImGui::SameLine(0.0f, gap);
         first = false;
         std::snprintf(probe, sizeof(probe), "overflow.item%d", i);
-        if (facet::demo::ProtoButton(ctx, kItems[i], probe))
+        const bool selected = i == page.current;
+        const bool pressed = facet::demo::ProtoButton(ctx, kItems[i], probe, false, selected);
+        if (selected)
+        {
+            pill.Target(ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
+            page.marked = i;
+        }
+        if (pressed)
             page.current = i;
     }
     if (fit.showButton)
@@ -133,6 +142,7 @@ FACET_DEMO_PAGE("overflow", "Overflow", "Blocks", 40, "default", "narrow", "open
     {
         page.open = false;
     }
+    pill.End(facet::ToU32(t.colors.accentSubtle), facet::Px(t.radii.control));
     Note("Current: %s. %d of %d items in the row%s.", kItems[page.current], kItemCount - fit.hiddenCount, kItemCount,
          fit.showButton ? ", the rest behind More" : "");
     // The row is what the default and narrow states change: keep it in the image at any size.
@@ -170,6 +180,7 @@ FACET_DEMO_SELFTEST("overflow")
     test.Reveal("overflow.more");
     test.ExpectVisible("overflow.more");
     test.Expect("the current item stays in the row", [] { return page.visible[page.current]; });
+    test.Expect("and is drawn as selected", [] { return page.marked == page.current; });
 
     test.Click("overflow.more");
     test.Expect("More opens the overflow list", [] { return page.open; });
@@ -177,6 +188,7 @@ FACET_DEMO_SELFTEST("overflow")
     test.ExpectNear("choosing from the list makes it current", [] { return page.current; }, 7.0, 0.0);
     test.Expect("the list closes", [] { return !page.open; });
     test.Expect("and the chosen item is now in the row", [] { return page.visible[7]; });
+    test.Expect("drawn as the selected one", [] { return page.marked == 7; });
 
     // By keyboard: More opens and closes with Space.
     test.Click("overflow.item7");
