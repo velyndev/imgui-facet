@@ -1,7 +1,7 @@
 // BeginVirtualList, VirtualListRow, EndVirtualList and SetNextVirtualListScrollTo
 // (containers.h). Planned: draws the placeholders of src/widgets/structure_stub.h until Phase 2
-// implements the list. NextVisibleRows (common.h) hands out no rows yet, so a row loop inside
-// the frame submits nothing. While the list is loading, failed or empty, BeginVirtualList draws
+// implements the list. NextVisibleRows (common.h) hands out rows only inside the list core's row
+// ranges, which this placeholder does not open, so a row loop inside the frame submits nothing. While the list is loading, failed or empty, BeginVirtualList draws
 // one placeholder line where the state will be and returns false, as declared.
 
 #include "facet/widgets/containers.h"

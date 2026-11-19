@@ -1,6 +1,7 @@
 // BeginItemGrid, ItemGridTile and EndItemGrid (layout.h). Planned: draws the placeholders of
 // src/widgets/structure_stub.h until Phase 2 implements the grid. NextVisibleRows (common.h)
-// hands out no tiles yet, so a tile loop inside the frame submits nothing. While the grid is
+// hands out tiles only inside the list core's row ranges, which this placeholder does not open,
+// so a tile loop inside the frame submits nothing. While the grid is
 // loading, failed or empty, BeginItemGrid draws one placeholder line where the state will be and
 // returns false, as declared.
 

@@ -184,8 +184,8 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     }
 
     SectionHeader("Drag and drop");
-    facet::demo::Paragraph("BeginDragSource and BeginDropTarget mark the last item. They return false until the "
-                           "drag and drop core exists.");
+    facet::demo::Paragraph("BeginDragSource and BeginDropTarget mark the last item. They return false until Phase 2 builds "
+                           "them on the drag and drop core.");
     LabeledRow("Drag source");
     facet::StyledText("Drag source");
     if (facet::BeginDragSource(kDemoPayload, &ui.slot, sizeof(ui.slot), {.previewText = "Item 1"}))

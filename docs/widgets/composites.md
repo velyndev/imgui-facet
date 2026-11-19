@@ -13,7 +13,7 @@ Widgets > Composites.
 
 Every widget here is **planned**: each one below is declared, compiles and can be called; until
 Phase 2 implements it, a call draws a placeholder of the widget's default size and returns the
-neutral result. The drag and drop calls wait for the drag and drop core (planned). Each entry
+neutral result. The drag and drop calls are placeholders too; Phase 2 builds them on the drag and drop core. Each entry
 ends with its status.
 
 ## Who owns the data
