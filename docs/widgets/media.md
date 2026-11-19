@@ -13,24 +13,96 @@ low-level items sized in pixels; the widgets here take design units and `Radius`
 that is still loading shows a skeleton and a failed one a marker with its alt text, so loading
 needs no separate widget.
 
-**Status: planned**, except the core items. Each widget below is declared, compiles and can be
-called; until Phase 2 implements it, a call draws a placeholder of the widget's default size and
-returns the neutral result.
+Every widget here is **planned** except the core items: each one below is declared, compiles and
+can be called; until Phase 2 implements it, a call draws a placeholder of the widget's default
+size and returns the neutral result. Each entry ends with its status.
 
 ## Widgets
 
-| Widget | Declaration | What it does | Status |
-|---|---|---|---|
-| IconGlyph (core) | `void IconGlyph(Icon icon, float size = 0.0f, ImU32 color = 0)` in `core/icons.h` | A tinted icon on the text line, sized in pixels | ready |
-| ImageView | `bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {})`, `bool ImageView(const char* label, ID3D11ShaderResourceView* texture, const ImageViewOptions& options = {})`, `bool ImageViewRetryPressed()` | An image as one item in design units, with loading and failed states, optional activation and retry | planned |
-| Avatar | `bool Avatar(const char* label, ImageHandle image, const AvatarOptions& options = {})` | Round picture with an initials fallback, status dot and selection ring | planned |
-| AvatarGroup | `bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const AvatarGroupOptions& options = {})` | Overlapping avatars with a "+N" chip; the names show on hover | planned |
-| ThumbnailStrip | `bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem> items, const ThumbnailStripOptions& options = {})`, `bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGetter getter, void* user, const ThumbnailStripOptions& options = {})` | Scrolling row of thumbnails with one selected | planned |
-| Carousel | `bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, const CarouselOptions& options = {})` | One slide at a time with buttons, page dots, swipe and an optional pausable autoplay | planned |
-| ImageViewer | `bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {})` | Zoom and pan viewport with fit and 100 percent, optional minimap | planned |
-| ImageCompare | `bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after, const ImageCompareOptions& options = {})` | Before and after images with a draggable divider | planned |
-| TimelineScrubber | `bool TimelineScrubber(const char* label, double* playhead, double duration, const TimelineScrubberOptions& options = {})`, `bool TimelineScrubber(const char* label, double* playhead, double* loopIn, double* loopOut, double duration, const TimelineScrubberOptions& options = {})` | Time ruler with a playhead and optional loop markers | planned |
-| DropZone | `DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTypes, const DropZoneOptions& options = {})`, `const ImGuiPayload* DropZonePayload()` | Area that accepts drag and drop payloads of given types and can be activated | planned |
+### IconGlyph (core)
+
+```cpp
+void IconGlyph(Icon icon, float size = 0.0f, ImU32 color = 0);
+```
+
+A tinted icon on the text line, sized in pixels; declared in `core/icons.h`. Status: ready.
+
+### ImageView
+
+```cpp
+bool ImageView(const char* label, ImageHandle image, const ImageViewOptions& options = {});
+bool ImageView(const char* label, ID3D11ShaderResourceView* texture, const ImageViewOptions& options = {});
+bool ImageViewRetryPressed();
+```
+
+An image as one item in design units, with loading and failed states, optional activation and retry. Status: planned.
+
+### Avatar
+
+```cpp
+bool Avatar(const char* label, ImageHandle image, const AvatarOptions& options = {});
+```
+
+Round picture with an initials fallback, status dot and selection ring. Status: planned.
+
+### AvatarGroup
+
+```cpp
+bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const AvatarGroupOptions& options = {});
+```
+
+Overlapping avatars with a "+N" chip; the names show on hover. Status: planned.
+
+### ThumbnailStrip
+
+```cpp
+bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem> items, const ThumbnailStripOptions& options = {});
+bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGetter getter, void* user, const ThumbnailStripOptions& options = {});
+```
+
+Scrolling row of thumbnails with one selected. Status: planned.
+
+### Carousel
+
+```cpp
+bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, const CarouselOptions& options = {});
+```
+
+One slide at a time with buttons, page dots, swipe and an optional pausable autoplay. Status: planned.
+
+### ImageViewer
+
+```cpp
+bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {});
+```
+
+Zoom and pan viewport with fit and 100 percent, optional minimap. Status: planned.
+
+### ImageCompare
+
+```cpp
+bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after, const ImageCompareOptions& options = {});
+```
+
+Before and after images with a draggable divider. Status: planned.
+
+### TimelineScrubber
+
+```cpp
+bool TimelineScrubber(const char* label, double* playhead, double duration, const TimelineScrubberOptions& options = {});
+bool TimelineScrubber(const char* label, double* playhead, double* loopIn, double* loopOut, double duration, const TimelineScrubberOptions& options = {});
+```
+
+Time ruler with a playhead and optional loop markers. Status: planned.
+
+### DropZone
+
+```cpp
+DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTypes, const DropZoneOptions& options = {});
+const ImGuiPayload* DropZonePayload();
+```
+
+Area that accepts drag and drop payloads of given types and can be activated. Status: planned.
 
 ## Usage
 

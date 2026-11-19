@@ -13,9 +13,10 @@ writes nothing; End functions, queries and helpers such as `PassesFilter` draw n
 return neutral values. The exceptions: `ApplyReorderMove` works, the built-in strings and the
 edit session queries in `common.h` work, and the `BeginDataTable` placeholder opens a plain
 Dear ImGui table so the caller's cells land in it.
-The widgets themselves are built in Phase 2. Each family page under `docs/widgets/` gives the
-status of every entry. The demo gallery has one page per family under
-Widgets.
+The widgets themselves are built in Phase 2. Each family page under `docs/widgets/` gives every
+widget its own entry, which ends with "Status: planned." (or "Status: ready." for the core items
+listed there), so one search for that text finds every planned widget. The demo gallery has one
+page per family under Widgets.
 
 | Family | Header | Documentation | What it holds |
 |---|---|---|---|

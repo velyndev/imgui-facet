@@ -8,39 +8,225 @@ Header: `facet/widgets/display.h`. Every declaration follows [the API convention
 and the header comments are the full reference (parameters, units, keys, state kept per id).
 The demo gallery shows every widget on the page Widgets > Display.
 
-**Status: planned.** Each widget below is declared, compiles and can be called; until Phase 2
-implements it, a call draws a placeholder of the widget's default size (a hairline box that
-names the widget) and returns the neutral result (false, `None`, nothing written).
+Every widget here is **planned**: each one below is declared, compiles and can be called; until
+Phase 2 implements it, a call draws a placeholder of the widget's default size (a dashed box that
+names the widget) and returns the neutral result (false, `None`, nothing written). Each entry
+ends with its status.
 
 ## Widgets
 
-| Widget | Declaration | What it does | Status |
-|---|---|---|---|
-| StyledText | `void StyledText(const char* text, const StyledTextOptions& options = {})` | Text in a theme text style and a semantic tone, with wrapping and alignment | planned |
-| TruncatedText | `void TruncatedText(const char* text, const TruncatedTextOptions& options = {})` | Text cut with an ellipsis at the end, middle or start; full text as tooltip when cut | planned |
-| SectionHeader | `bool SectionHeader(const char* label, const SectionHeaderOptions& options = {})` | Section heading with description, trailing action and divider; true when the action is activated | planned |
-| Banner | `BannerAction Banner(const char* label, bool* open, const char* message, const BannerOptions& options = {})` | Full-width strip for view-wide conditions, with up to two actions and a close button | planned |
-| InlineAlert | `InlineAlertAction InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {})` | Tinted callout inside the content with one optional action | planned |
-| EmptyState | `bool EmptyState(const char* label, const EmptyStateOptions& options = {})` | Centered placeholder for a view without content, with one action | planned |
-| DataStateView | `[[nodiscard]] bool BeginDataStateView(const char* id, DataState state, int count, const DataStateViewOptions& options = {})`, `void EndDataStateView()`, `bool DataStateViewRetryPressed()`, `DataStateViewScope` | Switches a data view between skeleton rows, error with retry, empty state and content | planned |
-| ProgressBar | `void ProgressBar(const char* label, float fraction, const ProgressBarOptions& options = {})` | Linear progress with an optional buffer fill; `kIndeterminate` sweeps | planned |
-| ProgressRing | `void ProgressRing(const char* label, float fraction, const ProgressRingOptions& options = {})` | Circular progress arc with center text | planned |
-| Spinner | `void Spinner(const char* label, const SpinnerOptions& options = {})` | Busy indicator on the shared spinner clock | planned |
-| Skeleton | `void Skeleton(const SkeletonOptions& options = {})` | Loading placeholder lines, blocks or circles with the shared shimmer | planned |
-| Badge | `void Badge(const char* text, const BadgeOptions& options = {})` | Small toned label for a real status or category | planned |
-| CountBadge | `void CountBadge(int count, const CountBadgeOptions& options = {})` | Counter pill with a "99+" cap | planned |
-| StatusDot | `void StatusDot(const char* label, const StatusDotOptions& options = {})` | Status dot with an optional label and a pulsing live ring | planned |
-| StatusPill | `void StatusPill(const char* label, const StatusPillOptions& options = {})` | Toned pill for the state of a connection, job or device; tone changes crossfade | planned |
-| KeyCap | `void KeyCap(ImGuiKeyChord chord, const KeyCapOptions& options = {})` | A chord drawn as key caps, optionally live | planned |
-| ShortcutHint | `void ShortcutHint(const char* text, ImGuiKeyChord chord, const ShortcutHintOptions& options = {})`, `void ShortcutHint(const char* text, ShortcutId shortcut, const ShortcutHintOptions& options = {})` | Muted text with key caps at the end of the row | planned |
-| CharacterCounter | `void CharacterCounter(int count, int max, const CharacterCounterOptions& options = {})` | Text length against a limit, warning near it and destructive over it | planned |
-| InlineCode | `bool InlineCode(const char* label, const InlineCodeOptions& options = {})` | Inline code in a tinted box, optionally copied on activation | planned |
-| CodeView | `bool CodeView(const char* id, std::string_view code, const CodeViewOptions& options = {})` | Read-only code block with line numbers, light syntax tint and copy | planned |
-| LogView | `void LogView(const char* id, std::span<const LogEntry> entries, const LogViewOptions& options = {})`, `void LogView(const char* id, int entryCount, LogGetter getter, void* user, const LogViewOptions& options = {})` | Virtualized log with level colors, time column and follow mode | planned |
-| KeyValueList | `void BeginKeyValueList(const char* id, const KeyValueListOptions& options = {})`, `bool KeyValue(const char* label, const char* value, const KeyValueOptions& options = {})`, `void EndKeyValueList()`, `KeyValueListScope` | Read-only labelled values aligned with settings rows | planned |
-| StatTile | `void StatTile(const char* label, double value, const StatTileOptions& options = {})` | A value with caption, delta chip and trend line | planned |
-| DataTable | `[[nodiscard]] bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, int rowCount, ImGuiSelectionBasicStorage* selection, const DataTableOptions& options = {})`, `bool DataTableRow(int index)`, `void EndDataTable()`, `DataTableScope` | Sortable, resizable table with a sticky header, frozen columns, virtualized rows and selection | planned |
-| DataTable cell edit | `[[nodiscard]] bool BeginDataTableCellEdit()`, `void EndDataTableCellEdit()`, `DataTableCellEditScope` | Edits one cell in place with any editor widget | planned |
+### StyledText
+
+```cpp
+void StyledText(const char* text, const StyledTextOptions& options = {});
+```
+
+Text in a theme text style and a semantic tone, with wrapping and alignment. Status: planned.
+
+### TruncatedText
+
+```cpp
+void TruncatedText(const char* text, const TruncatedTextOptions& options = {});
+```
+
+Text cut with an ellipsis at the end, middle or start; full text as tooltip when cut. Status: planned.
+
+### SectionHeader
+
+```cpp
+bool SectionHeader(const char* label, const SectionHeaderOptions& options = {});
+```
+
+Section heading with description, trailing action and divider; true when the action is activated. Status: planned.
+
+### Banner
+
+```cpp
+BannerAction Banner(const char* label, bool* open, const char* message, const BannerOptions& options = {});
+```
+
+Full-width strip for view-wide conditions, with up to two actions and a close button. Status: planned.
+
+### InlineAlert
+
+```cpp
+InlineAlertAction InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {});
+```
+
+Tinted callout inside the content with one optional action. Status: planned.
+
+### EmptyState
+
+```cpp
+bool EmptyState(const char* label, const EmptyStateOptions& options = {});
+```
+
+Centered placeholder for a view without content, with one action. Status: planned.
+
+### DataStateView
+
+```cpp
+[[nodiscard]] bool BeginDataStateView(const char* id, DataState state, int count, const DataStateViewOptions& options = {});
+void EndDataStateView();
+bool DataStateViewRetryPressed();
+class DataStateViewScope;
+```
+
+Switches a data view between skeleton rows, error with retry, empty state and content. Status: planned.
+
+### ProgressBar
+
+```cpp
+void ProgressBar(const char* label, float fraction, const ProgressBarOptions& options = {});
+```
+
+Linear progress with an optional buffer fill; `kIndeterminate` sweeps. Status: planned.
+
+### ProgressRing
+
+```cpp
+void ProgressRing(const char* label, float fraction, const ProgressRingOptions& options = {});
+```
+
+Circular progress arc with center text. Status: planned.
+
+### Spinner
+
+```cpp
+void Spinner(const char* label, const SpinnerOptions& options = {});
+```
+
+Busy indicator on the shared spinner clock. Status: planned.
+
+### Skeleton
+
+```cpp
+void Skeleton(const SkeletonOptions& options = {});
+```
+
+Loading placeholder lines, blocks or circles with the shared shimmer. Status: planned.
+
+### Badge
+
+```cpp
+void Badge(const char* text, const BadgeOptions& options = {});
+```
+
+Small toned label for a real status or category. Status: planned.
+
+### CountBadge
+
+```cpp
+void CountBadge(int count, const CountBadgeOptions& options = {});
+```
+
+Counter pill with a "99+" cap. Status: planned.
+
+### StatusDot
+
+```cpp
+void StatusDot(const char* label, const StatusDotOptions& options = {});
+```
+
+Status dot with an optional label and a pulsing live ring. Status: planned.
+
+### StatusPill
+
+```cpp
+void StatusPill(const char* label, const StatusPillOptions& options = {});
+```
+
+Toned pill for the state of a connection, job or device; tone changes crossfade. Status: planned.
+
+### KeyCap
+
+```cpp
+void KeyCap(ImGuiKeyChord chord, const KeyCapOptions& options = {});
+```
+
+A chord drawn as key caps, optionally live. Status: planned.
+
+### ShortcutHint
+
+```cpp
+void ShortcutHint(const char* text, ImGuiKeyChord chord, const ShortcutHintOptions& options = {});
+void ShortcutHint(const char* text, ShortcutId shortcut, const ShortcutHintOptions& options = {});
+```
+
+Muted text with key caps at the end of the row. Status: planned.
+
+### CharacterCounter
+
+```cpp
+void CharacterCounter(int count, int max, const CharacterCounterOptions& options = {});
+```
+
+Text length against a limit, warning near it and destructive over it. Status: planned.
+
+### InlineCode
+
+```cpp
+bool InlineCode(const char* label, const InlineCodeOptions& options = {});
+```
+
+Inline code in a tinted box, optionally copied on activation. Status: planned.
+
+### CodeView
+
+```cpp
+bool CodeView(const char* id, std::string_view code, const CodeViewOptions& options = {});
+```
+
+Read-only code block with line numbers, light syntax tint and copy. Status: planned.
+
+### LogView
+
+```cpp
+void LogView(const char* id, std::span<const LogEntry> entries, const LogViewOptions& options = {});
+void LogView(const char* id, int entryCount, LogGetter getter, void* user, const LogViewOptions& options = {});
+```
+
+Virtualized log with level colors, time column and follow mode. Status: planned.
+
+### KeyValueList
+
+```cpp
+void BeginKeyValueList(const char* id, const KeyValueListOptions& options = {});
+bool KeyValue(const char* label, const char* value, const KeyValueOptions& options = {});
+void EndKeyValueList();
+class KeyValueListScope;
+```
+
+Read-only labelled values aligned with settings rows. Status: planned.
+
+### StatTile
+
+```cpp
+void StatTile(const char* label, double value, const StatTileOptions& options = {});
+```
+
+A value with caption, delta chip and trend line. Status: planned.
+
+### DataTable
+
+```cpp
+[[nodiscard]] bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, int rowCount, ImGuiSelectionBasicStorage* selection, const DataTableOptions& options = {});
+bool DataTableRow(int index);
+void EndDataTable();
+class DataTableScope;
+```
+
+Sortable, resizable table with a sticky header, frozen columns, virtualized rows and selection. Status: planned.
+
+### DataTable cell edit
+
+```cpp
+[[nodiscard]] bool BeginDataTableCellEdit();
+void EndDataTableCellEdit();
+class DataTableCellEditScope;
+```
+
+Edits one cell in place with any editor widget. Status: planned.
 
 ## Usage
 

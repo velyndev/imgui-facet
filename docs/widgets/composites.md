@@ -11,9 +11,10 @@ Header: `facet/widgets/composites.h`. It includes `display.h` (for `LogEntry`) a
 the header comments are the full reference. The demo gallery shows every widget on the page
 Widgets > Composites.
 
-**Status: planned.** Each widget below is declared, compiles and can be called; until Phase 2
-implements it, a call draws a placeholder of the widget's default size and returns the neutral
-result. The drag and drop calls wait for the drag and drop core of Phase 1c part B.
+Every widget here is **planned**: each one below is declared, compiles and can be called; until
+Phase 2 implements it, a call draws a placeholder of the widget's default size and returns the
+neutral result. The drag and drop calls wait for the drag and drop core (planned). Each entry
+ends with its status.
 
 ## Who owns the data
 
@@ -33,32 +34,224 @@ Item data always belongs to the caller and is read during the call.
 
 ## Widgets
 
-| Widget | Declaration | What it does | Status |
-|---|---|---|---|
-| CurveEditor | `bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {})`, `bool CurveEditor(const char* label, std::vector<ImVec2>* points, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {})` | Response curve through draggable, addable control points | planned |
-| BezierEditor | `bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {})` | Cubic easing editor with two handles, presets and numeric fields | planned |
-| GradientEditor | `bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count, const GradientEditorOptions& options = {})`, `bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options = {})` | Gradient bar with draggable color stops | planned |
-| PropertyGrid | `void BeginPropertyGrid(const char* id, const PropertyGridOptions& options = {})`, `void EndPropertyGrid()`, `[[nodiscard]] bool BeginPropertyCategory(const char* label, const PropertyCategoryOptions& options = {})`, `void EndPropertyCategory()`, `[[nodiscard]] bool BeginPropertyRow(const char* label, const PropertyRowOptions& options = {})`, `void EndPropertyRow()`, with scopes | Inspector of labelled rows in collapsible categories with a filter | planned |
-| ConsoleView | `bool ConsoleView(const char* id, std::string* command, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {})`, `bool ConsoleView(const char* id, std::string* command, int entryCount, LogGetter getter, void* user, const ConsoleViewOptions& options = {})`, `bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {})`, `bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, int entryCount, LogGetter getter, void* user, const ConsoleViewOptions& options = {})` | Log view with a command field, history and Tab completion | planned |
-| SearchFilterBar | `bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {})`, `bool SearchFilterBar(const char* label, char* buffer, std::size_t bufferSize, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {})` | Search field with toggleable filter chips and a result count | planned |
-| SettingsSearch | `void BeginSettingsSearch(const char* id, const SettingsSearchOptions& options = {})`, `void EndSettingsSearch()`, `bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {})`, `int SettingsSearchHitCount(const char* id, const char* section)`, `SettingsSearchScope` | Search over settings rows with hit counts per section | planned |
-| KeybindList | `bool KeybindList(const char* id, const KeybindListOptions& options = {})` (the shortcut registry), `bool KeybindList(const char* id, std::span<KeybindListItem> items, const KeybindListOptions& options = {})` | Editable table of key binds with conflict marks and reset | planned |
-| PresetList | `PresetListResult PresetList(const char* id, int* active, std::span<const PresetItem> presets, const PresetListOptions& options = {})` | Preset manager with create, save, rename, duplicate, delete, import and export | planned |
-| ThemeModeControl | `bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {})` | Light, Dark and System segments that can apply the mode | planned |
-| AccentPicker | `bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {})` | Accent swatches with a theme default and a custom color that can apply the accent | planned |
-| UiScaleControl | `bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {})` | Stepped UI scale with optional Ctrl zoom keys | planned |
-| InventoryGrid | `InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots, const InventoryGridOptions& options = {})` | Slot grid with drag to move, swap, merge and split | planned |
-| InventoryTile | `bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {})` | One item tile with count, category bar, lock and cooldown | planned |
-| InventorySlot | `InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {})` | Single slot that accepts inventory drops | planned |
-| InventoryDetailCard | `int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {})` | Detail card with stats and differences, tags and actions | planned |
-| MediaCard | `bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {})` | Card with a cover image, title, description and badges | planned |
-| UserChip | `bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {})` | Avatar, name and description in a pill for the signed-in account | planned |
-| ProfileSwitcher | `ProfileSwitcherAction ProfileSwitcher(const char* id, int* current, std::span<const AvatarItem> profiles, const ProfileSwitcherOptions& options = {})` | List of profiles with add and manage entries | planned |
-| PreviewCanvas | `void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanvasOptions& options = {})`, `void EndPreviewCanvas()`, `PreviewCanvasScope` | Letterboxed preview of a target resolution with grid, safe area and guides | planned |
-| CanvasElement | `bool CanvasElement(const char* label, CanvasElementState* element, const CanvasElementOptions& options = {})` | Anchored, draggable element inside a preview canvas | planned |
-| LayerList | `LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> layers, const LayerListOptions& options = {})` | Ordered layer rows with visibility and lock toggles and reordering | planned |
-| Onboarding | `[[nodiscard]] bool BeginOnboarding(const char* label, bool* open, int* step, int stepCount, const OnboardingOptions& options = {})`, `void EndOnboarding()`, `OnboardingScope` | Paged welcome panel with progress dots and skip | planned |
-| Drag and drop | `[[nodiscard]] bool BeginDragSource(const char* type, const void* data, std::size_t size, const DragSourceOptions& options = {})`, `void EndDragSource()`, `[[nodiscard]] bool BeginDropTarget()`, `const ImGuiPayload* AcceptDrop(const char* type, const AcceptDropOptions& options = {})`, `void EndDropTarget()`, with scopes | Themed drag previews, drop indicators and edge scrolling on top of Dear ImGui drag and drop | planned |
+### CurveEditor
+
+```cpp
+bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {});
+bool CurveEditor(const char* label, std::vector<ImVec2>* points, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {});
+```
+
+Response curve through draggable, addable control points. Status: planned.
+
+### BezierEditor
+
+```cpp
+bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {});
+```
+
+Cubic easing editor with two handles, presets and numeric fields. Status: planned.
+
+### GradientEditor
+
+```cpp
+bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count, const GradientEditorOptions& options = {});
+bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options = {});
+```
+
+Gradient bar with draggable color stops. Status: planned.
+
+### PropertyGrid
+
+```cpp
+void BeginPropertyGrid(const char* id, const PropertyGridOptions& options = {});
+void EndPropertyGrid();
+[[nodiscard]] bool BeginPropertyCategory(const char* label, const PropertyCategoryOptions& options = {});
+void EndPropertyCategory();
+[[nodiscard]] bool BeginPropertyRow(const char* label, const PropertyRowOptions& options = {});
+void EndPropertyRow();
+```
+
+Inspector of labelled rows in collapsible categories with a filter; every pair has its scope
+class. Status: planned.
+
+### ConsoleView
+
+```cpp
+bool ConsoleView(const char* id, std::string* command, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {});
+bool ConsoleView(const char* id, std::string* command, int entryCount, LogGetter getter, void* user, const ConsoleViewOptions& options = {});
+bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, std::span<const LogEntry> entries, const ConsoleViewOptions& options = {});
+bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, int entryCount, LogGetter getter, void* user, const ConsoleViewOptions& options = {});
+```
+
+Log view with a command field, history and Tab completion. Status: planned.
+
+### SearchFilterBar
+
+```cpp
+bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {});
+bool SearchFilterBar(const char* label, char* buffer, std::size_t bufferSize, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {});
+```
+
+Search field with toggleable filter chips and a result count. Status: planned.
+
+### SettingsSearch
+
+```cpp
+void BeginSettingsSearch(const char* id, const SettingsSearchOptions& options = {});
+void EndSettingsSearch();
+bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& options = {});
+int SettingsSearchHitCount(const char* id, const char* section);
+class SettingsSearchScope;
+```
+
+Search over settings rows with hit counts per section. Status: planned.
+
+### KeybindList
+
+```cpp
+bool KeybindList(const char* id, const KeybindListOptions& options = {});
+bool KeybindList(const char* id, std::span<KeybindListItem> items, const KeybindListOptions& options = {});
+```
+
+Editable table of key binds with conflict marks and reset; the first overload edits the shortcut
+registry. Status: planned.
+
+### PresetList
+
+```cpp
+PresetListResult PresetList(const char* id, int* active, std::span<const PresetItem> presets, const PresetListOptions& options = {});
+```
+
+Preset manager with create, save, rename, duplicate, delete, import and export. Status: planned.
+
+### ThemeModeControl
+
+```cpp
+bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {});
+```
+
+Light, Dark and System segments that can apply the mode. Status: planned.
+
+### AccentPicker
+
+```cpp
+bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {});
+```
+
+Accent swatches with a theme default and a custom color that can apply the accent. Status: planned.
+
+### UiScaleControl
+
+```cpp
+bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {});
+```
+
+Stepped UI scale with optional Ctrl zoom keys. Status: planned.
+
+### InventoryGrid
+
+```cpp
+InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots, const InventoryGridOptions& options = {});
+```
+
+Slot grid with drag to move, swap, merge and split. Status: planned.
+
+### InventoryTile
+
+```cpp
+bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {});
+```
+
+One item tile with count, category bar, lock and cooldown. Status: planned.
+
+### InventorySlot
+
+```cpp
+InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {});
+```
+
+Single slot that accepts inventory drops. Status: planned.
+
+### InventoryDetailCard
+
+```cpp
+int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {});
+```
+
+Detail card with stats and differences, tags and actions. Status: planned.
+
+### MediaCard
+
+```cpp
+bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {});
+```
+
+Card with a cover image, title, description and badges. Status: planned.
+
+### UserChip
+
+```cpp
+bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {});
+```
+
+Avatar, name and description in a pill for the signed-in account. Status: planned.
+
+### ProfileSwitcher
+
+```cpp
+ProfileSwitcherAction ProfileSwitcher(const char* id, int* current, std::span<const AvatarItem> profiles, const ProfileSwitcherOptions& options = {});
+```
+
+List of profiles with add and manage entries. Status: planned.
+
+### PreviewCanvas
+
+```cpp
+void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanvasOptions& options = {});
+void EndPreviewCanvas();
+class PreviewCanvasScope;
+```
+
+Letterboxed preview of a target resolution with grid, safe area and guides. Status: planned.
+
+### CanvasElement
+
+```cpp
+bool CanvasElement(const char* label, CanvasElementState* element, const CanvasElementOptions& options = {});
+```
+
+Anchored, draggable element inside a preview canvas. Status: planned.
+
+### LayerList
+
+```cpp
+LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> layers, const LayerListOptions& options = {});
+```
+
+Ordered layer rows with visibility and lock toggles and reordering. Status: planned.
+
+### Onboarding
+
+```cpp
+[[nodiscard]] bool BeginOnboarding(const char* label, bool* open, int* step, int stepCount, const OnboardingOptions& options = {});
+void EndOnboarding();
+class OnboardingScope;
+```
+
+Paged welcome panel with progress dots and skip. Status: planned.
+
+### Drag and drop
+
+```cpp
+[[nodiscard]] bool BeginDragSource(const char* type, const void* data, std::size_t size, const DragSourceOptions& options = {});
+void EndDragSource();
+[[nodiscard]] bool BeginDropTarget();
+const ImGuiPayload* AcceptDrop(const char* type, const AcceptDropOptions& options = {});
+void EndDropTarget();
+```
+
+Themed drag previews, drop indicators and edge scrolling on top of Dear ImGui drag and drop;
+both pairs have their scope class (`DragSourceScope`, `DropTargetScope`). Status: planned.
 
 ## Usage
 
