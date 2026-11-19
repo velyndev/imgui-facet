@@ -99,6 +99,9 @@ struct PopupOptions
     bool glass = false;                // backdrop blur behind the level (popovers; DESIGN.md dose caps)
     ImVec2 size = {0.0f, 0.0f};        // pixels per axis; 0 fits the content
     float minWidth = 0.0f;             // pixels; 0 for none (menus pass overlay.menuMinWidth through Px)
+    bool closeOnEscape = true;         // Popup and Modal: Escape closes it; false: the press stops
+                                       // at the level and closes nothing (a modal that must be
+                                       // answered)
 };
 
 // Opens level `id` at `anchor`. Opened while another Popup level is being submitted, it becomes
@@ -164,5 +167,130 @@ enum class ContextRequestTarget
 // receives where the menu opens: the pointer for the mouse, the bottom-left corner of the
 // focused item (or the window's content start) for the keys.
 bool ContextMenuRequested(ContextRequestTarget target, ImVec2* at);
+
+// ---- Beyond the shared calls ------------------------------------------------------------------
+//
+// How the host behaves in detail (what a widget author can rely on):
+//
+// Levels on Dear ImGui. Popup and Modal levels are Dear ImGui popups (OpenPopupEx, BeginPopupEx),
+// so they share Dear ImGui's popup stack with the host's own popups and follow its rules:
+//   - OpenPopupLevel and BeginPopupLevel of one level are called at the same popup depth: a
+//     level opened inside another level's BeginPopupLevel / EndPopupLevel is submitted there too.
+//   - One level per depth: opening a level where a sibling is open closes the sibling and its
+//     children ("opening a sibling closes the other branch"). Two independent popups at the root
+//     therefore close each other, exactly like two of the host's own popups. Tooltip levels and
+//     the forced levels of captures are plain windows outside the stack and never close a popup.
+//   - A level that is open but not submitted in a frame (its widget is gone, the page changed) is
+//     closed at facet::EndFrame of the next frame, without motion and without giving the focus
+//     back to an item that no longer exists.
+// Clicks outside. Dear ImGui closes the levels above the window that was clicked. The host then
+// keeps the left mouse button until it is released, so the click that dismissed a level never
+// presses the control under it; a click on the anchor of an open level therefore closes it, and
+// the anchor sees nothing (the next click opens it again). A right click outside closes the levels
+// too and still asks for a context menu where it lands (ContextMenuRequested).
+// Focus. A Popup level with takeFocus moves the keyboard focus to its first item (or the item
+// that called ImGui::SetItemDefaultFocus) when it opens; Dear ImGui's focus ring shows only after
+// keyboard input. When a level closes by Escape or by ClosePopupLevel, the focus returns to the
+// item that had it when the level opened. If that item is not submitted in the frame after, the
+// focus is cleared instead (it never rests on a destroyed item). After a click outside, the focus
+// stays where the click went.
+// Escape. The host owns ImGuiKey_Escape (ImGui::SetKeyOwner) in every frame after one in which a
+// Popup or Modal level was open or a layer claimed Escape, unless an item is active or another
+// owner took the key in that frame. Dear ImGui's own navigation therefore never sees the press
+// as well, with or without ImGuiConfigFlags_NavEnableKeyboard. A press the host acts on is
+// locked for the rest of its frame (ImGuiInputFlags_LockThisFrame), so code that reads the key
+// with ImGui::IsKeyPressed(ImGuiKey_Escape) and no owner does not see it either; other presses it
+// sees as before. When Escape closes a level, Dear ImGui's navigation cursor is made visible,
+// so Enter and Space act on the item the focus went back to. When the topmost entry of Dear
+// ImGui's popup stack is a popup of the host application, the host leaves Escape to it.
+// Motion. A level fades in over motion.popupOpen while it grows from motion.popupScaleFrom of its
+// size at the edge that faces the anchor and slides overlay.anchorGap toward it; it fades out over
+// motion.popupClose the same way. The close motion replays the level's last frame (popup_replay.h)
+// in a window that takes no input, so input reaches what is under the level from the frame it
+// closes. Under facet::ReduceMotion() a level appears and disappears at once. A device reset, a
+// scale or theme change and facet::Shutdown end every close motion at once.
+// Surface. The host draws each level's surface behind its content: the popover radius (the window
+// radius for a Modal, the control radius for a Tooltip), a hairline, the elevation shadow (2 for
+// Popup, 3 for Modal, 1 for Tooltip) and either the elevated surface color or, with glass, the
+// blurred backdrop (the opaque tint where blur is not available). A Modal also draws colors.scrim
+// over everything below it. Content padding: spacing.xs for Popup (rows run almost edge to edge),
+// spacing.xl for Modal, spacing.sm by spacing.xs for Tooltip.
+// Placement. Every frame, from the anchor and the content size of the previous frame
+// (popup_place.h), inside the main viewport's work area minus overlay.viewportMargin. While the
+// anchor stays where it is, a level keeps the side it took as long as it fits there, so content
+// that grows and shrinks does not make it jump; when the anchor moves it is placed afresh. A
+// Modal whose anchor rect is empty (the default) is centered in the work area.
+
+// Moves an open level to a new anchor; call it every frame while the anchor can move (it
+// scrolls, the window resizes). Unlike OpenPopupLevel it never opens a closed level, so calling
+// it every frame cannot bring back a level that a click outside closed.
+void SetPopupLevelAnchor(ImGuiID id, const PopupAnchor& anchor);
+
+// Closes the chain `id` belongs to: from the outermost Popup level below it that is not under a
+// Modal (or the root) up, so a menu row that ran its action closes the whole menu. Inside a Modal
+// it closes the levels above the Modal only.
+void ClosePopupLevelChain(ImGuiID id);
+
+// The level being submitted (between BeginPopupLevel and EndPopupLevel), or 0.
+ImGuiID CurrentPopupLevel();
+
+// Where level `id` was placed in its last BeginPopupLevel (screen pixels) and the side it took;
+// an empty rect and the anchor's side when it is not shown.
+ImRect PopupLevelRect(ImGuiID id);
+PopupSide PopupLevelSide(ImGuiID id);
+
+// True on the frame a mouse button was clicked over the scrim of Modal level `id`: outside its
+// window while it is the topmost level. The level stays open; the widget decides.
+bool PopupLevelScrimClicked(ImGuiID id);
+
+// True while level `id` plays its close motion.
+bool IsPopupLevelClosing(ImGuiID id);
+
+// True while the pointer moves toward `target` (screen pixels): it moved in this frame and its
+// position lies in the triangle from where it was to the near edge of `target`. Menus keep an
+// open submenu while the pointer crosses other rows on its way there.
+bool PopupPointerAimsAt(const ImRect& target);
+
+// ---- Tooltips ------------------------------------------------------------------------------------
+//
+// A tooltip belongs to an item. Call right after the item, every frame, with its state:
+//
+//     const ItemState item = ItemBehavior(id, size);
+//     ... draw the item ...
+//     if (BeginPopupTooltip(item.id, item.rect, item.hovered, item.focusVisible))
+//     {
+//         facet::Text(TextStyle::Footnote, "Copies the selection");
+//         EndPopupTooltip();
+//     }
+//
+// The rules (times from the overlay tokens, multiplied by motion.scale):
+//   - The pointer rests on the item for overlay.tooltipDelay, then the tooltip shows below and
+//     after the pointer, so the cursor never covers it, flipped where there is no room.
+//   - Within overlay.tooltipGrace after a tooltip was last visible, the next item shows its
+//     tooltip at once, so moving along a toolbar needs no new wait.
+//   - A mouse button press hides it until the pointer leaves the item; a key press hides it until
+//     the pointer moves again.
+//   - An item with visible keyboard focus (focusVisible) shows its tooltip below the item after
+//     the same delay.
+//   - One tooltip at a time; it never takes focus or input.
+// maxWidth: pixels where its text wraps; 0 for overlay.tooltipMaxWidth.
+[[nodiscard]] bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible,
+                                     float maxWidth = 0.0f);
+void EndPopupTooltip();  // only after BeginPopupTooltip returned true
+
+// The level id of the tooltip of item `itemId` (for IsPopupLevelOpen and tests).
+ImGuiID PopupTooltipLevel(ImGuiID itemId);
+
+// ---- For tests -------------------------------------------------------------------------------------
+
+struct PopupHostStats
+{
+    int trackedLevels = 0;     // level records in use (open, closing or remembered)
+    int closingLevels = 0;     // levels playing their close motion
+    int replayVertices = 0;    // vertex capacity of all snapshots together
+    int replayViews = 0;       // shader resource views the snapshots hold a reference on
+    bool ownsEscape = false;   // the host is the owner of ImGuiKey_Escape for the current frame
+};
+PopupHostStats GetPopupHostStats();
 
 } // namespace facet::internal
