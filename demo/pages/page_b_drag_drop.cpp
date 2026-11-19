@@ -3,7 +3,8 @@
 // exchange items with an insertion line (Ctrl copies), a grid of slots that swap, stack and split
 // (Shift), a small tree with before, after and into drops, a zone that takes list items only, and
 // a long list in a scroll area. Every prototype also works from the keyboard: Space picks the
-// focused item up, the arrows move it, Space or Enter drops it, Escape puts it back. The page
+// focused item up (Ctrl+Space in the tree, where Space opens and closes a group), the arrows move
+// it, Space or Enter drops it, Escape puts it back. The page
 // applies every reported drop to its own data, as a widget's caller would.
 
 #include <algorithm>
@@ -108,6 +109,7 @@ struct PageState
     int onlyDrops = 0;       // drops the list-only zone took
     int onlyLastKey = 0;
     int longDroppedAt = -1;  // where the last drop in the long list put the row
+    int treeLifted = -1;     // the tree node whose drag ran in the last frame
     ImGuiID longWindow = 0;
 
     // Rectangles of the last frame, for the forced drags of captures.
@@ -196,7 +198,7 @@ ListDrop ProtoList(facet::demo::PageCtx& ctx, const char* id, const ListModel& m
             fi::DragDropForceNextSource(look.forcedOffset);
         const RowPayload payload{model.tag, i, model.keys[i]};
         if (fi::DragDropBeginSource(kRowType, &payload, sizeof(payload),
-                                    {.previewText = label, .icon = facet::Icon("grip")}))
+                                    {.previewText = label, .icon = facet::Icon("grip"), .keyboard = true}))
         {
             lifted = i;
             fi::DragDropEndSource();
@@ -408,7 +410,8 @@ void ProtoGrid(facet::demo::PageCtx& ctx, int forcedCell, ImVec2 forcedOffset)
             if (Has(cells[i].forced, ForcedItemState::Dragging))
                 fi::DragDropForceNextSource(forcedOffset);
             const SlotPayload payload{i};
-            if (fi::DragDropBeginSource(kSlotType, &payload, sizeof(payload), {.previewText = label, .count = slot.count}))
+            if (fi::DragDropBeginSource(kSlotType, &payload, sizeof(payload),
+                                        {.previewText = label, .count = slot.count, .keyboard = true}))
             {
                 lifted = i;
                 fi::DragDropEndSource();
@@ -651,9 +654,13 @@ void ProtoTree(facet::demo::PageCtx& ctx, int forcedNode, ImVec2 forcedOffset)
             page.nodes[node].open = !n.open;
         if (Has(row.item.forced, ForcedItemState::Dragging))
             fi::DragDropForceNextSource(forcedOffset);
+        // Space opens and closes a group, so the tree picks its nodes up with Ctrl+Space.
         const NodePayload payload{node};
         if (fi::DragDropBeginSource(kNodeType, &payload, sizeof(payload),
-                                    {.previewText = n.label, .icon = facet::Icon(n.group ? "folder" : "file")}))
+                                    {.previewText = n.label,
+                                     .icon = facet::Icon(n.group ? "folder" : "file"),
+                                     .keyboard = true,
+                                     .pickUpChord = ImGuiMod_Ctrl | ImGuiKey_Space}))
         {
             lifted = node;
             fi::DragDropEndSource();
@@ -690,6 +697,7 @@ void ProtoTree(facet::demo::PageCtx& ctx, int forcedNode, ImVec2 forcedOffset)
         ImGui::PopID();
     }
     ImGui::EndGroup();
+    page.treeLifted = lifted;
     ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + height));
     ImGui::Dummy(ImVec2(width, 0.0f));
     if (fi::DragDropCanceled() && page.openedByDrag >= 0)
@@ -805,8 +813,8 @@ FACET_DEMO_PAGE("drag-drop", "Drag and drop", "Blocks", 140, "default", "draggin
     facet::demo::PageHeader("Drag and drop",
                             "Typed drags on Dear ImGui's drag and drop: a press becomes a drag after a few units of "
                             "travel, a ghost of the item follows the pointer, and drop zones show where it would land. "
-                            "Escape or a right click puts it back. Space picks a focused item up, the arrows move it, "
-                            "Space or Enter drops it.");
+                            "Escape or a right click puts it back. Space picks a focused item up (Ctrl+Space in the "
+                            "tree, where Space opens a group), the arrows move it, Space or Enter drops it.");
     Note("Prototypes built only from the item behaviour, the focus ring and the drag and drop core. Each one applies "
          "the drops the core reports to its own data, as a widget's caller would; the core never moves data.");
 
@@ -1052,6 +1060,22 @@ FACET_DEMO_SELFTEST("drag-drop")
                 [] { return page.nodes[3].open && page.nodes[1].parent == 3; });
     test.DragAndHold({T::Item("dd.tree.g2"), T::Item("dd.tree.i3", 0.5f, 0.5f)}, 0.4f, 0.1f);
     test.Expect("a group does not go inside itself", [] { return page.nodes[3].parent == -1; });
+    // Space opens and closes a focused group; Ctrl+Space picks a node up instead.
+    static bool groupWasOpen = false;
+    // After a click Dear ImGui activates with Space only once the keyboard moved the focus.
+    test.Click("dd.tree.g1");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectFocused("dd.tree.g1");
+    test.Do([] { groupWasOpen = page.nodes[0].open; });
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space opens or closes the focused group", [] { return page.nodes[0].open != groupWasOpen; });
+    test.KeyDown(ImGuiMod_Ctrl);
+    test.KeyPress(ImGuiKey_Space | ImGuiMod_Ctrl);
+    test.Expect("Ctrl+Space picks the group up and leaves it as it was",
+                [] { return page.treeLifted == 0 && page.nodes[0].open != groupWasOpen; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("Escape puts the group back", [] { return page.treeLifted == -1 && page.nodes[0].parent == -1; });
 
     // The long list: a drag held at the bottom edge asks for edge scrolling, and the drop lands
     // where the gap was shown.

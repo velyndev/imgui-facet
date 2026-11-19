@@ -48,6 +48,8 @@ struct TestList
     ImVec2 forceOffset = ImVec2(0.0f, 0.0f);
     bool disabled = false;
     bool readOnly = false;
+    fi::DragDropPreview preview{.previewText = "Row", .keyboard = true};
+    int pressedCount = 0;      // presses of any row's item behaviour (clicks, Space, Enter)
 
     std::vector<ImRect> slots;
     ImRect rect;
@@ -88,17 +90,20 @@ struct TestList
             itemOptions.readOnly = readOnly;
             const fi::ItemState row = fi::ItemBehavior(ImGui::GetID("row"), rowSize, itemOptions);
             slots[i] = row.rect;
+            if (row.pressed)
+                ++pressedCount;
             const std::string probe = std::string(name) + "." + std::to_string(i);
             session.Track(probe);
             if (focusKey == keys[i])
             {
                 ImGui::SetFocusID(row.id, ImGui::GetCurrentWindow());
+                ImGui::SetNavCursorVisible(true);  // as after a Tab: Space activates only then
                 focusKey = -1;
             }
             const RowPayload payload{list, i};
             if (forceFirst && i == 0)
                 fi::DragDropForceNextSource(forceOffset);
-            if (fi::DragDropBeginSource(kRowType, &payload, sizeof(payload), {.previewText = "Row"}))
+            if (fi::DragDropBeginSource(kRowType, &payload, sizeof(payload), preview))
             {
                 lifted = i;
                 ++liftedFrames;
@@ -1056,6 +1061,105 @@ TEST_CASE("A click ends a keyboard drag without a drop")
     session.Click(ImVec2(600.0f, 500.0f));
     CHECK_FALSE(list.active);
     CHECK_FALSE(list.delivered);
+}
+
+TEST_CASE("A source without the keyboard pick-up leaves Space to the item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestList list;
+    list.preview.keyboard = false;
+    session.SetUi([&] { list.Ui(session, "a"); });
+    session.Frames(2);
+    list.focusKey = 1;
+    session.Frames(2);
+    // The default of DragDropPreview is no keyboard pick-up.
+    CHECK_FALSE(fi::DragDropPreview{}.keyboard);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(list.active);
+    CHECK(list.pressedCount == 1);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(list.pressedCount == 2);
+}
+
+TEST_CASE("A pick-up chord with a modifier leaves plain Space to the item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestList list;
+    list.preview.pickUpChord = ImGuiMod_Ctrl | ImGuiKey_Space;
+    session.SetUi([&] { list.Ui(session, "a"); });
+    session.Frames(2);
+    list.focusKey = 1;
+    session.Frames(2);
+    // Plain Space activates the focused row and picks nothing up.
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(list.active);
+    CHECK(list.pressedCount == 1);
+    // Ctrl held first, then Space (KeyPress releases both): the row is picked up, not activated.
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_Space);
+    REQUIRE(list.active);
+    CHECK(list.info.keyboard);
+    CHECK(list.pressedCount == 1);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    REQUIRE(list.delivered);
+    CHECK(list.deliveredIndex == 4);
+}
+
+TEST_CASE("Space still selects a row of a multi-selection that is a drag source")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool selected[3] = {false, false, false};
+    int dragFrames = 0;
+    bool focusOnce = true;
+    session.SetUi([&] {
+        ImGuiMultiSelectIO* io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_None, -1, 3);
+        for (ImGuiSelectionRequest& request : io->Requests)
+        {
+            if (request.Type == ImGuiSelectionRequestType_SetAll)
+                std::fill(std::begin(selected), std::end(selected), request.Selected);
+            else
+                for (ImGuiSelectionUserData i = request.RangeFirstItem; i <= request.RangeLastItem; ++i)
+                    selected[i] = request.Selected;
+        }
+        for (int i = 0; i < 3; ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::SetNextItemSelectionUserData(i);
+            ImGui::Selectable("row", selected[i], ImGuiSelectableFlags_None, ImVec2(200.0f, 20.0f));
+            if (focusOnce && i == 1 && ImGui::GetFrameCount() > 3)
+            {
+                ImGui::SetFocusID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+                ImGui::SetNavCursorVisible(true);
+                focusOnce = false;
+            }
+            // A selectable row of a list that reorders by pointer drag only.
+            if (fi::DragDropBeginSource(kRowType, &i, sizeof(i)))
+            {
+                ++dragFrames;
+                fi::DragDropEndSource();
+            }
+            ImGui::PopID();
+        }
+        io = ImGui::EndMultiSelect();
+        for (ImGuiSelectionRequest& request : io->Requests)
+        {
+            if (request.Type == ImGuiSelectionRequestType_SetAll)
+                std::fill(std::begin(selected), std::end(selected), request.Selected);
+            else
+                for (ImGuiSelectionUserData i = request.RangeFirstItem; i <= request.RangeLastItem; ++i)
+                    selected[i] = request.Selected;
+        }
+    });
+    session.Frames(6);
+    REQUIRE_FALSE(focusOnce);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(selected[1]);
+    CHECK(dragFrames == 0);
 }
 
 // ---- Edge scrolling -----------------------------------------------------------------------------

@@ -1047,11 +1047,16 @@ bool DragDropBeginSource(const char* type, const void* data, std::size_t size, c
         return true;
     }
 
-    // Space on the focused item picks it up.
-    if (preview.keyboard && drag.kind == DragKind::None && !g.DragDropActive && g.NavId == id)
+    // The pick-up chord on the focused item picks it up. Its key is owned only while exactly the
+    // chord's modifiers are held, so a chord with a modifier leaves the plain key to Dear ImGui's
+    // activation.
+    const ImGuiKey pickUpKey = static_cast<ImGuiKey>(preview.pickUpChord & ~ImGuiMod_Mask_);
+    const ImGuiKeyChord pickUpMods = preview.pickUpChord & ImGuiMod_Mask_;
+    if (preview.keyboard && pickUpKey != ImGuiKey_None && drag.kind == DragKind::None && !g.DragDropActive &&
+        g.NavId == id && g.IO.KeyMods == pickUpMods)
     {
-        ImGui::SetKeyOwner(ImGuiKey_Space, id);
-        if (ImGui::IsKeyPressed(ImGuiKey_Space, ImGuiInputFlags_None, id))
+        ImGui::SetKeyOwner(pickUpKey, id);
+        if (ImGui::IsKeyPressed(pickUpKey, ImGuiInputFlags_None, id))
         {
             StartDrag(DragKind::Keyboard, id, preview);
             FillPayload(drag.payload, drag.data, type, data, size, id);

@@ -33,11 +33,15 @@
 // clicks nothing. The core never changes the caller's data, so a cancel restores everything by
 // itself; entries animated with DragDropAnimatedPosition spring back to their places.
 //
-// Keyboard: while a source item has the keyboard focus, Space picks it up (DragDropPreview::
-// keyboard). The arrow keys then move it between the places it can land: the gaps of every
-// ordered zone of its type and every single zone, in the direction of the arrow, scrolling the
-// place into view (ScrollAreaRevealRect). Space or Enter drops it there, Escape or a click puts
-// it back. Zones report a keyboard drag exactly like a pointer drag (hovered, insertIndex,
+// Keyboard: a source that opts in (DragDropPreview::keyboard) is picked up by its pick-up chord,
+// Space by default, while it has the keyboard focus. It is opt-in because the source owns the
+// chord's key while it is focused, and Dear ImGui then no longer activates the item with it: a
+// source that is also pressed, toggled or selected with Space (a slot, a tree group, a row of a
+// multi-selection) leaves it off or picks up with a chord that has a modifier (Ctrl+Space), whose
+// key it owns only while the modifier is held. The arrow keys then move it between the places it
+// can land: the gaps of every ordered zone of its type and every single zone, in the direction of
+// the arrow, scrolling the place into view (ScrollAreaRevealRect). Space or Enter drops it there,
+// Escape or a click puts it back. Zones report a keyboard drag exactly like a pointer drag (hovered, insertIndex,
 // delivered, hoverOpen), so owners draw the same feedback; DragDropZoneResult::keyboard tells
 // them apart. Give rows ids made from stable keys (ImGui::PushID(key)), so the keyboard focus
 // stays on the moved row after the caller reorders its data.
@@ -131,13 +135,14 @@ struct DragDropPreview
     ImageHandle image;                  // invalid for none
     int count = 0;                      // items moved together (a multi-selection): above 1 a count badge
     DragDropDrawFn draw = nullptr;      // redraws the item instead of text, icon and image; null for none
-    bool keyboard = true;               // Space on the focused item picks it up for a keyboard drag
+    bool keyboard = false;              // pickUpChord on the focused item picks it up for a keyboard drag
+    ImGuiKeyChord pickUpChord = ImGuiKey_Space;  // with keyboard: the key and the exact modifiers that pick it up
 };
 
 // Makes the last item a drag source for a payload of `type` with `size` bytes at `data` (at most
 // kDragDropMaxPayloadSize; `data` may be null only when `size` is 0). Returns true while this
-// item's drag is in progress, pointer or keyboard (from the frame the threshold is passed or Space
-// picks it up to the frame of the drop or cancel); then call DragDropEndSource. Returns false
+// item's drag is in progress, pointer or keyboard (from the frame the threshold is passed or the
+// pick-up chord picks it up to the frame of the drop or cancel); then call DragDropEndSource. Returns false
 // otherwise; call DragDropEndSource only after true. Nothing happens for a disabled or read-only
 // item. A type longer than 32 characters or a payload over the limit is a usage error (reported,
 // and no drag starts). Calls Dear ImGui's BeginDragDropSource without its preview tooltip; for
@@ -163,7 +168,7 @@ struct DragDropInfo
     ImVec2 grabOffset = {0.0f, 0.0f};       // pointer minus the source item's top-left corner when the drag started
     ImVec2 sourceSize = {0.0f, 0.0f};       // the source item's size when the drag started (pixels);
                                             // zero for a stock source
-    bool keyboard = false;                  // picked up with Space and moved with the arrow keys
+    bool keyboard = false;                  // picked up with the pick-up chord and moved with the arrow keys
     bool facetSource = false;               // started by DragDropBeginSource (a ghost is drawn), not a stock source
 };
 
