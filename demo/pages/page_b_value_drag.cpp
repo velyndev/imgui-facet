@@ -27,6 +27,7 @@ enum CaptureState
     kHovered,
     kDragging,
     kFocused,
+    kStates,  // the read-only and disabled sliders
 };
 
 enum Slider
@@ -110,14 +111,17 @@ void SliderRow(facet::demo::PageCtx& ctx, int index)
     facet::internal::EndRow();
     if (index == kDisabled)
         ImGui::EndDisabled();
-    // The capture states show on the linear slider: keep it in the image at any size.
-    if (index == kLinear)
+    // The capture states show on the linear slider, and "states" on the read-only and disabled
+    // ones further down: keep them in the image at any size.
+    if (index == kLinear && ctx.captureState != kStates)
         ctx.RevealInCapture(0.5f);
+    if (index == kDisabled && ctx.captureState == kStates)
+        ctx.RevealInCapture(0.7f);
 }
 
 } // namespace
 
-FACET_DEMO_PAGE("value-drag", "Value drag", "Blocks", 50, "default", "hovered", "dragging", "focused")
+FACET_DEMO_PAGE("value-drag", "Value drag", "Blocks", 50, "default", "hovered", "dragging", "focused", "states")
 {
     if (!page.initialized)
         Reset();
