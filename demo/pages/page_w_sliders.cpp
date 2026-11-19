@@ -54,9 +54,8 @@ const char* const kSegments[] = {"Option 1", "Option 2", "Option 3"};
 FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30)
 {
     facet::demo::PageHeader("Sliders",
-                            "Sliders, range sliders, multi-handle sliders, knobs and two-dimensional pads. "
-                            "Every widget on this page is a placeholder until it is implemented: it has the "
-                            "widget's default size, cannot be operated and writes nothing.");
+                            "Sliders, range sliders, multi-handle sliders, knobs and two-dimensional pads.");
+    facet::demo::PlannedFamilyNote("sliders");
 
     SectionHeader("One value");
     LabeledRow("Slider");

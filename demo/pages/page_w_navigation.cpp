@@ -124,12 +124,9 @@ void Steps(facet::demo::PageCtx& ctx, NavigationState& s)
 FACET_DEMO_PAGE("navigation", "Navigation", "Widgets", 70, "default", "shortcuts")
 {
     facet::demo::PageHeader("Navigation",
-                            "The sidebar, tab bars, menu bars, menus and menu items, breadcrumbs, "
-                            "pagination, step indicators, wizards and the shortcut sheet. Every "
-                            "widget on this page is a placeholder until Phase 2 implements it: it "
-                            "shows its name and the word planned, and does not react to input.");
-    Note("Declared in facet/widgets/navigation.h; the declarations and usage examples are in "
-         "docs/widgets/navigation.md.");
+                            "The sidebar, tab bars, menu bars, menus and menu items, breadcrumbs, pagination, step "
+                            "indicators, wizards and the shortcut sheet.");
+    facet::demo::PlannedFamilyNote("navigation");
     NavigationState& s = State();
     PageNavigation(s);
     Menus(s);

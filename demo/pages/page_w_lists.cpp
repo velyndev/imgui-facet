@@ -134,12 +134,9 @@ void Hierarchies(ListsState& s)
 FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60)
 {
     facet::demo::PageHeader("Lists",
-                            "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, "
-                            "tree views, checkbox trees, transfer lists and checklists. Every widget "
-                            "on this page is a placeholder until Phase 2 implements it: it shows its "
-                            "name and the word planned, and does not react to input.");
-    Note("Declared in facet/widgets/lists.h; the declarations and usage examples are in "
-         "docs/widgets/lists.md.");
+                            "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
+                            "checkbox trees, transfer lists and checklists.");
+    facet::demo::PlannedFamilyNote("lists");
     ListsState& s = State();
     ChooseOne(s);
     ChooseSeveral(s);

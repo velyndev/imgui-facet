@@ -164,13 +164,9 @@ FACET_DEMO_PAGE("overlays", "Overlays", "Widgets", 100, "default", "modal", "con
                 "palette")
 {
     facet::demo::PageHeader("Overlays",
-                            "Modals, confirm dialogs, popovers, context menus, tooltips, toasts, "
-                            "drawers, loading overlays, the command palette, watermark overlays and "
-                            "the unsaved changes bar. Every widget on this page is a placeholder "
-                            "until Phase 2 implements it: it shows its name and the word planned, "
-                            "and does not react to input.");
-    Note("Declared in facet/widgets/overlays.h; the declarations and usage examples are in "
-         "docs/widgets/overlays.md.");
+                            "Modals, confirm dialogs, popovers, context menus, tooltips, toasts, drawers, loading "
+                            "overlays, the command palette, watermark overlays and the unsaved changes bar.");
+    facet::demo::PlannedFamilyNote("overlays");
     OverlaysState& s = State();
     CallerOpened(ctx, s);
     InputOpened();

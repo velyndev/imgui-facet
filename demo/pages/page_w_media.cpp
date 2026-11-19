@@ -50,37 +50,37 @@ FACET_DEMO_PAGE("media", "Media", "Widgets", 130)
     const facet::ImageHandle none;
 
     facet::demo::PageHeader("Media",
-                            "Images in design units, avatars, thumbnail strips, carousels, image viewers, before and "
-                            "after comparisons, timeline scrubbers and drop zones. The pixel-sized core items Image "
-                            "and IconGlyph are shown on the Images and Icons pages. Every widget on this page is a "
-                            "placeholder of its declared size until it is implemented in Phase 2.");
+                            "Images in design units, avatars, thumbnail strips, carousels, image viewers, before "
+                            "and after comparisons, timeline scrubbers and drop zones. The pixel-sized core items "
+                            "Image and IconGlyph are shown on the Images and Icons pages.");
+    facet::demo::PlannedFamilyNote("media");
 
     SectionHeader("Images");
-    LabeledRow("ImageView");
+    LabeledRow("Image view");
     facet::ImageView("Placeholder image", none,
                      {.fit = facet::ImageFit::Cover, .corners = facet::Radius::Card, .retryLabel = "Retry",
                       .width = imageSide, .height = imageSide});
-    LabeledRow("ImageViewer");
+    LabeledRow("Image viewer");
     facet::ImageViewer("Placeholder image##viewer", none, &ui.view, {.minimap = true, .height = viewerHeight});
-    LabeledRow("ImageCompare");
+    LabeledRow("Image compare");
     facet::ImageCompare("Comparison", &ui.split, none, none,
                         {.beforeLabel = "Before", .afterLabel = "After", .height = viewerHeight});
 
     SectionHeader("People");
     LabeledRow("Avatar");
     facet::Avatar("Placeholder", none, {.showStatus = true, .status = facet::Tone::Success});
-    LabeledRow("AvatarGroup");
+    LabeledRow("Avatar group");
     facet::AvatarGroup("Members", kAvatars, {.maxVisible = 3});
 
     SectionHeader("Collections");
-    LabeledRow("ThumbnailStrip");
+    LabeledRow("Thumbnail strip");
     facet::ThumbnailStrip("Thumbnails", &ui.thumbnail, kImages, {.captions = true});
     LabeledRow("Carousel");
     facet::Carousel("Slides", &ui.slide, kImages, {.captions = true, .height = viewerHeight});
 
     SectionHeader("Time and files");
-    LabeledRow("TimelineScrubber");
+    LabeledRow("Timeline scrubber");
     facet::TimelineScrubber("Timeline", &ui.playhead, &ui.loopIn, &ui.loopOut, kTimelineSeconds);
-    LabeledRow("DropZone");
+    LabeledRow("Drop zone");
     facet::DropZone("Drop zone", kAcceptTypes, {.hint = "Drop a file here", .icon = facet::Icon("upload")});
 }

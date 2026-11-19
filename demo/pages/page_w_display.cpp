@@ -52,35 +52,35 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110)
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
 
     facet::demo::PageHeader("Display",
-                            "Text styles, alerts and empty states, progress and loading, badges and status marks, key "
-                            "caps, code and log views, key-value lists, stat tiles and data tables. Every widget on "
-                            "this page is a placeholder of its declared size until it is implemented in Phase 2.");
+                            "Text styles, alerts and empty states, progress and loading, badges and status marks, "
+                            "key caps, code and log views, key-value lists, stat tiles and data tables.");
+    facet::demo::PlannedFamilyNote("display");
 
     SectionHeader("Text");
-    LabeledRow("StyledText");
+    LabeledRow("Styled text");
     facet::StyledText("Sample text", {.style = facet::TextStyle::Headline});
-    LabeledRow("TruncatedText");
+    LabeledRow("Truncated text");
     facet::TruncatedText("A placeholder line that is cut with an ellipsis where it does not fit",
                          {.mode = facet::TruncateMode::Middle});
-    LabeledRow("SectionHeader");
+    LabeledRow("Section header");
     facet::SectionHeader("Section title", {.description = "Description", .actionLabel = "Action", .divider = true});
 
     SectionHeader("Alerts and states");
     LabeledRow("Banner");
     facet::Banner("Banner title", &ui.bannerOpen, "Banner message.",
                   {.tone = facet::Tone::Warning, .primaryAction = "Action 1", .secondaryAction = "Action 2"});
-    LabeledRow("InlineAlert");
+    LabeledRow("Inline alert");
     facet::InlineAlert("Alert title", &ui.alertOpen, "Alert message.", {.tone = facet::Tone::Accent});
-    LabeledRow("EmptyState");
+    LabeledRow("Empty state");
     facet::EmptyState("Nothing to show", {.message = "Placeholder message.", .actionLabel = "Action", .compact = true});
-    LabeledRow("DataStateView");
+    LabeledRow("Data state view");
     if (facet::BeginDataStateView("data view", facet::DataState::Loading, 0, {.skeletonRows = 2}))
         facet::EndDataStateView();
 
     SectionHeader("Progress and loading");
-    LabeledRow("ProgressBar");
+    LabeledRow("Progress bar");
     facet::ProgressBar("Progress##bar", 0.4f, {.showPercent = true});
-    LabeledRow("ProgressRing");
+    LabeledRow("Progress ring");
     facet::ProgressRing("Progress##ring", facet::kIndeterminate);
     LabeledRow("Spinner");
     facet::Spinner("Loading");
@@ -90,41 +90,41 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110)
     SectionHeader("Badges and status");
     LabeledRow("Badge");
     facet::Badge("Label", {.tone = facet::Tone::Accent});
-    LabeledRow("CountBadge");
+    LabeledRow("Count badge");
     facet::CountBadge(3);
-    LabeledRow("StatusDot");
+    LabeledRow("Status dot");
     facet::StatusDot("Status", {.tone = facet::Tone::Success});
-    LabeledRow("StatusPill");
+    LabeledRow("Status pill");
     facet::StatusPill("Status###pill", {.tone = facet::Tone::Warning, .liveDot = true});
 
     SectionHeader("Keys and text marks");
-    LabeledRow("KeyCap");
+    LabeledRow("Key cap");
     facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_S);
-    LabeledRow("ShortcutHint");
+    LabeledRow("Shortcut hint");
     facet::ShortcutHint("Action", ImGuiMod_Ctrl | ImGuiKey_K);
-    LabeledRow("CharacterCounter");
+    LabeledRow("Character counter");
     facet::CharacterCounter(12, 40);
-    LabeledRow("InlineCode");
+    LabeledRow("Inline code");
     facet::InlineCode("value", {.copyOnActivate = true});
 
     SectionHeader("Code and logs");
-    LabeledRow("CodeView");
+    LabeledRow("Code view");
     facet::CodeView("code", kCodeSample,
                     {.language = facet::CodeLanguage::Cpp, .highlightLines = kHighlightedLines, .height = viewHeight});
-    LabeledRow("LogView");
+    LabeledRow("Log view");
     facet::LogView("log", kLogEntries, {.height = viewHeight});
 
     SectionHeader("Data");
-    LabeledRow("KeyValueList");
+    LabeledRow("Key value list");
     ImGui::BeginGroup();  // keeps the rows in the control column of the row
     facet::BeginKeyValueList("details", {.copyable = true});
     facet::KeyValue("Key 1", "Value 1");
     facet::KeyValue("Key 2", "Value 2");
     facet::EndKeyValueList();
     ImGui::EndGroup();
-    LabeledRow("StatTile");
+    LabeledRow("Stat tile");
     facet::StatTile("Example value", 0.0);
-    LabeledRow("DataTable");
+    LabeledRow("Data table");
     if (facet::BeginDataTable("table", kColumns, kTableRows, &ui.selection,
                               {.sortable = true, .frozenColumns = 1, .height = viewHeight}))
     {

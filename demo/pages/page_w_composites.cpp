@@ -88,20 +88,19 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     facet::demo::PageHeader("Composites",
                             "Editors for curves, easing and gradients, property grids, console views, search and "
                             "settings search, key bind and preset lists, theme controls, inventory grids and item "
-                            "cards, people, preview canvases, layer lists, onboarding and the drag and drop calls. "
-                            "Every widget on this page is a placeholder of its declared size until it is implemented "
-                            "in Phase 2.");
+                            "cards, people, preview canvases, layer lists, onboarding and the drag and drop calls.");
+    facet::demo::PlannedFamilyNote("composites");
 
     SectionHeader("Editors");
-    LabeledRow("CurveEditor");
+    LabeledRow("Curve editor");
     facet::CurveEditor("Response", ui.curve, &ui.curveCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.marker = 0.5f});
-    LabeledRow("BezierEditor");
+    LabeledRow("Bezier editor");
     facet::BezierEditor("Easing", &ui.easing);
-    LabeledRow("GradientEditor");
+    LabeledRow("Gradient editor");
     facet::GradientEditor("Gradient", ui.stops, &ui.stopCount, {.alpha = true});
 
     SectionHeader("Inspectors");
-    LabeledRow("PropertyGrid");
+    LabeledRow("Property grid");
     ImGui::BeginGroup();  // keeps the grid in the control column of the row
     facet::BeginPropertyGrid("properties");
     if (facet::BeginPropertyCategory("Category 1"))
@@ -117,58 +116,58 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     }
     facet::EndPropertyGrid();
     ImGui::EndGroup();
-    LabeledRow("ConsoleView");
+    LabeledRow("Console view");
     facet::ConsoleView("console", &ui.command, kConsoleLines, {.commands = kCommands, .height = viewHeight});
-    LabeledRow("KeybindList");
+    LabeledRow("Key bind list");
     facet::KeybindList("binds", ui.binds);
 
     SectionHeader("Search and settings");
-    LabeledRow("SearchFilterBar");
+    LabeledRow("Search filter bar");
     facet::SearchFilterBar("Search##filter bar", &ui.query, ui.filters);
-    LabeledRow("SettingsSearch");
+    LabeledRow("Settings search");
     ImGui::BeginGroup();
     facet::BeginSettingsSearch("settings", {.filter = ui.settingsQuery.c_str()});
     if (facet::SettingsSearchMatch("Setting 1", {.keywords = "placeholder"}))
         facet::StyledText("Setting 1", {.secondary = true});
     facet::EndSettingsSearch();
     ImGui::EndGroup();
-    LabeledRow("PresetList");
+    LabeledRow("Preset list");
     facet::PresetList("presets", &ui.preset, kPresets, {.importExport = true});
-    LabeledRow("ThemeModeControl");
+    LabeledRow("Theme mode control");
     facet::ThemeModeControl("Theme##composites", &ui.themeMode, {.apply = false});
-    LabeledRow("AccentPicker");
+    LabeledRow("Accent picker");
     facet::AccentPicker("Accent##composites", &ui.themeAccent, &ui.accent, {.apply = false});
-    LabeledRow("UiScaleControl");
+    LabeledRow("UI scale control");
     facet::UiScaleControl("UI scale##composites", &ui.uiScale, kScaleMin, kScaleMax, {.apply = false});
 
     SectionHeader("Inventory");
-    LabeledRow("InventoryGrid");
+    LabeledRow("Inventory grid");
     facet::InventoryGrid("inventory", &ui.slot, kSlots, {.columns = 3});
-    LabeledRow("InventoryTile");
+    LabeledRow("Inventory tile");
     facet::InventoryTile("tile", kSlots[0], {.selected = true});
-    LabeledRow("InventorySlot");
+    LabeledRow("Inventory slot");
     facet::InventorySlot("Slot 1", facet::InventoryItem{}, {.placeholderIcon = facet::Icon("grid")});
-    LabeledRow("InventoryDetailCard");
+    LabeledRow("Inventory detail card");
     facet::InventoryDetailCard("Item 1", facet::ImageHandle{},
                           {.description = "Placeholder description.", .stats = kStats, .tags = kTags,
                            .actions = kActions});
 
     SectionHeader("Cards and people");
-    LabeledRow("MediaCard");
+    LabeledRow("Media card");
     facet::MediaCard("Title", facet::ImageHandle{}, {.description = "Detail", .badges = kTags});
-    LabeledRow("UserChip");
+    LabeledRow("User chip");
     facet::UserChip("Profile 1", facet::ImageHandle{}, {.description = "Placeholder"});
-    LabeledRow("ProfileSwitcher");
+    LabeledRow("Profile switcher");
     facet::ProfileSwitcher("profiles", &ui.profile, kProfiles, {.addLabel = "Add profile"});
 
     SectionHeader("Canvas and layers");
-    LabeledRow("PreviewCanvas");
+    LabeledRow("Preview canvas");
     ImGui::BeginGroup();
     facet::BeginPreviewCanvas("canvas", kReferenceSize, {.safeArea = 0.05f});
     facet::CanvasElement("Element 1", &ui.element);
     facet::EndPreviewCanvas();
     ImGui::EndGroup();
-    LabeledRow("LayerList");
+    LabeledRow("Layer list");
     facet::LayerList("layers", &ui.layer, ui.layers);
 
     SectionHeader("Onboarding");
@@ -187,11 +186,11 @@ FACET_DEMO_PAGE("composites", "Composites", "Widgets", 140)
     SectionHeader("Drag and drop");
     facet::demo::Paragraph("BeginDragSource and BeginDropTarget mark the last item. They return false until the "
                            "drag and drop core exists.");
-    LabeledRow("BeginDragSource");
+    LabeledRow("Drag source");
     facet::StyledText("Drag source");
     if (facet::BeginDragSource(kDemoPayload, &ui.slot, sizeof(ui.slot), {.previewText = "Item 1"}))
         facet::EndDragSource();
-    LabeledRow("BeginDropTarget");
+    LabeledRow("Drop target");
     facet::StyledText("Drop target");
     if (facet::BeginDropTarget())
     {

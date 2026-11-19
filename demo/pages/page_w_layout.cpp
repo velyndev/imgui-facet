@@ -148,12 +148,9 @@ void Tiles(LayoutState& s)
 FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90)
 {
     facet::demo::PageHeader("Layout",
-                            "Stacks, grids, flow layout, split views, panels, list and detail, "
-                            "settings rows, dependent groups, separators and item grids. Every "
-                            "widget on this page is a placeholder until Phase 2 implements it: it "
-                            "shows its name and the word planned, and does not react to input.");
-    Note("Declared in facet/widgets/layout.h; the declarations and usage examples are in "
-         "docs/widgets/layout.md.");
+                            "Stacks, grids, flow layout, split views, panels, list and detail, settings rows, "
+                            "dependent groups, separators and item grids.");
+    facet::demo::PlannedFamilyNote("layout");
     LayoutState& s = State();
     Arrange();
     Divide(s);

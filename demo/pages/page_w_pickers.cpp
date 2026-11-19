@@ -62,10 +62,9 @@ const facet::FileType kFileTypes[] = {
 FACET_DEMO_PAGE("pickers", "Pickers", "Widgets", 50)
 {
     facet::demo::PageHeader("Pickers",
-                            "Color wells, pickers and inputs, swatch palettes, date and time pickers, angle, "
-                            "icon and thumbnail pickers, and the file browser. Every widget on this page is a "
-                            "placeholder until it is implemented: it has the widget's default size, cannot be "
-                            "operated and writes nothing.");
+                            "Color wells, pickers and inputs, swatch palettes, date and time pickers, angle, icon "
+                            "and thumbnail pickers, and the file browser.");
+    facet::demo::PlannedFamilyNote("pickers");
 
     if (!ui.seeded)
     {

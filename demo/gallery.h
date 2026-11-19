@@ -67,6 +67,9 @@ void SectionHeader(const char* title);
 void Paragraph(const char* text);
 // Footnote text in labelSecondary, printf formatted, wrapped at the content width.
 void Note(const char* fmt, ...) IM_FMTARGS(1);
+// The Note every widget family page shows under its header: the widgets are placeholders until
+// Phase 2, and where `family` ("lists") is declared and documented.
+void PlannedFamilyNote(const char* family);
 // A Note on the line of the last item (call after ImGui::SameLine): its first line of text is
 // centered on the item's height, wherever the item's text sits.
 void NoteBeside(const char* fmt, ...) IM_FMTARGS(1);

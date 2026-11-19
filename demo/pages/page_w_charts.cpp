@@ -42,10 +42,10 @@ ChartsUi ui;
 FACET_DEMO_PAGE("charts", "Charts", "Widgets", 120)
 {
     facet::demo::PageHeader("Charts",
-                            "Sparklines, line, bar and donut charts, gauges, level meters, frame time graphs, legends "
-                            "and the range brush. All charts share one data form (ChartSeries) and one axis options "
-                            "struct (ChartAxis). Every widget on this page is a placeholder of its declared size until "
-                            "it is implemented in Phase 2; the example values are a fixed pattern, not data.");
+                            "Sparklines, line, bar and donut charts, gauges, level meters, frame time graphs, "
+                            "legends and the range brush. All charts share one data form (ChartSeries) and one axis "
+                            "options struct (ChartAxis). The example values are a fixed pattern, not data.");
+    facet::demo::PlannedFamilyNote("charts");
 
     SectionHeader("Small charts");
     LabeledRow("Sparkline");
@@ -54,20 +54,20 @@ FACET_DEMO_PAGE("charts", "Charts", "Widgets", 120)
     facet::Legend("legend", ui.legend);
 
     SectionHeader("Charts with axes");
-    LabeledRow("LineChart");
+    LabeledRow("Line chart");
     facet::LineChart("line chart", kSeries, {.yAxis = {.label = "Value"}, .crosshair = true});
-    LabeledRow("BarChart");
+    LabeledRow("Bar chart");
     facet::BarChart("bar chart", kSeries, kCategories, {.stacked = true});
-    LabeledRow("DonutChart");
+    LabeledRow("Donut chart");
     facet::DonutChart("donut chart", kSlices, {.legend = true});
-    LabeledRow("ChartRangeBrush");
+    LabeledRow("Chart range brush");
     facet::ChartRangeBrush("Range##brush", &ui.low, &ui.high, 0.0, 5.0, kSeries, {.minGap = 1.0});
 
     SectionHeader("Gauges and meters");
     LabeledRow("Gauge");
     facet::Gauge("Value##gauge", 0.5, 0.0, 1.0, {.format = "%.2f", .zones = kZones});
-    LabeledRow("LevelMeter");
+    LabeledRow("Level meter");
     facet::LevelMeter("Level##meter", kChannels, 0.0f, 1.0f, {.zones = kZones});
-    LabeledRow("FrameTimeGraph");
+    LabeledRow("Frame time graph");
     facet::FrameTimeGraph("frame times", {.compact = true});
 }

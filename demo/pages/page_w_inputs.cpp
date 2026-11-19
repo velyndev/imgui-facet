@@ -58,10 +58,9 @@ const facet::UnitItem kTimeUnits[] = {{"ms", 0.001}, {"s", 1.0}, {"min", 60.0}};
 FACET_DEMO_PAGE("inputs", "Inputs", "Widgets", 40)
 {
     facet::demo::PageHeader("Inputs",
-                            "Text, search and number fields, drag and vector fields, special-purpose fields, "
-                            "key bind capture and ratings. Every widget on this page is a placeholder until it "
-                            "is implemented: it has the widget's default size, cannot be operated and writes "
-                            "nothing.");
+                            "Text, search and number fields, drag and vector fields, special-purpose fields, key "
+                            "bind capture and ratings.");
+    facet::demo::PlannedFamilyNote("inputs");
 
     SectionHeader("Text");
     LabeledRow("Text field");

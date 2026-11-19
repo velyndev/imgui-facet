@@ -51,9 +51,8 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20)
 {
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
-                            "cycle selectors, option cards and the key bind mode selector. Every widget on this "
-                            "page is a placeholder until it is implemented: it has the widget's default size, "
-                            "cannot be operated and writes nothing.");
+                            "cycle selectors, option cards and the key bind mode selector.");
+    facet::demo::PlannedFamilyNote("selection");
 
     SectionHeader("On and off");
     LabeledRow("Toggle");

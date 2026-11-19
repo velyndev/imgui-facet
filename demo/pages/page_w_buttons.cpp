@@ -40,8 +40,8 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10)
 {
     facet::demo::PageHeader("Buttons",
                             "Push buttons with variants, icon buttons, copy buttons, links and toggle button "
-                            "groups. Every widget on this page is a placeholder until it is implemented: it "
-                            "has the widget's default size, cannot be operated and returns nothing.");
+                            "groups.");
+    facet::demo::PlannedFamilyNote("buttons");
 
     SectionHeader("Actions");
     Paragraph("One primary action per view, secondary and plain actions beside it, and a destructive one.");
