@@ -1,6 +1,6 @@
-// TabBar and TabBarClosedTab (navigation.h). Planned: draws the placeholder of
-// src/widgets/structure_stub.h until Phase 2 implements the tab bar. Returns false and never
-// writes *index.
+// TabBar, TabBarClosedTab and TabBarMovedTab (navigation.h). Planned: draws the placeholder of
+// src/widgets/structure_stub.h until Phase 2 implements the tab bar. Returns false, never
+// writes *index and reports no closed or moved tab.
 
 #include "facet/widgets/navigation.h"
 #include "widgets/structure_stub.h"
@@ -32,6 +32,11 @@ bool TabBar(const char* id, int*, std::span<const char* const>, const TabBarOpti
 int TabBarClosedTab()
 {
     return -1;
+}
+
+ReorderMove TabBarMovedTab()
+{
+    return {};
 }
 
 } // namespace facet

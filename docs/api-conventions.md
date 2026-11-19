@@ -492,6 +492,7 @@ struct TabBarOptions
     bool closable = false;             // a close button per tab; read with TabBarClosedTab
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills; tabs that do not fit move into a menu
+    bool reorderable = false;          // tabs reorder by drag and keyboard pick-up; read with TabBarMovedTab (since 0.1)
 };
 
 // The tab strip with the selection pill; the caller draws the content of *index. Arrow keys
@@ -499,6 +500,8 @@ struct TabBarOptions
 bool TabBar(const char* id, int* index, std::span<const ChoiceItem> tabs, const TabBarOptions& options = {});
 // The tab whose close button was activated in the last TabBar call this frame, or -1.
 int TabBarClosedTab();
+// The move of a tab dropped in the last TabBar call this frame; invalid when none moved.
+ReorderMove TabBarMovedTab();
 
 struct MenuItemOptions
 {

@@ -20,6 +20,7 @@
 
 #include "facet/core/input.h"
 #include "facet/widgets/common.h"
+#include "facet/widgets/lists.h"
 
 namespace facet
 {
@@ -113,18 +114,26 @@ struct TabBarOptions
     bool closable = false;             // a close button per tab; read TabBarClosedTab
     ControlSize size = ControlSize::Inherit;
     float width = 0.0f;                // units; 0 fills; tabs that do not fit move into a "more" menu
+    bool reorderable = false;          // tabs reorder by drag and keyboard pick-up; read TabBarMovedTab (since 0.1)
 };
 
 // The tab strip; the caller draws the content of the tab *index below it. Tabs show the item
 // icon, label and detail (as a badge). Left and Right move between tabs; Ctrl+Page Down and
 // Ctrl+Page Up switch to the next and previous tab while focus is inside the window (Ctrl+Tab
 // stays with Dear ImGui's window switcher, which always claims it). Writes *index and returns
-// true when another tab is chosen. A closed tab is reported by TabBarClosedTab; the caller removes it.
+// true when another tab is chosen. A closed tab is reported by TabBarClosedTab; the caller removes
+// it. With `reorderable`, a tab is dragged to a new place, or picked up with Ctrl+Space (Space
+// still selects), moved with Left and Right, dropped with Space or Enter and put back with
+// Escape; TabBarMovedTab reports the move, the caller applies it to its tabs, and TabBar has
+// already written *index to the place the selected tab lands on.
 // Default width: the available width. Tab widths of the last frame are kept under the id.
 bool TabBar(const char* id, int* index, std::span<const ChoiceItem> tabs, const TabBarOptions& options = {});
 bool TabBar(const char* id, int* index, std::span<const char* const> tabs, const TabBarOptions& options = {});
 // The tab whose close button was activated in the last TabBar call of this frame, or -1.
 int TabBarClosedTab();
+// The move of a tab dropped in the last TabBar call of this frame (ApplyReorderMove, lists.h,
+// applies it to the caller's tabs); IsValid() is false when no tab moved.
+ReorderMove TabBarMovedTab();
 
 // --- Menus ---------------------------------------------------------------------------------------
 

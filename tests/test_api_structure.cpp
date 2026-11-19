@@ -496,6 +496,9 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs", &v.index, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs labels", &v.index, kLabels)));
     CHECK_BALANCED(CHECK(facet::TabBarClosedTab() == -1));
+    CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs reorder", &v.index, kItems, {.reorderable = true})));
+    CHECK_BALANCED(CHECK_FALSE(facet::TabBarMovedTab().IsValid()));
+    CHECK_FALSE(facet::TabBarOptions{}.reorderable);
     CHECK_BALANCED({
         const bool open = facet::BeginMenuBar("Menus");
         CHECK(open);

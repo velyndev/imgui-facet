@@ -38,12 +38,15 @@ Status: planned
 bool TabBar(const char* id, int* index, std::span<const ChoiceItem> tabs, const TabBarOptions& options = {});
 bool TabBar(const char* id, int* index, std::span<const char* const> tabs, const TabBarOptions& options = {});
 int TabBarClosedTab();
+ReorderMove TabBarMovedTab();
 ```
 
 A tab strip with the selection pill or an underline, closable tabs and an overflow menu; the caller
 draws the content of the selected tab. Left and Right move between tabs, Ctrl+Page Down and
 Ctrl+Page Up switch tabs from anywhere in the window. Ctrl+Tab is not used: Dear ImGui always claims
-it for its window switcher.
+it for its window switcher. With `TabBarOptions::reorderable`, tabs move by drag, or from the
+keyboard with Ctrl+Space (Space still selects the tab), Left and Right, then Space or Enter; Escape
+puts the tab back. `TabBarMovedTab` reports the move for `ApplyReorderMove`.
 
 ### BeginMenuBar
 
