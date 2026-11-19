@@ -94,7 +94,8 @@ The building blocks the widgets will be made of exist inside the library. What e
     - Multi-handle: range sliders whose handles stop at or push each other, logarithmic,
       stepped, mirrored and vertical ones, a draggable span, and three handles that can be
       added and removed.
-    - Selection pill: the sliding highlight behind the selected entry.
+    - Selection pill: the sliding highlight behind the selected entry, with a capture state
+      that shows it on the way to a new entry.
     - Fuzzy matching: the built-in icon names ranked as you type, with the matched letters
       highlighted, an empty state, and the time one key press takes over 10000 generated
       names.

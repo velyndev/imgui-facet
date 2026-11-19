@@ -128,7 +128,10 @@ bool CaptureOne(AppShell& shell, const CaptureOptions& options, int pageIndex, i
     ctx.capture = true;
     ctx.captureState = stateIndex;
     for (int frame = 0; frame < options.warmupFrames; ++frame)
+    {
+        ctx.captureFramesLeft = options.warmupFrames - 1 - frame;
         session.Frame([&] { DrawGallery(gallery, ctx, nullptr); });
+    }
 
     const std::filesystem::path filePath = options.directory / fileName;
     const std::string pathText = reinterpret_cast<const char*>(filePath.u8string().c_str());

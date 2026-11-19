@@ -53,6 +53,8 @@ struct PageCtx
 {
     bool capture = false;     // true in --capture runs: the page should show captureState
     int captureState = 0;     // index into the page's state names; 0 outside capture runs
+    int captureFramesLeft = 0;  // capture runs: frames still rendered after this one before the
+                                // image is read (each one fixed time step long); 0 otherwise
     bool dark = false;        // the dark theme is shown (facet::T() is Theme::Dark())
     float scale = 1.0f;       // total UI scale: monitor DPI / 96 in the window or --scale
                               // offscreen, times the UI scale chosen in the title strip

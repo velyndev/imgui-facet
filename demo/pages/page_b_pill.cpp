@@ -1,6 +1,7 @@
 // Demo page: Selection pill. A prototype segmented control and a prototype list, both built only
 // from the item behaviour, the focus ring and the selection pill, so the one gesture they share
-// can be compared; a reduce motion switch shows the pill moving at once instead.
+// can be compared; a reduce motion switch shows the pill moving at once instead. The "moving"
+// capture shows both pills a fixed time after the selection changed, stretched on the way.
 
 #include <algorithm>
 #include <cstdio>
@@ -30,7 +31,12 @@ enum CaptureState
     kDefault,
     kHovered,
     kFocused,
+    kMoving,
 };
+
+// The "moving" capture: frames between the selection change and the image, at the fixed time
+// step of capture runs (1/60 s), early in the pill's spring so the stretch shows.
+constexpr int kMovingFrames = 6;
 
 constexpr const char* kSegments[] = {"Day", "Week", "Month", "Year"};
 constexpr const char* kEntries[] = {"First entry", "Second entry", "Third entry", "Fourth entry", "Fifth entry"};
@@ -108,8 +114,16 @@ void List(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("pill", "Selection pill", "Blocks", 70, "default", "hovered", "focused")
+FACET_DEMO_PAGE("pill", "Selection pill", "Blocks", 70, "default", "hovered", "focused", "moving")
 {
+    if (ctx.capture)
+    {
+        // Every state starts from the same selection; "moving" changes it kMovingFrames before
+        // the image: Week to Year, the first entry to the fourth.
+        const bool moved = ctx.captureState == kMoving && ctx.captureFramesLeft < kMovingFrames;
+        page.segment = moved ? 3 : 1;
+        page.entry = moved ? 3 : 0;
+    }
     facet::demo::PageHeader("Selection pill",
                             "The identity motif: one soft highlight behind the selected entry that springs to the "
                             "next one when the selection changes. Tabs, the sidebar, segmented controls and lists "
@@ -127,7 +141,11 @@ FACET_DEMO_PAGE("pill", "Selection pill", "Blocks", 70, "default", "hovered", "f
             ctx.ForceNextItemState(ForcedItemState::Focused, 1);
     }
     facet::demo::ProtoSegmented(ctx, "segments", &page.segment, kSegments, "pill.segments");
-    Note("Selected: %s. One Tab stop; Left and Right move the selection.", kSegments[page.segment]);
+    if (ctx.capture && ctx.captureState == kMoving)
+        Note("Shown %.0f ms after the selection changed from Week to Year, and from the first entry to the fourth.",
+             static_cast<double>(kMovingFrames) * 1000.0 / 60.0);
+    else
+        Note("Selected: %s. One Tab stop; Left and Right move the selection.", kSegments[page.segment]);
 
     SectionHeader("List");
     List(ctx);
