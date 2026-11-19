@@ -19,12 +19,15 @@ the reason for each are listed in `DESIGN.md`.
 | `elevation` | Three shadow levels (their surfaces are in `colors`) |
 | `glass` | Backdrop blur settings |
 | `layout` | Width class breakpoints and the labelled row columns |
-| `overlay` | Popup placement, menus, tooltip timing, toasts, dialog, drawer and command palette sizes |
+| `overlay` | Popup placement, menus and their shortcut gap, tooltip timing, toasts, dialog, drawer and command palette sizes |
 | `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths |
 | `scroll` | Overlay scrollbar widths, inset, minimum thumb, hide delay, wheel distance, edge fade |
 | `list` | Row heights per control size, tree indent, default visible rows, typeahead timeout |
 | `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target |
 | `field` | Text field padding and caret width |
+| `tabs` | Narrowest and widest tab of a tab bar |
+| `table` | Data table header height, narrowest column, column resize band |
+| `picker` | Day cell of the date pickers |
 
 Lengths are design units. Widgets convert them with `facet::Px()` (see `docs/scaling.md`).
 

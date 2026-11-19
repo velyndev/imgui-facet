@@ -60,7 +60,10 @@ cursor, disabled ones the not-allowed cursor.
 | Labelled rows | label column 112 (gap included), narrowest control beside it 128 | Labels line up across rows; a row stacks before its control gets too narrow to operate |
 | Larger controls | fader 140, pad 192, picker 256, number field beside a slider 72, histogram 40, chart 160, panel 192, card 256, thumbnail 128, inventory slot 64; knob arc 270 degrees | Multiples of the 4 px grid, most of them whole steps of the largest spacing (32), so large controls line up with the content around them; the knob arc leaves its gap at the bottom where the value reads |
 | Popup placement | 4 from the anchor, 8 from the display edges | Close enough to read as attached, clear of the anchor's outline; never touching the display edge |
-| Menus | at least 180 wide, submenus open after 0.2 s of rest | Short menu labels still get a target that is easy to hit; a pointer crossing a row on its way does not open its submenu |
+| Menus | at least 180 wide, submenus open after 0.2 s of rest, 24 between a label and its shortcut | Short menu labels still get a target that is easy to hit; a pointer crossing a row on its way does not open its submenu; the shortcut column reads as separate from the longest label |
+| Tabs | 64 to 240 wide | A one-word tab stays an easy target; one long title cannot push the other tabs into the overflow menu |
+| Tables | header 32, columns at least 48, resize band 8 | The header sits on the regular list row rhythm; a column keeps room for a short value and its sort mark; the resize band is two grid steps, easy to grab without covering the cell |
+| Date pickers | day cell 32 | Seven days fit the 256 picker width with padding, and each day is above the minimum hit target |
 | Tooltips | 0.5 s delay, 0.4 s grace, text wraps at 280 | The first tooltip waits until the pointer rests; moving on to a neighbour shows its tooltip at once; long text stays a readable column |
 | Toasts | 5 s, 320 wide, 8 apart, 16 from the corner, 3 at once | Long enough to read two lines, few enough that the stack never covers the content it reports on |
 | Dialogs and drawers | modal 440, drawer 320 wide or 280 high, command palette 560 | Wide enough for a title and two buttons in one row, narrow enough to read as a layer over the content |

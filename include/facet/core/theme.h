@@ -292,6 +292,7 @@ struct OverlayTokens
     float drawerWidth = 320.0f;      // drawers that slide in from the start or end edge
     float drawerHeight = 280.0f;     // drawers that slide in from the top or bottom edge
     float commandPaletteWidth = 560.0f;
+    float menuShortcutGap = 24.0f;   // between a menu row's label and its shortcut text (since 0.1)
 };
 
 // Desktop surfaces: the floating shell, the app frame, sidebars and side panes. Design units.
@@ -349,6 +350,27 @@ struct FieldTokens
     float caretWidth = 1.5f;           // rounded to whole pixels, at least one
 };
 
+// Tabs of a TabBar. Design units.
+struct TabTokens
+{
+    float minWidth = 64.0f;            // narrowest tab, also what the overflow measurement keeps per tab
+    float maxWidth = 240.0f;           // widest tab; a longer label is cut with an ellipsis
+};
+
+// Data tables. Design units.
+struct TableTokens
+{
+    float headerHeight = 32.0f;        // the header row
+    float minColumnWidth = 48.0f;      // a column is never resized narrower
+    float resizeBand = 8.0f;           // width of the band on a column edge that resizes it
+};
+
+// Date and time pickers. Design units.
+struct PickerTokens
+{
+    float dayCell = 32.0f;             // one day of the calendar grid, square
+};
+
 struct Theme
 {
     bool dark = false;
@@ -367,6 +389,9 @@ struct Theme
     ListTokens list;
     DragTokens drag;
     FieldTokens field;
+    TabTokens tabs;      // (since 0.1)
+    TableTokens table;   // (since 0.1)
+    PickerTokens picker; // (since 0.1)
 
     static Theme Light();
     static Theme Dark();

@@ -217,6 +217,7 @@ OverlayTokens MixOverlay(const OverlayTokens& a, const OverlayTokens& b, float t
     out.drawerWidth = Lerp(a.drawerWidth, b.drawerWidth, t);
     out.drawerHeight = Lerp(a.drawerHeight, b.drawerHeight, t);
     out.commandPaletteWidth = Lerp(a.commandPaletteWidth, b.commandPaletteWidth, t);
+    out.menuShortcutGap = Lerp(a.menuShortcutGap, b.menuShortcutGap, t);
     return out;
 }
 
@@ -276,6 +277,30 @@ FieldTokens MixField(const FieldTokens& a, const FieldTokens& b, float t)
     FieldTokens out;
     out.padding = Lerp(a.padding, b.padding, t);
     out.caretWidth = Lerp(a.caretWidth, b.caretWidth, t);
+    return out;
+}
+
+TabTokens MixTabs(const TabTokens& a, const TabTokens& b, float t)
+{
+    TabTokens out;
+    out.minWidth = Lerp(a.minWidth, b.minWidth, t);
+    out.maxWidth = Lerp(a.maxWidth, b.maxWidth, t);
+    return out;
+}
+
+TableTokens MixTable(const TableTokens& a, const TableTokens& b, float t)
+{
+    TableTokens out;
+    out.headerHeight = Lerp(a.headerHeight, b.headerHeight, t);
+    out.minColumnWidth = Lerp(a.minColumnWidth, b.minColumnWidth, t);
+    out.resizeBand = Lerp(a.resizeBand, b.resizeBand, t);
+    return out;
+}
+
+PickerTokens MixPicker(const PickerTokens& a, const PickerTokens& b, float t)
+{
+    PickerTokens out;
+    out.dayCell = Lerp(a.dayCell, b.dayCell, t);
     return out;
 }
 
@@ -679,6 +704,9 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.list = MixList(a.list, b.list, t);
     out.drag = MixDrag(a.drag, b.drag, t);
     out.field = MixField(a.field, b.field, t);
+    out.tabs = MixTabs(a.tabs, b.tabs, t);
+    out.table = MixTable(a.table, b.table, t);
+    out.picker = MixPicker(a.picker, b.picker, t);
     return out;
 }
 

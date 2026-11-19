@@ -33,8 +33,8 @@ bool SameColors(const facet::Colors& a, const facet::Colors& b)
 }
 
 // Every length and time token of the groups for popups, containers, scrolling, lists, drag and
-// drop and text fields, the control sizes in Metrics and the popup motion, as pointers into a
-// theme, so one loop checks them all.
+// drop, text fields, tabs, tables and pickers, the control sizes in Metrics and the popup motion,
+// as pointers into a theme, so one loop checks them all.
 std::vector<float*> AddedFloatTokens(facet::Theme& t)
 {
     facet::OverlayTokens& o = t.overlay;
@@ -45,7 +45,9 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
     facet::Metrics& m = t.metrics;
     return {&o.anchorGap, &o.viewportMargin, &o.menuMinWidth, &o.submenuDelay, &o.tooltipDelay, &o.tooltipGrace,
             &o.tooltipMaxWidth, &o.toastDuration, &o.toastWidth, &o.toastStackGap, &o.toastMargin, &o.modalWidth,
-            &o.drawerWidth, &o.drawerHeight, &o.commandPaletteWidth,
+            &o.drawerWidth, &o.drawerHeight, &o.commandPaletteWidth, &o.menuShortcutGap,
+            &t.tabs.minWidth, &t.tabs.maxWidth, &t.table.headerHeight, &t.table.minColumnWidth, &t.table.resizeBand,
+            &t.picker.dayCell,
             &c.shellSize.x, &c.shellSize.y, &c.shellMinSize.x, &c.shellMinSize.y, &c.titleBarHeight,
             &c.resizeBorder, &c.sidebarWidth, &c.railWidth, &c.inspectorWidth, &c.inspectorMinWidth,
             &s.barThickness, &s.barThicknessHover, &s.barInset, &s.minThumbLength, &s.barHideDelay,
