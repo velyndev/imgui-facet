@@ -88,6 +88,20 @@ std::string Describe(const Target& target)
     return buffer;
 }
 
+// Clipboard hooks of a run: the text lives in the std::string the platform io points to.
+const char* GetRunClipboard(ImGuiContext*)
+{
+    const auto* text = static_cast<const std::string*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);
+    return text != nullptr ? text->c_str() : "";
+}
+
+void SetRunClipboard(ImGuiContext*, const char* value)
+{
+    auto* text = static_cast<std::string*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);
+    if (text != nullptr)
+        *text = value != nullptr ? value : "";
+}
+
 class PageRun
 {
 public:
@@ -98,7 +112,23 @@ public:
         gallery.dark = dark;
         gallery.baseScale = scale;
         ctx.probes = &probes;
+        // The run's own clipboard: copy and paste in a script never touch the system clipboard.
+        ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+        platform.Platform_ClipboardUserData = &clipboard;
+        platform.Platform_GetClipboardTextFn = &GetRunClipboard;
+        platform.Platform_SetClipboardTextFn = &SetRunClipboard;
     }
+
+    ~PageRun()
+    {
+        ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+        platform.Platform_GetClipboardTextFn = nullptr;
+        platform.Platform_SetClipboardTextFn = nullptr;
+        platform.Platform_ClipboardUserData = nullptr;
+    }
+
+    PageRun(const PageRun&) = delete;
+    PageRun& operator=(const PageRun&) = delete;
 
     void Frame()
     {
@@ -126,26 +156,60 @@ public:
             return true;
 
         case SelftestScript::StepKind::Click:
+        case SelftestScript::StepKind::DoubleClick:
         {
+            const bool twice = step.kind == SelftestScript::StepKind::DoubleClick;
+            const char* verb = twice ? "double click '" : "click '";
             const ProbeRecord* probe = probes.Find(step.text);
             if (probe == nullptr)
-                return Report(false, "click '" + step.text + "': probe not found");
+                return Report(false, verb + step.text + "': probe not found");
             if (!probe->visible)
             {
                 probes.RequestReveal(step.text);
                 Frames(kRevealFrames);
                 probe = probes.Find(step.text);
                 if (probe == nullptr || !probe->visible)
-                    return Report(false, "click '" + step.text + "': item cannot be scrolled into view");
+                    return Report(false, verb + step.text + "': item cannot be scrolled into view");
             }
             const ImVec2 center((probe->min.x + probe->max.x) * 0.5f, (probe->min.y + probe->max.y) * 0.5f);
             io.AddMousePosEvent(center.x, center.y);
             Frame();
-            io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+            io.AddMouseButtonEvent(step.button, true);
             Frame();
-            io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-            Frames(2);
+            io.AddMouseButtonEvent(step.button, false);
+            Frame();
+            if (twice)
+            {
+                // Two frames from the first press: far inside io.MouseDoubleClickTime.
+                io.AddMouseButtonEvent(step.button, true);
+                Frame();
+                io.AddMouseButtonEvent(step.button, false);
+                Frame();
+            }
+            Frame();
             return true;
+        }
+
+        case SelftestScript::StepKind::SetClipboard:
+            clipboard = step.text;
+            return true;
+
+        case SelftestScript::StepKind::ExpectClipboard:
+        {
+            const bool ok = clipboard == step.expectedText;
+            return Report(ok, ok ? step.text : step.text + " (found \"" + clipboard + "\")");
+        }
+
+        case SelftestScript::StepKind::ExpectNotVisible:
+        {
+            const ProbeRecord* probe = probes.Find(step.text);
+            std::string description = "'" + step.text + "' is not visible";
+            if (probe == nullptr && !probes.SeenInRun(step.text))
+                return Report(false, description + " (probe never recorded in this run)");
+            const bool hidden = probe == nullptr || !probe->visible;
+            if (probe == nullptr)
+                description += " (not submitted in the latest frame)";
+            return Report(hidden, description);
         }
 
         case SelftestScript::StepKind::KeyPress:
@@ -374,6 +438,8 @@ private:
             Frame();
         }
         io.AddMousePosEvent(points.back().x, points.back().y);
+        if (step.hold > 0.0f)
+            Frames(FramesFor(step.hold));  // the button stays down, the mouse rests on the target
         io.AddMouseButtonEvent(step.button, false);
         Frames(2);
         return true;
@@ -396,6 +462,7 @@ private:
     GalleryState gallery;
     PageCtx ctx;
     ProbeTable probes;
+    std::string clipboard;  // the run's own clipboard, read and written by Dear ImGui
 };
 
 } // namespace
@@ -421,6 +488,8 @@ void ProbeTable::RecordLastItem(std::string_view name)
     // The clip rect in effect for the item: the window's visible area, narrowed by a clip rect
     // the code around the item pushed (a table column, a list region under a pinned header).
     record.visible = ImGui::GetCurrentWindowRead()->ClipRect.Contains(center);
+    if (!SeenInRun(name))
+        seen.emplace_back(name);
     for (auto& entry : entries)
     {
         if (entry.first == name)
@@ -430,6 +499,11 @@ void ProbeTable::RecordLastItem(std::string_view name)
         }
     }
     entries.emplace_back(std::string(name), record);
+}
+
+bool ProbeTable::SeenInRun(std::string_view name) const
+{
+    return std::find(seen.begin(), seen.end(), name) != seen.end();
 }
 
 const char* ProbeTable::NameOf(ImGuiID id) const
@@ -462,11 +536,21 @@ void SelftestScript::Do(std::function<void()> action)
     steps.push_back(std::move(step));
 }
 
-void SelftestScript::Click(std::string_view probe)
+void SelftestScript::Click(std::string_view probe, ImGuiMouseButton button)
 {
     Step step;
     step.kind = StepKind::Click;
     step.text = probe;
+    step.button = button;
+    steps.push_back(std::move(step));
+}
+
+void SelftestScript::DoubleClick(std::string_view probe, ImGuiMouseButton button)
+{
+    Step step;
+    step.kind = StepKind::DoubleClick;
+    step.text = probe;
+    step.button = button;
     steps.push_back(std::move(step));
 }
 
@@ -575,6 +659,17 @@ void SelftestScript::Drag(std::vector<Target> path, float seconds, ImGuiMouseBut
     steps.push_back(std::move(step));
 }
 
+void SelftestScript::DragAndHold(std::vector<Target> path, float seconds, float holdSeconds, ImGuiMouseButton button)
+{
+    Step step;
+    step.kind = StepKind::Drag;
+    step.path = std::move(path);
+    step.seconds = seconds;
+    step.hold = std::max(holdSeconds, 0.0f);
+    step.button = button;
+    steps.push_back(std::move(step));
+}
+
 void SelftestScript::Wheel(const Target& target, float wheelY, float wheelX)
 {
     Step step;
@@ -647,6 +742,31 @@ void SelftestScript::ExpectVisible(std::string_view probe)
     Step step;
     step.kind = StepKind::ExpectVisible;
     step.text = probe;
+    steps.push_back(std::move(step));
+}
+
+void SelftestScript::ExpectNotVisible(std::string_view probe)
+{
+    Step step;
+    step.kind = StepKind::ExpectNotVisible;
+    step.text = probe;
+    steps.push_back(std::move(step));
+}
+
+void SelftestScript::SetClipboard(std::string_view text)
+{
+    Step step;
+    step.kind = StepKind::SetClipboard;
+    step.text = text;
+    steps.push_back(std::move(step));
+}
+
+void SelftestScript::ExpectClipboard(std::string_view description, std::string_view expected)
+{
+    Step step;
+    step.kind = StepKind::ExpectClipboard;
+    step.text = description;
+    step.expectedText = expected;
     steps.push_back(std::move(step));
 }
 

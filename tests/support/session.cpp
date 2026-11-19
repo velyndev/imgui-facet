@@ -50,6 +50,11 @@ Session::Session(const SessionOptions& sessionOptions) : options(sessionOptions)
     // No platform backend: the only input is what a test queues.
     io.AddFocusEvent(true);
     io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+    // The session's own clipboard instead of the system one.
+    ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+    platform.Platform_ClipboardUserData = this;
+    platform.Platform_GetClipboardTextFn = &Session::GetClipboardText;
+    platform.Platform_SetClipboardTextFn = &Session::SetClipboardText;
 
     ready = SUCCEEDED(hr) && device != nullptr;
     if (ready && options.initFacet)
@@ -142,29 +147,51 @@ void Session::ApplyTextureRequests()
     }
 }
 
+const char* Session::GetClipboardText(ImGuiContext*)
+{
+    const auto* session = static_cast<const Session*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);
+    return session != nullptr ? session->clipboard.c_str() : "";
+}
+
+void Session::SetClipboardText(ImGuiContext*, const char* text)
+{
+    auto* session = static_cast<Session*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);
+    if (session != nullptr)
+        session->clipboard = text != nullptr ? text : "";
+}
+
 void Session::Track(std::string_view name)
 {
-    const ImRect rect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    const ImGuiID id = ImGui::GetItemID();
-    for (auto& entry : tracked)
+    TrackedItem item;
+    item.name = name;
+    item.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    item.id = ImGui::GetItemID();
+    item.visible = ImGui::GetCurrentWindowRead()->ClipRect.Contains(item.rect.GetCenter());
+    for (TrackedItem& entry : tracked)
     {
-        if (entry.first == name)
+        if (entry.name == name)
         {
-            entry.second = {id, rect};
+            entry = std::move(item);
             return;
         }
     }
-    tracked.emplace_back(std::string(name), std::make_pair(id, rect));
+    tracked.push_back(std::move(item));
+}
+
+const Session::TrackedItem* Session::FindTracked(std::string_view name) const
+{
+    for (const TrackedItem& entry : tracked)
+    {
+        if (entry.name == name)
+            return &entry;
+    }
+    return nullptr;
 }
 
 ImRect Session::ItemRect(std::string_view name) const
 {
-    for (const auto& entry : tracked)
-    {
-        if (entry.first == name)
-            return entry.second.second;
-    }
-    return ImRect();
+    const TrackedItem* item = FindTracked(name);
+    return item != nullptr ? item->rect : ImRect();
 }
 
 ImVec2 Session::ItemCenter(std::string_view name) const
@@ -174,12 +201,14 @@ ImVec2 Session::ItemCenter(std::string_view name) const
 
 ImGuiID Session::ItemId(std::string_view name) const
 {
-    for (const auto& entry : tracked)
-    {
-        if (entry.first == name)
-            return entry.second.first;
-    }
-    return 0;
+    const TrackedItem* item = FindTracked(name);
+    return item != nullptr ? item->id : 0;
+}
+
+bool Session::ItemVisible(std::string_view name) const
+{
+    const TrackedItem* item = FindTracked(name);
+    return item != nullptr && item->visible;
 }
 
 void Session::MouseMove(ImVec2 pos)
@@ -208,7 +237,23 @@ void Session::Click(ImVec2 pos, ImGuiMouseButton button)
     Frame();
 }
 
+void Session::DoubleClick(ImVec2 pos, ImGuiMouseButton button)
+{
+    MouseMove(pos);
+    MouseDown(button);
+    MouseUp(button);
+    MouseDown(button);  // two frames after the first press
+    MouseUp(button);
+    Frame();
+}
+
 void Session::Drag(const std::vector<ImVec2>& path, int framesPerSegment, ImGuiMouseButton button)
+{
+    DragAndHold(path, framesPerSegment, 0, button);
+}
+
+void Session::DragAndHold(const std::vector<ImVec2>& path, int framesPerSegment, int holdFrames,
+                          ImGuiMouseButton button)
 {
     if (path.empty())
         return;
@@ -225,6 +270,7 @@ void Session::Drag(const std::vector<ImVec2>& path, int framesPerSegment, ImGuiM
             MouseMove(ImVec2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
         }
     }
+    Frames(std::max(0, holdFrames));  // the button stays down, the mouse rests at the last point
     MouseUp(button);
     Frame();
 }

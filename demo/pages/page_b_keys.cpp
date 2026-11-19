@@ -574,4 +574,37 @@ FACET_DEMO_SELFTEST("keys")
         page.hold.whileTextInput = false;
         ResetShortcuts();
     });
+
+    // A right click and the Menu key reach a listening capture that accepts mouse buttons.
+    test.Click("keys.allowMouse");
+    test.Click("keys.capture");
+    test.Click("keys.capture", ImGuiMouseButton_Right);
+    test.ExpectText("a right click is captured", [] { return ChordText(page.captured); }, "Mouse Right");
+    test.Click("keys.capture");
+    test.KeyPress(ImGuiKey_Menu);
+    test.ExpectText("the Menu key is captured", [] { return ChordText(page.captured); }, "Menu");
+    test.Click("keys.allowMouse");
+
+    // Text editing in the stock field: typed text (character input, no IME), Shift+Left
+    // selection, copy and paste through the run's own clipboard, and a double click that
+    // selects a word (the field's middle lies on or after the last word at every size).
+    test.Do([] { page.text[0] = '\0'; });
+    test.Click("keys.text");
+    test.Type("hello world");
+    test.ExpectText("the typed text arrives", [] { return std::string(page.text); }, "hello world");
+    for (int i = 0; i < 5; ++i)
+        test.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    test.ExpectClipboard("Shift+Left five times and Ctrl+C copy the last word", "world");
+    test.KeyPress(ImGuiKey_End);
+    test.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    test.ExpectText("Ctrl+V pastes it at the end", [] { return std::string(page.text); }, "hello worldworld");
+    test.DoubleClick("keys.text");
+    test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    test.ExpectClipboard("a double click selects the word under the pointer", "worldworld");
+    test.SetClipboard("again");
+    test.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    test.ExpectText("pasting replaces the selected word", [] { return std::string(page.text); }, "hello again");
+    test.KeyPress(ImGuiKey_Escape);
+    test.Do([] { page.text[0] = '\0'; });
 }

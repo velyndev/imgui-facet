@@ -544,6 +544,7 @@ FACET_DEMO_SELFTEST("tokens")
     // holding Down walks to the last one, and Enter opens it.
     test.SelectPage("composites");
     test.ExpectVisible("nav.composites");
+    test.ExpectNotVisible("nav.tokens");  // the top of the list is scrolled out of view
     test.Click("nav.tokens");
     test.ExpectPage("tokens");
     test.HoldKey(ImGuiKey_DownArrow, 3.0f);

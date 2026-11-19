@@ -14,6 +14,8 @@
 //     texture request as done after each frame, so fonts and atlases work without a backend;
 //   - the main viewport size and the circle tessellation tables, which a frame would set up,
 //     so draw lists can also be recorded outside a frame;
+//   - a clipboard of its own (Clipboard, SetClipboard), empty at the start, so copy and paste
+//     in a test never read or change the system clipboard;
 //   - facet::Init with the device (unless options.initFacet is false; then call InitFacet).
 // The destructor runs facet::Shutdown and destroys the context. One Session at a time.
 //
@@ -99,18 +101,34 @@ public:
     ImVec2 ItemCenter(std::string_view name) const;
     // The id of a tracked item in the latest frame, 0 when it was not tracked.
     ImGuiID ItemId(std::string_view name) const;
+    // Whether the center of a tracked item lay in the visible part of its window (the clip rect
+    // it was submitted with) in the latest frame; false when it was not tracked.
+    bool ItemVisible(std::string_view name) const;
+
+    // --- Clipboard ------------------------------------------------------------------------
+    // The session's own clipboard, which Dear ImGui reads and writes (Ctrl+C, Ctrl+V).
+    const std::string& Clipboard() const { return clipboard; }
+    void SetClipboard(std::string_view text) { clipboard = text; }
 
     // --- Mouse ----------------------------------------------------------------------------
     // Each call queues events and renders frames, so the next query sees the result.
     void MouseMove(ImVec2 pos);                        // one frame
     void MouseDown(ImGuiMouseButton button = ImGuiMouseButton_Left);  // one frame
     void MouseUp(ImGuiMouseButton button = ImGuiMouseButton_Left);    // one frame
-    // Move, press, release: three frames, then one more so the result is drawn.
+    // Move, press, release: three frames, then one more so the result is drawn. A right click is
+    // Click(pos, ImGuiMouseButton_Right).
     void Click(ImVec2 pos, ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Click, then a second press and release at the same place right after it, well within
+    // io.MouseDoubleClickTime, so Dear ImGui counts a double click.
+    void DoubleClick(ImVec2 pos, ImGuiMouseButton button = ImGuiMouseButton_Left);
     // Presses at path[0], moves through every point of the path, releases at the last one.
     // `framesPerSegment` frames per straight segment, positions interpolated linearly.
     void Drag(const std::vector<ImVec2>& path, int framesPerSegment = 4,
               ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Drag, but the button stays down with the mouse still at the last point for `holdFrames`
+    // frames before the release: a drag resting on a target.
+    void DragAndHold(const std::vector<ImVec2>& path, int framesPerSegment, int holdFrames,
+                     ImGuiMouseButton button = ImGuiMouseButton_Left);
     // Moves to pos, then turns the wheel (positive: up / left) for one frame.
     void Wheel(ImVec2 pos, float wheelY, float wheelX = 0.0f);
 
@@ -122,18 +140,30 @@ public:
     void KeyPress(ImGuiKeyChord chord);
     // Holds the chord for `seconds` of frame time (key repeat runs), then releases it.
     void HoldKey(ImGuiKeyChord chord, float seconds);
-    // UTF-8 text as character input, one frame.
+    // UTF-8 text as character input (no IME composition), one frame.
     void Type(const char* text);
 
 private:
+    struct TrackedItem
+    {
+        std::string name;
+        ImGuiID id = 0;
+        ImRect rect;
+        bool visible = false;
+    };
+
     void ApplyTextureRequests();
+    const TrackedItem* FindTracked(std::string_view name) const;
+    static const char* GetClipboardText(ImGuiContext* context);
+    static void SetClipboardText(ImGuiContext* context, const char* text);
 
     SessionOptions options;
     Microsoft::WRL::ComPtr<ID3D11Device> device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
     ImGuiContext* imgui = nullptr;
     std::function<void()> ui;
-    std::vector<std::pair<std::string, std::pair<ImGuiID, ImRect>>> tracked;
+    std::vector<TrackedItem> tracked;
+    std::string clipboard;
     ImTextureID nextTextureId = 1;
     int frames = 0;
     bool facetStarted = false;

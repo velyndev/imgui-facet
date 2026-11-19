@@ -206,9 +206,12 @@ facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|b
 
 Runs the input scripts that pages register, followed by checks, offscreen at the given size and
 scale (defaults `1280x800`, scale 1) in the given theme (default dark; `both` runs every script
-once per theme). Scripts click, press and release the mouse apart, drag along a path (also out
-of the window), turn the wheel, press and hold keys with modifiers, rest the mouse on an item,
-type text, and check values with a tolerance, text, focus and visibility. Durations are counted
+once per theme). Scripts click with any mouse button, double click, press and release the mouse
+apart, drag along a path (also out of the window) and hold a drag still at its end, turn the
+wheel, press and hold keys with modifiers (the Menu key included), rest the mouse on an item,
+type text, copy and paste through a clipboard of the run's own (the system clipboard is never
+touched), and check values with a tolerance, text, the clipboard, focus, and whether an item is
+or is not in the visible part of its window. Durations are counted
 in frames of the fixed 1/60 s time step, so a run does not depend on the speed of the machine.
 A scripted click on a control outside the visible part of its window scrolls it into view
 first. It prints a `PASS` or `FAIL` line per check, naming the page and theme, and exits with 1

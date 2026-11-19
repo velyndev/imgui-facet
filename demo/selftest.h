@@ -33,12 +33,24 @@
 //     test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);                 // modifiers: Ctrl, Shift, Alt
 //     test.HoldKey(ImGuiKey_RightArrow, 1.0f);                   // key repeat runs for 1 s
 //     test.Hover(T::Item("button"), 0.6f);                       // rest the mouse for 0.6 s
-//     test.Type("hello");                                        // UTF-8 text input
+//     test.Type("hello");                                        // UTF-8 text input, without IME
+//     test.Click("list", ImGuiMouseButton_Right);                // a right click
+//     test.DoubleClick("field");                                 // two clicks within the double click time
+//     test.KeyPress(ImGuiKey_Menu);                              // the Menu key (also Shift+F10)
+//     test.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Shift);        // extends a text selection
+//     test.SetClipboard("pasted");                               // the run's own clipboard
+//     test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+//     test.ExpectClipboard("Ctrl+C copied the word", "hello");
+//     test.DragAndHold({T::Item("row.2"), T::Item("row.0")}, 0.3f, 0.7f);  // rests 0.7 s on the target
 //     test.ExpectNear("value is about 0.3", [] { return value; }, 0.3, 0.05);
 //     test.ExpectText("the field holds hi", [] { return std::string(text); }, "hi");
 //     test.ExpectVisible("nav.composites");                      // scrolled into view
+//     test.ExpectNotVisible("nav.tokens");                       // scrolled out of view
 //     test.SelectPage("composites");                             // as --page would
 //     test.ExpectPage("composites");                             // the page shown
+//
+// The clipboard: every run gets a clipboard of its own, empty at the start, so Ctrl+C and
+// Ctrl+V in a script never read or change the system clipboard.
 
 #include <functional>
 #include <string>
@@ -77,9 +89,13 @@ public:
     // Scrolls the item of this probe into the middle of its window when it is recorded
     // next, the way a person scrolls to a control before clicking it.
     void RequestReveal(std::string_view name) { pendingReveal = name; }
+    // True when a probe of this name was recorded in any frame of the run so far, also when the
+    // latest frame skipped it (a virtualized list submits only its visible rows).
+    bool SeenInRun(std::string_view name) const;
 
 private:
     std::vector<std::pair<std::string, ProbeRecord>> entries;
+    std::vector<std::string> seen;  // every name recorded in the run; Clear keeps it
     std::string pendingReveal;
 };
 
@@ -120,6 +136,10 @@ public:
         Reveal,
         SelectPage,
         ExpectPage,
+        DoubleClick,
+        SetClipboard,
+        ExpectClipboard,
+        ExpectNotVisible,
     };
 
     struct Step
@@ -129,13 +149,14 @@ public:
         ImGuiKeyChord chord = 0;     // key steps: key plus optional ImGuiMod_* flags
         int frames = 0;              // Wait
         float seconds = 0.0f;        // Drag, KeyHold, MouseMove (Hover)
+        float hold = 0.0f;           // Drag: seconds the button stays down at the last point
         bool down = false;           // MouseButton, KeyChange
-        ImGuiMouseButton button = ImGuiMouseButton_Left;
+        ImGuiMouseButton button = ImGuiMouseButton_Left;  // Click, DoubleClick, MouseButton, Drag
         std::vector<Target> path;    // mouse steps: one point, or the drag path
         ImVec2 wheel = ImVec2(0.0f, 0.0f);
         double expected = 0.0;       // ExpectNear
         double tolerance = 0.0;
-        std::string expectedText;    // ExpectText
+        std::string expectedText;    // ExpectText, ExpectClipboard
         std::function<void()> action;
         std::function<bool()> check;
         std::function<double()> number;
@@ -144,9 +165,12 @@ public:
 
     // Runs arbitrary code between frames, typically to reset page state.
     void Do(std::function<void()> action);
-    // Moves the mouse to the center of the probed item, presses and releases the left button.
-    // An item outside the visible area of its window is scrolled into view first.
-    void Click(std::string_view probe);
+    // Moves the mouse to the center of the probed item, presses and releases `button`. An item
+    // outside the visible area of its window is scrolled into view first.
+    void Click(std::string_view probe, ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Like Click, then presses and releases `button` a second time at the same place one frame
+    // later, well within io.MouseDoubleClickTime, so Dear ImGui counts a double click.
+    void DoubleClick(std::string_view probe, ImGuiMouseButton button = ImGuiMouseButton_Left);
     // Presses and releases a key, with modifiers when given (ImGuiKey_Tab | ImGuiMod_Shift).
     void KeyPress(ImGuiKeyChord chord);
     // Renders this many extra frames.
@@ -170,6 +194,11 @@ public:
     // over `seconds` (at least one frame per segment), and releases at the last point. Every
     // point is resolved when the drag starts; only the first one is scrolled into view.
     void Drag(std::vector<Target> path, float seconds = 0.25f, ImGuiMouseButton button = ImGuiMouseButton_Left);
+    // Drag, but the button stays down with the mouse still at the last point for `holdSeconds`
+    // of frame time before it is released: a drag that rests over a target (spring-loaded
+    // folders, a list scrolling while the drag sits at its edge).
+    void DragAndHold(std::vector<Target> path, float seconds, float holdSeconds,
+                     ImGuiMouseButton button = ImGuiMouseButton_Left);
     // Moves to the target, then turns the wheel by (wheelX, wheelY) notches in one frame;
     // positive wheelY scrolls up.
     void Wheel(const Target& target, float wheelY, float wheelX = 0.0f);
@@ -189,6 +218,15 @@ public:
     void ExpectText(std::string_view description, std::function<std::string()> value, std::string_view expected);
     // Records PASS when the center of the probed item lies in the visible part of its window.
     void ExpectVisible(std::string_view probe);
+    // Records PASS when the probed item is outside the visible part of its window: its center
+    // lies outside the clip rect, or it was skipped in the latest frame although it was recorded
+    // earlier in the run (a virtualized list no longer submits it). A name never recorded in the
+    // run fails, so a mistyped probe cannot pass.
+    void ExpectNotVisible(std::string_view probe);
+    // Replaces the text of the run's own clipboard (see the top of this file).
+    void SetClipboard(std::string_view text);
+    // Records PASS when the run's clipboard holds `expected`; the result line shows the text found.
+    void ExpectClipboard(std::string_view description, std::string_view expected);
     // Scrolls the probed item into the middle of its window, as a person scrolls to look at
     // it, so a following ExpectVisible checks that it is drawn at all in a small viewport.
     // Records FAIL only when the probe is missing.

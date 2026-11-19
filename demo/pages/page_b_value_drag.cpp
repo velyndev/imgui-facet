@@ -235,4 +235,11 @@ FACET_DEMO_SELFTEST("value-drag")
     test.ExpectNear("read-only keeps its value", [] { return page.values[kReadOnly]; }, 0.7, 0.0);
     test.Drag({T::Item("drag.disabled.track", 0.3f), T::Item("drag.disabled.track", 0.9f)});
     test.ExpectNear("disabled keeps its value", [] { return page.values[kDisabled]; }, 0.3, 0.0);
+
+    // A drag that rests on its target for half a second before the release: the value stays
+    // where the drag stopped, and the whole drag is one edit session.
+    test.Do([] { Reset(); });
+    test.DragAndHold({T::Item("drag.linear.track", 0.5f), T::Item("drag.linear.track", 0.3f)}, 0.25f, 0.5f);
+    test.ExpectNear("a drag held on its target ends there", [] { return page.values[kLinear]; }, 0.3, 0.01);
+    test.ExpectNear("as one committed session", [] { return page.commits[kLinear]; }, 1.0, 0.0);
 }
