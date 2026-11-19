@@ -40,6 +40,9 @@ enum class FontWeight
 };
 inline constexpr int kFontWeightCount = 3;
 
+// Colors in one cycle of the chart palette (Colors::chart).
+inline constexpr int kChartPaletteSize = 8;
+
 // Semantic colors. Each name says where the color is used, not what it looks like.
 struct Colors
 {
@@ -88,11 +91,27 @@ struct Colors
     ImVec4 success;
     ImVec4 warning;
 
+    // The keyboard focus ring: the accent hue with its lightness moved until it reaches 3:1
+    // (WCAG non-text contrast) on bg, bgSecondary, bgTertiary, bgElevated and every
+    // bgElevatedLevels surface. Accent marks that must stay visible on any surface without
+    // being text (drop indicators) use it too.
     ImVec4 focusRing;
 
     ImVec4 shadow;     // shadow color; its strength comes from the Elevation tokens
     ImVec4 glassTint;  // tint of blurred panels; its strength comes from Glass::tintOpacity
     ImVec4 scrim;      // dims the content behind modal layers
+
+    // Series colors of charts, legends and other indexed data (docs/api-conventions.md rule 10):
+    // the hues step around the OKLCH circle from the accent hue, neighbours far apart, and each
+    // color reaches 3:1 on every surface listed for focusRing. Theme::ApplyAccent derives them.
+    // Data index i takes chart[i % kChartPaletteSize]; later cycles repeat the hues at another
+    // lightness.
+    ImVec4 chart[kChartPaletteSize];
+
+    // Thumbs of the overlay scrollbars, at rest and while hovered or dragged. Both reach 3:1 on
+    // every surface, so the scroll position can be seen on any of them.
+    ImVec4 scrollThumb;
+    ImVec4 scrollThumbHover;
 
     // The surface of elevation level 1 to 3; the level is clamped into that range.
     const ImVec4& ElevatedSurface(int level) const
@@ -148,6 +167,19 @@ struct Metrics
     float focusRingWidth = 3.0f;
     float hairline = 1.0f;       // rendered as at least one physical pixel
     float minHitTarget = 24.0f;  // smallest clickable area, even for smaller visuals
+
+    // Default sizes of larger controls, used when a widget's options leave the size at 0.
+    float faderLength = 140.0f;       // vertical sliders and faders
+    float dialSweep = 270.0f;         // degrees of a knob's or arc slider's arc, open at the bottom
+    float padSize = 192.0f;           // side of two-dimensional pads (XYPad, BoxRangePad, JoystickPad)
+    float pickerWidth = 256.0f;       // inline color picker and saturation square
+    float numberFieldWidth = 72.0f;   // the number field beside a slider (SliderWithInput, RangeInput)
+    float histogramHeight = 40.0f;    // bar area of RangeSliderHistogram
+    float chartHeight = 160.0f;       // charts and curve, easing and envelope editors
+    float panelHeight = 192.0f;       // code, log and table views and the file browser
+    float cardWidth = 256.0f;         // option cards and other cards of a fixed width
+    float thumbnailSize = 128.0f;     // thumbnails and media cards
+    float slotSize = 64.0f;           // inventory slots
 };
 
 struct TextStyleSpec
@@ -191,6 +223,12 @@ struct Motion
     // Periods of the looping loading indicators (also multiplied by `scale`).
     float shimmerPeriod = 1.4f;  // one sweep of the skeleton highlight
     float spinnerPeriod = 1.0f;  // one turn of the spinner arc
+
+    // Popups, menus and dialogs (also multiplied by `scale`): they fade in while growing from
+    // popupScaleFrom of their size toward the anchor side, and fade out faster than they came.
+    float popupOpen = 0.15f;
+    float popupClose = 0.10f;
+    float popupScaleFrom = 0.96f;
 };
 
 // One soft shadow; lengths in design units.
@@ -234,6 +272,83 @@ struct LayoutTokens
     float minRowControl = 128.0f;  // narrowest control kept beside its label; narrower rows stack
 };
 
+// Floating layers: popups, menus, tooltips, toasts, dialogs and drawers. Lengths in design units,
+// times in seconds (times are multiplied by motion.scale like every duration).
+struct OverlayTokens
+{
+    float anchorGap = 4.0f;          // between a popup and the rectangle it is anchored to
+    float viewportMargin = 8.0f;     // a popup is moved or flipped to keep this far from the display edges
+    float menuMinWidth = 180.0f;     // narrowest menu and context menu
+    float submenuDelay = 0.2f;       // pointer rest on a menu row before its submenu opens
+    float tooltipDelay = 0.5f;       // pointer rest on an item before its first tooltip shows
+    float tooltipGrace = 0.4f;       // after a tooltip hides, the next one shows at once within this time
+    float tooltipMaxWidth = 280.0f;  // tooltip text wraps here
+    float toastDuration = 5.0f;      // a toast stays this long unless hovered
+    float toastWidth = 320.0f;
+    float toastStackGap = 8.0f;      // between stacked toasts
+    float toastMargin = 16.0f;       // between the toast stack and the display corner
+    int toastMaxCount = 3;           // toasts shown at once; later ones wait in the queue
+    float modalWidth = 440.0f;       // modal and confirm dialogs
+    float drawerWidth = 320.0f;      // drawers that slide in from the start or end edge
+    float drawerHeight = 280.0f;     // drawers that slide in from the top or bottom edge
+    float commandPaletteWidth = 560.0f;
+};
+
+// Desktop surfaces: the floating shell, the app frame, sidebars and side panes. Design units.
+struct ContainerTokens
+{
+    ImVec2 shellSize = {420.0f, 520.0f};     // first size of a shell, until a saved size exists
+    ImVec2 shellMinSize = {280.0f, 160.0f};  // smallest shell: the title bar and one control row fit
+    float titleBarHeight = 40.0f;            // shell and app frame title bars
+    float resizeBorder = 6.0f;               // band along the edges that resizes a shell or app frame
+    float sidebarWidth = 220.0f;             // an expanded sidebar
+    float railWidth = 52.0f;                 // a sidebar collapsed to its icon rail
+    float inspectorWidth = 280.0f;           // first width of an inspector pane
+    float inspectorMinWidth = 200.0f;        // narrowest inspector pane
+};
+
+// Overlay scrollbars, smooth scrolling and edge fades (the scroll core). Lengths in design units,
+// times in seconds.
+struct ScrollTokens
+{
+    float barThickness = 6.0f;         // thumb width while the pointer is elsewhere
+    float barThicknessHover = 10.0f;   // thumb width while the pointer is over the bar or drags it
+    float barInset = 2.0f;             // between the thumb and the edge of the area
+    float minThumbLength = 24.0f;      // a long content still gets a thumb that can be grabbed
+    float barHideDelay = 1.0f;         // an idle bar fades out after this time
+    float wheelDistance = 64.0f;       // scrolled per wheel notch, eased over motion.durationStandard
+    float edgeFade = 16.0f;            // length of the fade where content continues past an edge
+};
+
+// Rows of lists, trees and tables (the list and selection core). Lengths in design units.
+struct ListTokens
+{
+    float rowHeightSmall = 24.0f;      // rows of ControlSize::Small lists
+    float rowHeight = 32.0f;           // rows of ControlSize::Regular lists
+    float rowHeightLarge = 40.0f;      // rows of ControlSize::Large lists
+    float indent = 16.0f;              // per tree level
+    int popupRows = 8;                 // visible rows of a dropdown or completion list at most (maxVisibleRows 0)
+    int inlineRows = 6;                // visible rows of an inline list (visibleRows 0)
+    float typeaheadTimeout = 1.0f;     // seconds; a pause this long starts a new typeahead search
+};
+
+// Drag and drop (the drag and drop core). Lengths in design units, times in seconds.
+struct DragTokens
+{
+    float startThreshold = 4.0f;       // pointer travel before a press becomes a drag
+    float ghostOpacity = 0.7f;         // opacity of the drag preview
+    float autoScrollZone = 32.0f;      // band inside a scroll area's edge where a drag scrolls it
+    float autoScrollSpeed = 800.0f;    // units per second at the very edge, less further in
+    float hoverOpenDelay = 0.6f;       // a drag resting this long on a closed node, tab or group opens it
+};
+
+// Text fields (the text field core). Design units.
+struct FieldTokens
+{
+    float padding = 8.0f;              // between the field frame and its text, icon or buttons
+    float caretWidth = 1.5f;           // rounded to whole pixels, at least one
+};
+
 struct Theme
 {
     bool dark = false;
@@ -246,15 +361,22 @@ struct Theme
     Elevation elevation;
     Glass glass;
     LayoutTokens layout;
+    OverlayTokens overlay;
+    ContainerTokens containers;
+    ScrollTokens scroll;
+    ListTokens list;
+    DragTokens drag;
+    FieldTokens field;
 
     static Theme Light();
     static Theme Dark();
 
     // Sets colors.accent and derives accentHover, accentPressed, accentSubtle, onAccent,
-    // accentText and focusRing from it in OKLCH. onAccent is white or black, whichever is
-    // more readable, and hover and pressed move the lightness away from it, so text on
-    // every accent state reaches at least 4.5:1. accentText depends on the surface colors,
-    // so call this after changing them. The accent alpha is ignored.
+    // accentText, focusRing and the chart palette from it in OKLCH. onAccent is white or black,
+    // whichever is more readable, and hover and pressed move the lightness away from it, so
+    // text on every accent state reaches at least 4.5:1. accentText (4.5:1), focusRing and the
+    // chart colors (3:1) depend on the surface colors, so call this after changing them. The
+    // accent alpha is ignored.
     void ApplyAccent(const ImVec4& accent);
 };
 

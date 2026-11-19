@@ -13,9 +13,9 @@
 // The ring: a stroke of T().metrics.focusRingWidth just outside the control, one hairline away
 // from its edge, with corners concentric to the control's radius and of the control's corner
 // shape (RingShape: the theme's corners for rectangles, circular arcs for knobs and capsules),
-// plus a soft halo (the glow the dose rules allow for focus). Its color is colors.focusRing when
-// that reaches 3:1 against every content surface of the theme, otherwise colors.accentText, which
-// reaches 4.5:1 on all of them; so the ring stays visible for any accent in both themes. It
+// plus a soft halo (the glow the dose rules allow for focus). Its color is colors.focusRing, which
+// Theme::ApplyAccent derives to reach 3:1 against every surface of the theme, so the ring stays
+// visible for any accent in both themes. It
 // fades in and out with ItemState::focusAmount (motion.durationFast). It is drawn into the
 // item's window draw list with the window's clip rectangle, so a control scrolled partly out of
 // a child window has its ring cut at the same edge.

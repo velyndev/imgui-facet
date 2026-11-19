@@ -43,12 +43,23 @@ constexpr float kPressedLightnessStep = 0.08f;
 
 // WCAG AA contrast for normal text, the target of accentText.
 constexpr float kTextContrast = 4.5f;
-// Lightness step (OKLCH L) of the accentText search.
+// Lightness step (OKLCH L) of the accentText and focusRing searches.
 constexpr float kTextLightnessStep = 0.01f;
 
-// WCAG 2 non-text contrast for the boundary of a control, and the mix step of its search.
+// WCAG 2 non-text contrast for the boundary of a control, the focus ring and the chart colors,
+// and the mix step of the boundary search.
 constexpr float kBoundaryContrast = 3.0f;
 constexpr float kBoundaryMixStep = 0.05f;
+
+// Chart palette: the chroma of every series, the lightness each theme starts from, and the hue
+// offsets from the accent hue in degrees, ordered so that consecutive series differ by at least
+// 90 degrees and the first four split the circle into quarters.
+constexpr float kChartChroma = 0.14f;
+constexpr float kChartLightnessLight = 0.56f;
+constexpr float kChartLightnessDark = 0.72f;
+constexpr float kChartHueOffsets[kChartPaletteSize] = {0.0f, 180.0f, 90.0f, 270.0f, 45.0f, 225.0f, 135.0f, 315.0f};
+// Below this relative luminance of bg the surfaces count as dark: colors on them get lighter.
+constexpr float kDarkSurfaceLuminance = 0.18f;
 
 // Where Windows keeps the app mode (1 light, 0 dark).
 constexpr wchar_t kPersonalizeKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
@@ -70,23 +81,48 @@ float MinSurfaceContrast(const Colors& c, const ImVec4& text)
     return lowest;
 }
 
-// The accent with its lightness moved away from the surfaces (darker on light surfaces,
-// lighter on dark ones) in small steps until it is readable on all of them. Black and white
-// end the search, and one of them always reaches 4.5:1 on the preset surfaces.
-ImVec4 DeriveAccentText(const Colors& c, bool dark)
+// The color rounded to 8 bits per channel, as Dear ImGui draws it.
+ImVec4 AsDrawn(const ImVec4& color)
 {
-    const Oklch lch = ToOklch(c.accent);
-    const float direction = dark ? 1.0f : -1.0f;
+    return FromU32(ToU32(color));
+}
+
+// `color` (made opaque) with its lightness moved away from the surfaces (darker on light
+// surfaces, lighter on dark ones) in small steps until it reaches `contrast` on all of them. With `drawn`, each
+// candidate is rounded to 8 bits per channel first, so the contrast holds for the color exactly
+// as it is drawn. Black and white end the search, and one of them always reaches 4.5:1 on the
+// preset surfaces.
+ImVec4 MoveUntilContrast(const Colors& c, const ImVec4& color, bool darkSurfaces, float contrast, bool drawn)
+{
+    const Oklch lch = ToOklch(color);
+    const float direction = darkSurfaces ? 1.0f : -1.0f;
     for (int step = 0;; ++step)
     {
         const float L = lch.L + direction * kTextLightnessStep * static_cast<float>(step);
         if (L < 0.0f || L > 1.0f)
             break;
-        const ImVec4 candidate = FromOklch({L, lch.C, lch.h});
-        if (MinSurfaceContrast(c, candidate) >= kTextContrast)
+        // Step 0 is the color itself, so one that already reaches the contrast stays exact.
+        const ImVec4 exact = step == 0 ? WithAlpha(color, 1.0f) : FromOklch({L, lch.C, lch.h});
+        const ImVec4 candidate = drawn ? AsDrawn(exact) : exact;
+        if (MinSurfaceContrast(c, candidate) >= contrast)
             return candidate;
     }
-    return dark ? Rgb(0xFFFFFF) : Rgb(0x000000);
+    return darkSurfaces ? Rgb(0xFFFFFF) : Rgb(0x000000);
+}
+
+// The chart palette: kChartPaletteSize hues around the accent hue at one chroma, each starting
+// from the theme's series lightness and moved until it reaches 3:1 on every surface.
+void DeriveChartPalette(Colors& c)
+{
+    const bool darkSurfaces = RelativeLuminance(c.bg) < kDarkSurfaceLuminance;
+    const float accentHue = ToOklch(c.accent).h;
+    const float lightness = darkSurfaces ? kChartLightnessDark : kChartLightnessLight;
+    for (int i = 0; i < kChartPaletteSize; ++i)
+    {
+        const float hue = std::fmod(accentHue + kChartHueOffsets[i], 360.0f);
+        c.chart[i] = MoveUntilContrast(c, FromOklch({lightness, kChartChroma, hue}), darkSurfaces, kBoundaryContrast,
+                                       true);
+    }
 }
 
 void SetElevation(Elevation& elevation, float opacity1, float opacity2, float opacity3)
@@ -149,6 +185,97 @@ Colors MixColors(const Colors& a, const Colors& b, float t)
     out.shadow = Mix(a.shadow, b.shadow, t);
     out.glassTint = Mix(a.glassTint, b.glassTint, t);
     out.scrim = Mix(a.scrim, b.scrim, t);
+    for (int i = 0; i < kChartPaletteSize; ++i)
+        out.chart[i] = Mix(a.chart[i], b.chart[i], t);
+    out.scrollThumb = Mix(a.scrollThumb, b.scrollThumb, t);
+    out.scrollThumbHover = Mix(a.scrollThumbHover, b.scrollThumbHover, t);
+    return out;
+}
+
+// Whole-number tokens (counts of rows and toasts) switch at the halfway point like enums.
+int Lerp(int a, int b, float t)
+{
+    return t < 0.5f ? a : b;
+}
+
+OverlayTokens MixOverlay(const OverlayTokens& a, const OverlayTokens& b, float t)
+{
+    OverlayTokens out;
+    out.anchorGap = Lerp(a.anchorGap, b.anchorGap, t);
+    out.viewportMargin = Lerp(a.viewportMargin, b.viewportMargin, t);
+    out.menuMinWidth = Lerp(a.menuMinWidth, b.menuMinWidth, t);
+    out.submenuDelay = Lerp(a.submenuDelay, b.submenuDelay, t);
+    out.tooltipDelay = Lerp(a.tooltipDelay, b.tooltipDelay, t);
+    out.tooltipGrace = Lerp(a.tooltipGrace, b.tooltipGrace, t);
+    out.tooltipMaxWidth = Lerp(a.tooltipMaxWidth, b.tooltipMaxWidth, t);
+    out.toastDuration = Lerp(a.toastDuration, b.toastDuration, t);
+    out.toastWidth = Lerp(a.toastWidth, b.toastWidth, t);
+    out.toastStackGap = Lerp(a.toastStackGap, b.toastStackGap, t);
+    out.toastMargin = Lerp(a.toastMargin, b.toastMargin, t);
+    out.toastMaxCount = Lerp(a.toastMaxCount, b.toastMaxCount, t);
+    out.modalWidth = Lerp(a.modalWidth, b.modalWidth, t);
+    out.drawerWidth = Lerp(a.drawerWidth, b.drawerWidth, t);
+    out.drawerHeight = Lerp(a.drawerHeight, b.drawerHeight, t);
+    out.commandPaletteWidth = Lerp(a.commandPaletteWidth, b.commandPaletteWidth, t);
+    return out;
+}
+
+ContainerTokens MixContainers(const ContainerTokens& a, const ContainerTokens& b, float t)
+{
+    ContainerTokens out;
+    out.shellSize = Lerp(a.shellSize, b.shellSize, t);
+    out.shellMinSize = Lerp(a.shellMinSize, b.shellMinSize, t);
+    out.titleBarHeight = Lerp(a.titleBarHeight, b.titleBarHeight, t);
+    out.resizeBorder = Lerp(a.resizeBorder, b.resizeBorder, t);
+    out.sidebarWidth = Lerp(a.sidebarWidth, b.sidebarWidth, t);
+    out.railWidth = Lerp(a.railWidth, b.railWidth, t);
+    out.inspectorWidth = Lerp(a.inspectorWidth, b.inspectorWidth, t);
+    out.inspectorMinWidth = Lerp(a.inspectorMinWidth, b.inspectorMinWidth, t);
+    return out;
+}
+
+ScrollTokens MixScroll(const ScrollTokens& a, const ScrollTokens& b, float t)
+{
+    ScrollTokens out;
+    out.barThickness = Lerp(a.barThickness, b.barThickness, t);
+    out.barThicknessHover = Lerp(a.barThicknessHover, b.barThicknessHover, t);
+    out.barInset = Lerp(a.barInset, b.barInset, t);
+    out.minThumbLength = Lerp(a.minThumbLength, b.minThumbLength, t);
+    out.barHideDelay = Lerp(a.barHideDelay, b.barHideDelay, t);
+    out.wheelDistance = Lerp(a.wheelDistance, b.wheelDistance, t);
+    out.edgeFade = Lerp(a.edgeFade, b.edgeFade, t);
+    return out;
+}
+
+ListTokens MixList(const ListTokens& a, const ListTokens& b, float t)
+{
+    ListTokens out;
+    out.rowHeightSmall = Lerp(a.rowHeightSmall, b.rowHeightSmall, t);
+    out.rowHeight = Lerp(a.rowHeight, b.rowHeight, t);
+    out.rowHeightLarge = Lerp(a.rowHeightLarge, b.rowHeightLarge, t);
+    out.indent = Lerp(a.indent, b.indent, t);
+    out.popupRows = Lerp(a.popupRows, b.popupRows, t);
+    out.inlineRows = Lerp(a.inlineRows, b.inlineRows, t);
+    out.typeaheadTimeout = Lerp(a.typeaheadTimeout, b.typeaheadTimeout, t);
+    return out;
+}
+
+DragTokens MixDrag(const DragTokens& a, const DragTokens& b, float t)
+{
+    DragTokens out;
+    out.startThreshold = Lerp(a.startThreshold, b.startThreshold, t);
+    out.ghostOpacity = Lerp(a.ghostOpacity, b.ghostOpacity, t);
+    out.autoScrollZone = Lerp(a.autoScrollZone, b.autoScrollZone, t);
+    out.autoScrollSpeed = Lerp(a.autoScrollSpeed, b.autoScrollSpeed, t);
+    out.hoverOpenDelay = Lerp(a.hoverOpenDelay, b.hoverOpenDelay, t);
+    return out;
+}
+
+FieldTokens MixField(const FieldTokens& a, const FieldTokens& b, float t)
+{
+    FieldTokens out;
+    out.padding = Lerp(a.padding, b.padding, t);
+    out.caretWidth = Lerp(a.caretWidth, b.caretWidth, t);
     return out;
 }
 
@@ -395,6 +522,8 @@ Theme Theme::Light()
     c.shadow = Rgb(0x000000);
     c.glassTint = Rgb(0xFFFFFF);
     c.scrim = Rgb(0x000000, 0.20f);
+    c.scrollThumb = Rgb(0x000000, 0.45f);
+    c.scrollThumbHover = Rgb(0x000000, 0.60f);
     SetElevation(theme.elevation, 0.10f, 0.12f, 0.18f);
     theme.ApplyAccent(kLightAccent);
     return theme;
@@ -429,6 +558,8 @@ Theme Theme::Dark()
     c.shadow = Rgb(0x000000);
     c.glassTint = Rgb(0x1C1C1E);
     c.scrim = Rgb(0x000000, 0.48f);
+    c.scrollThumb = Rgb(0xFFFFFF, 0.45f);
+    c.scrollThumbHover = Rgb(0xFFFFFF, 0.62f);
     SetElevation(theme.elevation, 0.36f, 0.44f, 0.56f);
     theme.ApplyAccent(kDarkAccent);
     return theme;
@@ -450,9 +581,12 @@ void Theme::ApplyAccent(const ImVec4& accent)
     c.accentHover = shifted(kHoverLightnessStep);
     c.accentPressed = shifted(kPressedLightnessStep);
 
-    c.accentText = DeriveAccentText(c, dark);
+    c.accentText = MoveUntilContrast(c, c.accent, dark, kTextContrast, false);
     c.accentSubtle = WithAlpha(c.accent, dark ? 0.24f : 0.14f);
-    c.focusRing = WithAlpha(c.accent, dark ? 0.80f : 0.70f);
+    // The ring sits beside the control on whatever surface holds it, so it needs the non-text
+    // contrast on every surface, not only on the one the accent was chosen for.
+    c.focusRing = MoveUntilContrast(c, c.accent, dark, kBoundaryContrast, true);
+    DeriveChartPalette(c);
 }
 
 Theme MixThemes(const Theme& a, const Theme& b, float t)
@@ -493,6 +627,17 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     m.focusRingWidth = Lerp(ma.focusRingWidth, mb.focusRingWidth, t);
     m.hairline = Lerp(ma.hairline, mb.hairline, t);
     m.minHitTarget = Lerp(ma.minHitTarget, mb.minHitTarget, t);
+    m.faderLength = Lerp(ma.faderLength, mb.faderLength, t);
+    m.dialSweep = Lerp(ma.dialSweep, mb.dialSweep, t);
+    m.padSize = Lerp(ma.padSize, mb.padSize, t);
+    m.pickerWidth = Lerp(ma.pickerWidth, mb.pickerWidth, t);
+    m.numberFieldWidth = Lerp(ma.numberFieldWidth, mb.numberFieldWidth, t);
+    m.histogramHeight = Lerp(ma.histogramHeight, mb.histogramHeight, t);
+    m.chartHeight = Lerp(ma.chartHeight, mb.chartHeight, t);
+    m.panelHeight = Lerp(ma.panelHeight, mb.panelHeight, t);
+    m.cardWidth = Lerp(ma.cardWidth, mb.cardWidth, t);
+    m.thumbnailSize = Lerp(ma.thumbnailSize, mb.thumbnailSize, t);
+    m.slotSize = Lerp(ma.slotSize, mb.slotSize, t);
 
     for (int i = 0; i < kTextStyleCount; ++i)
         out.type.styles[i].size = Lerp(a.type.styles[i].size, b.type.styles[i].size, t);
@@ -507,6 +652,9 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     motion.scale = Lerp(a.motion.scale, b.motion.scale, t);
     motion.shimmerPeriod = Lerp(a.motion.shimmerPeriod, b.motion.shimmerPeriod, t);
     motion.spinnerPeriod = Lerp(a.motion.spinnerPeriod, b.motion.spinnerPeriod, t);
+    motion.popupOpen = Lerp(a.motion.popupOpen, b.motion.popupOpen, t);
+    motion.popupClose = Lerp(a.motion.popupClose, b.motion.popupClose, t);
+    motion.popupScaleFrom = Lerp(a.motion.popupScaleFrom, b.motion.popupScaleFrom, t);
 
     for (int i = 0; i < 3; ++i)
     {
@@ -524,6 +672,13 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.layout.expandedFrom = Lerp(a.layout.expandedFrom, b.layout.expandedFrom, t);
     out.layout.labelColumn = Lerp(a.layout.labelColumn, b.layout.labelColumn, t);
     out.layout.minRowControl = Lerp(a.layout.minRowControl, b.layout.minRowControl, t);
+
+    out.overlay = MixOverlay(a.overlay, b.overlay, t);
+    out.containers = MixContainers(a.containers, b.containers, t);
+    out.scroll = MixScroll(a.scroll, b.scroll, t);
+    out.list = MixList(a.list, b.list, t);
+    out.drag = MixDrag(a.drag, b.drag, t);
+    out.field = MixField(a.field, b.field, t);
     return out;
 }
 

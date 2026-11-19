@@ -1,5 +1,5 @@
 // WCAG contrast of the theme tokens: every text token on every surface in both presets,
-// and the derived accent colors for accents across 24 hues.
+// and the derived accent colors (text, focus ring, chart palette) for accents across 24 hues.
 
 #include <vector>
 
@@ -42,13 +42,22 @@ void CheckAccentDerivation(const facet::Theme& theme)
     CHECK(facet::ContrastRatio(c.onAccent, c.accent) >= kTextContrast);
     CHECK(facet::ContrastRatio(c.onAccent, c.accentHover) >= kTextContrast);
     CHECK(facet::ContrastRatio(c.onAccent, c.accentPressed) >= kTextContrast);
+    // The focus ring and the chart colors are measured as drawn: rounded to 8 bits per channel.
+    const ImVec4 ring = facet::FromU32(facet::ToU32(c.focusRing));
     for (const Named& surface : Surfaces(c))
     {
         CAPTURE(surface.name);
         CHECK(facet::ContrastRatio(c.accentText, surface.color) >= kTextContrast);
+        CHECK(facet::ContrastRatio(ring, surface.color) >= kNonTextContrast);
+        for (int i = 0; i < facet::kChartPaletteSize; ++i)
+        {
+            CAPTURE(i);
+            CHECK(facet::ContrastRatio(facet::FromU32(facet::ToU32(c.chart[i])), surface.color) >= kNonTextContrast);
+        }
     }
     CHECK(c.accent.w == doctest::Approx(1.0f));
     CHECK(c.accentText.w == doctest::Approx(1.0f));
+    CHECK(c.focusRing.w == doctest::Approx(1.0f));
 }
 
 } // namespace
@@ -121,6 +130,36 @@ TEST_CASE("The control boundary color reaches 3:1 on the content surfaces")
             CHECK(facet::ContrastRatio(boundary, surface.color) >= kNonTextContrast);
         }
     }
+}
+
+TEST_CASE("The scrollbar thumbs reach 3:1 on every surface")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        for (const Named& surface : Surfaces(c))
+        {
+            CAPTURE(surface.name);
+            CHECK(facet::ContrastRatio(c.scrollThumb, surface.color) >= kNonTextContrast);
+            CHECK(facet::ContrastRatio(c.scrollThumbHover, surface.color) >
+                  facet::ContrastRatio(c.scrollThumb, surface.color));
+        }
+    }
+}
+
+TEST_CASE("The focus ring keeps the accent where the accent already reaches 3:1")
+{
+    // The light default blue reaches 3:1 on every light surface, so the ring is that blue.
+    const facet::Theme light = facet::Theme::Light();
+    CHECK(facet::ToU32(light.colors.focusRing) == facet::ToU32(light.colors.accent));
+    // Yellow is far below 3:1 on white: the ring keeps its hue and gets darker.
+    facet::Theme theme = facet::Theme::Light();
+    theme.ApplyAccent(facet::Rgb(0xFFCC00));
+    const facet::Oklch accent = facet::ToOklch(theme.colors.accent);
+    const facet::Oklch ring = facet::ToOklch(theme.colors.focusRing);
+    CHECK(ring.L < accent.L);
+    CHECK(ring.h == doctest::Approx(accent.h).epsilon(0.05));
 }
 
 TEST_CASE("The default accents give readable accent states in both themes")

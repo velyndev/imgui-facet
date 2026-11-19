@@ -22,10 +22,12 @@ The building blocks the widgets will be made of exist inside the library. What e
 - The public core headers in `include/facet/core/`. Every declared function links; the state
   of each area:
   - Core, theme and scale: light and dark presets, a runtime accent with derived readable
-    states, an accent for one region (`PushAccent` / `PopAccent`), animated theme switches, a
+    states (text at 4.5:1, the focus ring and an eight-color chart palette at 3:1 on every
+    surface), an accent for one region (`PushAccent` / `PopAccent`), animated theme switches, a
     mode that follows the Windows app theme and `ApplyImGuiStyle` for stock Dear ImGui widgets
-    (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). See
-    `docs/theming.md` and `docs/scaling.md`.
+    (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). The theme
+    also holds the tokens of the planned popups, scrollbars, lists, drag and drop, text fields
+    and containers. See `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
     (`layout.h`) work. See `docs/layout.md`.
   - Core, input: key chords as text and back, key binds in the modes Hold, Toggle, Always and

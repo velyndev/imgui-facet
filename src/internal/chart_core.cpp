@@ -41,18 +41,15 @@ constexpr int kMaxMantissaDigits = 14;
 // An empty linear domain is widened by this fraction of its value on each side (at least 0.5).
 constexpr double kEmptyWidening = 1e-9;
 
-// Series colors: the chroma of every series, the lightness each theme starts from, the step
-// the lightness moves by until the contrast is reached, and that contrast (WCAG non-text).
-constexpr float kSeriesChroma = 0.14f;
-constexpr float kSeriesLightnessLight = 0.56f;
-constexpr float kSeriesLightnessDark = 0.72f;
+// Series colors: the step the lightness moves by until the contrast is reached, and that
+// contrast (WCAG non-text). The first cycle is the theme's chart palette (Colors::chart).
 constexpr float kSeriesLightnessStep = 0.01f;
 constexpr float kSeriesContrast = 3.0f;
 // Each later cycle of the palette moves the lightness this far from the surfaces.
 constexpr float kSeriesCycleShift = 0.12f;
-// Hue offsets from the accent hue in degrees, ordered so that consecutive series differ by at
-// least 90 degrees and the first four split the circle into quarters.
-constexpr float kSeriesHueOffsets[kSeriesPaletteSize] = {0.0f, 180.0f, 90.0f, 270.0f, 45.0f, 225.0f, 135.0f, 315.0f};
+// Below this relative luminance of bg the surfaces count as dark (as in Theme::ApplyAccent).
+constexpr float kDarkSurfaceLuminance = 0.18f;
+static_assert(kSeriesPaletteSize == kChartPaletteSize, "one series cycle is the theme's chart palette");
 
 // Polylines are drawn in pieces of this many points (each piece overlaps the next by one).
 constexpr int kPolylineChunk = 4096;
@@ -827,14 +824,17 @@ ImVec4 SeriesColor(const Colors& colors, int index)
     index = std::max(index, 0);
     // Light surfaces need darker series, dark surfaces lighter ones: the luminance of bg says
     // which way to move.
-    const bool darkSurfaces = RelativeLuminance(colors.bg) < 0.18f;
+    const bool darkSurfaces = RelativeLuminance(colors.bg) < kDarkSurfaceLuminance;
     const int cycle = index / kSeriesPaletteSize;
-    const float hue = ToOklch(colors.accent).h + kSeriesHueOffsets[index % kSeriesPaletteSize];
-    float lightness = darkSurfaces ? kSeriesLightnessDark + kSeriesCycleShift * static_cast<float>(cycle)
-                                   : kSeriesLightnessLight - kSeriesCycleShift * static_cast<float>(cycle);
-    lightness = std::clamp(lightness, 0.05f, 0.98f);
+    const ImVec4& base = colors.chart[index % kSeriesPaletteSize];
+    if (cycle == 0 && MinSurfaceContrast(colors, base) >= kSeriesContrast)
+        return base;
+    // The palette color of the index, moved further from the surfaces for each later cycle. It
+    // is checked again below, so a theme whose surfaces changed after ApplyAccent stays readable.
+    Oklch lch = ToOklch(base);
+    const float shift = kSeriesCycleShift * static_cast<float>(cycle);
+    lch.L = std::clamp(darkSurfaces ? lch.L + shift : lch.L - shift, 0.05f, 0.98f);
     const float direction = darkSurfaces ? kSeriesLightnessStep : -kSeriesLightnessStep;
-    const Oklch lch{lightness, kSeriesChroma, std::fmod(hue, 360.0f)};
     // Every candidate is rounded to 8 bits per channel first, so the contrast holds for the
     // color exactly as it is drawn.
     const auto drawn = [](const Oklch& c) { return FromU32(ToU32(FromOklch(c))); };

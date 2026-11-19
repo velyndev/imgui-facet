@@ -47,7 +47,7 @@ cursor, disabled ones the not-allowed cursor.
 | Corners | Continuous path from radius 10 up, circular arcs below | Large surfaces get a smooth corner join; small ones cannot show the difference |
 | Control heights | small 22, regular 28, large 36 | Pointer-density sizes for desktop tools and menus |
 | Toggle, checkbox, slider | toggle 38 x 22 with a 2 inset, checkbox 16, slider track 4 and knob 18 | Sized against the 28 control height so rows line up |
-| Focus ring | 3 wide, accent at 70 % (light) or 80 % (dark) | Visible on every surface without hiding the control |
+| Focus ring | 3 wide, in the focusRing color (see Colors) | Visible on every surface without hiding the control |
 | Hairline | 1, at least one physical pixel | Separators stay crisp at every scale |
 | Minimum hit target | 24 | Small visuals stay easy to click |
 | Type | caption 11, footnote 12, callout 12, body 13, headline 13 semibold, title3 15 semibold, title2 17 semibold, title1 22 bold, large title 26 bold | Compact desktop scale with weight carrying the hierarchy |
@@ -58,6 +58,19 @@ cursor, disabled ones the not-allowed cursor.
 | Glass | blur radius 20, tint opacity 0.72, saturation 1.5 | Enough tint to keep text on the panel readable over any backdrop |
 | Width classes | Compact below 400, Regular from 400, Expanded from 720 (available width) | Below 400 a label and a usable control no longer fit side by side; from 720 a side column fits next to the content |
 | Labelled rows | label column 112 (gap included), narrowest control beside it 128 | Labels line up across rows; a row stacks before its control gets too narrow to operate |
+| Larger controls | fader 140, pad 192, picker 256, number field beside a slider 72, histogram 40, chart 160, panel 192, card 256, thumbnail 128, inventory slot 64; knob arc 270 degrees | Multiples of the 4 px grid, most of them whole steps of the largest spacing (32), so large controls line up with the content around them; the knob arc leaves its gap at the bottom where the value reads |
+| Popup placement | 4 from the anchor, 8 from the display edges | Close enough to read as attached, clear of the anchor's outline; never touching the display edge |
+| Menus | at least 180 wide, submenus open after 0.2 s of rest | Short menu labels still get a target that is easy to hit; a pointer crossing a row on its way does not open its submenu |
+| Tooltips | 0.5 s delay, 0.4 s grace, text wraps at 280 | The first tooltip waits until the pointer rests; moving on to a neighbour shows its tooltip at once; long text stays a readable column |
+| Toasts | 5 s, 320 wide, 8 apart, 16 from the corner, 3 at once | Long enough to read two lines, few enough that the stack never covers the content it reports on |
+| Dialogs and drawers | modal 440, drawer 320 wide or 280 high, command palette 560 | Wide enough for a title and two buttons in one row, narrow enough to read as a layer over the content |
+| Shell | first size 420 x 520, smallest 280 x 160, title bar 40, resize band 6 | A settings menu fits without scrolling at the first size; at the smallest the title bar and one control row remain |
+| Side columns | sidebar 220, icon rail 52, inspector 280 (at least 200) | Room for an icon and a short label; the rail keeps the icon on the minimum hit target with a margin |
+| Scrollbars | 6 wide at rest, 10 while hovered or dragged, 2 inset, thumb at least 24, hidden after 1 s idle, edge fade 16, 64 per wheel notch | A thin bar leaves the content its width; it grows where the pointer needs a target, and the thumb never gets shorter than the minimum hit target |
+| List rows | small 24, regular 32, large 40; indent 16 per tree level; dropdowns show 8 rows, inline lists 6; typeahead resets after 1 s | A list is scanned row by row and gets one grid step more air than a form row; 8 rows show a choice without hiding the field above |
+| Drag and drop | starts after 4, preview at 70 %, edge scroll in a 32 band at up to 800 per second, a resting drag opens a target after 0.6 s | A small slip stays a click; the preview shows what moves without hiding where it lands; scrolling speeds up toward the edge so the user controls it |
+| Text fields | 8 inner padding, caret 1.5 rounded to whole pixels | Text lines up with the labels of other controls; the caret stays one or two crisp pixels at every scale |
+| Popup motion | open 150 ms from 96 % size, close 100 ms | A popup grows out of its anchor, which shows where it came from; it leaves faster than it came so the next action is never kept waiting |
 
 ## Colors
 
@@ -71,6 +84,9 @@ cursor, disabled ones the not-allowed cursor.
 | separatorOpaque | #C6C6C8 | #38383A | Where a translucent line would double up (crossing table borders) |
 | Accent | #0066CC | #1F6FEB | One blue, dark enough in each theme for white text on it |
 | accentSubtle | the accent at 14 % | the accent at 24 % | A selection background that tints without competing with the text on it |
+| focusRing | the accent hue, lightness moved to 3:1 on every surface | the same | The ring sits on whatever surface holds the control, so it needs the non-text contrast on all of them; an accent that already has it is kept as it is |
+| Chart palette (chart[0] to chart[7]) | eight hues from the accent hue, chroma 0.14, lightness from 0.56, moved to 3:1 | the same from lightness 0.72 | Neighbouring series differ by at least 90 degrees of hue, and every series stays visible on every surface for any accent |
+| scrollThumb, scrollThumbHover | black at 45 / 60 % | white at 45 / 62 % | The scroll position reads at 3:1 on every surface, and the thumb gets stronger where the pointer is |
 | Accent presets | blue, purple, pink, red, orange, yellow, green, graphite | the same | A short list of distinct hues; any of them derives readable states |
 | Status: destructive, success, warning | #C4000F, #146C2E, #8A5300 | #FF6B5F, #32D74B, #FFD60A | Readable as text on the content surfaces |
 | shadow | black | black | A neutral shadow; its strength comes from the elevation opacity |
@@ -87,9 +103,11 @@ Contrast rules, checked by the unit tests:
 - The accent is set at runtime. `Theme::ApplyAccent` derives the other accent colors in OKLCH:
   onAccent is white or black, whichever is more readable; hover and pressed move the lightness
   away from onAccent so text on them stays at 4.5:1 or more; accentText keeps the hue and moves
-  the lightness until it reaches 4.5:1 on every surface, for links and accent text. The tests
+  the lightness until it reaches 4.5:1 on every surface, for links and accent text; focusRing
+  and the chart palette do the same for 3:1, measured as drawn (8 bits per channel). The tests
   check this for 24 hues at five lightness levels in both themes.
-- Outlines of controls reach 3:1 (non-text contrast) on the content surfaces.
+- Outlines of controls reach 3:1 (non-text contrast) on the content surfaces; the scrollbar
+  thumbs reach 3:1 on every surface.
 
 ## Core
 
@@ -132,8 +150,8 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   control's own corner shape (circular arcs around knobs), focusRing width, a soft halo,
   faded over durationFast; shown only after keyboard or gamepad input, because a mouse user
   already knows where they clicked.
-- **Ring color.** focusRing when it reaches 3:1 on every surface, otherwise accentText, so the
-  ring is visible with every accent preset.
+- **Ring color.** focusRing, which reaches 3:1 on every surface for any accent (see Colors), so
+  the ring is visible with every accent preset and every custom accent.
 - **Selection pill motion.** The leading edge uses the standard spring at 0.7 of its response,
   so the pill stretches slightly and settles; it animates relative to the group's content so
   scrolling never animates it.
@@ -159,9 +177,9 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   texts start in one line.
 - **Disabled rows.** A disabled row draws its label, marker, description and help text in
   labelTertiary; an error keeps destructive, because it still needs to be read.
-- **Series colors.** Hues step around the OKLCH circle from the accent hue, neighbours far
-  apart, and each color moves in lightness until it reaches 3:1 on every surface, so lines
-  and areas stay distinguishable from the background with any accent.
+- **Series colors.** The first eight are the chart palette of the theme (see Colors); later
+  series repeat its hues further from the surfaces in lightness, and every color is checked
+  again for 3:1, so lines and areas stay distinguishable from the background with any accent.
 - **Plot edges** sit on whole pixels, so clip edges and grid lines stay crisp at every scale.
 
 ### Prototype controls

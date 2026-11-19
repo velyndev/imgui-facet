@@ -62,7 +62,7 @@ constexpr ColorToken kAccents[] = {
     {"accentPressed", &facet::Colors::accentPressed, Measure::OnAccent},
     {"accentSubtle", &facet::Colors::accentSubtle, Measure::Surface},
     {"accentText", &facet::Colors::accentText, Measure::Text},
-    {"focusRing", &facet::Colors::focusRing, Measure::None},
+    {"focusRing", &facet::Colors::focusRing, Measure::Text},
 };
 
 constexpr ColorToken kStatus[] = {
@@ -72,6 +72,8 @@ constexpr ColorToken kStatus[] = {
     {"shadow", &facet::Colors::shadow, Measure::None},
     {"glassTint", &facet::Colors::glassTint, Measure::None},
     {"scrim", &facet::Colors::scrim, Measure::None},
+    {"scrollThumb", &facet::Colors::scrollThumb, Measure::Text},
+    {"scrollThumbHover", &facet::Colors::scrollThumbHover, Measure::Text},
 };
 
 struct TokensState
@@ -402,7 +404,7 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent", "elev
     DrawFills();
     DrawColorGroup("Labels and separators", kLabels, std::size(kLabels));
     DrawColorGroup("Accent, derived in OKLCH", kAccents, std::size(kAccents));
-    DrawColorGroup("Status and effects", kStatus, std::size(kStatus));
+    DrawColorGroup("Status, effects and scrollbars", kStatus, std::size(kStatus));
     Paragraph("labelTertiary and labelQuaternary stay below 4.5:1 on purpose: they mark disabled text and "
               "decoration only.");
 

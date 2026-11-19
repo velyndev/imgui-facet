@@ -34,8 +34,6 @@ constexpr ImGuiKey kModalityKeys[] = {
     ImGuiKey_Enter,    ImGuiKey_KeypadEnter, ImGuiKey_Escape,
 };
 
-// Non-text contrast a ring needs against the surface around it (WCAG 2.2, 1.4.11).
-constexpr float kRingContrast = 3.0f;
 // Share of the ring color in its halo.
 constexpr float kHaloAlpha = 0.35f;
 
@@ -120,15 +118,7 @@ void SetKeyboardModality(bool keyboard)
 
 ImVec4 FocusRingColor()
 {
-    const Colors& c = T().colors;
-    const ImVec4* surfaces[] = {&c.bg, &c.bgSecondary, &c.bgTertiary, &c.bgElevated,
-                                &c.bgElevatedLevels[0], &c.bgElevatedLevels[1], &c.bgElevatedLevels[2]};
-    for (const ImVec4* surface : surfaces)
-    {
-        if (ContrastRatio(c.focusRing, *surface) < kRingContrast)
-            return c.accentText;
-    }
-    return c.focusRing;
+    return T().colors.focusRing;
 }
 
 float FocusRingOutset()

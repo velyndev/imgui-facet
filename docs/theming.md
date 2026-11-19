@@ -10,14 +10,21 @@ the reason for each are listed in `DESIGN.md`.
 
 | Group | Holds |
 |---|---|
-| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states, status colors, focus ring, shadow, glass tint, scrim |
+| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states, status colors, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`) and the scrollbar thumbs |
 | `spacing` | The 4 px grid: `xs` 4 to `xxxl` 32 |
 | `radii` | `element`, `control`, `card`, `popover`, `window`, and where continuous corners start |
-| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target |
+| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, and the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots) |
 | `type` | Size and weight of every `TextStyle` |
-| `motion` | Springs, durations, loading periods, a global `scale` and `reduceMotion` |
+| `motion` | Springs, durations, loading periods, the popup open and close motion, a global `scale` and `reduceMotion` |
 | `elevation` | Three shadow levels (their surfaces are in `colors`) |
 | `glass` | Backdrop blur settings |
+| `layout` | Width class breakpoints and the labelled row columns |
+| `overlay` | Popup placement, menus, tooltip timing, toasts, dialog, drawer and command palette sizes |
+| `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths |
+| `scroll` | Overlay scrollbar widths, inset, minimum thumb, hide delay, wheel distance, edge fade |
+| `list` | Row heights per control size, tree indent, default visible rows, typeahead timeout |
+| `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target |
+| `field` | Text field padding and caret width |
 
 Lengths are design units. Widgets convert them with `facet::Px()` (see `docs/scaling.md`).
 
@@ -31,6 +38,26 @@ theme.motion.scale = 1.5f;      // every duration and spring 1.5 times longer
 facet::SetTheme(theme);
 ```
 
+### The token behind an option's default
+
+Widget options whose comment says "0 for the token default" (or names a default size) read these
+tokens. The widgets are planned; the table fixes which token each one takes.
+
+| Options | Token |
+|---|---|
+| `ShellOptions::initialSize`, `minSize` | `containers.shellSize`, `containers.shellMinSize` |
+| `AppFrameOptions::resizeBorder`, `TitleBarOptions::height` | `containers.resizeBorder`, `containers.titleBarHeight` |
+| `SidebarOptions::width` (and its icon rail) | `containers.sidebarWidth` (`containers.railWidth`) |
+| `InspectorPaneOptions::paneWidth`, `minPaneWidth` | `containers.inspectorWidth`, `containers.inspectorMinWidth` |
+| `ModalOptions::width`, `DrawerOptions::extent` | `overlay.modalWidth`, `overlay.drawerWidth` (Start, End) or `overlay.drawerHeight` (Top, Bottom) |
+| `TooltipOptions::maxWidth`, `ToastOptions::duration` | `overlay.tooltipMaxWidth`, `overlay.toastDuration` |
+| `maxVisibleRows` (dropdowns, Autocomplete, CommandPalette) | `list.popupRows` |
+| `visibleRows` (ListBox, SelectableList, TransferList, SearchableChecklist) | `list.inlineRows` |
+| `height` of vertical sliders and channel faders | `metrics.faderLength` |
+| `fieldWidth` (SliderWithInput, RangeInput), `histogramHeight` | `metrics.numberFieldWidth`, `metrics.histogramHeight` |
+| `sweep` (ArcRangeSlider, Knob) | `metrics.dialSweep` |
+| `OptionCardGroupOptions::cardWidth`, `ThumbnailPickerOptions::thumbnailSize`, `FileBrowserOptions::height` | `metrics.cardWidth`, `metrics.thumbnailSize`, `metrics.panelHeight` |
+
 ## Switching
 
 ```cpp
@@ -40,7 +67,8 @@ facet::SetTheme(theme, false);   // at once
 
 An animated switch lasts `motion.durationStandard * motion.scale` of the new theme. Facet
 blends one step per `facet::NewFrame`: colors in OKLab, lengths and timings linearly, and
-switches (`dark`, font weights, flags) change at the halfway point. `T()` returns the blend
+switches (`dark`, font weights, flags) and whole-number counts (rows, toasts) change at the
+halfway point. `T()` returns the blend
 while it runs; `facet::ThemeTransitionActive()` tells whether one runs. Before `facet::Init`,
 while motion is reduced, or with a duration of 0 the switch is immediate.
 
@@ -60,8 +88,8 @@ animated switch at the next `facet::NewFrame`. `facet::SystemPrefersDarkTheme()`
 setting.
 
 A mode switch replaces only `dark`, `colors` and `elevation` with those of the preset. The other
-groups of the current theme (spacing, radii, metrics, type, motion, glass) stay as the app set
-them with `SetTheme`, so a reduced-motion or motion-scale setting survives a switch, including
+groups of the current theme (spacing, radii, metrics, type, motion, glass and the groups after
+it) stay as the app set them with `SetTheme`, so a reduced-motion or motion-scale setting survives a switch, including
 one that follows the Windows setting.
 
 ## Accent
@@ -78,7 +106,12 @@ facet::SetAccent(IM_COL32(0x24, 0x8A, 0x3D, 0xFF));
 - `accentSubtle`: the accent at low opacity, for selection backgrounds.
 - `accentText`: the accent hue with its lightness moved until it reaches 4.5:1 on every surface,
   for links and accent-colored text.
-- `focusRing`: the accent at 70 % (light) or 80 % (dark).
+- `focusRing`: the accent hue with its lightness moved until it reaches 3:1 (the non-text
+  contrast) on every surface, opaque; an accent that already reaches it is used as it is. Drop
+  indicators use it too.
+- `chart[0]` to `chart[7]`: the chart palette, eight hues stepping around the OKLCH circle from
+  the accent hue, each moved in lightness until it reaches 3:1 on every surface. Charts, legends
+  and other indexed data take color `i % kChartPaletteSize` for entry `i`.
 
 `SetThemeMode` keeps the accent of the last `SetAccent` for its presets until
 `facet::ClearAccent()`; `SetTheme` shows the accent of the theme passed to it.
@@ -114,11 +147,14 @@ The unit tests check, for both presets:
   shadow cannot darken the black background; in the light preset they are all white.
 - The status colors reach 4.5:1 as text on `bg`, `bgSecondary` and `bgTertiary`.
 - For accents across 24 hues at five lightness levels, every accent state carries readable
-  `onAccent` text and `accentText` is readable on every surface.
+  `onAccent` text, `accentText` is readable on every surface, and `focusRing` and every chart
+  palette color reach 3:1 on every surface as drawn (8 bits per channel).
 - `facet::ControlBoundaryColor()` reaches 3:1 on the content surfaces, for control outlines.
+- `scrollThumb` and `scrollThumbHover` reach 3:1 on every surface.
 
 A custom theme with other surface colors should call `theme.ApplyAccent(theme.colors.accent)`
-after changing them, because `accentText` depends on the surfaces.
+after changing them, because `accentText`, `focusRing` and the chart palette depend on the
+surfaces.
 
 ## Stock Dear ImGui widgets
 

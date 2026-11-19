@@ -1,5 +1,8 @@
 // Theme presets, switching, blending and the Dear ImGui style mapping.
 
+#include <cstddef>
+#include <vector>
+
 #include <doctest/doctest.h>
 
 #include <facet/facet.h>
@@ -24,7 +27,35 @@ bool SameColors(const facet::Colors& a, const facet::Colors& b)
         same = same && SameColor(a.fill[i], b.fill[i]);
     for (int i = 0; i < 3; ++i)
         same = same && SameColor(a.bgElevatedLevels[i], b.bgElevatedLevels[i]);
-    return same;
+    for (int i = 0; i < facet::kChartPaletteSize; ++i)
+        same = same && SameColor(a.chart[i], b.chart[i]);
+    return same && SameColor(a.scrollThumb, b.scrollThumb) && SameColor(a.scrollThumbHover, b.scrollThumbHover);
+}
+
+// Every length and time token of the groups for popups, containers, scrolling, lists, drag and
+// drop and text fields, the control sizes in Metrics and the popup motion, as pointers into a
+// theme, so one loop checks them all.
+std::vector<float*> AddedFloatTokens(facet::Theme& t)
+{
+    facet::OverlayTokens& o = t.overlay;
+    facet::ContainerTokens& c = t.containers;
+    facet::ScrollTokens& s = t.scroll;
+    facet::ListTokens& l = t.list;
+    facet::DragTokens& d = t.drag;
+    facet::Metrics& m = t.metrics;
+    return {&o.anchorGap, &o.viewportMargin, &o.menuMinWidth, &o.submenuDelay, &o.tooltipDelay, &o.tooltipGrace,
+            &o.tooltipMaxWidth, &o.toastDuration, &o.toastWidth, &o.toastStackGap, &o.toastMargin, &o.modalWidth,
+            &o.drawerWidth, &o.drawerHeight, &o.commandPaletteWidth,
+            &c.shellSize.x, &c.shellSize.y, &c.shellMinSize.x, &c.shellMinSize.y, &c.titleBarHeight,
+            &c.resizeBorder, &c.sidebarWidth, &c.railWidth, &c.inspectorWidth, &c.inspectorMinWidth,
+            &s.barThickness, &s.barThicknessHover, &s.barInset, &s.minThumbLength, &s.barHideDelay,
+            &s.wheelDistance, &s.edgeFade,
+            &l.rowHeightSmall, &l.rowHeight, &l.rowHeightLarge, &l.indent, &l.typeaheadTimeout,
+            &d.startThreshold, &d.ghostOpacity, &d.autoScrollZone, &d.autoScrollSpeed, &d.hoverOpenDelay,
+            &t.field.padding, &t.field.caretWidth,
+            &m.faderLength, &m.dialSweep, &m.padSize, &m.pickerWidth, &m.numberFieldWidth, &m.histogramHeight,
+            &m.chartHeight, &m.panelHeight, &m.cardWidth, &m.thumbnailSize, &m.slotSize,
+            &t.motion.popupOpen, &t.motion.popupClose, &t.motion.popupScaleFrom};
 }
 
 // Restores the global theme state after a test changes it.
@@ -152,6 +183,68 @@ TEST_CASE("MixThemes blends colors in OKLab and lengths linearly")
         const float L = facet::ToOklab(facet::MixThemes(light, dark, static_cast<float>(i) / 10.0f).colors.bg).L;
         CHECK(L <= previous + 1e-5f);
         previous = L;
+    }
+}
+
+TEST_CASE("MixThemes blends the popup, container, scroll, list, drag and field tokens")
+{
+    facet::Theme a = facet::Theme::Light();
+    facet::Theme b = facet::Theme::Dark();
+    std::vector<float*> fromA = AddedFloatTokens(a);
+    std::vector<float*> fromB = AddedFloatTokens(b);
+    REQUIRE(fromA.size() == fromB.size());
+    // b gets every token doubled plus one, so each one differs and has a known midpoint.
+    for (std::size_t i = 0; i < fromB.size(); ++i)
+        *fromB[i] = *fromA[i] * 2.0f + 1.0f;
+    b.overlay.toastMaxCount = a.overlay.toastMaxCount + 2;
+    b.list.popupRows = a.list.popupRows + 4;
+    b.list.inlineRows = a.list.inlineRows + 4;
+
+    facet::Theme mid = facet::MixThemes(a, b, 0.5f);
+    facet::Theme start = facet::MixThemes(a, b, 0.0f);
+    facet::Theme end = facet::MixThemes(a, b, 1.0f);
+    const std::vector<float*> fromMid = AddedFloatTokens(mid);
+    const std::vector<float*> fromStart = AddedFloatTokens(start);
+    const std::vector<float*> fromEnd = AddedFloatTokens(end);
+    for (std::size_t i = 0; i < fromMid.size(); ++i)
+    {
+        CAPTURE(i);
+        CHECK(*fromMid[i] == doctest::Approx((*fromA[i] + *fromB[i]) * 0.5f));
+        CHECK(*fromStart[i] == *fromA[i]);
+        CHECK(*fromEnd[i] == *fromB[i]);
+    }
+    // Counts switch at the halfway point, like enums.
+    CHECK(facet::MixThemes(a, b, 0.49f).overlay.toastMaxCount == a.overlay.toastMaxCount);
+    CHECK(mid.overlay.toastMaxCount == b.overlay.toastMaxCount);
+    CHECK(mid.list.popupRows == b.list.popupRows);
+    CHECK(mid.list.inlineRows == b.list.inlineRows);
+    // The new colors blend in OKLab like the others.
+    const ImVec4 expected = facet::Mix(a.colors.scrollThumb, b.colors.scrollThumb, 0.5f);
+    CHECK(mid.colors.scrollThumb.x == doctest::Approx(expected.x));
+    CHECK(mid.colors.scrollThumb.w == doctest::Approx(expected.w));
+    const ImVec4 chart = facet::Mix(a.colors.chart[3], b.colors.chart[3], 0.5f);
+    CHECK(mid.colors.chart[3].y == doctest::Approx(chart.y));
+}
+
+TEST_CASE("The tokens of part B hold their documented starting values in both presets")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        CHECK(theme.overlay.anchorGap == theme.spacing.xs);
+        CHECK(theme.overlay.viewportMargin == theme.spacing.sm);
+        CHECK(theme.overlay.toastMaxCount == 3);
+        CHECK(theme.list.popupRows == 8);
+        CHECK(theme.list.rowHeight > theme.metrics.controlHeight);
+        CHECK(theme.scroll.barThicknessHover > theme.scroll.barThickness);
+        CHECK(theme.scroll.minThumbLength >= theme.metrics.minHitTarget);
+        CHECK(theme.containers.shellMinSize.x < theme.containers.shellSize.x);
+        CHECK(theme.containers.shellMinSize.y < theme.containers.shellSize.y);
+        CHECK(theme.containers.railWidth < theme.containers.sidebarWidth);
+        CHECK(theme.motion.popupClose < theme.motion.popupOpen);
+        CHECK(theme.motion.popupScaleFrom < 1.0f);
+        CHECK(theme.drag.ghostOpacity > 0.0f);
+        CHECK(theme.drag.ghostOpacity < 1.0f);
     }
 }
 

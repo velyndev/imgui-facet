@@ -238,13 +238,16 @@ void DrawGridLines(ImDrawList* drawList, const ImRect& plot, std::span<const flo
 
 // --- Series colors ---------------------------------------------------------------------------
 
-// Distinct series colors per palette cycle; later series repeat the hues at another lightness.
+// Distinct series colors per palette cycle (kChartPaletteSize in theme.h); later series repeat
+// the hues at another lightness.
 inline constexpr int kSeriesPaletteSize = 8;
 
-// The color of series `index` (0 is the accent hue). Hues step around the OKLCH circle from
-// the accent hue in an order that keeps neighbouring series far apart; chroma is fixed; the
-// lightness starts where the theme's text sits and moves away from the surfaces until the
-// color reaches 3:1 on bg, bgSecondary, bgTertiary and every elevated surface.
+// The color of series `index` (0 is the accent hue). The first cycle is the theme's chart
+// palette, colors.chart (Theme::ApplyAccent derives it: hues stepping around the OKLCH circle
+// from the accent hue, neighbours far apart, one chroma). Each later cycle moves the lightness
+// of the same hue further from the surfaces. Every color is checked again and moved until it
+// reaches 3:1 on bg, bgSecondary, bgTertiary and every elevated surface, as drawn (8 bits per
+// channel), so a theme whose surfaces changed after ApplyAccent stays readable too.
 ImVec4 SeriesColor(const Colors& colors, int index);
 // SeriesColor for indices 0 to out.size() - 1.
 void SeriesPalette(const Colors& colors, std::span<ImVec4> out);
