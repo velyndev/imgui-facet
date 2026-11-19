@@ -4,8 +4,9 @@ Facet is a design framework for Dear ImGui applications on Windows with Direct3D
 a consistent set of custom widgets, a light and a dark theme, icon rendering and proper scaling
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
-**Status: early development.** Every building block the widgets are made of exists inside the
-library and works; no Facet widget is implemented yet. The fourteen widget family
+**Status: early development.** The building blocks of Phase 1 exist inside the library and
+work; no Facet widget is implemented yet. Planned blocks: overlay scrollbars inside popup levels
+and multiline text areas (both still use Dear ImGui's own bar there). The fourteen widget family
 headers in `include/facet/widgets/` declare the planned widgets with documentation comments,
 and every declared function links. Each widget function draws a placeholder that says
 "planned", returns the neutral result and writes nothing; End functions, queries and helpers
@@ -26,8 +27,9 @@ works, the built-in strings and the edit session queries in `common.h` work, and
     surface), an accent for one region (`PushAccent` / `PopAccent`), animated theme switches, a
     mode that follows the Windows app theme and `ApplyImGuiStyle` for stock Dear ImGui widgets
     (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). The theme
-    also holds the tokens of popups, scrollbars, lists, drag and drop and text fields, which
-    the blocks below use, and of the planned containers. See `docs/theming.md` and `docs/scaling.md`.
+    also holds the tokens of popups, menus, scrollbars, lists, drag and drop and text fields,
+    which the blocks below use, and of the planned containers, tabs, tables and date pickers.
+    See `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
     (`layout.h`) work. See `docs/layout.md`.
   - Core, input: key chords as text and back, key binds in the modes Hold, Toggle, Always and
@@ -67,22 +69,28 @@ works, the built-in strings and the edit session queries in `common.h` work, and
   - the popup host (`popup_host.h`, `popup_place.h`): placement beside an anchor with flip and
     clamp, nested levels on Dear ImGui's popup stack, Escape and the context menu keys through
     key ownership, focus return, glass or opaque surfaces, an open motion and a close motion
-    that replays the last frame, tooltips with hover intent, and the modal scrim;
+    that replays the last frame, tooltips with hover intent, and the modal scrim; and the menu
+    rows on it (`popup_menu.h`): submenus that open after a rest or by key and stay open while
+    the pointer aims at them, a shortcut column, and icons or check marks;
   - the scroll core (`scroll.h`): scroll areas with overlay bars, smooth wheel scrolling that
     hands over between nested areas, edge fades, revealing a rectangle and edge scrolling;
   - the list and selection core (`list_core.h`, `list_view.h`): virtualized rows, Dear
-    ImGui's multi-select with box selection, keyboard and typeahead, trees, and the loading,
-    error and empty states;
+    ImGui's multi-select with box selection, keyboard and typeahead, trees, the loading,
+    error and empty states, an active row driven from a field that keeps the keyboard, and the
+    row look and keys on their own for containers that place their rows themselves;
   - the drag and drop core (`drag_drop.h`): typed drags that work with stock Dear ImGui
     sources and targets, ordered and wrapping drop zones with the gap or an insertion line,
-    the drag preview, edge scrolling of scroll areas, and a keyboard path;
+    the drag preview, edge scrolling of scroll areas, and a keyboard path that a source opts
+    into;
   - the text field core (`text_field.h`, `text_field_number.h`): fields on Dear ImGui's own
-    text editing with the Facet frame, adornments, edit sessions and number editing.
+    text editing with the Facet frame, adornments, edit sessions and number editing with a
+    logarithmic drag and a hook for a field's own text grammar.
 
   The blocks call each other through these headers: a list view scrolls in a scroll area and
   keeps the wheel inside a popup level, a drag edge scrolls the area under it, a drag within a
-  list view reports the move, and a text field hands its list keys to an open completion
-  level (tested in `tests/test_block_combinations.cpp`).
+  list view reports the move, a text field hands its list keys to an open completion level and
+  drives the active row of a list view there, and a table runs its rows through the list row
+  block (tested in `tests/test_block_combinations.cpp` and `tests/test_list_core.cpp`).
 - `facet::EndFrame` reports a `PushAccent`, `PushControlSize` or Facet scope left open
   through Dear ImGui's recoverable error path and clears it.
 - `facet_demo`, a gallery application with a borderless, resizable, per-monitor DPI aware
@@ -131,8 +139,9 @@ works, the built-in strings and the edit session queries in `common.h` work, and
       the arrow keys after Tab, a logarithmic axis, a 100000 sample series drawn through
       decimation, the series colors with their contrast, and an empty state.
     - Popup host: a dropdown list and a long list that shrinks to the room it has, a menu with
-      submenus, a context menu, a glass popover, tooltips, a modal with a confirm level, and
-      levels placed near the display edges; a capture state shows a level in its close motion.
+      submenus, shortcuts that work and a checked choice, a context menu, a glass popover,
+      tooltips, a modal with a confirm level, and levels placed near the display edges; a
+      capture state shows a level in its close motion.
     - Scroll: a long area with edge fades, nested areas that hand the wheel over, an area that
       scrolls on both axes, the edge fades on every surface, content that fits, and a reduce
       motion switch.
