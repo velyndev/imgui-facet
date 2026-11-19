@@ -657,7 +657,8 @@ void Note(const char* fmt, ...)
 void PlannedFamilyNote(const char* family)
 {
     Note("Every widget on this page is a placeholder of its declared size until Phase 2 implements it: it shows its "
-         "name and the word planned, cannot be operated and returns nothing. Declared in facet/widgets/%s.h; the "
+         "name and the word planned (a narrow box only its label, with the whole text on hover), cannot be operated "
+         "and returns nothing. Declared in facet/widgets/%s.h; the "
          "declarations and usage examples are in docs/widgets/%s.md.",
          family, family);
 }
