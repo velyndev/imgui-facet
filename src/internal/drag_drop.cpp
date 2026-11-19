@@ -834,7 +834,7 @@ void DrawGhost()
     {
         char count[16];
         std::snprintf(count, sizeof(count), "%d", drag.count);
-        DrawBadge(drawList, rect.Max.x > rect.Min.x ? ImVec2(rect.Max.x, rect.Min.y) : rect.Min, count, Icon());
+        DrawBadge(drawList, ImVec2(rect.Max.x, rect.Min.y), count, Icon());
     }
     if (s.ghostEffect == DragDropEffect::Copy)
         DrawBadge(drawList, rect.Max, nullptr, Icon("plus"));
@@ -1098,7 +1098,7 @@ bool DragDropActive(const char* type, DragDropInfo* info)
         found.grabOffset = drag.grabOffset;
         found.sourceSize = drag.sourceSize;
         found.keyboard = drag.kind == DragKind::Keyboard;
-        found.facet = true;
+        found.facetSource = true;
     }
     else if (const ImGuiPayload* payload = ImGui::GetDragDropPayload())
     {
@@ -1110,7 +1110,7 @@ bool DragDropActive(const char* type, DragDropInfo* info)
             found.grabOffset = drag.grabOffset;
             found.sourceSize = drag.sourceSize;
         }
-        found.facet = ours;
+        found.facetSource = ours;
     }
     else
     {

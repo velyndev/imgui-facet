@@ -872,7 +872,7 @@ TEST_CASE("The ghost follows the pointer at the grab offset with the ghost opaci
     CHECK(ghost.GetHeight() == doctest::Approx(list.rowSize.y));
 
     REQUIRE(list.active);
-    CHECK(list.info.facet);
+    CHECK(list.info.facetSource);
     CHECK_FALSE(list.info.keyboard);
     CHECK(list.info.grabOffset.x == doctest::Approx(30.0f));
     CHECK(list.info.sourceSize.y == doctest::Approx(list.rowSize.y));

@@ -164,7 +164,7 @@ struct DragDropInfo
     ImVec2 sourceSize = {0.0f, 0.0f};       // the source item's size when the drag started (pixels);
                                             // zero for a stock source
     bool keyboard = false;                  // picked up with Space and moved with the arrow keys
-    bool facet = false;                     // started by DragDropBeginSource (a ghost is drawn)
+    bool facetSource = false;               // started by DragDropBeginSource (a ghost is drawn), not a stock source
 };
 
 // Whether a drag is in progress, of `type` when it is not null. *info (may be null) receives it.
