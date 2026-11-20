@@ -66,9 +66,20 @@ Subsystem ScrollSubsystem();             // src/internal/scroll.cpp
 Subsystem DragDropSubsystem();           // src/internal/drag_drop.cpp
 Subsystem TextFieldSubsystem();          // src/internal/text_field.cpp
 Subsystem WidgetsCommonSubsystem();      // src/widgets/common.cpp: control size stack
-Subsystem WidgetsControlsSubsystem();    // src/widgets/controls_frame.cpp
-Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp
-Subsystem WidgetsContentSubsystem();     // src/widgets/content_frame.cpp
+// One entry per widget family that is implemented on its own, each in a file of that family, so
+// a family adds per-frame or per-device work without touching a file another family owns.
+Subsystem WidgetsButtonsSubsystem();     // src/widgets/buttons/buttons_frame.cpp
+Subsystem WidgetsSelectionSubsystem();   // src/widgets/selection/selection_frame.cpp
+Subsystem WidgetsSlidersSubsystem();     // src/widgets/sliders/sliders_frame.cpp
+Subsystem WidgetsTextInputsSubsystem();  // src/widgets/inputs/text_inputs_frame.cpp: the text-like inputs
+Subsystem WidgetsValueInputsSubsystem(); // src/widgets/inputs/value_inputs_frame.cpp: the number-like inputs
+Subsystem WidgetsListsSubsystem();       // src/widgets/lists/lists_frame.cpp
+Subsystem WidgetsContainersSubsystem();  // src/widgets/containers/containers_frame.cpp
+Subsystem WidgetsDisplaySubsystem();     // src/widgets/display/display_frame.cpp (DataTable excluded)
+// The families that are still grouped.
+Subsystem WidgetsControlsSubsystem();    // src/widgets/controls_frame.cpp: pickers
+Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp: navigation, layout, overlays
+Subsystem WidgetsContentSubsystem();     // src/widgets/content_frame.cpp: DataTable, charts, media, composites
 Subsystem ScopesSubsystem();             // src/internal/scope_stack.cpp
 
 // The ordered table (src/core/subsystems.cpp). Built on first use, valid for the whole run.

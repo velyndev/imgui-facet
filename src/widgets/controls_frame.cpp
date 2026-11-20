@@ -1,5 +1,6 @@
-// Per-frame work of the widget families buttons, selection, sliders, inputs and pickers.
-// The widgets are placeholders until Phase 2, so the module has no hooks yet.
+// Per-frame work of the pickers family. The buttons, selection, sliders and inputs families have
+// entries of their own (src/internal/subsystem.h). The pickers are placeholders, so the module
+// has no hooks yet.
 
 #include "internal/subsystem.h"
 

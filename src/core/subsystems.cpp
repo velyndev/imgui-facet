@@ -30,10 +30,13 @@
 //
 // Widgets (Phase 1c and 2), after the blocks they build on:
 //   widgets common     the control size stack; EndFrame closes sizes left pushed
-//   widgets controls   buttons, selection, sliders, inputs, pickers
-//   widgets structure  lists, navigation, containers, layout, overlays; EndFrame draws the
-//                      toast stack, after every page has drawn
-//   widgets content    display, charts, media, composites
+//   one entry per family implemented on its own (buttons, selection, sliders, text inputs,
+//                      value inputs, lists, containers, display), in that order; each fills
+//                      its own accessor in a file of its family
+//   widgets controls   pickers
+//   widgets structure  navigation, layout, overlays, and the placeholder frames of every
+//                      family; EndFrame draws the toast stack, after every page has drawn
+//   widgets content    DataTable, charts, media, composites
 //
 // Last:
 //   scopes             EndFrame reports Begin / End pairs still open, after every module
@@ -48,7 +51,7 @@ namespace facet::internal
 
 std::span<const Subsystem> Subsystems()
 {
-    static const std::array<Subsystem, 20> table = {
+    static const std::array<Subsystem, 28> table = {
         ThemeSubsystem(),
         ScaleSubsystem(),
         StateStorageSubsystem(),
@@ -65,6 +68,14 @@ std::span<const Subsystem> Subsystems()
         DragDropSubsystem(),
         TextFieldSubsystem(),
         WidgetsCommonSubsystem(),
+        WidgetsButtonsSubsystem(),
+        WidgetsSelectionSubsystem(),
+        WidgetsSlidersSubsystem(),
+        WidgetsTextInputsSubsystem(),
+        WidgetsValueInputsSubsystem(),
+        WidgetsListsSubsystem(),
+        WidgetsContainersSubsystem(),
+        WidgetsDisplaySubsystem(),
         WidgetsControlsSubsystem(),
         WidgetsStructureSubsystem(),
         WidgetsContentSubsystem(),

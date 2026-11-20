@@ -1,6 +1,6 @@
-// Per-frame work of the widget families display, charts, media and composites, for example
-// sampling frame times for the frame time graph.
-// The widgets are placeholders until Phase 2, so the module has no hooks yet.
+// Per-frame work of DataTable and the widget families charts, media and composites, for example
+// sampling frame times for the frame time graph (the rest of display.h has an entry of its own,
+// see src/internal/subsystem.h). The widgets are placeholders, so the module has no hooks yet.
 
 #include "internal/subsystem.h"
 
