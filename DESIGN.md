@@ -74,6 +74,14 @@ cursor, disabled ones the not-allowed cursor.
 | Drag and drop | starts after 4, preview at 70 %, edge scroll in a 32 band at up to 800 per second, a resting drag opens a target after 0.6 s | A small slip stays a click; the preview shows what moves without hiding where it lands; scrolling speeds up toward the edge so the user controls it |
 | Text fields | 8 inner padding, caret 1.5 rounded to whole pixels | Text lines up with the labels of other controls; the caret stays one or two crisp pixels at every scale |
 | Popup motion | open 150 ms from 96 % size, close 100 ms | A popup grows out of its anchor, which shows where it came from; it leaves faster than it came so the next action is never kept waiting |
+| Status dots | 8, page dots 6 | A status dot reads at a glance next to Body text; page dots are a step smaller because they only count, they do not report a state |
+| Slider marks | ticks 4, the track height | A tick as thick as the track reads as part of it, not as a separate control |
+| Segment inset | 2, the toggle knob inset | The selection pill sits inside the track the same way a toggle knob sits in its track |
+| Progress tracks | small 4, regular 6, large 8 | Small equals the slider track so a strength meter under a field matches the sliders; each size adds one half grid step |
+| State icons | 32 above an empty or error state | One grid step of the largest spacing: big enough to read as the subject of the empty area, small enough not to become an illustration |
+| Status bar | 24 high | The small list row height, so status segments line up with small controls |
+| Feedback hold | 1.5 s | A copied check stays long enough to be seen after the pointer moves away, short enough that it does not linger as a stale state |
+| Live pulse | 2 s per pulse, still with reduced motion | Slower than the spinner, so a live dot reads as calm presence and not as work in progress |
 
 ## Colors
 
@@ -92,6 +100,11 @@ cursor, disabled ones the not-allowed cursor.
 | scrollThumb, scrollThumbHover | black at 45 / 60 % | white at 45 / 62 % | The scroll position reads at 3:1 on every surface, and the thumb gets stronger where the pointer is |
 | Accent presets | blue, purple, pink, red, orange, yellow, green, graphite | the same | A short list of distinct hues; any of them derives readable states |
 | Status: destructive, success, warning | #C4000F, #146C2E, #8A5300 | #FF6B5F, #32D74B, #FFD60A | Readable as text on the content surfaces |
+| onDestructive, destructiveHover, destructivePressed | white on destructive; hover and pressed 0.04 and 0.08 darker | black on destructive; hover and pressed lighter | The same derivation as the accent states, so a destructive button behaves like a primary one and its text stays at 4.5:1 |
+| onSuccess, onWarning | white, white | black, black | Whichever of white or black reads better on the solid fill |
+| destructiveSubtle, successSubtle, warningSubtle | the status color at 14 % | the status color at 14 % | Enough to tint the surface; the dark accentSubtle strength (24 %) would take labelSecondary below 4.5:1 on the bright dark warning, so the washes keep 14 % in both themes; the tone glyph keeps 3:1 on them |
+| accentTextVisited | accentText with its hue turned 60 degrees, lightness moved to 4.5:1 | the same | A visited link stays a link (same chroma and strength) but differs in hue from an unvisited one |
+| Code tints keyword, string, number | #7A1FA2, #1A6B2B, #9A4A00 | #D7A8FF, #7EE08F, #FFB86B | Three hues far apart that reach 4.5:1 on every surface; comments use labelSecondary, so code never needs a color that is hard to read |
 | shadow | black | black | A neutral shadow; its strength comes from the elevation opacity |
 | Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Dark surfaces need more strength for a shadow to show over bgSecondary and bgTertiary |
 | glassTint | #FFFFFF | #1C1C1E | The panel tint matches the theme's base surfaces, so glass reads as a surface |
@@ -287,6 +300,27 @@ Text field core:
 - **Drag fields** show the left-right resize cursor over the field and its label, which says
   that dragging changes the value.
 
+Control anatomy (`src/internal/control.h`), the parts every widget family shares:
+
+- **Padding by size.** Push-like controls keep spacing.sm, spacing.md and spacing.lg between their
+  edge and their content at Small, Regular and Large, so the space around the text grows with the
+  height and every size looks equally balanced.
+- **Icons beside text** are as large as the font size, whole pixels, spacing.sm from the text, so
+  an icon reads as part of its label at every size.
+- **Labels in front** take their text width and spacing.sm, at most half the widget; a longer
+  label ends in an ellipsis and shows in full on hover and keyboard focus, so the control always
+  keeps half the row.
+- **Labels above** a group or a tall control use the control text style and stand spacing.xs above
+  it, the same gap as the message line below, so label, control and message read as one block.
+- **One message line** for every control: Footnote, spacing.xs under it, help text in
+  labelSecondary, an error in destructive with the error icon; every error is also collected for
+  ValidationSummary.
+- **One disabled look** for every variant of a control: fill[3], a separator hairline where the
+  control has a surface, labelTertiary content, no hover or press feedback, so a disabled primary
+  action no longer claims the accent.
+- **Fill feedback.** Hover blends the rest fill toward the hover fill and a press toward the
+  pressed fill over durationFast, so the feedback is the same in every widget.
+
 ### Prototype controls
 
 The Blocks pages operate the blocks through prototype controls in `demo/`. They are not the
@@ -302,6 +336,37 @@ Phase 2 widgets; their look is the starting point for them:
 - **Marks.** Step ticks (including an off-grid max) and snap stops are labelSecondary dots.
 - **Read-only** fills in labelSecondary, so a value that cannot change does not look like an
   accent selection.
+
+## Widgets
+
+Button:
+
+- **Secondary** is the neutral fill with the 3:1 boundary hairline, like a text field, so a row of
+  neutral controls reads as one set.
+- **Primary** is the accent fill with onAccent text and a focusRing hairline; focusRing equals the
+  accent where the accent already reaches 3:1, and keeps a light accent's edge visible otherwise.
+- **Destructive** is the solid destructive fill with onDestructive text and no hairline, because
+  the destructive color reaches 3:1 itself; its weight matches the primary action, so a dangerous
+  action is never the quieter one.
+- **Plain** is text only, with a fill only while hovered or pressed, for actions next to a primary
+  one that should not compete with it.
+- **Loading** keeps the width and shows the spinner where the icon is (where the label is without
+  an icon) in the content color, so the row does not shift while work runs.
+- **Icon only.** An empty visible label gives a square of one control height, so icon buttons line
+  up with the control height grid.
+
+ProgressBar:
+
+- **Track and fill.** The track is fill[0]; the value is the tone color at 3:1 (focusRing for the
+  accent tone), so the value reads on every surface while the track stays a quiet frame; a buffer
+  fill in labelTertiary sits between them in strength.
+- **Thickness** follows the control size (4, 6, 8) with radii.element capped at half the
+  thickness, which rounds the ends of these thin tracks fully.
+- **Placement.** Without a label line the track is centered in one control height, so it lines up
+  with the labels of a settings row; with one it follows the line directly.
+- **Motion.** A new value eases in over durationStandard; an indeterminate bar sweeps a segment of
+  30 % of the track on the shared loading clock, so it moves in step with skeletons, and fades in
+  place with reduced motion.
 
 ## Effects
 

@@ -1,10 +1,11 @@
 # Inputs
 
 Header: `facet/widgets/inputs.h`. The declarations follow [the API conventions](../api-conventions.md);
-the comment above each declaration in the header is the full reference. Every widget here is
-**planned**: the function exists, draws a placeholder of the widget's default size, returns the neutral
-result and writes nothing. Phase 2 implements the widgets and changes their status to ready. See
-[the widget index](../widgets.md).
+the comment above each declaration in the header is the full reference. Each entry below ends with
+the widget's status. A **planned** widget exists as a function that draws a placeholder of the
+widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
+header describes. See [the widget index](../widgets.md). The demo gallery shows the text-like
+inputs on the page Text inputs and the number-like ones on the page Value inputs.
 
 Text editing, IME, undo, selection and the clipboard are Dear ImGui's own (`InputTextEx`); Facet
 draws the frame, the placeholder, icons and messages around it. Editable text comes as

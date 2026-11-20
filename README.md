@@ -5,15 +5,18 @@ a consistent set of custom widgets, a light and a dark theme, icon rendering and
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
 **Status: early development.** The building blocks of Phase 1 exist inside the library and
-work; no Facet widget is implemented yet. Planned blocks: overlay scrollbars inside popup levels
-and multiline text areas (both still use Dear ImGui's own bar there). The fourteen widget family
-headers in `include/facet/widgets/` declare the planned widgets with documentation comments,
-and every declared function links. Each widget function draws a placeholder that says
-"planned", returns the neutral result and writes nothing; End functions, queries and helpers
-such as `PassesFilter` draw nothing and return neutral values. The exceptions: `ApplyReorderMove`
-works, the built-in strings and the edit session queries in `common.h` work, and the
-`BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it (see
-`docs/widgets.md` and the family pages under `docs/widgets/`). What exists today:
+work. Planned blocks: overlay scrollbars inside popup levels and multiline text areas (both still
+use Dear ImGui's own bar there). The fourteen widget family headers in `include/facet/widgets/`
+declare every widget with documentation comments, and every declared function links. Two widgets
+are implemented: `Button` and `ProgressBar`. The other widgets of the buttons, selection,
+sliders, inputs, lists, containers and display families are being implemented; until a widget is
+ready, and for every widget of the other families, the function draws a placeholder that says
+"planned", returns the neutral result and writes nothing, and planned End functions, queries and
+helpers such as `PassesFilter` draw nothing and return neutral values. Besides the ready widgets,
+`ApplyReorderMove`, the built-in strings and the edit session queries in `common.h` work, and the
+`BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it. The
+status of each widget is the last line of its entry on its family page under `docs/widgets/`
+(see `docs/widgets.md`). What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -28,7 +31,9 @@ works, the built-in strings and the edit session queries in `common.h` work, and
     mode that follows the Windows app theme and `ApplyImGuiStyle` for stock Dear ImGui widgets
     (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). The theme
     also holds the tokens of popups, menus, scrollbars, lists, drag and drop and text fields,
-    which the blocks below use, and of the planned containers, tabs, tables and date pickers.
+    which the blocks below use, and of the widgets: status fill states and washes, visited
+    links, code tints, dots, ticks, progress tracks, copied feedback, containers, tabs, tables
+    and date pickers.
     See `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
     (`layout.h`) work. See `docs/layout.md`.
@@ -65,7 +70,10 @@ works, the built-in strings and the edit session queries in `common.h` work, and
   groups, overflow fitting, the value drag core (linear, logarithmic, stepped, wrapping and
   delta mappings with one edit session per drag or key press), the multi-handle model, the
   selection pill, fuzzy matching with ranked match ranges, chord capture, the chart core
-  (scales, ticks and labels, hover snapping, decimation and series colors), and:
+  (scales, ticks and labels, hover snapping, decimation and series colors), the control anatomy
+  every widget shares (`control.h`: sizes and paddings, the label in front of or above a
+  control, text cut with an ellipsis and its tooltip, fill feedback, the field frame, the loading
+  spinner and the help and error line, whose errors are collected for `ValidationSummary`), and:
   - the popup host (`popup_host.h`, `popup_place.h`): placement beside an anchor with flip and
     clamp, nested levels on Dear ImGui's popup stack, Escape and the context menu keys through
     key ownership, focus return, glass or opaque surfaces, an open motion and a close motion
@@ -154,9 +162,13 @@ works, the built-in strings and the edit session queries in `common.h` work, and
     - Text field core: plain, narrow, search, password, validated, floating label, limited and
       loading fields, a number field with steppers and drag, a multiline area, a read-only
       field, and the three control sizes.
-  - Widgets: one page per widget family (Buttons, Selection, Sliders, Inputs, Pickers, Lists,
-    Navigation, Containers, Layout, Overlays, Display, Charts, Media, Composites). Every widget
-    on them is a placeholder of its declared size that cannot be operated.
+  - Widgets: one page per widget family (Buttons, Selection, Sliders, Text inputs and Value
+    inputs, Pickers, Lists, Navigation, Containers, Layout, Overlays, Display, Charts, Media,
+    Composites). Buttons shows `Button` in every variant, size, icon placement and state, with
+    capture states for hover, press, keyboard focus and loading and a selftest; Display shows
+    `ProgressBar` driven by a value slider, in three sizes and tones and indeterminate, with a
+    selftest. Every other widget on them is a placeholder of its declared size that cannot be
+    operated.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection
@@ -271,8 +283,9 @@ src/             library sources; src/internal holds headers shared inside the l
 assets/icons/    SVG files embedded into the library
 cmake/           dependency, warning and asset embedding scripts
 docs/            topic guides: theming, scaling, images and icons, layout, input;
-                 api-conventions.md (the rules every widget declaration follows); widgets.md
-                 (the widget families, with one page each under docs/widgets/)
+                 api-conventions.md (the rules every widget declaration follows);
+                 writing-a-widget.md (how a widget is built, tested, shown and documented);
+                 widgets.md (the widget families, with one page each under docs/widgets/)
 demo/            facet_demo; demo/pages holds one file per page
 tests/           doctest unit tests, one file per topic; tests/support holds the shared
                  Dear ImGui and WARP session for tests that run frames and scripted input;

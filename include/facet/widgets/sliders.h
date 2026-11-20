@@ -4,10 +4,10 @@
 // knobs and two-dimensional pads.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is planned: its widgets are declared here and implemented in
-// Phase 2 (docs/widgets/sliders.md). Until then every widget function draws a placeholder of
-// the widget's default size, returns false and writes nothing. The queries report that nothing
-// happened (-1).
+// with other families. The family is being implemented: the entry of each widget in
+// docs/widgets/sliders.md ends with its status. A widget whose status is planned draws a
+// placeholder of the widget's default size, returns false and writes nothing; its queries report
+// that nothing happened (-1).
 //
 // Common to every widget here:
 //   - The bool result is true on the frame a value was written. Drags, clicks and keys write at

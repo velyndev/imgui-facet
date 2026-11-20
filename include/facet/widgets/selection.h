@@ -4,10 +4,10 @@
 // cycle selectors, option cards and the key bind mode selector.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is planned: its widgets are declared here and implemented in
-// Phase 2 (docs/widgets/selection.md). Until then every widget function draws a placeholder of
-// the widget's default size, returns false and writes nothing. The queries report that nothing
-// happened (false or -1).
+// with other families. The family is being implemented: the entry of each widget in
+// docs/widgets/selection.md ends with its status. A widget whose status is planned draws a
+// placeholder of the widget's default size, returns false and writes nothing; its queries report
+// that nothing happened (false or -1).
 //
 // Common to every widget here:
 //   - The bool result is true on the frame the widget wrote its value or selection.

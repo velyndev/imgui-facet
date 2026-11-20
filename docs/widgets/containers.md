@@ -9,8 +9,8 @@ inspector pane, declared in `facet/widgets/containers.h`. Every declaration foll
 A widget whose status is planned is declared and callable: it draws a dashed placeholder with its
 name, returns the neutral result and never writes a value. Containers whose content sits in the page
 show that content inside the placeholder; layers (the shell, the mini window) open nothing and show
-one placeholder line while the caller asks for them. Phase 2 implements each widget and changes its
-status to ready.
+one placeholder line while the caller asks for them. A widget whose status is ready works as its
+header describes.
 
 When End is called: a Begin that returns `void` always lays out its content and its End is always
 called. A Begin that returns `[[nodiscard]] bool` may skip its content, and its End is called only
