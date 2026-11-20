@@ -150,13 +150,17 @@ void SliderSection(facet::demo::PageCtx& ctx)
               "move a tenth, Home and End go to the ends; Ctrl+click or Enter types a value, Escape restores it.");
 
     LabeledRow("Continuous");
-    ForceCaptureLook(ctx);
+    // Hovered and focused show on this slider, dragging on the range below.
+    const bool sliderState = ctx.capture && (ctx.captureState == kHovered || ctx.captureState == kFocused);
+    if (sliderState)
+        ForceCaptureLook(ctx);
     if (facet::Slider("Level", &ui.level, 0.0f, 1.0f, {.format = "%.2f", .valueBubble = true}))
         ++ui.levelEdits;
     if (facet::IsItemEditCommitted())
         ++ui.levelCommits;
     ctx.Probe("slider.level");
-    ctx.RevealInCapture(0.3f);
+    if (sliderState)
+        ctx.RevealInCapture(0.3f);
     LabeledRow("Whole numbers");
     facet::Slider("Count", &ui.count, 0, 10, {.step = 1.0});
     ctx.Probe("slider.count");
@@ -248,7 +252,6 @@ void KnobSection(facet::demo::PageCtx& ctx)
     const auto KnobNext = [&] { facet::demo::SameLineIfFits(right, knobWidth); };
     LabeledRow("Variants");
     right = facet::demo::ContentRight();
-    ForceCaptureLook(ctx);
     facet::Knob("Arc", &ui.knobArc, 0.0f, 1.0f, {.format = "%.2f"});
     ctx.Probe("knob.arc");
     KnobNext();
@@ -320,12 +323,15 @@ void RangeSection(facet::demo::PageCtx& ctx)
               "types its value.");
 
     LabeledRow("Minimum gap");
-    ForceCaptureLook(ctx, 1);
+    const bool rangeState = ctx.capture && ctx.captureState == kDragging;
+    if (rangeState)
+        ForceCaptureLook(ctx, 1);
     facet::RangeSlider("Price", &ui.low, &ui.high, 0.0f, 100.0f,
                        {.format = "%.0f", .minGap = 10.0, .valueBubble = true});
     ctx.Probe("range.price");
     ProbeHandles(ctx, "Price", "range.price", 2);
-    ctx.RevealInCapture(0.4f);
+    if (rangeState)
+        ctx.RevealInCapture(0.4f);
     LabeledRow("Push, steps of 5");
     facet::RangeSlider("Window", &ui.lowInt, &ui.highInt, 0, 100,
                        {.step = 5.0, .minGap = 10.0, .collision = facet::HandleCollision::Push});
@@ -433,8 +439,6 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     SectionHeader("More ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
               "and either stop at each other or push each other.");
-    LabeledRow("Range over bars");
-    facet::RangeSliderHistogram("##histogram", &ui.histogramLow, &ui.histogramHigh, 0.0f, 1.0f, kBins);
     LabeledRow("Arc range");
     facet::ArcRangeSlider("##arc", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f});
     LabeledRow("Shares");
