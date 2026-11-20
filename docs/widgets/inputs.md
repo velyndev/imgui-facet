@@ -27,8 +27,26 @@ bool TextField(const char* label, std::string* text, const TextFieldOptions& opt
 bool TextField(const char* label, char* buffer, std::size_t bufferSize, const TextFieldOptions& options = {});
 ```
 
-Single-line text with a placeholder, a leading icon, a clear button and a length limit.
-Status: planned.
+Single-line text on the text field core: Dear ImGui edits it (caret, selection with the mouse and
+with Shift and the arrows, word moves with Ctrl, double click, undo and redo, the clipboard, key
+repeat, IME), Facet draws the frame around it. The visible label part sits in front of the frame
+and takes at most half the width; a longer label ends in an ellipsis and shows in full on hover
+and keyboard focus. Options add a placeholder (labelSecondary), a leading icon, a clear button
+while there is text (not a Tab stop; it empties the text, counts as one committed edit and gives
+the keyboard back to the field), a limit in code points that also cuts a paste, select-all on
+focus, a trailing spinner while `loading` (the text stays editable), the mixed placeholder until
+the first edit, and the error or help line under the frame. The width follows rule 6 and fills the
+row by default; the three control sizes set the height and the text style.
+
+Typing writes per keystroke and returns true on each write (with
+`ImGuiItemFlags_LiveEditOnInputText` pushed off, on Enter, Tab or focus loss only). Enter, Tab or a
+click elsewhere ends the edit: `IsItemEditCommitted()` is true once if the text changed. Escape
+restores the text from activation, writes it, returns true and reports `IsItemEditCanceled()`.
+`readOnly` (or a pushed `ImGuiItemFlags_ReadOnly`) lets the text be focused, selected and copied but
+never changed; a null `text` or an empty buffer shows an empty read-only field and returns false.
+The buffer form cuts the text to fit and keeps it zero terminated. Inside `ImGui::BeginDisabled` the
+field is not a Tab stop and takes no input. `callback` receives only the events named in
+`callbackEvents`. Status: ready.
 
 ### SecureField
 

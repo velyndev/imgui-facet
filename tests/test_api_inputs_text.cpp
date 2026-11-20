@@ -50,8 +50,6 @@ void CallTextInputStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, TextField("Text 1", &v.text, {.placeholder = "Placeholder", .clearButton = true}));
-    FACET_CHECK_STUB(false, TextField("Text 2", buffer, bufferSize));
     FACET_CHECK_STUB(false, SecureField("Secure 1", &v.text, {.strength = 0.5f}));
     FACET_CHECK_STUB(false, SecureField("Secure 2", buffer, bufferSize));
     FACET_CHECK_STUB(false, SearchField("Search 1", &v.text, {.recent = std::span(kLabels)}));
@@ -84,7 +82,7 @@ void CallTextInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 28;
+constexpr int kTextInputStubCalls = 26;
 
 } // namespace
 
@@ -99,7 +97,7 @@ TEST_CASE("Text input placeholders called outside a frame return the neutral res
     REQUIRE(session.Ready());
     Values values;
     const std::string pristine = Describe(values);
-    CHECK_FALSE(facet::TextField("Text 1", &values.text));
+    CHECK_FALSE(facet::PathField("Path 1", &values.text));
     facet::FieldValidation("Message");
     CHECK(Describe(values) == pristine);
 }
@@ -113,25 +111,25 @@ TEST_CASE("Text input placeholders take their width in the order of the conventi
     session.SetUi([&] {
         available = ImGui::GetContentRegionAvail().x;
         units = facet::Px(1.0f);
-        facet::TextField("Default", static_cast<std::string*>(nullptr));
+        facet::PathField("Default", static_cast<std::string*>(nullptr));
         session.Track("default");
-        facet::TextField("Units", static_cast<std::string*>(nullptr), {.width = 200.0f});
+        facet::PathField("Units", static_cast<std::string*>(nullptr), {.width = 200.0f});
         session.Track("units");
-        facet::TextField("Fill", static_cast<std::string*>(nullptr), {.width = facet::kFill});
+        facet::PathField("Fill", static_cast<std::string*>(nullptr), {.width = facet::kFill});
         session.Track("fill");
-        facet::TextField("Minus", static_cast<std::string*>(nullptr), {.width = -50.0f});
+        facet::PathField("Minus", static_cast<std::string*>(nullptr), {.width = -50.0f});
         session.Track("minus");
         ImGui::SetNextItemWidth(150.0f);
-        facet::TextField("Next", static_cast<std::string*>(nullptr));
+        facet::PathField("Next", static_cast<std::string*>(nullptr));
         session.Track("next");
         // The option wins over SetNextItemWidth, and the request does not leak to the next item.
         ImGui::SetNextItemWidth(150.0f);
-        facet::TextField("Both", static_cast<std::string*>(nullptr), {.width = 100.0f});
+        facet::PathField("Both", static_cast<std::string*>(nullptr), {.width = 100.0f});
         session.Track("both");
-        facet::TextField("After", static_cast<std::string*>(nullptr));
+        facet::PathField("After", static_cast<std::string*>(nullptr));
         session.Track("after");
         ImGui::PushItemWidth(120.0f);
-        facet::TextField("Pushed", static_cast<std::string*>(nullptr));
+        facet::PathField("Pushed", static_cast<std::string*>(nullptr));
         session.Track("pushed");
         ImGui::PopItemWidth();
     });
