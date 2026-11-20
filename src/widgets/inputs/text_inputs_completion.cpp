@@ -138,6 +138,16 @@ void CompletionList::BeforeField()
     }
 }
 
+void CompletionList::CloseAccepted()
+{
+    CompletionState& state = GetState<CompletionState>(level_);
+    ClosePopupLevel(level_);
+    state.latched = true;
+    state.highlight = -1;
+    TextFieldSetSelection(field_, INT_MAX, INT_MAX);
+    ReleaseCompletionKeys(level_, false);
+}
+
 int CompletionList::Highlight() const
 {
     return GetState<CompletionState>(level_).highlight;
@@ -264,7 +274,7 @@ int CompletionList::Run(const TextFieldResult& field, const CompletionDesc& desc
     }
     if (!desc.forcedOpen && !IsPopupLevelOpen(level_))
         ReleaseCompletionKeys(level_, false);
-    else if (state.highlight < 0)
+    else if (state.highlight < 0 && !desc.holdTab)
         ReleaseCompletionKeys(level_, false, true);
     return accepted;
 }

@@ -34,6 +34,8 @@ inline bool TextWritable(const char* buffer, std::size_t bufferSize)
 // buffer, cut at a whole code point to fit with its terminator). Returns true when the text changed.
 // Allocation failures keep the old text.
 bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, const char* value);
+// The same for [value, valueEnd).
+bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, const char* value, const char* valueEnd);
 
 // The Dear ImGui callback events a widget forwards (inputs.h "Text callbacks"); every other bit
 // of `events` is dropped.
@@ -94,6 +96,7 @@ struct CompletionDesc
     int maxVisibleRows = 0;              // 0 for list.popupRows
     ControlSize size = ControlSize::Inherit;
     bool forcedOpen = false;             // a capture's Open state: shown for this frame without input
+    bool holdTab = false;                // with no active row Tab stays with the list (an inline completion takes it)
 };
 
 class CompletionList
@@ -108,6 +111,9 @@ public:
     void BeforeField();
     // Opens, places, draws and closes the list. Returns the row accepted this frame, or -1.
     int Run(const TextFieldResult& field, const CompletionDesc& desc);
+    // Closes the list after the widget took an entry itself (an inline completion), with the caret
+    // moved to the end of the field; it stays closed until the next edit.
+    void CloseAccepted();
     // The active row, -1 for none.
     int Highlight() const;
     // True while the list is open.

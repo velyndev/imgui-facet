@@ -36,6 +36,7 @@ enum CaptureState
     kFocused,
     kFilled,
     kOpen,
+    kSuggestions,
 };
 
 constexpr const char* kSample = "Sample text";
@@ -92,10 +93,17 @@ struct TextInputsUi
     std::string notesValidated;
     std::string notesReadOnly = "Read-only sample text\non two lines";
 
+    // Autocomplete
+    std::string completion;
+    std::string completionInline;
+    std::string completionPrefix;
+    std::string completionLoading;
+    std::string completionError;
+    int completionPicked = -1;
+
     // The planned widgets below.
     std::string filter;
     facet::FilterSettings filterSettings;
-    std::string completion;
     std::vector<std::string> tags = {"Option 1"};
     std::string name = "Option 1";
     bool renaming = false;
@@ -339,6 +347,56 @@ void TextAreaSection(facet::demo::PageCtx& ctx)
     facet::TextArea("Read-only##readonly", &ui.notesReadOnly, {.minLines = 2, .readOnly = true});
 }
 
+// Suggestions named after the built-in icons they show, so the list has icons and details that
+// mean something without inventing data.
+const facet::ChoiceItem kIconSuggestions[] = {
+    {"Calendar", facet::Icon("calendar"), "Icon"}, {"Clock", facet::Icon("clock"), "Icon"},
+    {"Download", facet::Icon("download"), "Icon"}, {"Folder", facet::Icon("folder"), "Icon"},
+    {"Keyboard", facet::Icon("keyboard"), "Icon"}, {"Layers", facet::Icon("layers"), "Icon"},
+    {"Palette", facet::Icon("palette"), "Icon"},   {"Settings", facet::Icon("settings"), "Icon"},
+    {"Sliders", facet::Icon("sliders"), "Icon"},   {"Upload", facet::Icon("upload"), "Icon"},
+};
+
+void AutocompleteSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Autocomplete");
+    Paragraph("Suggestions under the field while it has the keyboard. Up, Down, Page Up and Page Down move, Enter, Tab "
+              "or a click takes a suggestion, Escape closes the list and a second Escape restores the text.");
+
+    LabeledRow("Fuzzy");
+    if (ctx.capture && ctx.captureState == kSuggestions)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    const ImGuiID fuzzyId = ImGui::GetID("##complete");
+    facet::Autocomplete("##complete", &ui.completion, kIconSuggestions, {.placeholder = "Type an icon name"});
+    if (facet::AutocompleteAcceptedItem() >= 0)
+        ui.completionPicked = facet::AutocompleteAcceptedItem();
+    ProbeFrame(ctx, "inputs.complete");
+    ProbeCompletionRows(ctx, fuzzyId, "inputs.complete.row", 3);
+    if (ctx.capture && ctx.captureState == kSuggestions)
+        ctx.RevealInCapture(0.2f);
+    if (ui.completionPicked >= 0)
+        Note("Last suggestion taken: %s.", kIconSuggestions[ui.completionPicked].label);
+    else
+        Note("No suggestion taken yet.");
+
+    LabeledRow("Inline, strict");
+    facet::Autocomplete("##completeInline", &ui.completionInline, kOptions,
+                        {.placeholder = "Option 1, 2 or 3", .inlineCompletion = true, .strict = true,
+                         .helpText = "Tab or Right takes the grey rest; other text is undone"});
+    ProbeFrame(ctx, "inputs.complete.inline");
+
+    LabeledRow("Prefix");
+    facet::Autocomplete("##completePrefix", &ui.completionPrefix, kOptions, {.fuzzy = false});
+    ProbeFrame(ctx, "inputs.complete.prefix");
+
+    LabeledRow("Loading");
+    facet::Autocomplete("##completeLoading", &ui.completionLoading, kOptions, {.state = facet::DataState::Loading});
+    ProbeFrame(ctx, "inputs.complete.loading");
+
+    LabeledRow("Load failed");
+    facet::Autocomplete("##completeError", &ui.completionError, kOptions, {.state = facet::DataState::Error});
+}
+
 void PlannedSections(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Other text fields");
@@ -348,8 +406,6 @@ void PlannedSections(facet::demo::PageCtx& ctx)
     SectionHeader("Search and suggestions");
     LabeledRow("Filter field");
     facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
-    LabeledRow("Autocomplete");
-    facet::Autocomplete("##complete", &ui.completion, kOptions);
     LabeledRow("Tags");
     facet::TagInput("##tags", &ui.tags, {.suggestions = kOptions});
 
@@ -375,7 +431,7 @@ void PlannedSections(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open")
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions")
 {
     if (ctx.capture)
     {
@@ -392,6 +448,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     SecureFieldSection(ctx);
     SearchFieldSection(ctx);
     TextAreaSection(ctx);
+    AutocompleteSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -565,6 +622,53 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.Type("short");
     test.ExpectText("the validated area takes text", [] { return ui.notesValidated; }, "short");
     test.KeyPress(ImGuiKey_Enter | ImGuiMod_Ctrl);
+
+    // Autocomplete: keyboard choice, pointer choice, Escape in steps, inline and strict.
+    test.Click("inputs.complete");
+    test.Type("fol");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Down and Enter take the suggestion", [] { return ui.completion; }, "Folder");
+    test.ExpectFocused("inputs.complete");
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("s");
+    test.Wait(2);
+    test.Click("inputs.complete.row.0");
+    test.Expect("a click on a suggestion takes it", [] { return ui.completion.size() > 1 && ui.completionPicked >= 0; });
+    test.Wait(2);
+    test.ExpectFocused("inputs.complete");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Click("inputs.complete");
+    test.Do([] { ui.completionPicked = -1; });
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("zz");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape closes the list and keeps the text", [] { return ui.completion; }, "zz");
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("the second Escape restores the text from activation",
+                [] { return ui.completion != "zz" && !ui.completion.empty(); });
+    test.Click("inputs.complete.inline");
+    test.Type("Opt");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectText("Tab takes the inline completion", [] { return ui.completionInline; }, "Option 1");
+    test.ExpectFocused("inputs.complete.inline");
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("nope");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.ExpectText("strict mode undoes text that matches no suggestion", [] { return ui.completionInline; }, "Option 1");
+    test.Click("inputs.complete.prefix");
+    test.Type("2");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("prefix matching finds nothing for a middle part", [] { return ui.completionPrefix; }, "2");
+    test.Click("inputs.complete.loading");
+    test.Type("x");
+    test.ExpectText("a loading list leaves the field editable", [] { return ui.completionLoading; }, "x");
+    test.KeyPress(ImGuiKey_Enter);
 
     // The stock checkbox with the planned message under it works.
     test.Click("inputs.stock");

@@ -3,6 +3,7 @@
 #include "widgets/inputs/text_inputs_shared.h"
 
 #include <cstring>
+#include <string_view>
 
 namespace facet::internal::text_inputs
 {
@@ -52,13 +53,21 @@ bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, con
 {
     if (value == nullptr)
         value = "";
+    return WriteFieldText(text, buffer, bufferSize, value, value + std::strlen(value));
+}
+
+bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, const char* value, const char* valueEnd)
+{
+    if (value == nullptr || valueEnd == nullptr || valueEnd < value)
+        value = valueEnd = "";
+    const std::string_view wanted(value, static_cast<std::size_t>(valueEnd - value));
     if (text != nullptr)
     {
-        if (*text == value)
+        if (std::string_view(*text) == wanted)
             return false;
         try
         {
-            text->assign(value);
+            text->assign(wanted);
         }
         catch (...)
         {
@@ -68,7 +77,7 @@ bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, con
     }
     if (buffer == nullptr || bufferSize == 0)
         return false;
-    std::size_t length = std::strlen(value);
+    std::size_t length = wanted.size();
     if (length > bufferSize - 1)
     {
         length = bufferSize - 1;

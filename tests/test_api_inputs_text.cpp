@@ -53,13 +53,6 @@ void CallTextInputStubs(Values& v)
     FACET_CHECK_STUB(false, FilterField("Filter 1", &v.text, &v.filter));
     FACET_CHECK_STUB(false, FilterField("Filter 2", buffer, bufferSize, nullptr, {.placeholder = "Placeholder"}));
     CHECK(PassesFilter(v.text, v.filter, "Sample text"));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 1", &v.text, kChoices));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 2", &v.text, kLabels, {.strict = true}));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 3", &v.text, 0, nullptr, nullptr, {.state = facet::DataState::Loading}));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 4", buffer, bufferSize, kChoices));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 5", buffer, bufferSize, kLabels));
-    FACET_CHECK_STUB(false, Autocomplete("Complete 6", buffer, bufferSize, 0, nullptr, nullptr));
-    CHECK(AutocompleteAcceptedItem() == -1);
     FACET_CHECK_STUB(false, TagInput("Tags 1", &v.tags, {.suggestions = std::span(kLabels)}));
     FACET_CHECK_STUB(false, InlineRename("Rename 1", &v.text, &v.editing));
     FACET_CHECK_STUB(false, InlineRename("Rename 2", buffer, bufferSize, nullptr, {.selectStem = true}));
@@ -76,7 +69,7 @@ void CallTextInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 20;
+constexpr int kTextInputStubCalls = 14;
 
 } // namespace
 

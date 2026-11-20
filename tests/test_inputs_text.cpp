@@ -1052,3 +1052,233 @@ TEST_CASE("A read-only TextArea takes no text and the buffer form cuts at its si
     session.Type("abcdefgh");
     CHECK(std::string(buffer) == "abcde");
 }
+
+// ---- Autocomplete ------------------------------------------------------------------------------
+
+namespace
+{
+
+const char* const kSuggestions[] = {"Gamma", "Alphabet", "Alpha", "Beta"};
+
+// One Autocomplete under test, with what it reported.
+struct AutocompleteProbe
+{
+    std::string text;
+    int writes = 0;
+    int accepted = -1;  // the last AutocompleteAcceptedItem() that was not -1
+    ImGuiID id = 0;
+};
+
+void RunAutocomplete(facet::test::Session& session, AutocompleteProbe& probe, const facet::AutocompleteOptions& options)
+{
+    probe.writes += facet::Autocomplete("##complete", &probe.text, kSuggestions, options) ? 1 : 0;
+    session.Track("field");
+    probe.id = ImGui::GetID("##complete");
+    TrackCompletion(probe.id);
+    if (facet::AutocompleteAcceptedItem() >= 0)
+        probe.accepted = facet::AutocompleteAcceptedItem();
+}
+
+} // namespace
+
+TEST_CASE("Autocomplete: typing filters by fuzzy rank, Down and Enter take the best suggestion")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    session.SetUi([&] { RunAutocomplete(session, probe, {}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    CHECK(CompletionOpen());  // every suggestion while the text is empty
+    session.Type("alp");
+    session.Frames(2);
+    CHECK(CompletionOpen());
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.text == "Alpha");  // the exact prefix ranks above the longer name
+    CHECK(probe.accepted == 2);
+    CHECK(ImGui::GetActiveID() == probe.id);
+    session.Frames(2);
+    CHECK_FALSE(CompletionOpen());
+    CHECK(facet::AutocompleteAcceptedItem() == -1);  // only on the frame of the choice
+}
+
+TEST_CASE("Autocomplete in prefix mode lists only suggestions that start with the text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    session.SetUi([&] { RunAutocomplete(session, probe, {.fuzzy = false}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("ph");  // fuzzy would match the alpha names, prefix matches nothing
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.text == "ph");
+    CHECK(probe.accepted == -1);
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("be");
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.text == "Beta");
+    CHECK(probe.accepted == 3);
+}
+
+TEST_CASE("Autocomplete: a click on a suggestion takes it and the field keeps the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    session.SetUi([&] { RunAutocomplete(session, probe, {}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("a");
+    session.Frames(3);
+    REQUIRE(CompletionOpen());
+    session.Click(CompletionRowCenter(0));
+    CHECK_FALSE(probe.text == "a");
+    CHECK(probe.accepted >= 0);
+    session.Frames(2);
+    CHECK(ImGui::GetActiveID() == probe.id);
+}
+
+TEST_CASE("Autocomplete: Escape closes the list, the next Escape restores the text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    probe.text = "Beta";
+    session.SetUi([&] { RunAutocomplete(session, probe, {}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("ga");
+    session.Frames(2);
+    REQUIRE(CompletionOpen());
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(CompletionOpen());
+    CHECK(ImGui::GetActiveID() == probe.id);
+    CHECK(probe.text == "ga");
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(probe.text == "Beta");
+    CHECK(ImGui::GetActiveID() != probe.id);
+}
+
+TEST_CASE("Autocomplete in strict mode restores text that matches no suggestion when the edit ends")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    probe.text = "Beta";
+    session.SetUi([&] { RunAutocomplete(session, probe, {.strict = true}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("zzz");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(probe.text == "Beta");
+    // A match in other case takes the suggestion's spelling.
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("gamma");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(probe.text == "Gamma");
+    CHECK(probe.accepted == 0);
+}
+
+TEST_CASE("Autocomplete: the inline completion is taken with Tab or Right")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    session.SetUi([&] { RunAutocomplete(session, probe, {.inlineCompletion = true}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("Alp");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(probe.text == "Alpha");
+    CHECK(ImGui::GetActiveID() == probe.id);  // Tab took the completion, the focus stayed
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("Ga");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(probe.text == "Gamma");
+    session.Type("!");
+    CHECK(probe.text == "Gamma!");
+}
+
+namespace
+{
+
+bool CityGetter(void* user, int index, facet::ChoiceItem* out)
+{
+    const char* const* names = static_cast<const char* const*>(user);
+    out->label = names[index];
+    return index != 1;  // the second entry is left out
+}
+
+} // namespace
+
+TEST_CASE("Autocomplete with a getter skips left-out entries and shows the loading state in the open list")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    facet::DataState state = facet::DataState::Ready;
+    int accepted = -1;
+    ImGuiID id = 0;
+    const char* const names[] = {"Option 1", "Option 2", "Option 3"};
+    session.SetUi([&] {
+        facet::Autocomplete("##getter", &text, 3, CityGetter, static_cast<void*>(const_cast<const char**>(names)), {.state = state});
+        session.Track("field");
+        id = ImGui::GetID("##getter");
+        TrackCompletion(id);
+        if (facet::AutocompleteAcceptedItem() >= 0)
+            accepted = facet::AutocompleteAcceptedItem();
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("2");
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(text == "2");  // "Option 2" was left out by the getter
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_Backspace);
+    state = facet::DataState::Loading;
+    session.Type("3");
+    session.Frames(2);
+    CHECK(CompletionOpen());
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(text == "3");  // nothing to take while loading; the text stays editable
+    state = facet::DataState::Ready;
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(text == "Option 3");
+    CHECK(accepted == 2);
+}
+
+TEST_CASE("A read-only Autocomplete opens no list and writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AutocompleteProbe probe;
+    probe.text = "Beta";
+    session.SetUi([&] { RunAutocomplete(session, probe, {.readOnly = true}); });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    CHECK_FALSE(CompletionOpen());
+    session.Type("x");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.text == "Beta");
+    CHECK(probe.writes == 0);
+}

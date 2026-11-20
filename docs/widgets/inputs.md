@@ -126,8 +126,27 @@ bool Autocomplete(const char* label, char* buffer, std::size_t bufferSize, int s
 int AutocompleteAcceptedItem();
 ```
 
-A text field with a list of matching suggestions, fuzzy or by prefix, with an optional inline
-completion. Status: planned.
+A TextField with the matching suggestions in a list under it while it has the keyboard (every
+suggestion while the text is empty). `fuzzy` ranks them with the fuzzy matcher and marks the matched
+characters on an accentSubtle background; with it off, suggestions that start with the text keep
+their order. A suggestion's icon and `detail` show in its row; disabled ones are shown and skipped.
+The list keeps the keyboard in the field, exactly as the recent list of SearchField: Up and Down (Page
+Up and Page Down by a page) move the active row, Enter, Tab or a click writes the suggestion's visible
+label and gives the keyboard back with the caret at the end, the pointer and the keys share one active
+row, Enter and Tab with no active row act on the field, and Escape closes the list (the next Escape
+restores the text from activation). The list follows the field on scroll and resize; with no match it
+shows `emptyText`, and with `state` Loading or Error it shows that state while the text stays
+editable. `AutocompleteAcceptedItem()` returns the index of the suggestion taken by the last call of
+the frame, or -1.
+
+`inlineCompletion` draws the rest of the best suggestion after the caret in labelSecondary while the
+list is open, no row is active and the text is a prefix of it; Tab, or Right with the caret at the end,
+takes it. `strict` puts back the text from activation (or the suggestion taken last in the edit)
+when an edit ends on text that matches no suggestion, and gives a match that differs only in case the
+suggestion's spelling. Writing, `readOnly`
+(no list), `mixed`, error and help text, sizes and width are as for TextField. The getter form is
+called during the call for every suggestion while the list is open, so a very large source costs a
+scan per frame. Status: ready.
 
 ### TagInput
 
