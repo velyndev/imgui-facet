@@ -86,8 +86,23 @@ Status: planned.
 bool Link(const char* label, const LinkOptions& options = {});
 ```
 
-Accent text that underlines on hover and focus; with `url` it also asks Dear ImGui's platform hook to
-open the address. Status: planned.
+The visible label in the accentText token as one item the width of its text, one text line tall
+(the hit area grows to the minimum hit target). Returns true on activation (a click, Enter or Space
+while focused).
+
+- **Address.** With `url`, activation also calls `ImGui::GetPlatformIO().Platform_OpenInShellFn`
+  (as `ImGui::TextLinkOpenURL` does) when the host has one, a trailing external-link icon marks
+  the link, and the address shows as its tooltip on hover and keyboard focus.
+- **Look.** A hairline underline just under the baseline while the pointer is on it, while it is
+  pressed and while it has the keyboard focus; the focus ring follows after keyboard input.
+  `visited` draws accentTextVisited (the caller tracks visits). Both colors reach 4.5:1 on every
+  surface.
+- **States.** Disabled: labelTertiary, no underline, no Tab stop, never activates or opens.
+- **Sizes and width.** `size` picks the text style (Footnote for Small, Body otherwise).
+  `ImGui::SetNextItemWidth` narrower than the text cuts it with an ellipsis and shows it in full in
+  the tooltip. Keeps no state.
+
+Status: ready.
 
 ### ToggleButtonGroup
 

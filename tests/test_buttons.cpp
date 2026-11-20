@@ -421,6 +421,97 @@ TEST_CASE("A selected icon button shows the latched tint; loading and disabled o
     CHECK(presses == 0);
 }
 
+// --- Link -------------------------------------------------------------------------------------
+
+namespace
+{
+
+std::string& OpenedUrl()
+{
+    static std::string url;
+    return url;
+}
+
+// Stands in for the platform's shell, so a test never starts a browser.
+bool RecordOpen(ImGuiContext*, const char* path)
+{
+    OpenedUrl() = path != nullptr ? path : "";
+    return true;
+}
+
+} // namespace
+
+TEST_CASE("A link activates by click and keys and asks the platform hook to open its address")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGui::GetPlatformIO().Platform_OpenInShellFn = RecordOpen;
+    OpenedUrl().clear();
+    int presses = 0;
+    int plainPresses = 0;
+    float textWidth = 0.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::Link("Release notes", {.url = "https://example.invalid/notes"}))
+            ++presses;
+        session.Track("link");
+        if (facet::Link("Show details"))
+            ++plainPresses;
+        session.Track("plain");
+        textWidth = facet::MeasureText(facet::TextStyle::Body, "Show details").x;
+    });
+    session.Frame();
+    CHECK(session.ItemRect("plain").GetWidth() == doctest::Approx(std::ceil(textWidth)));
+    CHECK(session.ItemRect("link").GetWidth() > session.ItemRect("plain").GetWidth() * 0.5f);
+    session.Click(session.ItemCenter("link"));
+    CHECK(presses == 1);
+    CHECK(OpenedUrl() == "https://example.invalid/notes");
+    OpenedUrl().clear();
+    session.Click(session.ItemCenter("plain"));
+    CHECK(plainPresses == 1);
+    CHECK(OpenedUrl().empty());  // no address, nothing opened
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("link"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(presses == 2);
+}
+
+TEST_CASE("A link draws accentText, accentTextVisited when visited, and nothing activates it while disabled")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    ImGui::GetPlatformIO().Platform_OpenInShellFn = RecordOpen;
+    const facet::Colors& c = facet::T().colors;
+    int fresh = 0;
+    int visited = 0;
+    int presses = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        int from = drawList->VtxBuffer.Size;
+        facet::Link("Fresh");
+        fresh = CountColor(from, facet::ToU32(c.accentText));
+        from = drawList->VtxBuffer.Size;
+        facet::Link("Visited", {.visited = true});
+        visited = CountColor(from, facet::ToU32(c.accentTextVisited));
+        ImGui::BeginDisabled();
+        presses += facet::Link("Disabled", {.url = "https://example.invalid"}) ? 1 : 0;
+        session.Track("disabled");
+        ImGui::EndDisabled();
+    });
+    session.Frame();
+    CHECK(fresh > 0);
+    CHECK(visited > 0);
+    OpenedUrl().clear();
+    session.Click(session.ItemCenter("disabled"));
+    CHECK(presses == 0);
+    CHECK(OpenedUrl().empty());
+}
+
 TEST_CASE("A button outside a frame returns false")
 {
     facet::test::Session session;

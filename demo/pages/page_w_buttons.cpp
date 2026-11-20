@@ -48,6 +48,11 @@ struct ButtonsUi
     bool iconLoading = false;
     bool pinTip = false;  // the pin's tooltip shows (read in the frame, for the selftest)
 
+    // Link
+    int links = 0;
+    bool linkVisited = false;
+    std::string openedUrl;  // selftests: the address the link asked the platform to open
+
     // The planned widgets below.
     bool latches[3] = {true, false, false};
     int view = 0;
@@ -286,6 +291,64 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
          ui.iconLoading ? "runs until Stop loading is pressed" : "is idle");
 }
 
+// Stands in for the platform's shell during selftests: the address is recorded instead of opened,
+// so a selftest never starts a browser.
+bool RecordOpenedUrl(ImGuiContext*, const char* path)
+{
+    ui.openedUrl = path != nullptr ? path : "";
+    return true;
+}
+
+void LinkSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Link");
+    Paragraph("Accent text for navigation inside a sentence or a row. It underlines under the pointer and the "
+              "keyboard focus; with an address it opens it through the platform and shows it as a tooltip.");
+    if (ctx.probes != nullptr)
+        ImGui::GetPlatformIO().Platform_OpenInShellFn = RecordOpenedUrl;
+
+    LabeledRow("Links");
+    {
+        const ButtonRow row;
+        if (ctx.capture && ctx.captureState == kHovered)
+            ctx.ForceNextItemState(ForcedItemState::Hovered);
+        else if (ctx.capture && ctx.captureState == kFocused)
+            ctx.ForceNextItemState(ForcedItemState::Focused);
+        if (facet::Link("Placeholder link"))
+            Pressed(&ui.links, "Placeholder link");
+        ctx.Probe("button.link.plain");
+        row.Next();
+        if (facet::Link("Placeholder address", {.url = "about:blank", .visited = ui.linkVisited}))
+        {
+            ui.linkVisited = true;
+            Pressed(&ui.links, "Placeholder address");
+        }
+        ctx.Probe("button.link.url");
+    }
+    LabeledRow("Sizes");
+    {
+        const ButtonRow row;
+        facet::Link("Small link", {.size = facet::ControlSize::Small});
+        row.Next();
+        facet::Link("Regular link");
+        row.Next();
+        facet::Link("Large link", {.size = facet::ControlSize::Large});
+    }
+    LabeledRow("States");
+    {
+        const ButtonRow row;
+        facet::Link("Visited link", {.visited = true});
+        row.Next();
+        ImGui::BeginDisabled();
+        if (facet::Link("Disabled link"))
+            Pressed(&ui.links, "Disabled link");
+        ctx.Probe("button.link.disabled");
+        ImGui::EndDisabled();
+    }
+    Note("Links activated: %d. The placeholder address %s.", ui.links,
+         ui.linkVisited ? "is marked visited" : "has not been visited");
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pressed", "focused", "loading")
@@ -299,11 +362,11 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pres
 
     IconButtonSection(ctx);
 
-    SectionHeader("Copy and links");
+    SectionHeader("Copy button");
     LabeledRow("Copy button");
     facet::CopyButton("Copy sample text", "Sample text", {.iconOnly = false});
-    LabeledRow("Link");
-    facet::Link("Placeholder link", {.url = "about:blank"});
+
+    LinkSection(ctx);
 
     SectionHeader("Toggle groups");
     Paragraph("Latched tool buttons: independent flags, or one choice at a time.");
@@ -396,4 +459,16 @@ FACET_DEMO_SELFTEST("buttons")
     test.ExpectNear("a loading icon button does not activate again", [] { return ui.iconPresses; }, 3.0, 0.0);
     test.Click("button.icon.stop");
     test.Expect("the plain button stops loading", [] { return !ui.iconLoading; });
+
+    // Link: click and Enter, the address goes to the platform hook (recorded here), disabled.
+    test.Click("button.link.plain");
+    test.ExpectNear("a click activates the link", [] { return ui.links; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("button.link.url");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Enter opens the address through the platform hook", [] { return ui.openedUrl; }, "about:blank");
+    test.Expect("and the caller marks it visited", [] { return ui.linkVisited; });
+    test.Click("button.link.disabled");
+    test.ExpectNear("the disabled link does not activate", [] { return ui.links; }, 2.0, 0.0);
 }
