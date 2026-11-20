@@ -46,8 +46,43 @@ bool Slider(const char* label, float* value, float min, float max, const SliderO
 bool Slider(const char* label, int* value, int min, int max, const SliderOptions& options = {});
 ```
 
-A track with a fill and a knob; logarithmic, stepped, center fill, vertical and a value bubble come
-from the options. Status: planned.
+A track with an accent fill and a round knob, the visible label in front and the formatted value at
+the end, inside the widget width (the available width by default). The value column is as wide as
+the widest of the two range ends and the values shown so far, so it does not jitter; it gives way
+first when the row is narrow, and the label is cut at half the width with its full text on hover
+and keyboard focus. The knob follows the control size (Small, Regular, Large) and sits on whole
+pixels.
+
+- **Input:** a press on the knob grabs it without moving the value; a press elsewhere on the track
+  moves the value under the pointer first. Shift drags ten times finer, Ctrl snaps to a tenth of
+  the range (or ten steps). A drag that leaves the window keeps going and returns exactly to the
+  value it passed on the way out. Keys on the focused slider: Left and Right (Down and Up when
+  vertical) step a hundredth of the range or one step, Shift a tenth of that, Ctrl ten times;
+  Page Up and Down a tenth of the range; Home and End the ends. The wheel steps while the slider
+  is focused or Alt is held. Escape during a drag or a held key restores the value from the start
+  of the edit.
+- **Typed values:** Ctrl+click or Enter replaces the track with a number field (the number core)
+  holding the value; Enter, Tab or a click elsewhere writes the typed number, clamped to the range
+  and snapped to the step, and Escape leaves the value as it was. Enter and Escape return the focus
+  to the slider. A vertical slider shows the field centered over the fader, wider than the fader.
+- **Options:** `scale` Logarithmic needs `min > 0` and falls back to Linear otherwise; `step`
+  snaps to `min + n * step` and draws a tick per step when there are at most 21; the int overload
+  writes whole numbers only; `fillFromCenter` fills from the middle of the track; `valueBubble`
+  shows the value above the knob (beside a vertical one) while it is held or has keyboard focus;
+  `orientation` Vertical draws a fader one control height wide and `height` units high
+  (faderLength by default) without the label, which becomes its tooltip, and without the value
+  column.
+- **States:** disabled (`ImGui::BeginDisabled`) draws the disabled tokens, is not a Tab stop and
+  writes nothing; `readOnly` (or a pushed `ImGuiItemFlags_ReadOnly`) draws the fill in
+  labelSecondary, keeps the focus and writes nothing; `mixed` hides the knob and the fill until
+  the first edit; `error` draws the unfilled track in the destructive color and the message under
+  the control, replacing `helpText`. `min == max` and a null value pointer show the slider
+  read-only.
+- **Item queries:** the slider is one item under the label's id; it is active during a drag and
+  during a key press with its repeats, so `facet::IsItemEditCommitted()` reports each finished
+  drag and key press once.
+
+Status: ready.
 
 ### SliderStepped
 

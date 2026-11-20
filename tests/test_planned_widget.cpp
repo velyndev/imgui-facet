@@ -96,26 +96,26 @@ TEST_CASE("Placeholders of every widget group take kFill, negative widths and re
     REQUIRE(session.Ready());
     facet::SetTheme(facet::Theme::Light(), false);
     float available = 0.0f;
-    float value = 0.25f;
-    float readOnlyValue = 0.75f;
+    ImVec4 value(0.25f, 0.5f, 0.5f, 1.0f);
+    ImVec4 readOnlyValue(0.75f, 0.5f, 0.5f, 1.0f);
     int index = 1;
     static const char* const kItems[] = {"One", "Two"};
     session.SetUi([&] {
         available = ImGui::GetContentRegionAvail().x;
         // One widget of each group: controls, structure, content.
-        facet::Slider("Fill##controls", &value, 0.0f, 1.0f, {.width = facet::kFill});
+        facet::ColorChannelSlider("Fill##controls", &value, {.width = facet::kFill});
         session.Track("controls.fill");
         facet::ListBox("Fill##structure", &index, std::span<const char* const>(kItems), {.width = facet::kFill});
         session.Track("structure.fill");
         facet::ProgressBar("Fill##content", 0.5f, {.width = facet::kFill});
         session.Track("content.fill");
-        facet::Slider("Less##controls", &value, 0.0f, 1.0f, {.width = -40.0f});
+        facet::ColorChannelSlider("Less##controls", &value, {.width = -40.0f});
         session.Track("controls.less");
         facet::ListBox("Less##structure", &index, std::span<const char* const>(kItems), {.width = -40.0f});
         session.Track("structure.less");
         facet::ProgressBar("Less##content", 0.5f, {.width = -40.0f});
         session.Track("content.less");
-        facet::Slider("Read-only##controls", &readOnlyValue, 0.0f, 1.0f, {.readOnly = true});
+        facet::ColorChannelSlider("Read-only##controls", &readOnlyValue, {.readOnly = true});
         session.Track("controls.readOnly");
     });
     session.Frame();
@@ -131,8 +131,8 @@ TEST_CASE("Placeholders of every widget group take kFill, negative widths and re
     // Neither a writable nor a read-only placeholder writes its value.
     session.Click(session.ItemCenter("controls.fill"));
     session.Click(session.ItemCenter("controls.readOnly"));
-    CHECK(value == 0.25f);
-    CHECK(readOnlyValue == 0.75f);
+    CHECK(value.x == 0.25f);
+    CHECK(readOnlyValue.x == 0.75f);
 }
 
 TEST_CASE("PlannedWidth follows the width precedence of the API conventions")

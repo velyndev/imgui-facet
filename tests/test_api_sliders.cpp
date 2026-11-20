@@ -89,8 +89,6 @@ static_assert(facet::KnobVariant{} == facet::KnobVariant::Arc);
 void CallSliderStubs(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, Slider("Slider 1", &v.number, 0.0f, 1.0f, {.valueBubble = true}));
-    FACET_CHECK_STUB(false, Slider("Slider 2", &v.integer, 0, 10, {.orientation = Orientation::Vertical}));
     FACET_CHECK_STUB(false, SliderStepped("Stepped 1", &v.number, kStops, {.stopLabels = std::span(kLabels)}));
     FACET_CHECK_STUB(false, SliderWithInput("With input 1", &v.number, 0.0f, 1.0f));
     FACET_CHECK_STUB(false, SliderWithInput("With input 2", &v.integer, 0, 10));
@@ -119,7 +117,7 @@ void CallSliderStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 23;
+constexpr int kSliderStubCalls = 21;
 
 } // namespace
 
@@ -143,14 +141,14 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
-    float value = 0.5f;
+    ImVec2 stick(0.25f, 0.5f);
     float gain = 0.5f;
     ImGuiID expected = 0;
     session.SetUi([&] {
         ImGui::Button("before");
         session.Track("before");
         expected = ImGui::GetID("Volume##value");
-        facet::Slider("Volume##value", &value, 0.0f, 1.0f);
+        facet::JoystickPad("Volume##value", &stick);
         session.Track("slider");
         facet::Knob("Gain", &gain, 0.0f, 1.0f);
         session.Track("knob");
@@ -160,7 +158,6 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
     session.Frame();
 
     CHECK(session.ItemId("slider") == expected);
-    CHECK(session.ItemRect("slider").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
     // Tab goes from the stock button before straight to the one after: no placeholder is a Tab stop.
     session.Click(session.ItemCenter("before"));
     session.KeyPress(ImGuiKey_Tab);
@@ -172,7 +169,8 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
     CHECK_FALSE(ImGui::IsAnyItemActive());
     const ImRect slider = session.ItemRect("slider");
     session.Drag({ImVec2(slider.Min.x + 4.0f, slider.GetCenter().y), ImVec2(slider.Max.x - 4.0f, slider.GetCenter().y)});
-    CHECK(value == 0.5f);
+    CHECK(stick.x == 0.25f);
+    CHECK(stick.y == 0.5f);
     CHECK(gain == 0.5f);
 }
 
