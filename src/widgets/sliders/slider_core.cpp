@@ -3,7 +3,9 @@
 #include "widgets/sliders/slider_core.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <system_error>
 
 #include "facet/core/anim.h"
 #include "facet/core/color.h"
@@ -56,6 +58,18 @@ constexpr int kSliderTypingWaitFrames = 3;
 
 } // namespace
 
+double SliderFloatToDouble(float value)
+{
+    if (!std::isfinite(value))
+        return static_cast<double>(value);
+    char buffer[32];
+    const std::to_chars_result written = std::to_chars(buffer, buffer + sizeof(buffer), value);
+    double result = static_cast<double>(value);
+    if (written.ec == std::errc())
+        std::from_chars(buffer, written.ptr, result);
+    return result;
+}
+
 SliderMetrics GetSliderMetrics(ControlSize size)
 {
     const Theme& t = T();
@@ -105,8 +119,9 @@ SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, flo
     float controlMin = origin.x + f.label.width;
     float controlMax = origin.x + width;
     float column = valueWidth > 0.0f ? std::ceil(valueWidth) + m.valueGap : 0.0f;
-    // The value column gives way first, so the track keeps room for two knobs.
-    if (controlMax - controlMin - column < m.knob * 2.0f)
+    // The value column gives way first, so the track keeps the length of the narrowest control a
+    // labelled row keeps beside its label.
+    if (controlMax - controlMin - column < std::max(m.knob * 2.0f, Px(T().layout.minRowControl)))
         column = 0.0f;
     f.value = ImRect(controlMax - column + (column > 0.0f ? m.valueGap : 0.0f), origin.y, controlMax, origin.y + height);
     controlMax -= column;
@@ -210,8 +225,24 @@ void DrawSliderTicks(ImDrawList* drawList, const ImRect& track, Orientation orie
     // Below the track (beside a vertical one), clear of the knob's round edge.
     const float offset = std::round(m.knob * 0.5f) + m.tick * 0.5f;
     const float radius = m.tick * 0.5f;
-    for (const double fraction : fractions)
+    // Ticks closer than three tick sizes would merge into a line: draw every n-th one, and always
+    // the last, so the ends of the range stay marked.
+    const float length = orientation == Orientation::Vertical ? track.GetHeight() : track.GetWidth();
+    const int count = static_cast<int>(fractions.size());
+    int stride = 1;
+    if (count > 1)
     {
+        const float spacing = length / static_cast<float>(count - 1);
+        stride = spacing > 0.0f ? static_cast<int>(std::ceil(m.tick * 3.0f / spacing)) : count;
+        stride = std::max(1, stride);
+    }
+    for (int i = 0; i < count; ++i)
+    {
+        const bool last = i == count - 1;
+        // A strided tick too close to the last one gives way to it.
+        if (!last && (i % stride != 0 || (i > 0 && count - 1 - i < (stride + 1) / 2)))
+            continue;
+        const double fraction = fractions[static_cast<size_t>(i)];
         const float at = SliderTrackPos(track, orientation, fraction);
         const ImVec2 center = orientation == Orientation::Vertical ? ImVec2(std::round(track.Min.x) + offset, at)
                                                                    : ImVec2(at, std::round(track.Min.y) + offset);

@@ -3,6 +3,7 @@
 // selftest that operates the ready widgets by mouse and keyboard. A widget whose docs entry is not
 // ready yet draws its placeholder at its default size.
 
+#include <cstdio>
 #include <span>
 #include <vector>
 
@@ -42,13 +43,30 @@ struct SlidersUi
     int levelEdits = 0;      // frames that wrote level
     int levelCommits = 0;    // finished drags and key presses of level
 
+    // RangeSlider
+    float low = 20.0f;
+    float high = 80.0f;
+    int lowInt = 20;
+    int highInt = 80;
+    float spreadLow = -0.5f;
+    float spreadHigh = 0.5f;
+    int spanLow = 30;
+    int spanHigh = 50;
+    float bandLow = 200.0f;
+    float bandHigh = 2000.0f;
+    int filterLow = 10;
+    int filterHigh = 90;
+    int roLow = 25, roHigh = 75;
+    int offLow = 25, offHigh = 75;
+    int errLow = 40, errHigh = 50;
+    int mixLow = 25, mixHigh = 75;
+    bool mixRangeSet = false;
+    float vLow = 0.25f;
+    float vHigh = 0.75f;
+
     // The planned widgets below.
     float steppedStops = 0.25f;
     float field = 0.75f;
-    float low = 0.2f;
-    float high = 0.8f;
-    int lowInt = 20;
-    int highInt = 80;
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
     float handles[3] = {0.2f, 0.5f, 0.8f};
@@ -158,6 +176,89 @@ void SliderSection(facet::demo::PageCtx& ctx)
          ui.levelEdits, ui.levelCommits, ui.count, ui.gain, ui.frequency);
 }
 
+// Probes for the handles of the widget submitted last under `label`: each handle's id with the
+// widget's rectangle, so a selftest can check which handle has the keyboard focus.
+void ProbeHandles(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count)
+{
+    const ImGuiID widget = ImGui::GetID(label);
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    char name[64];
+    for (int i = 0; i < count; ++i)
+    {
+        ImGui::PushOverrideID(widget);
+        const ImGuiID id = ImGui::GetID(i);
+        ImGui::PopID();
+        std::snprintf(name, sizeof(name), "%s.h%d", probe, i);
+        facet::demo::ProbeRect(ctx, name, id, min, max);
+    }
+}
+
+void RangeSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("RangeSlider");
+    Paragraph("Two handles, each its own Tab stop. Handles never cross and keep the minimum gap; dragging the filled "
+              "span moves both, a click on the empty track moves the nearer handle. Ctrl+click or Enter on a handle "
+              "types its value.");
+
+    LabeledRow("Minimum gap");
+    ForceCaptureLook(ctx, 1);
+    facet::RangeSlider("Price", &ui.low, &ui.high, 0.0f, 100.0f,
+                       {.format = "%.0f", .minGap = 10.0, .valueBubble = true});
+    ctx.Probe("range.price");
+    ProbeHandles(ctx, "Price", "range.price", 2);
+    ctx.RevealInCapture(0.4f);
+    LabeledRow("Push, steps of 5");
+    facet::RangeSlider("Window", &ui.lowInt, &ui.highInt, 0, 100,
+                       {.step = 5.0, .minGap = 10.0, .collision = facet::HandleCollision::Push});
+    ctx.Probe("range.window");
+    ProbeHandles(ctx, "Window", "range.window", 2);
+    LabeledRow("Mirror");
+    facet::RangeSlider("Spread", &ui.spreadLow, &ui.spreadHigh, -1.0f, 1.0f, {.format = "%+.2f", .mirror = true});
+    ctx.Probe("range.spread");
+    ProbeHandles(ctx, "Spread", "range.spread", 2);
+    LabeledRow("Fixed span");
+    facet::RangeSlider("Span", &ui.spanLow, &ui.spanHigh, 0, 100, {.fixedSpan = true});
+    ctx.Probe("range.span");
+    ProbeHandles(ctx, "Span", "range.span", 2);
+    LabeledRow("Logarithmic");
+    facet::RangeSlider("Band", &ui.bandLow, &ui.bandHigh, 20.0f, 20000.0f,
+                       {.format = "%.0f", .scale = facet::ValueScale::Logarithmic, .minGap = 10.0});
+    ctx.Probe("range.band");
+    LabeledRow("Reset and typing");
+    facet::RangeSlider("Filter", &ui.filterLow, &ui.filterHigh, 0, 100,
+                       {.allowOutOfRange = true, .doubleClickReset = true,
+                        .helpText = "Double-click a handle to clear its bound; typed values may leave the range"});
+    ctx.Probe("range.filter");
+    ProbeHandles(ctx, "Filter", "range.filter", 2);
+
+    LabeledRow("States");
+    facet::RangeSlider("Read-only", &ui.roLow, &ui.roHigh, 0, 100, {.readOnly = true});
+    ctx.Probe("range.readOnly");
+    LabeledRow("");
+    ImGui::BeginDisabled();
+    facet::RangeSlider("Disabled", &ui.offLow, &ui.offHigh, 0, 100);
+    ImGui::EndDisabled();
+    ctx.Probe("range.disabled");
+    LabeledRow("");
+    facet::RangeSlider("Limits", &ui.errLow, &ui.errHigh, 0, 100,
+                       {.error = ui.errHigh - ui.errLow < 20 ? "Leave at least 20 between the limits" : nullptr});
+    ctx.Probe("range.limits");
+    LabeledRow("");
+    if (facet::RangeSlider("Mixed", &ui.mixLow, &ui.mixHigh, 0, 100, {.mixed = !ui.mixRangeSet}))
+        ui.mixRangeSet = true;
+    ctx.Probe("range.mixed");
+
+    LabeledRow("Vertical");
+    facet::RangeSlider("Vertical range", &ui.vLow, &ui.vHigh, 0.0f, 1.0f,
+                       {.format = "%.2f", .minGap = 0.1, .valueBubble = true, .orientation = facet::Orientation::Vertical});
+    ctx.Probe("range.vertical");
+    ProbeHandles(ctx, "Vertical range", "range.vertical", 2);
+
+    Note("Price %.0f to %.0f, window %d to %d, spread %+.2f to %+.2f, filter %d to %d.", ui.low, ui.high, ui.lowInt,
+         ui.highInt, ui.spreadLow, ui.spreadHigh, ui.filterLow, ui.filterHigh);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging")
@@ -176,11 +277,11 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     LabeledRow("Knob");
     facet::Knob("##knob", &ui.knob, 0.0f, 1.0f);
 
+    RangeSection(ctx);
+
     SectionHeader("Ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
               "and either stop at each other or push each other.");
-    LabeledRow("Range");
-    facet::RangeSlider("##range", &ui.low, &ui.high, 0.0f, 1.0f, {.minGap = 0.1});
     LabeledRow("Range with fields");
     facet::RangeInput("##rangeInput", &ui.lowInt, &ui.highInt, 0, 100, {.collision = facet::HandleCollision::Push});
     LabeledRow("Range over bars");
@@ -204,28 +305,38 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 FACET_DEMO_SELFTEST("sliders")
 {
     using T = facet::demo::Target;
+    // A point on the control row of a horizontal slider: half a regular control height below the
+    // top of the item, so a message line under the control does not move it. Fractions from 0.55
+    // on lie on the track in every layout: the label takes at most half the width.
+    const auto Row = [](const char* probe, float fx) { return T::Item(probe, fx, 0.0f).Offset(0.0f, 14.0f); };
     test.Do([] { ui = {}; });
 
     // Slider, pointer: a click on the track moves the value there, a drag follows the pointer, a
     // drag out of the window and back to the press point ends on the start value.
-    test.Drag({T::Item("slider.count", 0.45f), T::Item("slider.count", 0.99f)}, 0.3f);
+    test.Drag({Row("slider.count", 0.6f), Row("slider.count", 0.99f)}, 0.3f);
     test.ExpectNear("a drag past the end of the track reaches 10", [] { return ui.count; }, 10.0, 0.0);
-    test.Click("slider.count");
+    test.MouseMove(Row("slider.count", 0.6f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("a click on the track moves the count under the pointer", [] { return ui.count > 0 && ui.count < 10; });
     static float pressed = 0.0f;
-    test.MouseMove(T::Item("slider.level", 0.6f));
+    test.MouseMove(Row("slider.level", 0.6f));
     test.MouseDown();
     test.Do([] { pressed = ui.level; });
     test.MouseMove(T::Display(1.5f, 0.5f));
     test.Expect("a drag out of the window to the right reaches the maximum", [] { return ui.level == 1.0f; });
     test.MouseMove(T::Display(-0.5f, 0.5f));
-    test.MouseMove(T::Item("slider.level", 0.6f));
+    test.MouseMove(Row("slider.level", 0.6f));
     test.MouseUp();
     test.Expect("a drag out of the window and back ends on the value under the pointer",
                 [] { return ui.level == pressed; });
     test.Expect("the drag was one finished edit", [] { return ui.levelCommits == 1; });
-    test.Drag({T::Item("slider.frequency", 0.3f), T::Item("slider.frequency", 0.1f)}, 0.3f);
-    test.Expect("the logarithmic slider follows the pointer down", [] { return ui.frequency < 440.0f; });
+    test.MouseMove(Row("slider.frequency", 0.9f));
+    test.MouseDown();
+    test.Do([] { pressed = ui.frequency; });
+    test.MouseMove(Row("slider.frequency", 0.6f));
+    test.MouseUp();
+    test.Expect("the logarithmic slider follows the pointer down", [] { return ui.frequency < pressed; });
 
     // Slider, keyboard: Tab reaches it, the arrows step, End and Home reach the ends.
     test.Click("slider.gain");
@@ -258,10 +369,12 @@ FACET_DEMO_SELFTEST("sliders")
     test.ExpectNear("the read-only slider keeps its value", [] { return ui.readOnly; }, 0.4, 1e-6);
     test.Drag({T::Item("slider.disabled", 0.5f), T::Item("slider.disabled", 0.95f)}, 0.2f);
     test.ExpectNear("the disabled slider keeps its value", [] { return ui.disabled; }, 0.6, 1e-6);
-    test.Click("slider.limit");
+    test.MouseMove(Row("slider.limit", 0.7f));
+    test.MouseDown();
+    test.MouseUp();
     test.KeyPress(ImGuiKey_Home);
     test.Expect("Home clears the error of the limit", [] { return ui.invalid <= 0.8f; });
-    test.MouseMove(T::Item("slider.mixed", 0.8f));
+    test.MouseMove(Row("slider.mixed", 0.8f));
     test.MouseDown();
     test.MouseUp();
     test.Expect("the first edit of a mixed slider sets its value", [] { return ui.mixedSet; });
@@ -275,4 +388,96 @@ FACET_DEMO_SELFTEST("sliders")
     test.ExpectNear("Up raises the vertical fader one step", [] { return ui.fader; }, 0.01, 0.0001);
     test.Drag({T::Item("slider.faderB", 0.5f, 0.9f), T::Item("slider.faderB", 0.5f, 0.1f)}, 0.3f);
     test.Expect("a drag up raises the second fader", [] { return ui.faderB > 0.8f; });
+
+    // RangeSlider, keyboard, one Tab chain through every range on the page: each handle is a Tab
+    // stop, the arrows move the focused handle, the gap holds, Push, mirror and fixed span move the
+    // other handle, Enter types a value.
+    test.Click("slider.faderB");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.price.h0");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right moves the low handle one hundredth", [] { return ui.low; }, 21.0, 1e-4);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End stops the low handle one gap before the high one", [] { return ui.low; }, 70.0, 1e-4);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.price.h1");
+    test.KeyPress(ImGuiKey_Home);
+    test.ExpectNear("Home stops the high handle one gap after the low one", [] { return ui.high; }, 80.0, 1e-4);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End moves the high handle to the maximum", [] { return ui.high; }, 100.0, 1e-4);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.window.h0");
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End on the low handle pushes the high one to 100 and keeps the gap",
+                [] { return ui.lowInt == 90 && ui.highInt == 100; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.spread.h0");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("mirror moves the high handle the other way", [] { return ui.spreadLow > -0.5f && ui.spreadHigh < 0.5f; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.span.h0");
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("fixed span moves both handles and stops at the end", [] { return ui.spanLow == 80 && ui.spanHigh == 100; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.filter.h0");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.Type("-5");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.ExpectNear("a typed value outside the range is written with allowOutOfRange", [] { return ui.filterLow; }, -5.0, 0.0);
+    test.ExpectFocused("range.filter.h0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.filter.h1");
+    // The read-only range keeps its two Tab stops, the disabled one has none.
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("range.vertical.h0");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up raises the low handle of the vertical range", [] { return ui.vLow; }, 0.26, 1e-6);
+
+    // Pointer: the span drags both handles and keeps their distance; a click between the handles
+    // grabs the span without moving it; a click on the empty track moves the nearer handle.
+    // The values put 0.55 of the row between the handles, or just before the low one, in the wide
+    // and the narrow layout alike.
+    test.Do([] { ui.lowInt = 10; ui.highInt = 90; });
+    test.Drag({Row("range.window", 0.55f), Row("range.window", 0.48f)}, 0.3f);
+    test.Expect("dragging the span moves both handles by the same amount",
+                [] { return ui.highInt - ui.lowInt == 80 && ui.lowInt < 10; });
+    test.Do([] { ui.lowInt = 10; ui.highInt = 90; });
+    test.MouseMove(Row("range.window", 0.55f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click between the handles grabs the span without moving it",
+                [] { return ui.lowInt == 10 && ui.highInt == 90; });
+    test.Do([] { ui.lowInt = 60; ui.highInt = 90; });
+    test.MouseMove(Row("range.window", 0.55f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click before the low handle moves it there", [] { return ui.lowInt < 60 && ui.highInt == 90; });
+    test.Do([] { ui.low = 20.0f; ui.high = 80.0f; });
+    test.Drag({T::Item("range.price", 0.5f), T::Display(1.5f, 0.5f), T::Item("range.price", 0.5f)}, 0.4f);
+    test.Expect("a span drag out of the window and back ends where it started",
+                [] { return ui.low == 20.0f && ui.high == 80.0f; });
+
+    // States.
+    test.Drag({T::Item("range.readOnly", 0.5f), T::Item("range.readOnly", 0.9f)}, 0.2f);
+    test.Expect("the read-only range keeps its values", [] { return ui.roLow == 25 && ui.roHigh == 75; });
+    test.Drag({T::Item("range.disabled", 0.5f), T::Item("range.disabled", 0.9f)}, 0.2f);
+    test.Expect("the disabled range keeps its values", [] { return ui.offLow == 25 && ui.offHigh == 75; });
+    test.MouseMove(Row("range.mixed", 0.9f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("the first edit of a mixed range sets it", [] { return ui.mixRangeSet; });
 }

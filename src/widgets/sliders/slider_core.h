@@ -29,6 +29,16 @@
 namespace facet::internal
 {
 
+// A float value as the double of its shortest decimal form (0.8f gives 0.8, not 0.800000011920929),
+// so a value the caller typed as a decimal lies exactly on the keyboard grid and on the step grid
+// of the value drag core, and a step from it never rounds back to the same float. NaN and the
+// infinities pass through.
+double SliderFloatToDouble(float value);
+
+// The caller's value as the double the family edits.
+inline double SliderValueIn(float value) { return SliderFloatToDouble(value); }
+inline double SliderValueIn(int value) { return static_cast<double>(value); }
+
 // Lengths of a slider of one control size, in whole pixels at the current scale.
 struct SliderMetrics
 {

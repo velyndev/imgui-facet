@@ -62,7 +62,7 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
     // An empty range and a missing value are shown, never written.
     const bool fixed = value == nullptr || !(mapping.max > mapping.min);
     const bool readOnly = o.readOnly || fixed || (next.itemFlags & ImGuiItemFlags_ReadOnly) != 0;
-    const double current = value != nullptr ? static_cast<double>(*value) : mapping.min;
+    const double current = value != nullptr ? internal::SliderValueIn(*value) : mapping.min;
 
     const float valueWidth = vertical ? 0.0f
                                       : internal::SliderValueWidth(id, mapping.min, mapping.max, current, o.format,
@@ -141,7 +141,7 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
         else
             *value = static_cast<Value>(edited);
         // The written value is what the knob shows from now on.
-        edited = static_cast<double>(*value);
+        edited = internal::SliderValueIn(*value);
     }
 
     const bool disabled = item.disabled || (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
@@ -201,7 +201,8 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
 
 bool Slider(const char* label, float* value, float min, float max, const SliderOptions& options)
 {
-    return SliderImpl(label, value, static_cast<double>(min), static_cast<double>(max), false, options);
+    return SliderImpl(label, value, internal::SliderFloatToDouble(min), internal::SliderFloatToDouble(max), false,
+                      options);
 }
 
 bool Slider(const char* label, int* value, int min, int max, const SliderOptions& options)

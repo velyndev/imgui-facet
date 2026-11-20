@@ -49,8 +49,9 @@ bool Slider(const char* label, int* value, int min, int max, const SliderOptions
 A track with an accent fill and a round knob, the visible label in front and the formatted value at
 the end, inside the widget width (the available width by default). The value column is as wide as
 the widest of the two range ends and the values shown so far, so it does not jitter; it gives way
-first when the row is narrow, and the label is cut at half the width with its full text on hover
-and keyboard focus. The knob follows the control size (Small, Regular, Large) and sits on whole
+when the track would get shorter than the `layout.minRowControl` token, and the label is cut at
+half the width with its full text on hover and keyboard focus. A track shorter than its knob gets
+a smaller knob, so nothing leaves the row. Ticks closer than three tick sizes are thinned. The knob follows the control size (Small, Regular, Large) and sits on whole
 pixels.
 
 - **Input:** a press on the knob grabs it without moving the value; a press elsewhere on the track
@@ -112,9 +113,42 @@ bool RangeSlider(const char* label, float* low, float* high, float min, float ma
 bool RangeSlider(const char* label, int* low, int* high, int min, int max, const RangeSliderOptions& options = {});
 ```
 
-Two handles selecting a range, with minimum gap, clamp or push, span drag, mirror, fixed span,
-value bubbles, typed values outside the range, a double click that resets one handle, and
-logarithmic, stepped and vertical variants. Status: planned.
+Two handles selecting `[*low, *high]` on the shared slider track, with the label in front and both
+values at the end (low, a short bar, high; each in a column as wide as the widest value, so the
+row does not jitter). Handle 0 is `*low`, handle 1 `*high`; each is its own item under the widget
+id with its own Tab stop and round focus ring.
+
+- **Pointer:** a press on a knob grabs it without moving it; a press on the filled span grabs
+  the span (with `dragSpan`), which moves both handles and keeps their distance in value units; a
+  press on the empty track moves the nearer handle there. Handles at one value separate in the
+  direction of the first movement. A drag that leaves the window keeps going and returns exactly
+  to the values it passed on the way out. The span thickens while a press would grab it.
+- **Keys** on a focused handle: as Slider; Home and End go as far as the handle can (the other
+  handle and the gap stop it, unless it pushes). Escape during a drag or a key press restores both
+  values from where the edit began.
+- **Rules:** handles never cross; `minGap` holds under every input and is clamped to the range
+  (a gap as large as the range pins the handles to the ends, where nothing can move them);
+  `collision` Push lets a handle move the other along until that one reaches the end of the range;
+  `mirror` moves the other handle the same distance the other way around the middle of the range
+  (values that are not symmetric are drawn symmetric, kept from the high handle, and written on
+  the first edit); `fixedSpan` moves both handles with every drag and key and stops them as a
+  whole at the ends. Steps, the logarithmic scale (with `min > 0`, else linear), the int overload
+  and vertical all combine with these.
+- **Typed values:** Ctrl+click or Enter on a handle replaces the track with a number field for
+  that handle. The typed value obeys the same rules (order, gap, collision) and is clamped to the
+  range and snapped to the step, unless `allowOutOfRange`, which writes it as typed while the
+  track draws it clamped; an out-of-range value stays until its own handle is edited.
+- **`doubleClickReset`:** a double click on a handle moves it to its end of the range (low to
+  `min`, high to `max`), as far as the rules allow.
+- **States:** as Slider. `mixed` hides both knobs, the fill and the values until the first edit
+  writes both values; the handles stay Tab stops and show their focus ring. Values passed in out
+  of range, out of order or closer than the gap are drawn repaired and written only for the
+  handles an edit moves.
+- **Item queries:** while a handle (or the span) is active or was just released, the last item
+  id is that part's, so `ImGui::IsItemActive()` and `facet::IsItemEditCommitted()` report the
+  drag; otherwise it is the widget's.
+
+Status: ready.
 
 ### RangeInput
 
