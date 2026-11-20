@@ -1,10 +1,10 @@
 # Buttons
 
 Header: `facet/widgets/buttons.h`. The declarations follow [the API conventions](../api-conventions.md);
-the comment above each declaration in the header is the full reference. Every widget here is
-**planned**: the function exists, draws a placeholder of the widget's default size, returns the neutral
-result and writes nothing. Phase 2 implements the widgets and changes their status to ready. See
-[the widget index](../widgets.md).
+the comment above each declaration in the header is the full reference. Each entry below ends with
+the widget's status. A **planned** widget exists as a function that draws a placeholder of the
+widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
+header describes. See [the widget index](../widgets.md).
 
 Activation means a click released inside, Enter or Space while focused, or the gamepad activate
 button. Disable a button with `ImGui::BeginDisabled`.
@@ -17,8 +17,34 @@ button. Disable a button with `ImGui::BeginDisabled`.
 bool Button(const char* label, const ButtonOptions& options = {});
 ```
 
-A push button with a variant (`Secondary`, `Primary`, `Plain`, `Destructive`), an optional leading
-icon and a loading state; returns true when activated. Status: planned.
+A push button with a variant, an optional leading icon and a loading state; returns true on the
+frame it is activated (a click released inside, or Space or Enter while it has keyboard focus).
+
+- **Variants.** `Secondary` (the default) has the neutral fill with a 3:1 outline; `Primary` the
+  accent fill with `onAccent` text, for the one primary action of a view; `Plain` is text only with
+  a fill on hover and press; `Destructive` the solid destructive fill with `onDestructive` text.
+  Hover and press deepen the fill over `motion.durationFast`. A disabled button
+  (`ImGui::BeginDisabled`) of any variant shows the same neutral disabled look, shows the
+  not-allowed cursor, is not a Tab stop and never returns true.
+- **Sizes.** `size` picks the control height (22, 28 or 36 units) and the padding (8, 12 or 16
+  units on each side); Small draws its label in Footnote, Regular and Large in Body.
+  `facet::PushControlSize` sets the size of every button that leaves it at `Inherit`.
+- **Icons.** `icon` sits in front of the label, as large as the label text. A label whose visible
+  part is empty (`"##save"`) with an icon gives a square icon-only button; `IconButton` is the
+  widget for that, because it also shows its name as a tooltip.
+- **Width.** Its content by default. `width` in units, `facet::kFill`, a negative width (the
+  available width minus that much), `ImGui::SetNextItemWidth` and `ImGui::PushItemWidth` apply in
+  that order. In a width narrower than its content the label ends in an ellipsis, and the whole
+  label shows as a tooltip on hover and on keyboard focus.
+- **Loading.** `loading` puts the spinner in the icon's place (in the label's place without an
+  icon) and keeps the width; hover and press show nothing and activation returns false, but the
+  button keeps its Tab stop so the focus does not jump while it waits.
+- **Item queries.** After the call the button is Dear ImGui's last item: `ImGui::IsItemHovered`,
+  `IsItemActive`, `SetItemTooltip` and `ImGui::SameLine` work as after a stock button, and stock
+  text after `SameLine` sits on the label's line.
+
+The demo page Buttons shows every variant, size and state; `facet_demo --capture` renders it
+hovered, pressed, focused and loading. Status: ready.
 
 ### IconButton
 
