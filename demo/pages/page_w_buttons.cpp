@@ -1,6 +1,6 @@
-// Demo page: Buttons. Button is implemented: its variants, sizes, icons, states and width rules,
-// with capture states and a selftest. Every other widget of facet/widgets/buttons.h is called
-// once below it; a planned widget draws its placeholder at its default size.
+// Demo page: Buttons. Every widget of facet/widgets/buttons.h in a section with its variants, sizes
+// and states, capture states for the important looks and a selftest that operates each by mouse
+// and keyboard.
 
 #include <string>
 
@@ -56,10 +56,15 @@ struct ButtonsUi
     bool linkVisited = false;
     std::string openedUrl;  // selftests: the address the link asked the platform to open
 
-    // The planned widgets below.
+    // ToggleButtonGroup
     bool latches[3] = {true, false, false};
     int view = 0;
     int textView = 1;
+    int labelView = 1;
+    int narrowView = 0;
+    int disabledItem = 0;
+    int mixedView = 0;
+    int toggleWrites = 0;
 };
 
 ButtonsUi ui;
@@ -72,6 +77,8 @@ enum CaptureState
     kPressed,
     kFocused,
     kLoading,
+    kToolsState,    // the icon buttons, copy buttons and links, focused, confirming and hovered
+    kTogglesState,  // the toggle button groups, a button focused and one hovered
 };
 
 // Toolbar items named after the built-in icons they show.
@@ -209,6 +216,8 @@ void ButtonSection(facet::demo::PageCtx& ctx)
 
 void IconButtonSection(facet::demo::PageCtx& ctx)
 {
+    if (ctx.capture && ctx.captureState == kToolsState)
+        ctx.RevealInCapture(0.04f);
     SectionHeader("IconButton");
     Paragraph("A square button for a tool whose icon says what it does; its name shows as a tooltip on hover and "
               "on keyboard focus. A latched tool passes selected and flips its own flag.");
@@ -216,9 +225,7 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
     LabeledRow("Tools");
     {
         const ButtonRow row;
-        if (ctx.capture && ctx.captureState == kHovered)
-            ctx.ForceNextItemState(ForcedItemState::Hovered);
-        else if (ctx.capture && ctx.captureState == kFocused)
+        if (ctx.capture && ctx.captureState == kToolsState)
             ctx.ForceNextItemState(ForcedItemState::Focused);
         if (facet::IconButton("Zoom in", facet::Icon("zoom-in")))
             Pressed(&ui.zoom, "Zoom in");
@@ -278,7 +285,7 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
         facet::IconButton("Disabled and latched", facet::Icon("lock"), {.selected = true});
         ImGui::EndDisabled();
         row.Next();
-        const bool loading = ui.iconLoading || (ctx.capture && ctx.captureState == kLoading);
+        const bool loading = ui.iconLoading || (ctx.capture && (ctx.captureState == kLoading || ctx.captureState == kToolsState));
         if (facet::IconButton("Refresh", facet::Icon("refresh"), {.variant = facet::ButtonVariant::Secondary, .loading = loading}))
         {
             ui.iconLoading = true;
@@ -305,10 +312,8 @@ void CopyButtonSection(facet::demo::PageCtx& ctx)
     {
         facet::Text(facet::TextStyle::Body, "%s", kSample);
         ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.sm));
-        if (ctx.capture && ctx.captureState == kPressed)
+        if (ctx.capture && ctx.captureState == kToolsState)
             ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Pressed);
-        else if (ctx.capture && ctx.captureState == kFocused)
-            ctx.ForceNextItemState(ForcedItemState::Focused);
         if (facet::CopyButton("Copy the placeholder text", kSample))
             Pressed(&ui.copies, "Copy (icon only)");
         ctx.Probe("button.copy.icon");
@@ -339,6 +344,58 @@ void CopyButtonSection(facet::demo::PageCtx& ctx)
     Note("Copies on this page: %d.", ui.copies);
 }
 
+void ToggleGroupSection(facet::demo::PageCtx& ctx)
+{
+    if (ctx.capture && ctx.captureState == kTogglesState)
+        ctx.RevealInCapture(0.04f);
+    SectionHeader("ToggleButtonGroup");
+    Paragraph("Latched tool buttons joined into one row: independent flags, or one choice at a time with the "
+              "selection pill. Every button is a Tab stop; buttons that do not fit move into a menu.");
+
+    static const facet::ChoiceItem kWithDisabled[] = {
+        {"Option 1"},
+        {"Option 2 (disabled)", {}, nullptr, nullptr, true},
+        {"Option 3"},
+    };
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.toggleWrites;
+    };
+
+    LabeledRow("Independent");
+    if (ctx.capture && ctx.captureState == kTogglesState)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 1);
+    count(facet::ToggleButtonGroup("Panels", ui.latches, kTools));
+    ctx.Probe("button.toggles.latches");
+    LabeledRow("Exclusive");
+    if (ctx.capture && ctx.captureState == kTogglesState)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 2);
+    count(facet::ToggleButtonGroup("##view", &ui.view, kTools, {.allowEmpty = true}));
+    ctx.Probe("button.toggles.view");
+    LabeledRow("Icons and labels");
+    count(facet::ToggleButtonGroup("##labels", &ui.labelView, kTools, {.iconOnly = false}));
+    LabeledRow("Text only");
+    count(facet::ToggleButtonGroup("##text", &ui.textView, kToolNames));
+    LabeledRow("Narrow");
+    // 150 units hold one or two of the labels; the rest move into the "more" menu.
+    count(facet::ToggleButtonGroup("##narrow", &ui.narrowView, kToolNames, {.width = 150.0f}));
+    ctx.Probe("button.toggles.narrow");
+    LabeledRow("States");
+    {
+        const ButtonRow row;
+        count(facet::ToggleButtonGroup("##disabledItem", &ui.disabledItem, kWithDisabled));
+        ctx.Probe("button.toggles.disabledItem");
+        row.Next();
+        int fixed = 0;
+        facet::ToggleButtonGroup("##readOnly", &fixed, kToolNames, {.readOnly = true});
+        row.Next();
+        count(facet::ToggleButtonGroup("##mixed", &ui.mixedView, kTools, {.mixed = true}));
+    }
+    Note("Panels latched: %d of 3. View: %s. Text: %s. Writes on this section: %d.",
+         ui.latches[0] + ui.latches[1] + ui.latches[2], ui.view >= 0 ? kTools[ui.view].label : "none",
+         ui.textView >= 0 ? kToolNames[ui.textView] : "none", ui.toggleWrites);
+}
+
 // Stands in for the platform's shell during selftests: the address is recorded instead of opened,
 // so a selftest never starts a browser.
 bool RecordOpenedUrl(ImGuiContext*, const char* path)
@@ -358,10 +415,8 @@ void LinkSection(facet::demo::PageCtx& ctx)
     LabeledRow("Links");
     {
         const ButtonRow row;
-        if (ctx.capture && ctx.captureState == kHovered)
+        if (ctx.capture && ctx.captureState == kToolsState)
             ctx.ForceNextItemState(ForcedItemState::Hovered);
-        else if (ctx.capture && ctx.captureState == kFocused)
-            ctx.ForceNextItemState(ForcedItemState::Focused);
         if (facet::Link("Placeholder link"))
             Pressed(&ui.links, "Placeholder link");
         ctx.Probe("button.link.plain");
@@ -399,7 +454,8 @@ void LinkSection(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pressed", "focused", "loading")
+FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pressed", "focused", "loading", "tools",
+                "toggles")
 {
     facet::demo::PageHeader("Buttons",
                             "Push buttons with variants, icon buttons, copy buttons, links and toggle button "
@@ -414,14 +470,7 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pres
 
     LinkSection(ctx);
 
-    SectionHeader("Toggle groups");
-    Paragraph("Latched tool buttons: independent flags, or one choice at a time.");
-    LabeledRow("Independent");
-    facet::ToggleButtonGroup("Views", ui.latches, kTools);
-    LabeledRow("Exclusive");
-    facet::ToggleButtonGroup("View", &ui.view, kTools, {.iconOnly = false});
-    LabeledRow("Text only");
-    facet::ToggleButtonGroup("Text view", &ui.textView, kToolNames);
+    ToggleGroupSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("buttons")
@@ -530,4 +579,28 @@ FACET_DEMO_SELFTEST("buttons")
     test.Expect("and the caller marks it visited", [] { return ui.linkVisited; });
     test.Click("button.link.disabled");
     test.ExpectNear("the disabled link does not activate", [] { return ui.links; }, 2.0, 0.0);
+
+    // ToggleButtonGroup: latches by click and Space, an exclusive choice, allowEmpty, the disabled item.
+    test.MouseMove(T::Item("button.toggles.latches", 1.0f).Offset(-14.0f, 0.0f));  // the last button
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click latches the last tool", [] { return ui.latches[2]; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space flips the focused tool", [] { return ui.latches[1]; });
+    // The exclusive icon group: its square buttons fit at every width of the selftest.
+    test.Do([] { ui.view = 2; });
+    test.MouseMove(T::Item("button.toggles.view", 0.0f).Offset(14.0f, 0.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click chooses the first view", [] { return ui.view; }, 0.0, 0.0);
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("pressing the chosen view again clears the choice (allowEmpty)", [] { return ui.view; }, -1.0, 0.0);
+    test.MouseMove(T::Item("button.toggles.disabledItem", 0.5f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the disabled item does not take the choice", [] { return ui.disabledItem; }, 0.0, 0.0);
+    test.ExpectNear("each change wrote once", [] { return ui.toggleWrites; }, 4.0, 0.0);
 }

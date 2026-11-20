@@ -2,6 +2,7 @@
 // keyboard, the disabled and loading states, sizes and the width rule, a cut label with its
 // tooltip, the variant colors and the item queries after the call.
 
+#include <cfloat>
 #include <cmath>
 #include <string>
 
@@ -578,6 +579,170 @@ TEST_CASE("A copy button without text is disabled and copies nothing")
     session.Click(session.ItemCenter("copy"));
     CHECK(copies == 0);
     CHECK(session.Clipboard() == "unchanged");
+}
+
+// --- ToggleButtonGroup ------------------------------------------------------------------------
+
+namespace
+{
+
+ImGuiID ToggleEntryId(const char* label, int index)
+{
+    return ImHashData(&index, sizeof(index), ImGui::GetID(label));
+}
+
+// The bounding box of the vertices of `color` the window draw list received since `from`.
+ImRect ColorBounds(int from, ImU32 color)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImRect bounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        if (drawList->VtxBuffer[i].col == color)
+            bounds.Add(drawList->VtxBuffer[i].pos);
+    return bounds;
+}
+
+const facet::ChoiceItem kTools[] = {
+    {"Grid", facet::Icon("grid")},
+    {"List", facet::Icon("list")},
+    {"Layers", facet::Icon("layers"), nullptr, nullptr, true},
+    {"Image", facet::Icon("image")},
+};
+
+} // namespace
+
+TEST_CASE("Independent toggle buttons flip their flags; each enabled button is a Tab stop")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool flags[3] = {false, true, false};  // the fourth item has no flag: drawn disabled
+    int writes = 0;
+    ImGuiID ids[4] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 4; ++i)
+            ids[i] = ToggleEntryId("Tools", i);
+        if (facet::ToggleButtonGroup("Tools", flags, kTools))
+            ++writes;
+        session.Track("group");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("group");
+    const float side = facet::ControlHeight(facet::ControlSize::Regular);
+    // Icon-only buttons are one control height wide, at the end of the label in front.
+    session.Click(ImVec2(r.Max.x - side * 3.5f, r.GetCenter().y));
+    CHECK(flags[0]);
+    session.Click(ImVec2(r.Max.x - side * 2.5f, r.GetCenter().y));
+    CHECK_FALSE(flags[1]);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(flags[0]);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ids[1]);
+    session.KeyPress(ImGuiKey_Tab);  // the disabled third and the flagless fourth are passed over
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(writes == 3);
+}
+
+TEST_CASE("An exclusive toggle group writes the index, and with allowEmpty a second press writes -1")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"Left", "Center", "Right"};
+    int strict = 0;
+    int loose = 1;
+    session.SetUi([&] {
+        facet::ToggleButtonGroup("##strict", &strict, kItems, {.width = 300.0f});
+        session.Track("strict");
+        facet::ToggleButtonGroup("##loose", &loose, kItems, {.allowEmpty = true, .width = 300.0f});
+        session.Track("loose");
+    });
+    session.Frame();
+    const ImRect s = session.ItemRect("strict");
+    session.Click(ImVec2(s.Min.x + s.GetWidth() * 0.83f, s.GetCenter().y));
+    CHECK(strict == 2);
+    session.Click(ImVec2(s.Min.x + s.GetWidth() * 0.83f, s.GetCenter().y));
+    CHECK(strict == 2);  // pressing the selected button again keeps it
+    const ImRect l = session.ItemRect("loose");
+    session.Click(ImVec2(l.Min.x + l.GetWidth() * 0.5f, l.GetCenter().y));
+    CHECK(loose == -1);
+    session.Click(ImVec2(l.Min.x + l.GetWidth() * 0.17f, l.GetCenter().y));
+    CHECK(loose == 0);
+}
+
+TEST_CASE("The selection pill of a toggle group moves frame by frame exactly as a segmented control's")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    static const char* const kItems[] = {"One", "Two", "Three", "Four"};
+    int a = 0;
+    int b = 0;
+    ImRect segments;
+    ImRect toggles;
+    session.SetUi([&] {
+        const ImU32 tint = facet::ToU32(facet::T().colors.accentSubtle);
+        int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::SegmentedControl("##segments", &a, kItems, {.width = 320.0f});
+        segments = ColorBounds(from, tint);
+        from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::ToggleButtonGroup("##toggles", &b, kItems, {.width = 320.0f});
+        toggles = ColorBounds(from, tint);
+    });
+    session.Frame();
+    a = 3;
+    b = 3;
+    for (int frame = 0; frame < 30; ++frame)
+    {
+        session.Frame();
+        CHECK(toggles.Min.x == doctest::Approx(segments.Min.x));
+        CHECK(toggles.Max.x == doctest::Approx(segments.Max.x));
+        CHECK(toggles.GetHeight() == doctest::Approx(segments.GetHeight()));
+    }
+}
+
+TEST_CASE("Toggle buttons that do not fit move into a menu and can be chosen there")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First option", "Second option", "Third option", "Fourth option"};
+    int index = 0;
+    bool moreHovered = false;
+    bool menuOpen = false;
+    float available = 0.0f;
+    session.SetUi([&] {
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(200.0f), facet::Px(300.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        const ImGuiID id = ImGui::GetID("##view");
+        facet::ToggleButtonGroup("##view", &index, kItems);
+        session.Track("group");
+        moreHovered = GImGui->HoveredId == ImGui::GetIDWithSeed("more", nullptr, id);
+        menuOpen = facet::internal::IsPopupLevelOpen(ImGui::GetIDWithSeed("more menu", nullptr, id));
+        ImGui::EndChild();
+    });
+    session.Frame();
+    session.Frame();
+    const ImRect r = session.ItemRect("group");
+    CHECK(r.GetWidth() == doctest::Approx(available));
+    // The "more" button is at the end of the row.
+    session.MouseMove(ImVec2(r.Max.x - 4.0f, r.GetCenter().y));
+    session.Frame();
+    CHECK(moreHovered);
+    session.Click(ImVec2(r.Max.x - 4.0f, r.GetCenter().y));
+    session.Frames(2);
+    REQUIRE(menuOpen);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(index > 0);
+    CHECK_FALSE(menuOpen);
 }
 
 TEST_CASE("A button outside a frame returns false")

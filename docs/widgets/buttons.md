@@ -131,8 +131,32 @@ bool ToggleButtonGroup(const char* label, int* index, std::span<const char* cons
                        const ToggleButtonGroupOptions& options = {});
 ```
 
-A joined row of latched toolbar buttons: independent flags, or one exclusive choice. The
-label-only forms draw text buttons. Status: planned.
+A joined row of latched toolbar buttons on one track, one button per item, with the visible label
+part in front (rule 6; `"##name"` hides it in a toolbar). It shares its drawing with
+SegmentedControl, so both look and move alike.
+
+- **Independent latches** (`std::span<bool>`): activating a button flips its flag; a latched button
+  shows the selection tint (accentSubtle, faded in over `motion.durationFast`) with a semibold label.
+  Items without a flag read as off and are drawn disabled; extra flags are ignored.
+- **Exclusive latch** (`int*`): activating a button writes its index; the chosen button sits on the
+  selection pill, which springs between buttons exactly as in a segmented control (the same block,
+  the same spring, the same whole-pixel edges, at once with reduced motion). With `allowEmpty`,
+  activating the chosen button writes -1. An out-of-range index shows no button on.
+- **Keys.** Every enabled button is its own Tab stop; Space or Enter toggles the focused one.
+  Items with `disabled` are drawn disabled and skipped.
+- **Content.** `iconOnly` (the default for the `ChoiceItem` forms) shows the item icons in square
+  buttons with the labels as tooltips; with it off, icon and label. The label-only forms always
+  show the labels.
+- **Width.** `width` 0 fits the buttons, at most the available width; a set width divides it
+  among the buttons. Buttons that do not fit move into a "more" button at the end of the track,
+  which opens a menu of them (checked when on); the chosen or latched buttons stay in the row
+  longest, and the "more" button shows the tint while one of them is in the menu. When even one
+  button does not fit, the "more" button fills the track.
+- **States.** `ImGui::BeginDisabled` disables the whole group. `readOnly`: shown and focusable,
+  never written. `mixed`: no button shows the on look until an edit.
+- **Item queries.** After the call they describe the whole group (rule 11).
+
+Status: ready.
 
 ## Usage
 
