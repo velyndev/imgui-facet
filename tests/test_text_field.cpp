@@ -1646,3 +1646,33 @@ TEST_CASE("Text field: text that continues past an edge fades out there, and onl
     session.Frame();
     CHECK(leftAlpha < 0.3f);
 }
+
+TEST_CASE("Text field: a field with a visible label ends at its frame, also in the window's content size")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    TextFieldResult plain;
+    TextFieldResult multi;
+    ImRect plainItem;
+    ImRect multiItem;
+    float idealRight = 0.0f;
+    session.SetUi([&] {
+        ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f));
+        ImGui::Begin("auto sized", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+        ImGui::SetNextItemWidth(200.0f);
+        plain = TextFieldBehavior("Visible label", &text);
+        plainItem = GImGui->LastItemData.Rect;
+        ImGui::SetNextItemWidth(200.0f);
+        multi = TextFieldBehavior("Another label", &text, {.multiline = true});
+        multiItem = GImGui->LastItemData.Rect;
+        idealRight = GImGui->CurrentWindow->DC.IdealMaxPos.x;
+        ImGui::End();
+    });
+    session.Frames(3);
+    // Dear ImGui's own label (drawn after its frame, out of sight) adds nothing to the widget.
+    CHECK(plainItem.Max.x == doctest::Approx(plain.frame.Max.x));
+    CHECK(multiItem.Max.x == doctest::Approx(multi.frame.Max.x));
+    CHECK(plainItem.GetWidth() == doctest::Approx(200.0f));
+    CHECK(idealRight <= plain.frame.Max.x + 0.5f);
+}

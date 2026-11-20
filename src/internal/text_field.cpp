@@ -817,6 +817,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     ItemState dragItem;
     const int vertexStart = drawList->VtxBuffer.Size;
     const ImVec2 maxPosBackup = window->DC.CursorMaxPos;
+    const ImVec2 idealMaxPosBackup = window->DC.IdealMaxPos;
     // The text clip: the text area, plus the caret width at the end so a caret after the last
     // visible character still shows.
     const ImVec2 clipMin(textLeft, frame.Min.y);
@@ -899,6 +900,10 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
             changed = ImGui::InputTextEx(label, hint, buf, bufSize, textFrame.GetSize(), flags, TextFieldCallback,
                                          &callbackContext);
             fieldStatus = g.LastItemData.StatusFlags;
+            // InputTextEx counts the visible label it draws after its frame (out of sight here)
+            // into the item rect, which EndGroup would take as the widget's extent: the item ends
+            // at the text frame.
+            g.LastItemData.Rect.Max.x = ImMin(g.LastItemData.Rect.Max.x, textFrame.Max.x);
         }
         if (text != nullptr)
             buf = text->data();  // the resize callback may have moved it
@@ -963,6 +968,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
                 geometry.maskAdvance = star->AdvanceX;
     }
     window->DC.CursorMaxPos = ImMax(maxPosBackup, frame.Max);
+    window->DC.IdealMaxPos = ImMax(idealMaxPosBackup, frame.Max);
 
     ImGuiInputTextState* state = g.ActiveId == id ? ImGui::GetInputTextState(id) : nullptr;
     const bool activeNow = state != nullptr;
