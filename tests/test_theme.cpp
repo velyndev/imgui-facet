@@ -29,7 +29,23 @@ bool SameColors(const facet::Colors& a, const facet::Colors& b)
         same = same && SameColor(a.bgElevatedLevels[i], b.bgElevatedLevels[i]);
     for (int i = 0; i < facet::kChartPaletteSize; ++i)
         same = same && SameColor(a.chart[i], b.chart[i]);
+    same = same && SameColor(a.destructiveHover, b.destructiveHover) &&
+           SameColor(a.destructivePressed, b.destructivePressed) && SameColor(a.onDestructive, b.onDestructive) &&
+           SameColor(a.onSuccess, b.onSuccess) && SameColor(a.onWarning, b.onWarning) &&
+           SameColor(a.destructiveSubtle, b.destructiveSubtle) && SameColor(a.successSubtle, b.successSubtle) &&
+           SameColor(a.warningSubtle, b.warningSubtle) && SameColor(a.accentTextVisited, b.accentTextVisited) &&
+           SameColor(a.codeKeyword, b.codeKeyword) && SameColor(a.codeString, b.codeString) &&
+           SameColor(a.codeNumber, b.codeNumber);
     return same && SameColor(a.scrollThumb, b.scrollThumb) && SameColor(a.scrollThumbHover, b.scrollThumbHover);
+}
+
+// The colors added for the first widgets, as pointers into a theme.
+std::vector<ImVec4*> WidgetColorTokens(facet::Theme& t)
+{
+    facet::Colors& c = t.colors;
+    return {&c.destructiveHover, &c.destructivePressed, &c.onDestructive, &c.onSuccess, &c.onWarning,
+            &c.destructiveSubtle, &c.successSubtle, &c.warningSubtle, &c.accentTextVisited,
+            &c.codeKeyword, &c.codeString, &c.codeNumber};
 }
 
 // Every length and time token of the groups for popups, containers, scrolling, lists, drag and
@@ -57,7 +73,10 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
             &t.field.padding, &t.field.caretWidth,
             &m.faderLength, &m.dialSweep, &m.padSize, &m.pickerWidth, &m.numberFieldWidth, &m.histogramHeight,
             &m.chartHeight, &m.panelHeight, &m.cardWidth, &m.thumbnailSize, &m.slotSize,
-            &t.motion.popupOpen, &t.motion.popupClose, &t.motion.popupScaleFrom};
+            &t.motion.popupOpen, &t.motion.popupClose, &t.motion.popupScaleFrom,
+            &m.statusDotSize, &m.pageDotSize, &m.sliderTickSize, &m.segmentInset, &m.progressHeightSmall,
+            &m.progressHeight, &m.progressHeightLarge, &m.emptyIconSize, &c.statusBarHeight,
+            &t.motion.feedbackHold, &t.motion.pulsePeriod};
 }
 
 // Restores the global theme state after a test changes it.
@@ -226,6 +245,64 @@ TEST_CASE("MixThemes blends the popup, container, scroll, list, drag and field t
     CHECK(mid.colors.scrollThumb.w == doctest::Approx(expected.w));
     const ImVec4 chart = facet::Mix(a.colors.chart[3], b.colors.chart[3], 0.5f);
     CHECK(mid.colors.chart[3].y == doctest::Approx(chart.y));
+    // So do the colors of the first widgets, every one of them.
+    const std::vector<ImVec4*> colorsA = WidgetColorTokens(a);
+    const std::vector<ImVec4*> colorsB = WidgetColorTokens(b);
+    const std::vector<ImVec4*> colorsMid = WidgetColorTokens(mid);
+    const std::vector<ImVec4*> colorsStart = WidgetColorTokens(start);
+    const std::vector<ImVec4*> colorsEnd = WidgetColorTokens(end);
+    for (std::size_t i = 0; i < colorsMid.size(); ++i)
+    {
+        CAPTURE(i);
+        const ImVec4 blend = facet::Mix(*colorsA[i], *colorsB[i], 0.5f);
+        CHECK(colorsMid[i]->x == doctest::Approx(blend.x));
+        CHECK(colorsMid[i]->y == doctest::Approx(blend.y));
+        CHECK(colorsMid[i]->w == doctest::Approx(blend.w));
+        CHECK(SameColor(*colorsStart[i], *colorsA[i]));
+        CHECK(SameColor(*colorsEnd[i], *colorsB[i]));
+    }
+}
+
+TEST_CASE("The tokens of the first widgets hold their documented starting values in both presets")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Metrics& m = theme.metrics;
+        CHECK(m.statusDotSize == 8.0f);
+        CHECK(m.pageDotSize < m.statusDotSize);
+        CHECK(m.sliderTickSize == m.sliderTrackHeight);
+        CHECK(m.segmentInset == m.toggleKnobInset);
+        CHECK(m.progressHeightSmall == m.sliderTrackHeight);
+        CHECK(m.progressHeightSmall < m.progressHeight);
+        CHECK(m.progressHeight < m.progressHeightLarge);
+        CHECK(m.emptyIconSize == theme.spacing.xxxl);
+        CHECK(theme.containers.statusBarHeight == theme.list.rowHeightSmall);
+        CHECK(theme.motion.feedbackHold > theme.motion.durationSlow);
+        CHECK(theme.motion.pulsePeriod > theme.motion.spinnerPeriod);
+        // The washes are the status colors at 14 %, never stronger than accentSubtle.
+        const facet::Colors& c = theme.colors;
+        CHECK(c.destructiveSubtle.w == doctest::Approx(0.14f));
+        CHECK(c.successSubtle.w == doctest::Approx(0.14f));
+        CHECK(c.warningSubtle.w == doctest::Approx(0.14f));
+        CHECK(c.destructiveSubtle.w <= c.accentSubtle.w);
+        CHECK(c.destructiveSubtle.x == doctest::Approx(c.destructive.x));
+    }
+}
+
+TEST_CASE("ApplyAccent derives the status states from changed status colors")
+{
+    facet::Theme theme = facet::Theme::Light();
+    theme.colors.destructive = facet::Rgb(0x0A7A3D);
+    theme.colors.warning = facet::Rgb(0xFFE066);
+    theme.ApplyAccent(theme.colors.accent);
+    const facet::Colors& c = theme.colors;
+    CHECK(c.destructiveSubtle.x == doctest::Approx(c.destructive.x));
+    CHECK(c.destructiveSubtle.y == doctest::Approx(c.destructive.y));
+    CHECK(facet::ContrastRatio(c.onDestructive, c.destructive) >= 4.5f);
+    CHECK(facet::ContrastRatio(c.onDestructive, c.destructivePressed) >= 4.5f);
+    // A light warning takes black text.
+    CHECK(c.onWarning.x == doctest::Approx(0.0f));
 }
 
 TEST_CASE("The tokens of part B hold their documented starting values in both presets")

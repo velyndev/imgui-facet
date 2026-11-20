@@ -1,6 +1,7 @@
 // WCAG contrast of the theme tokens: every text token on every surface in both presets,
 // and the derived accent colors (text, focus ring, chart palette) for accents across 24 hues.
 
+#include <cmath>
 #include <vector>
 
 #include <doctest/doctest.h>
@@ -48,6 +49,7 @@ void CheckAccentDerivation(const facet::Theme& theme)
     {
         CAPTURE(surface.name);
         CHECK(facet::ContrastRatio(c.accentText, surface.color) >= kTextContrast);
+        CHECK(facet::ContrastRatio(c.accentTextVisited, surface.color) >= kTextContrast);
         CHECK(facet::ContrastRatio(ring, surface.color) >= kNonTextContrast);
         for (int i = 0; i < facet::kChartPaletteSize; ++i)
         {
@@ -114,6 +116,72 @@ TEST_CASE("Status colors reach 4.5:1 as text on the content surfaces")
             CHECK(facet::ContrastRatio(c.destructive, surface.color) >= kTextContrast);
             CHECK(facet::ContrastRatio(c.success, surface.color) >= kTextContrast);
             CHECK(facet::ContrastRatio(c.warning, surface.color) >= kTextContrast);
+        }
+    }
+}
+
+TEST_CASE("Text on solid status fills reaches 4.5:1 on every state")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        CHECK(facet::ContrastRatio(c.onDestructive, c.destructive) >= kTextContrast);
+        CHECK(facet::ContrastRatio(c.onDestructive, c.destructiveHover) >= kTextContrast);
+        CHECK(facet::ContrastRatio(c.onDestructive, c.destructivePressed) >= kTextContrast);
+        CHECK(facet::ContrastRatio(c.onSuccess, c.success) >= kTextContrast);
+        CHECK(facet::ContrastRatio(c.onWarning, c.warning) >= kTextContrast);
+        // A solid destructive fill is its own boundary.
+        for (const Named& surface : ContentSurfaces(c))
+        {
+            CAPTURE(surface.name);
+            CHECK(facet::ContrastRatio(c.destructive, surface.color) >= kNonTextContrast);
+        }
+    }
+}
+
+TEST_CASE("Text stays readable on the status washes and the tone glyph stays visible")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        const Named washes[] = {{"accentSubtle", c.accentSubtle},
+                                {"destructiveSubtle", c.destructiveSubtle},
+                                {"successSubtle", c.successSubtle},
+                                {"warningSubtle", c.warningSubtle}};
+        const ImVec4 tones[] = {c.accentText, c.destructive, c.success, c.warning};
+        for (const Named& surface : ContentSurfaces(c))
+        {
+            CAPTURE(surface.name);
+            for (int i = 0; i < 4; ++i)
+            {
+                CAPTURE(washes[i].name);
+                const ImVec4 wash = facet::Over(washes[i].color, surface.color);
+                CHECK(facet::ContrastRatio(c.label, wash) >= kTextContrast);
+                CHECK(facet::ContrastRatio(c.labelSecondary, wash) >= kTextContrast);
+                CHECK(facet::ContrastRatio(tones[i], wash) >= kNonTextContrast);
+            }
+        }
+    }
+}
+
+TEST_CASE("Visited links and code tints reach 4.5:1 on every surface")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        // The visited link differs in hue from the plain one.
+        const float turn = std::fabs(facet::ToOklch(c.accentTextVisited).h - facet::ToOklch(c.accentText).h);
+        CHECK(std::fmin(turn, 360.0f - turn) > 30.0f);
+        for (const Named& surface : Surfaces(c))
+        {
+            CAPTURE(surface.name);
+            CHECK(facet::ContrastRatio(c.accentTextVisited, surface.color) >= kTextContrast);
+            CHECK(facet::ContrastRatio(c.codeKeyword, surface.color) >= kTextContrast);
+            CHECK(facet::ContrastRatio(c.codeString, surface.color) >= kTextContrast);
+            CHECK(facet::ContrastRatio(c.codeNumber, surface.color) >= kTextContrast);
         }
     }
 }

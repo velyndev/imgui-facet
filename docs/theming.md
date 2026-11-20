@@ -10,17 +10,17 @@ the reason for each are listed in `DESIGN.md`.
 
 | Group | Holds |
 |---|---|
-| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states, status colors, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`) and the scrollbar thumbs |
+| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states (visited links included), status colors with their solid fill states and translucent washes, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`), the scrollbar thumbs and the code view tints |
 | `spacing` | The 4 px grid: `xs` 4 to `xxxl` 32 |
 | `radii` | `element`, `control`, `card`, `popover`, `window`, and where continuous corners start |
-| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, and the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots) |
+| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots), status and page dots, slider ticks, the segment inset, progress tracks per control size and the icon of an empty state |
 | `type` | Size and weight of every `TextStyle` |
-| `motion` | Springs, durations, loading periods, the popup open and close motion, a global `scale` and `reduceMotion` |
+| `motion` | Springs, durations, loading periods, the popup open and close motion, how long copied feedback stays, the live dot pulse, a global `scale` and `reduceMotion` |
 | `elevation` | Three shadow levels (their surfaces are in `colors`) |
 | `glass` | Backdrop blur settings |
 | `layout` | Width class breakpoints and the labelled row columns |
 | `overlay` | Popup placement, menus and their shortcut gap, tooltip timing, toasts, dialog, drawer and command palette sizes |
-| `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths |
+| `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths, the status bar height |
 | `scroll` | Overlay scrollbar widths, inset, minimum thumb, hide delay, wheel distance, edge fade |
 | `list` | Row heights per control size, tree indent, default visible rows, typeahead timeout |
 | `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target |
@@ -60,6 +60,9 @@ tokens. The widgets are planned; the table fixes which token each one takes.
 | `fieldWidth` (SliderWithInput, RangeInput), `histogramHeight` | `metrics.numberFieldWidth`, `metrics.histogramHeight` |
 | `sweep` (ArcRangeSlider, Knob) | `metrics.dialSweep` |
 | `OptionCardGroupOptions::cardWidth`, `ThumbnailPickerOptions::thumbnailSize`, `FileBrowserOptions::height` | `metrics.cardWidth`, `metrics.thumbnailSize`, `metrics.panelHeight` |
+| `ProgressBarOptions::size` (track thickness), `SecureFieldOptions::strength` (the meter) | `metrics.progressHeightSmall`, `progressHeight`, `progressHeightLarge`; the meter takes the small one |
+| `EmptyStateOptions::icon` (not compact), `StatusDot`, `CycleSelectorOptions::pageDots` | `metrics.emptyIconSize`, `metrics.statusDotSize`, `metrics.pageDotSize` |
+| `CopyButton`, `CopyField`, `InlineCode` (how long Strings::copied shows), `StatusDotOptions::pulse` | `motion.feedbackHold`, `motion.pulsePeriod` |
 
 ## Switching
 
@@ -115,6 +118,14 @@ facet::SetAccent(IM_COL32(0x24, 0x8A, 0x3D, 0xFF));
 - `chart[0]` to `chart[7]`: the chart palette, eight hues stepping around the OKLCH circle from
   the accent hue, each moved in lightness until it reaches 3:1 on every surface. Charts, legends
   and other indexed data take color `i % kChartPaletteSize` for entry `i`.
+- `accentTextVisited`: the `accentText` hue turned by 60 degrees, moved until it reaches 4.5:1 on
+  every surface, for visited links.
+
+`ApplyAccent` also derives the states of the status colors, which do not depend on the accent:
+`onDestructive`, `destructiveHover` and `destructivePressed` like the accent states, `onSuccess`
+and `onWarning` (white or black), and `destructiveSubtle`, `successSubtle` and `warningSubtle`, the
+status colors at 14 % opacity. A theme that changes `destructive`, `success` or `warning` calls
+`theme.ApplyAccent(theme.colors.accent)` afterwards.
 
 `SetThemeMode` keeps the accent of the last `SetAccent` for its presets until
 `facet::ClearAccent()`; `SetTheme` shows the accent of the theme passed to it.
@@ -148,7 +159,12 @@ The unit tests check, for both presets:
   decoration.
 - In the dark preset the elevation surfaces get lighter with the level, because a black
   shadow cannot darken the black background; in the light preset they are all white.
-- The status colors reach 4.5:1 as text on `bg`, `bgSecondary` and `bgTertiary`.
+- The status colors reach 4.5:1 as text on `bg`, `bgSecondary` and `bgTertiary`; `onDestructive`
+  reaches 4.5:1 on every destructive state, `onSuccess` and `onWarning` on their fills; `label`
+  and `labelSecondary` reach 4.5:1 on every wash (`accentSubtle` and the status washes) over the
+  content surfaces, and the tone color itself 3:1 there.
+- `accentTextVisited` and the code tints `codeKeyword`, `codeString` and `codeNumber` reach 4.5:1
+  on every surface.
 - For accents across 24 hues at five lightness levels, every accent state carries readable
   `onAccent` text, `accentText` is readable on every surface, and `focusRing` and every chart
   palette color reach 3:1 on every surface as drawn (8 bits per channel).

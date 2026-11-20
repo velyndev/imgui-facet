@@ -113,6 +113,34 @@ struct Colors
     ImVec4 scrollThumb;
     ImVec4 scrollThumbHover;
 
+    // States of a solid destructive fill (the Destructive button variant): onDestructive is white
+    // or black, whichever is more readable on `destructive`, and hover and pressed move the
+    // lightness away from it, so its text reaches 4.5:1 on every state. Theme::ApplyAccent derives
+    // them from `destructive`. (since 0.1)
+    ImVec4 destructiveHover;
+    ImVec4 destructivePressed;
+    ImVec4 onDestructive;
+    // Text and glyphs on solid success and warning fills (solid badges, status pills), white or
+    // black like onDestructive. Derived by Theme::ApplyAccent. (since 0.1)
+    ImVec4 onSuccess;
+    ImVec4 onWarning;
+    // Translucent tone washes behind banners, inline alerts, subtle badges and delta chips, as
+    // accentSubtle is for the accent: the status color at 14 % in both themes. label and
+    // labelSecondary stay readable on each over every content surface. Derived by
+    // Theme::ApplyAccent from the status colors. (since 0.1)
+    ImVec4 destructiveSubtle;
+    ImVec4 successSubtle;
+    ImVec4 warningSubtle;
+    // Visited links: the accentText hue turned by a sixth of the circle, its lightness moved until
+    // it reaches 4.5:1 on every surface listed for accentText. Derived by Theme::ApplyAccent.
+    // (since 0.1)
+    ImVec4 accentTextVisited;
+    // Tints of the code view (keywords, string literals, numbers; comments use labelSecondary),
+    // each reaching 4.5:1 on every surface. (since 0.1)
+    ImVec4 codeKeyword;
+    ImVec4 codeString;
+    ImVec4 codeNumber;
+
     // The surface of elevation level 1 to 3; the level is clamped into that range.
     const ImVec4& ElevatedSurface(int level) const
     {
@@ -180,6 +208,16 @@ struct Metrics
     float cardWidth = 256.0f;         // option cards and other cards of a fixed width
     float thumbnailSize = 128.0f;     // thumbnails and media cards
     float slotSize = 64.0f;           // inventory slots
+
+    // Marks and thin tracks (since 0.1).
+    float statusDotSize = 8.0f;       // StatusDot, the live dot of a status pill
+    float pageDotSize = 6.0f;         // page dots under a cycle selector or carousel
+    float sliderTickSize = 4.0f;      // step and stop marks on a slider track
+    float segmentInset = 2.0f;        // gap between a segmented track and its selection pill
+    float progressHeightSmall = 4.0f; // progress track of ControlSize::Small (also strength meters)
+    float progressHeight = 6.0f;      // progress track of ControlSize::Regular
+    float progressHeightLarge = 8.0f; // progress track of ControlSize::Large
+    float emptyIconSize = 32.0f;      // the icon above an empty or error state (not compact)
 };
 
 struct TextStyleSpec
@@ -229,6 +267,10 @@ struct Motion
     float popupOpen = 0.15f;
     float popupClose = 0.10f;
     float popupScaleFrom = 0.96f;
+
+    // Feedback that stays a moment (since 0.1; also multiplied by `scale`).
+    float feedbackHold = 1.5f;   // a copy button or field shows its check and Strings::copied this long
+    float pulsePeriod = 2.0f;    // one pulse of a live status dot; it stays still while motion is reduced
 };
 
 // One soft shadow; lengths in design units.
@@ -306,6 +348,7 @@ struct ContainerTokens
     float railWidth = 52.0f;                 // a sidebar collapsed to its icon rail
     float inspectorWidth = 280.0f;           // first width of an inspector pane
     float inspectorMinWidth = 200.0f;        // narrowest inspector pane
+    float statusBarHeight = 24.0f;           // a status bar strip (since 0.1)
 };
 
 // Overlay scrollbars, smooth scrolling and edge fades (the scroll core). Lengths in design units,
@@ -397,11 +440,13 @@ struct Theme
     static Theme Dark();
 
     // Sets colors.accent and derives accentHover, accentPressed, accentSubtle, onAccent,
-    // accentText, focusRing and the chart palette from it in OKLCH. onAccent is white or black,
-    // whichever is more readable, and hover and pressed move the lightness away from it, so
-    // text on every accent state reaches at least 4.5:1. accentText (4.5:1), focusRing and the
-    // chart colors (3:1) depend on the surface colors, so call this after changing them. The
-    // accent alpha is ignored.
+    // accentText, accentTextVisited, focusRing and the chart palette from it in OKLCH. onAccent is
+    // white or black, whichever is more readable, and hover and pressed move the lightness away
+    // from it, so text on every accent state reaches at least 4.5:1. accentText (4.5:1), focusRing
+    // and the chart colors (3:1) depend on the surface colors, so call this after changing them.
+    // It also derives the states of the status colors the same way (destructiveHover,
+    // destructivePressed, onDestructive, onSuccess, onWarning and the three *Subtle washes), so
+    // call it after changing destructive, success or warning too. The accent alpha is ignored.
     void ApplyAccent(const ImVec4& accent);
 };
 

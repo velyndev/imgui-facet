@@ -37,9 +37,20 @@ constexpr std::array<AccentPreset, 8> kAccentPresets = {{
     {"Graphite", Rgb(0x8E8E93)},
 }};
 
-// Lightness steps (OKLCH L) of the hover and pressed accent states.
+// Lightness steps (OKLCH L) of the hover and pressed states of a solid fill (the accent and the
+// destructive color).
 constexpr float kHoverLightnessStep = 0.04f;
 constexpr float kPressedLightnessStep = 0.08f;
+
+// Opacity of accentSubtle in each theme, and of the status washes in both: the brightest status
+// color (the dark warning) at the dark accentSubtle opacity would take labelSecondary on it
+// below 4.5:1.
+constexpr float kSubtleAlphaLight = 0.14f;
+constexpr float kSubtleAlphaDark = 0.24f;
+constexpr float kStatusSubtleAlpha = 0.14f;
+
+// Hue turn (degrees) from accentText to accentTextVisited.
+constexpr float kVisitedHueTurn = 60.0f;
 
 // WCAG AA contrast for normal text, the target of accentText.
 constexpr float kTextContrast = 4.5f;
@@ -125,6 +136,45 @@ void DeriveChartPalette(Colors& c)
     }
 }
 
+// The text color on a solid fill and the fill's hover and pressed states: the text is white or
+// black, whichever is more readable, and the states move the lightness away from it, which only
+// raises the contrast.
+struct SolidFillStates
+{
+    ImVec4 on;
+    ImVec4 hover;
+    ImVec4 pressed;
+};
+
+SolidFillStates DeriveSolidFillStates(const ImVec4& fill)
+{
+    SolidFillStates states;
+    states.on = ReadableOn(fill);
+    const float direction = states.on.x > 0.5f ? -1.0f : 1.0f;
+    const Oklch lch = ToOklch(fill);
+    const auto shifted = [&](float step) {
+        return FromOklch({std::clamp(lch.L + direction * step, 0.0f, 1.0f), lch.C, lch.h});
+    };
+    states.hover = shifted(kHoverLightnessStep);
+    states.pressed = shifted(kPressedLightnessStep);
+    return states;
+}
+
+// The states of the status colors: the destructive fill states, the text on solid success and
+// warning fills, and the three translucent washes.
+void DeriveStatusStates(Colors& c)
+{
+    const SolidFillStates destructive = DeriveSolidFillStates(c.destructive);
+    c.onDestructive = destructive.on;
+    c.destructiveHover = destructive.hover;
+    c.destructivePressed = destructive.pressed;
+    c.onSuccess = ReadableOn(c.success);
+    c.onWarning = ReadableOn(c.warning);
+    c.destructiveSubtle = WithAlpha(c.destructive, kStatusSubtleAlpha);
+    c.successSubtle = WithAlpha(c.success, kStatusSubtleAlpha);
+    c.warningSubtle = WithAlpha(c.warning, kStatusSubtleAlpha);
+}
+
 void SetElevation(Elevation& elevation, float opacity1, float opacity2, float opacity3)
 {
     elevation.levels[0] = {{0.0f, 1.0f}, 3.0f, 0.0f, opacity1};
@@ -189,6 +239,18 @@ Colors MixColors(const Colors& a, const Colors& b, float t)
         out.chart[i] = Mix(a.chart[i], b.chart[i], t);
     out.scrollThumb = Mix(a.scrollThumb, b.scrollThumb, t);
     out.scrollThumbHover = Mix(a.scrollThumbHover, b.scrollThumbHover, t);
+    out.destructiveHover = Mix(a.destructiveHover, b.destructiveHover, t);
+    out.destructivePressed = Mix(a.destructivePressed, b.destructivePressed, t);
+    out.onDestructive = Mix(a.onDestructive, b.onDestructive, t);
+    out.onSuccess = Mix(a.onSuccess, b.onSuccess, t);
+    out.onWarning = Mix(a.onWarning, b.onWarning, t);
+    out.destructiveSubtle = Mix(a.destructiveSubtle, b.destructiveSubtle, t);
+    out.successSubtle = Mix(a.successSubtle, b.successSubtle, t);
+    out.warningSubtle = Mix(a.warningSubtle, b.warningSubtle, t);
+    out.accentTextVisited = Mix(a.accentTextVisited, b.accentTextVisited, t);
+    out.codeKeyword = Mix(a.codeKeyword, b.codeKeyword, t);
+    out.codeString = Mix(a.codeString, b.codeString, t);
+    out.codeNumber = Mix(a.codeNumber, b.codeNumber, t);
     return out;
 }
 
@@ -232,6 +294,7 @@ ContainerTokens MixContainers(const ContainerTokens& a, const ContainerTokens& b
     out.railWidth = Lerp(a.railWidth, b.railWidth, t);
     out.inspectorWidth = Lerp(a.inspectorWidth, b.inspectorWidth, t);
     out.inspectorMinWidth = Lerp(a.inspectorMinWidth, b.inspectorMinWidth, t);
+    out.statusBarHeight = Lerp(a.statusBarHeight, b.statusBarHeight, t);
     return out;
 }
 
@@ -549,6 +612,9 @@ Theme Theme::Light()
     c.scrim = Rgb(0x000000, 0.20f);
     c.scrollThumb = Rgb(0x000000, 0.45f);
     c.scrollThumbHover = Rgb(0x000000, 0.60f);
+    c.codeKeyword = Rgb(0x7A1FA2);
+    c.codeString = Rgb(0x1A6B2B);
+    c.codeNumber = Rgb(0x9A4A00);
     SetElevation(theme.elevation, 0.10f, 0.12f, 0.18f);
     theme.ApplyAccent(kLightAccent);
     return theme;
@@ -585,6 +651,9 @@ Theme Theme::Dark()
     c.scrim = Rgb(0x000000, 0.48f);
     c.scrollThumb = Rgb(0xFFFFFF, 0.45f);
     c.scrollThumbHover = Rgb(0xFFFFFF, 0.62f);
+    c.codeKeyword = Rgb(0xD7A8FF);
+    c.codeString = Rgb(0x7EE08F);
+    c.codeNumber = Rgb(0xFFB86B);
     SetElevation(theme.elevation, 0.36f, 0.44f, 0.56f);
     theme.ApplyAccent(kDarkAccent);
     return theme;
@@ -594,24 +663,21 @@ void Theme::ApplyAccent(const ImVec4& accent)
 {
     Colors& c = colors;
     c.accent = WithAlpha(accent, 1.0f);
-    c.onAccent = ReadableOn(c.accent);
-
-    // Hover and pressed move away from the text color, which only raises the contrast.
-    const bool whiteText = c.onAccent.x > 0.5f;
-    const float direction = whiteText ? -1.0f : 1.0f;
-    const Oklch lch = ToOklch(c.accent);
-    const auto shifted = [&](float step) {
-        return FromOklch({std::clamp(lch.L + direction * step, 0.0f, 1.0f), lch.C, lch.h});
-    };
-    c.accentHover = shifted(kHoverLightnessStep);
-    c.accentPressed = shifted(kPressedLightnessStep);
+    const SolidFillStates states = DeriveSolidFillStates(c.accent);
+    c.onAccent = states.on;
+    c.accentHover = states.hover;
+    c.accentPressed = states.pressed;
 
     c.accentText = MoveUntilContrast(c, c.accent, dark, kTextContrast, false);
-    c.accentSubtle = WithAlpha(c.accent, dark ? 0.24f : 0.14f);
+    const Oklch text = ToOklch(c.accentText);
+    c.accentTextVisited = MoveUntilContrast(c, FromOklch({text.L, text.C, std::fmod(text.h + kVisitedHueTurn, 360.0f)}),
+                                            dark, kTextContrast, false);
+    c.accentSubtle = WithAlpha(c.accent, dark ? kSubtleAlphaDark : kSubtleAlphaLight);
     // The ring sits beside the control on whatever surface holds it, so it needs the non-text
     // contrast on every surface, not only on the one the accent was chosen for.
     c.focusRing = MoveUntilContrast(c, c.accent, dark, kBoundaryContrast, true);
     DeriveChartPalette(c);
+    DeriveStatusStates(c);
 }
 
 Theme MixThemes(const Theme& a, const Theme& b, float t)
@@ -663,6 +729,14 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     m.cardWidth = Lerp(ma.cardWidth, mb.cardWidth, t);
     m.thumbnailSize = Lerp(ma.thumbnailSize, mb.thumbnailSize, t);
     m.slotSize = Lerp(ma.slotSize, mb.slotSize, t);
+    m.statusDotSize = Lerp(ma.statusDotSize, mb.statusDotSize, t);
+    m.pageDotSize = Lerp(ma.pageDotSize, mb.pageDotSize, t);
+    m.sliderTickSize = Lerp(ma.sliderTickSize, mb.sliderTickSize, t);
+    m.segmentInset = Lerp(ma.segmentInset, mb.segmentInset, t);
+    m.progressHeightSmall = Lerp(ma.progressHeightSmall, mb.progressHeightSmall, t);
+    m.progressHeight = Lerp(ma.progressHeight, mb.progressHeight, t);
+    m.progressHeightLarge = Lerp(ma.progressHeightLarge, mb.progressHeightLarge, t);
+    m.emptyIconSize = Lerp(ma.emptyIconSize, mb.emptyIconSize, t);
 
     for (int i = 0; i < kTextStyleCount; ++i)
         out.type.styles[i].size = Lerp(a.type.styles[i].size, b.type.styles[i].size, t);
@@ -680,6 +754,8 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     motion.popupOpen = Lerp(a.motion.popupOpen, b.motion.popupOpen, t);
     motion.popupClose = Lerp(a.motion.popupClose, b.motion.popupClose, t);
     motion.popupScaleFrom = Lerp(a.motion.popupScaleFrom, b.motion.popupScaleFrom, t);
+    motion.feedbackHold = Lerp(a.motion.feedbackHold, b.motion.feedbackHold, t);
+    motion.pulsePeriod = Lerp(a.motion.pulsePeriod, b.motion.pulsePeriod, t);
 
     for (int i = 0; i < 3; ++i)
     {
