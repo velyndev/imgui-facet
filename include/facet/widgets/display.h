@@ -6,8 +6,9 @@
 // tiles and data tables.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. Every widget here is declared and planned: its body draws a
-// placeholder until Phase 2 implements it (docs/widgets/display.md lists the status of each).
+// with other families. The family is being implemented: the entry of each widget in
+// docs/widgets/display.md ends with its status, and a widget whose status is planned draws a
+// placeholder of its default size and returns the neutral result.
 //
 // Lengths are design units (Px() is applied inside). Strings are UTF-8 and read only during
 // the call. Every function is for the thread that runs the Dear ImGui frame (context.h).
@@ -206,9 +207,15 @@ struct ProgressBarOptions
     float width = 0.0f;                    // units; 0 fills the available width
 };
 
-// A linear progress track. Not interactive. The visible label part is drawn above the bar;
-// the id keys the smoothed fill. `fraction` is 0 to 1 (clamped in the drawing) or
-// kIndeterminate, which sweeps a segment instead (a slow fade with reduced motion).
+// A linear progress track. Not interactive and not a Tab stop; ImGui::IsItemHovered and
+// SetItemTooltip work on it. The visible label part is drawn above the bar, cut with an
+// ellipsis when it does not fit, and with showPercent the percentage sits at the end of that
+// line. Without a label line the track is centered in one control height of `size`, so it lines
+// up with the labels of a settings row. The id keys the smoothed fill, which eases to a new value
+// over motion.durationStandard (at once with reduced motion). `fraction` is 0 to 1 (clamped in
+// the drawing, NaN drawn as 0) or kIndeterminate, which sweeps a segment on the shared loading
+// clock instead (a slow fade in place with reduced motion). Inside ImGui::BeginDisabled it is
+// drawn in the disabled colors.
 void ProgressBar(const char* label, float fraction, const ProgressBarOptions& options = {});
 
 struct ProgressRingOptions

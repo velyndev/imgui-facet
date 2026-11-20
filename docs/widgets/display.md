@@ -8,10 +8,10 @@ Header: `facet/widgets/display.h`. Every declaration follows [the API convention
 and the header comments are the full reference (parameters, units, keys, state kept per id).
 The demo gallery shows every widget on the page Widgets > Display.
 
-Every widget here is **planned**: each one below is declared, compiles and can be called; until
-Phase 2 implements it, a call draws a placeholder of the widget's default size (a dashed box that
-names the widget) and returns the neutral result (false, `None`, nothing written). Each entry
-ends with its status.
+Every widget below is declared, compiles and can be called, and each entry ends with its status. A
+**planned** widget draws a placeholder of its default size (a dashed box that names the widget)
+and returns the neutral result (false, `None`, nothing written); a **ready** one works as its
+header describes.
 
 ## Widgets
 
@@ -80,7 +80,13 @@ Switches a data view between skeleton rows, error with retry, empty state and co
 void ProgressBar(const char* label, float fraction, const ProgressBarOptions& options = {});
 ```
 
-Linear progress with an optional buffer fill; `kIndeterminate` sweeps. Status: planned.
+Linear progress: a track with the value's fill, an optional lighter buffer fill ahead of it, and the
+label line above it with the percentage at its end (`showPercent`). Not interactive and not a Tab
+stop. `tone` colors the fill (Accent by default, through the 3:1 focusRing color); `size` sets the
+track thickness (4, 6 or 8 units). Without a label line the track is centered in one control height,
+so it lines up in a settings row. A new value eases in over `motion.durationStandard`;
+`kIndeterminate` sweeps a segment on the shared loading clock, which becomes a slow fade in place
+with reduced motion. Values outside 0 to 1 are drawn clamped. Status: ready.
 
 ### ProgressRing
 

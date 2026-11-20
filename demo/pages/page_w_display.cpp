@@ -1,6 +1,6 @@
 // Demo page: Display. Calls every declared display widget once with neutral example
-// arguments, grouped by purpose. Until Phase 2 implements a widget, its call draws the
-// placeholder of the declared size; Phase 2 replaces the placeholders one by one.
+// arguments, grouped by purpose. ProgressBar is implemented and shown in several forms; a
+// planned widget draws the placeholder of its declared size.
 
 #include <iterator>
 
@@ -39,6 +39,9 @@ struct DisplayUi
 {
     bool bannerOpen = true;
     bool alertOpen = true;
+    float progress = 0.4f;
+    bool progressHovered = false;
+    ImGuiID progressId = 0;
     ImGuiSelectionBasicStorage selection;
 };
 
@@ -78,8 +81,24 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110)
         facet::EndDataStateView();
 
     SectionHeader("Progress and loading");
+    // ProgressBar is implemented: the stock slider sets its value, so the eased fill can be seen.
+    LabeledRow("Progress value");
+    ImGui::SliderFloat("##progress value", &ui.progress, 0.0f, 1.0f, "%.2f");
+    ctx.Probe("display.progressValue");
     LabeledRow("Progress bar");
-    facet::ProgressBar("Progress##bar", 0.4f, {.showPercent = true});
+    facet::ProgressBar("Example task##bar", ui.progress, {.showPercent = true, .buffer = ui.progress + 0.2f});
+    ctx.Probe("display.progress");
+    ui.progressHovered = ImGui::IsItemHovered();
+    ui.progressId = ImGui::GetItemID();
+    LabeledRow("Without a label");
+    facet::ProgressBar("##bar plain", ui.progress, {.tone = facet::Tone::Success});
+    LabeledRow("Sizes");
+    ImGui::BeginGroup();  // keeps the bars in the control column of the row
+    facet::ProgressBar("Small##bar", ui.progress, {.tone = facet::Tone::Neutral, .size = facet::ControlSize::Small});
+    facet::ProgressBar("Large##bar", ui.progress, {.tone = facet::Tone::Destructive, .size = facet::ControlSize::Large});
+    ImGui::EndGroup();
+    LabeledRow("Indeterminate");
+    facet::ProgressBar("Waiting##bar", facet::kIndeterminate);
     LabeledRow("Progress ring");
     facet::ProgressRing("Progress##ring", facet::kIndeterminate);
     LabeledRow("Spinner");
@@ -143,4 +162,28 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110)
         }
         facet::EndDataTable();
     }
+}
+
+FACET_DEMO_SELFTEST("display")
+{
+    using T = facet::demo::Target;
+    test.Do([] {
+        ui.progress = 0.4f;
+        ui.progressHovered = false;
+    });
+    // The progress bar follows its value and is not operable: a click on it changes nothing and
+    // Tab passes from the value slider over it.
+    test.Reveal("display.progress");
+    test.ExpectVisible("display.progress");
+    test.Hover(T::Item("display.progress"), 0.2f);
+    test.Expect("the progress bar answers ImGui::IsItemHovered", [] { return ui.progressHovered; });
+    test.Click("display.progress");
+    test.ExpectNear("a click on the bar leaves the value", [] { return ui.progress; }, 0.4, 0.0001);
+    test.Drag({T::Item("display.progressValue", 0.5f), T::Item("display.progressValue", 1.2f)}, 0.25f);
+    test.ExpectNear("the stock slider sets the value the bar shows", [] { return ui.progress; }, 1.0, 0.0001);
+    test.Click("display.progressValue");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.Expect("Tab passes over the progress bar",
+                [] { return ui.progressId != 0 && ImGui::GetFocusID() != ui.progressId; });
 }
