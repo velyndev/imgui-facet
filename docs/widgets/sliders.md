@@ -260,8 +260,26 @@ bool Knob(const char* label, float* value, float min, float max, const KnobOptio
 bool Knob(const char* label, int* value, int min, int max, const KnobOptions& options = {});
 ```
 
-A rotary control with an arc, dot or wiper, bipolar fill and vertical or circular drag.
-Status: planned.
+A dial `diameter` units across (two control heights of `size` by default, at most the available
+width) with a track arc along the sweep (`sweep` degrees, dialSweep by default, open at the bottom,
+clockwise over the top), a face in the background color with a 3:1 outline, the formatted value
+inside the face (under the dial when the dial is smaller than one and a half control heights) and
+the label under it in Footnote, cut with its full text on hover and keyboard focus.
+
+- **Variants:** Arc fills the arc from the start (from the middle with `fillFromCenter`) to the
+  value in the accent; Dot puts a dot on the face; Wiper draws a line from the centre.
+- **Input:** every press grabs without moving the value; dragging up (and back down) moves it,
+  one fader length of travel for the whole range, Shift ten times finer, and a drag that leaves the
+  window comes back exactly. With `circularDrag` the value follows the pointer angle along the
+  sweep (inside the gap at the bottom it goes to the nearer end) and Escape restores it. Up and
+  Down step while focused (Left and Right keep moving the focus), Page Up and Down a tenth, Home
+  and End the ends; the wheel steps while focused or with Alt. Ctrl+click or Enter types a value
+  in a number field over the dial. A double click restores the value from the start of its first
+  click.
+- **States:** as Slider: disabled, `readOnly`, `mixed` (no value mark and no text until the first
+  edit), `error` (the track arc in the destructive color and the message under the knob).
+
+Status: ready.
 
 ### XYPad
 

@@ -1016,3 +1016,83 @@ TEST_CASE("A multi slider handle dragged off the track and released there is rem
     REQUIRE(values.size() == 1);
     CHECK(values[0] == 1.0f);
 }
+// ---- Knob ----------------------------------------------------------------------------------
+
+TEST_CASE("A knob turns up with an upward drag, steps with Up and Down and restores on a double click")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float value = 0.5f;
+    int whole = 3;
+    int commits = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Knob("Gain", &value, 0.0f, 1.0f);
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("knob");
+        facet::Knob("Steps", &whole, 0, 10, {.variant = facet::KnobVariant::Dot});
+        session.Track("whole");
+    });
+    session.Frame();
+    const ImRect knob = session.ItemRect("knob");
+    const ImVec2 center(knob.GetCenter().x, knob.Min.y + knob.GetWidth() * 0.5f);
+    // A press grabs without moving the value; up increases, back to the press point restores it.
+    session.MouseMove(center);
+    session.MouseDown();
+    CHECK(value == 0.5f);
+    session.MouseMove(ImVec2(center.x, center.y - 40.0f));
+    CHECK(value > 0.5f);
+    session.MouseMove(ImVec2(center.x, center.y + 4000.0f));
+    CHECK(value == 0.0f);
+    session.MouseMove(center);
+    CHECK(value == 0.5f);
+    session.MouseMove(ImVec2(center.x, center.y + 30.0f));
+    session.MouseUp();
+    session.Frame();
+    CHECK(value < 0.5f);
+    CHECK(commits == 1);
+    // A double click restores the value from before its first click.
+    const float moved = value;
+    session.Seconds(0.5f);  // past the double click time of the drag's press
+    session.DoubleClick(center);
+    CHECK(value == moved);
+    // Keys: Tab reaches it, Up steps, End reaches the maximum.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(value == 1.0f);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(value == doctest::Approx(0.99f));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(whole == 4);
+}
+
+TEST_CASE("A circular knob follows the pointer angle, and a read-only knob writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float value = 0.5f;
+    float fixed = 0.5f;
+    session.SetUi([&] {
+        facet::Knob("Pan", &value, 0.0f, 1.0f, {.circularDrag = true});
+        session.Track("knob");
+        facet::Knob("Fixed", &fixed, 0.0f, 1.0f, {.readOnly = true});
+        session.Track("fixed");
+    });
+    session.Frame();
+    const ImRect knob = session.ItemRect("knob");
+    const ImVec2 center(knob.GetCenter().x, knob.Min.y + knob.GetWidth() * 0.5f);
+    // The pointer to the right of the centre is three quarters of the default 270 degree sweep:
+    // the sweep starts at the bottom left and runs clockwise over the top.
+    session.Drag({center, ImVec2(center.x + 60.0f, center.y)});
+    CHECK(value == doctest::Approx(5.0 / 6.0).epsilon(0.02));
+    session.Drag({center, ImVec2(center.x - 60.0f, center.y)});
+    CHECK(value == doctest::Approx(1.0 / 6.0).epsilon(0.02));
+    const ImRect f = session.ItemRect("fixed");
+    session.Drag({f.GetCenter(), ImVec2(f.GetCenter().x, f.GetCenter().y - 80.0f)});
+    CHECK(fixed == 0.5f);
+}

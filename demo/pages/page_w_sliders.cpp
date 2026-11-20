@@ -86,10 +86,16 @@ struct SlidersUi
     int marksRemoved = 0;
     int levels[3] = {2, 5, 8};
 
+    // Knob
+    float knobArc = 0.4f;
+    int knobDot = 3;
+    float knobWiper = 0.0f;
+    float knobPan = 0.0f;
+    float knobFixed = 0.6f;
+
     // The planned widgets below.
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
-    float knob = 0.4f;
     ImVec2 point = {0.5f, 0.5f};
     ImVec2 stick = {0.0f, 0.0f};
     float arcLow = 45.0f;
@@ -227,6 +233,44 @@ void MultiSection(facet::demo::PageCtx& ctx)
          ui.handles[2], static_cast<int>(ui.marks.size()), ui.marksAdded, ui.marksRemoved);
 }
 
+void KnobSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Knob");
+    Paragraph("Drag up to turn a knob up, or around it with circular drag. Up and Down step while it is focused, "
+              "the wheel turns it while it is focused or with Alt, a double click undoes the last click.");
+    // Knobs side by side, wrapping onto the next line in a narrow window.
+    const float knobWidth = facet::ControlHeight(facet::ControlSize::Large) * 2.0f;
+    float right = facet::demo::ContentRight();
+    const auto KnobNext = [&] { facet::demo::SameLineIfFits(right, knobWidth); };
+    LabeledRow("Variants");
+    right = facet::demo::ContentRight();
+    ForceCaptureLook(ctx);
+    facet::Knob("Arc", &ui.knobArc, 0.0f, 1.0f, {.format = "%.2f"});
+    ctx.Probe("knob.arc");
+    KnobNext();
+    facet::Knob("Dot", &ui.knobDot, 0, 10, {.variant = facet::KnobVariant::Dot});
+    ctx.Probe("knob.dot");
+    KnobNext();
+    facet::Knob("Wiper", &ui.knobWiper, -1.0f, 1.0f, {.format = "%+.2f", .variant = facet::KnobVariant::Wiper,
+                                                     .fillFromCenter = true});
+    ctx.Probe("knob.wiper");
+    KnobNext();
+    facet::Knob("Pan", &ui.knobPan, -1.0f, 1.0f, {.format = "%+.2f", .fillFromCenter = true, .circularDrag = true});
+    ctx.Probe("knob.pan");
+    LabeledRow("Sizes and states");
+    right = facet::demo::ContentRight();
+    facet::Knob("Small", &ui.knobArc, 0.0f, 1.0f, {.format = "%.2f", .size = facet::ControlSize::Small});
+    KnobNext();
+    facet::Knob("Large", &ui.knobArc, 0.0f, 1.0f, {.format = "%.2f", .size = facet::ControlSize::Large});
+    KnobNext();
+    facet::Knob("Read-only", &ui.knobFixed, 0.0f, 1.0f, {.format = "%.2f", .readOnly = true});
+    KnobNext();
+    ImGui::BeginDisabled();
+    facet::Knob("Disabled", &ui.knobFixed, 0.0f, 1.0f, {.format = "%.2f"});
+    ImGui::EndDisabled();
+    Note("Arc %.2f, dot %d, wiper %+.2f, pan %+.2f.", ui.knobArc, ui.knobDot, ui.knobWiper, ui.knobPan);
+}
+
 void SteppedSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("SliderStepped");
@@ -354,10 +398,6 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     ctx.Probe("withInput.scale");
     Note("Amount %d, scale %.2f.", ui.amount, ui.field);
 
-    SectionHeader("Knob");
-    LabeledRow("Knob");
-    facet::Knob("##knob", &ui.knob, 0.0f, 1.0f);
-
     RangeSection(ctx);
 
     SectionHeader("RangeInput");
@@ -373,6 +413,7 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     Note("Years %d to %d, limits %.2f to %.2f.", ui.yearLow, ui.yearHigh, ui.fieldLow, ui.fieldHigh);
 
     MultiSection(ctx);
+    KnobSection(ctx);
 
     SectionHeader("More ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
@@ -600,13 +641,30 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("Delete removes the focused mark", [] { return ui.marks.size() == 1 && ui.marksRemoved == 1; });
     test.KeyPress(ImGuiKey_Delete);
     test.Expect("the last mark stays: minHandles is 1", [] { return ui.marks.size() == 1; });
+    // Knob: a click grabs it without moving it, the first Tab after it shows the focus there.
+    test.Click("knob.arc");
+    test.ExpectNear("a click on the knob does not move it", [] { return ui.knobArc; }, 0.4, 1e-6);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("knob.arc");
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End turns the knob to its maximum", [] { return ui.knobArc; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down turns it one hundredth down", [] { return ui.knobArc; }, 0.99, 1e-6);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("knob.dot");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up turns the whole-number knob one step up", [] { return ui.knobDot; }, 4.0, 0.0);
     test.MouseMove(Row("multi.marks", 0.92f));
     test.MouseDown();
     test.MouseUp();
     test.MouseDown();
     test.MouseUp();
     test.Expect("a double click on the empty track adds a mark", [] { return ui.marks.size() == 2 && ui.marksAdded >= 1; });
-    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
+    test.Do([] { ui.knobArc = 0.5f; });
+    test.Drag({T::Item("knob.arc", 0.5f, 0.3f), T::Item("knob.arc", 0.5f, 0.3f).Offset(0.0f, 50.0f)}, 0.3f);
+    test.Expect("a downward drag turns the knob down", [] { return ui.knobArc < 0.5f; });
+    test.Drag({T::Item("knob.pan", 0.5f, 0.3f), T::Item("knob.pan", 0.5f, 0.3f).Offset(-60.0f, 0.0f)}, 0.3f);
+    test.Expect("a drag to the left of the circular knob turns it left", [] { return ui.knobPan < -0.3f; });    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
     test.Expect("a drag pushes the whole-number levels down", [] { return ui.levels[2] < 8; });
 
     test.Do([] { ui.yearLow = 1990; ui.yearHigh = 2020; });

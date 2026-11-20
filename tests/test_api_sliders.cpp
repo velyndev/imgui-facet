@@ -91,8 +91,6 @@ void CallSliderStubs(Values& v)
     using namespace facet;
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 1", &v.low, &v.high, 0.0f, 1.0f, kBins));
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 2", &v.lowInt, &v.highInt, 0, 10, kBins));
-    FACET_CHECK_STUB(false, Knob("Knob 1", &v.number, 0.0f, 1.0f, {.variant = KnobVariant::Dot}));
-    FACET_CHECK_STUB(false, Knob("Knob 2", &v.integer, 0, 10));
     FACET_CHECK_STUB(false, XYPad("Pad 1", &v.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.grid = true}));
     FACET_CHECK_STUB(false, JoystickPad("Stick 1", &v.point, {.deadzone = 0.1f}));
     FACET_CHECK_STUB(false, ArcRangeSlider("Arc 1", &v.low, &v.high, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f}));
@@ -102,7 +100,7 @@ void CallSliderStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 10;
+constexpr int kSliderStubCalls = 8;
 
 } // namespace
 
@@ -128,6 +126,7 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
     REQUIRE(session.Ready());
     ImVec2 stick(0.25f, 0.5f);
     float gain = 0.5f;
+    float gainHigh = 0.75f;
     ImGuiID expected = 0;
     session.SetUi([&] {
         ImGui::Button("before");
@@ -135,7 +134,7 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
         expected = ImGui::GetID("Volume##value");
         facet::JoystickPad("Volume##value", &stick);
         session.Track("slider");
-        facet::Knob("Gain", &gain, 0.0f, 1.0f);
+        facet::ArcRangeSlider("Gain", &gain, &gainHigh, 0.0f, 1.0f);
         session.Track("knob");
         ImGui::Button("after");
         session.Track("after");
@@ -157,6 +156,7 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
     CHECK(stick.x == 0.25f);
     CHECK(stick.y == 0.5f);
     CHECK(gain == 0.5f);
+    CHECK(gainHigh == 0.75f);
 }
 
 TEST_CASE("Pads keep their default size in a wide row and fit a short row")
