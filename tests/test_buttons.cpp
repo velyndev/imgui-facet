@@ -512,6 +512,74 @@ TEST_CASE("A link draws accentText, accentTextVisited when visited, and nothing 
     CHECK(OpenedUrl().empty());
 }
 
+// --- CopyButton -------------------------------------------------------------------------------
+
+TEST_CASE("A copy button writes the clipboard and confirms without moving anything")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 success = facet::ToU32(facet::T().colors.success);
+    int copies = 0;
+    int successVertices = 0;
+    float afterX = 0.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        if (facet::CopyButton("Copy the address", "placeholder text", {.iconOnly = false}))
+            ++copies;
+        successVertices = CountColor(from, success);
+        session.Track("copy");
+        ImGui::SameLine();
+        afterX = ImGui::GetCursorScreenPos().x;
+        facet::CopyButton("##icon", "second text");
+        session.Track("icon");
+    });
+    session.Frame();
+    const ImRect rest = session.ItemRect("copy");
+    const float restAfter = afterX;
+    CHECK(successVertices == 0);
+    session.Click(session.ItemCenter("copy"));
+    CHECK(copies == 1);
+    CHECK(session.Clipboard() == "placeholder text");
+    // Confirming: the check in the success color, the same rectangle, the next item where it was.
+    session.Frame();
+    CHECK(successVertices > 0);
+    CHECK(session.ItemRect("copy").GetWidth() == doctest::Approx(rest.GetWidth()));
+    CHECK(afterX == doctest::Approx(restAfter));
+    // After motion.feedbackHold the button shows its name again.
+    session.Seconds(facet::T().motion.feedbackHold + 0.2f);
+    CHECK(successVertices == 0);
+    // Keyboard, and the icon-only form: one control height square.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("icon"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(session.Clipboard() == "second text");
+    const ImRect icon = session.ItemRect("icon");
+    CHECK(icon.GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+}
+
+TEST_CASE("A copy button without text is disabled and copies nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetClipboard("unchanged");
+    int copies = 0;
+    session.SetUi([&] {
+        copies += facet::CopyButton("Copy", nullptr) ? 1 : 0;
+        session.Track("copy");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("copy"));
+    CHECK(copies == 0);
+    CHECK(session.Clipboard() == "unchanged");
+}
+
 TEST_CASE("A button outside a frame returns false")
 {
     facet::test::Session session;

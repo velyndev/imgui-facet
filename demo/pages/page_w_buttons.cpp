@@ -48,6 +48,9 @@ struct ButtonsUi
     bool iconLoading = false;
     bool pinTip = false;  // the pin's tooltip shows (read in the frame, for the selftest)
 
+    // CopyButton
+    int copies = 0;
+
     // Link
     int links = 0;
     bool linkVisited = false;
@@ -291,6 +294,51 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
          ui.iconLoading ? "runs until Stop loading is pressed" : "is idle");
 }
 
+void CopyButtonSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("CopyButton");
+    Paragraph("Copies a text to the clipboard. For a moment afterwards it shows a check and the word Copied, in a "
+              "width that holds both looks, so nothing next to it moves.");
+
+    static const char* const kSample = "Placeholder text to copy";
+    LabeledRow("Beside a value");
+    {
+        facet::Text(facet::TextStyle::Body, "%s", kSample);
+        ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.sm));
+        if (ctx.capture && ctx.captureState == kPressed)
+            ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Pressed);
+        else if (ctx.capture && ctx.captureState == kFocused)
+            ctx.ForceNextItemState(ForcedItemState::Focused);
+        if (facet::CopyButton("Copy the placeholder text", kSample))
+            Pressed(&ui.copies, "Copy (icon only)");
+        ctx.Probe("button.copy.icon");
+    }
+    LabeledRow("With its label");
+    {
+        const ButtonRow row;
+        if (facet::CopyButton("Copy##labelled", kSample, {.iconOnly = false}))
+            Pressed(&ui.copies, "Copy");
+        ctx.Probe("button.copy.label");
+        row.Next();
+        if (facet::CopyButton("Copy as one line", "Placeholder line",
+                              {.variant = facet::ButtonVariant::Secondary, .iconOnly = false}))
+            Pressed(&ui.copies, "Copy as one line");
+        ctx.Probe("button.copy.secondary");
+        row.Next();
+        facet::CopyButton("Copy##small", kSample,
+                          {.variant = facet::ButtonVariant::Secondary, .iconOnly = false, .size = facet::ControlSize::Small});
+    }
+    LabeledRow("States");
+    {
+        const ButtonRow row;
+        // A null text: nothing to copy, so the button is disabled.
+        if (facet::CopyButton("Nothing to copy", nullptr, {.variant = facet::ButtonVariant::Secondary, .iconOnly = false}))
+            Pressed(&ui.copies, "Nothing to copy");
+        ctx.Probe("button.copy.none");
+    }
+    Note("Copies on this page: %d.", ui.copies);
+}
+
 // Stands in for the platform's shell during selftests: the address is recorded instead of opened,
 // so a selftest never starts a browser.
 bool RecordOpenedUrl(ImGuiContext*, const char* path)
@@ -362,9 +410,7 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pres
 
     IconButtonSection(ctx);
 
-    SectionHeader("Copy button");
-    LabeledRow("Copy button");
-    facet::CopyButton("Copy sample text", "Sample text", {.iconOnly = false});
+    CopyButtonSection(ctx);
 
     LinkSection(ctx);
 
@@ -459,6 +505,19 @@ FACET_DEMO_SELFTEST("buttons")
     test.ExpectNear("a loading icon button does not activate again", [] { return ui.iconPresses; }, 3.0, 0.0);
     test.Click("button.icon.stop");
     test.Expect("the plain button stops loading", [] { return !ui.iconLoading; });
+
+    // CopyButton: the clipboard of the run receives the text, by click and by keyboard.
+    test.Click("button.copy.icon");
+    test.ExpectClipboard("a click copies the text", "Placeholder text to copy");
+    test.Click("button.copy.secondary");
+    test.ExpectClipboard("the secondary copy button copies its own text", "Placeholder line");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("button.copy.label");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectClipboard("Enter copies the text", "Placeholder text to copy");
+    test.Click("button.copy.none");
+    test.ExpectNear("the button without text copies nothing", [] { return ui.copies; }, 3.0, 0.0);
 
     // Link: click and Enter, the address goes to the platform hook (recorded here), disabled.
     test.Click("button.link.plain");

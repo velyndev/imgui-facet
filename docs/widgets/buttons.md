@@ -77,8 +77,22 @@ Status: ready.
 bool CopyButton(const char* label, const char* text, const CopyButtonOptions& options = {});
 ```
 
-Copies `text` to the clipboard and shows a check for a moment; returns true on the frame it copied.
-Status: planned.
+A button that copies `text` (UTF-8, read during the call) to the clipboard through
+`ImGui::SetClipboardText` when activated; returns true on the frame it copied.
+
+- **Confirmation.** For `motion.feedbackHold` (1.5 s) after a copy it shows the check icon instead
+  of the copy icon, in the success color on the Secondary and Plain variants, and `Strings::copied`
+  instead of its name. The width always holds both the name and `Strings::copied`, so the
+  confirmation moves nothing next to it. The time of the last copy is kept under its id.
+- **Name.** The visible label part is the tooltip of the icon-only form (on hover and keyboard
+  focus; `Strings::copied` while confirming) and the text of the labelled form; an empty visible
+  part uses `Strings::copy`.
+- **Forms.** `iconOnly` (the default) is one control height square; with it off the button shows
+  the icon and the name, sized as above. `variant` takes the Button colors (Plain by default).
+- **States.** A null `text` draws the button disabled (the shared disabled look, no Tab stop) and
+  it returns false.
+
+Status: ready.
 
 ### Link
 

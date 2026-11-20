@@ -35,7 +35,6 @@ void CallButtonStubs(Values& v)
 {
     using namespace facet;
     const std::span<bool> flags(v.flags);
-    FACET_CHECK_STUB(false, CopyButton("Copy 1", "Sample", {.iconOnly = false}));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 1", flags, kChoices));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 2", &v.index, kChoices, {.allowEmpty = true}));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 3", flags, kLabels));
@@ -43,7 +42,7 @@ void CallButtonStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallButtonStubs.
-constexpr int kButtonStubCalls = 5;
+constexpr int kButtonStubCalls = 4;
 
 } // namespace
 
