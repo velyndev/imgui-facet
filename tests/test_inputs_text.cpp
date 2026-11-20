@@ -904,3 +904,151 @@ TEST_CASE("A read-only SearchField shows no recent list and takes no text")
     CHECK(query.empty());
     CHECK(writes == 0);
 }
+
+// ---- TextArea ----------------------------------------------------------------------------------
+
+TEST_CASE("TextArea: Enter starts a new line and Ctrl+Enter commits the session")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    Signals signals;
+    session.SetUi([&] {
+        signals.Count(facet::TextArea("##notes", &text));
+        session.Track("area");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("area"));
+    session.Type("one");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Type("two");
+    CHECK(text == "one\ntwo");
+    CHECK(signals.commits == 0);
+    session.KeyPress(ImGuiKey_Enter | ImGuiMod_Ctrl);
+    CHECK(signals.commits == 1);
+    CHECK(text == "one\ntwo");
+}
+
+TEST_CASE("TextArea draws its label above the frame and keeps the label out of the frame width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    session.SetUi([&] {
+        facet::TextArea("##plain", &text);
+        session.Track("plain");
+        facet::TextArea("Notes", &text);
+        session.Track("labelled");
+    });
+    session.Frame();
+    const ImRect plain = session.ItemRect("plain");
+    const ImRect labelled = session.ItemRect("labelled");
+    CHECK(labelled.GetWidth() == doctest::Approx(plain.GetWidth()));
+    CHECK(labelled.GetHeight() > plain.GetHeight());
+}
+
+TEST_CASE("TextArea grows with its lines up to maxLines and stays fixed without it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string growing;
+    std::string fixed;
+    session.SetUi([&] {
+        facet::TextArea("##growing", &growing, {.minLines = 2, .maxLines = 4});
+        session.Track("growing");
+        facet::TextArea("##fixed", &fixed, {.minLines = 2});
+        session.Track("fixed");
+    });
+    session.Frame();
+    const float growingRest = session.ItemRect("growing").GetHeight();
+    const float fixedRest = session.ItemRect("fixed").GetHeight();
+    CHECK(growingRest == doctest::Approx(fixedRest));
+    growing = "1\n2\n3";
+    fixed = "1\n2\n3";
+    session.Frames(2);
+    const float three = session.ItemRect("growing").GetHeight();
+    CHECK(three > growingRest);
+    CHECK(session.ItemRect("fixed").GetHeight() == doctest::Approx(fixedRest));
+    growing = "1\n2\n3\n4\n5\n6\n7";
+    session.Frames(2);
+    const float capped = session.ItemRect("growing").GetHeight();
+    CHECK(capped > three);
+    growing += "\n8\n9";
+    session.Frames(2);
+    CHECK(session.ItemRect("growing").GetHeight() == doctest::Approx(capped));
+}
+
+TEST_CASE("TextArea: allowTab types a tab, maxLength stops typing, the counter adds its line")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string tabbed;
+    std::string limited;
+    std::string counted;
+    session.SetUi([&] {
+        facet::TextArea("##tabbed", &tabbed, {.allowTab = true});
+        session.Track("tabbed");
+        facet::TextArea("##limited", &limited, {.maxLength = 5});
+        session.Track("limited");
+        facet::TextArea("##counted", &counted, {.counter = true, .maxLength = 5});
+        session.Track("counted");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("tabbed"));
+    session.Type("a");
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("b");
+    CHECK(tabbed == "a\tb");
+    session.Click(session.ItemCenter("limited"));
+    session.Type("abcdefgh");
+    CHECK(limited == "abcde");
+    CHECK(session.ItemRect("counted").GetHeight() > session.ItemRect("limited").GetHeight());
+}
+
+TEST_CASE("TextArea: dragging the grip of a resizable area changes and keeps its height")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    session.SetUi([&] {
+        facet::TextArea("##resizable", &text, {.resizable = true});
+        session.Track("area");
+    });
+    session.Frame();
+    const ImRect before = session.ItemRect("area");
+    const ImVec2 grip(before.GetCenter().x, before.Max.y);
+    session.Drag({grip, ImVec2(grip.x, grip.y + 60.0f)});
+    session.Frames(2);
+    const float after = session.ItemRect("area").GetHeight();
+    CHECK(after == doctest::Approx(before.GetHeight() + 60.0f).epsilon(0.05));
+    // Never below minLines.
+    const ImVec2 moved(grip.x, session.ItemRect("area").Max.y);
+    session.Drag({moved, ImVec2(moved.x, moved.y - 400.0f)});
+    session.Frames(2);
+    CHECK(session.ItemRect("area").GetHeight() == doctest::Approx(before.GetHeight()));
+    CHECK(text.empty());
+}
+
+TEST_CASE("A read-only TextArea takes no text and the buffer form cuts at its size")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string fixed = "fixed";
+    char buffer[6] = {};
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::TextArea("##ro", &fixed, {.readOnly = true}) ? 1 : 0;
+        session.Track("ro");
+        facet::TextArea("##buffer", buffer, sizeof(buffer));
+        session.Track("buffer");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("ro"));
+    session.Type("x");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(fixed == "fixed");
+    CHECK(writes == 0);
+    session.Click(session.ItemCenter("buffer"));
+    session.Type("abcdefgh");
+    CHECK(std::string(buffer) == "abcde");
+}

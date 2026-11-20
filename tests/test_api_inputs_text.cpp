@@ -61,8 +61,6 @@ void CallTextInputStubs(Values& v)
     FACET_CHECK_STUB(false, Autocomplete("Complete 6", buffer, bufferSize, 0, nullptr, nullptr));
     CHECK(AutocompleteAcceptedItem() == -1);
     FACET_CHECK_STUB(false, TagInput("Tags 1", &v.tags, {.suggestions = std::span(kLabels)}));
-    FACET_CHECK_STUB(false, TextArea("Area 1", &v.text, {.maxLines = 6, .counter = true}));
-    FACET_CHECK_STUB(false, TextArea("Area 2", buffer, bufferSize));
     FACET_CHECK_STUB(false, InlineRename("Rename 1", &v.text, &v.editing));
     FACET_CHECK_STUB(false, InlineRename("Rename 2", buffer, bufferSize, nullptr, {.selectStem = true}));
     FACET_CHECK_STUB(false, MaskedInput("Masked 1", &v.text, "9999-9999"));
@@ -78,7 +76,7 @@ void CallTextInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 22;
+constexpr int kTextInputStubCalls = 20;
 
 } // namespace
 

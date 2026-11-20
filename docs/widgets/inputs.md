@@ -144,7 +144,18 @@ bool TextArea(const char* label, std::string* text, const TextAreaOptions& optio
 bool TextArea(const char* label, char* buffer, std::size_t bufferSize, const TextAreaOptions& options = {});
 ```
 
-Multi-line text that wraps, grows between line limits and can show a counter. Status: planned.
+Multi-line text on the text field core in Body style, with the visible label above the frame (it
+takes the whole width; the frame keeps it too). Enter inserts a line break, Ctrl+Enter ends the
+edit; `allowTab` makes Tab insert a tab instead of moving the focus. Lines wrap at the area width
+unless `wordWrap` is off (then the text scrolls sideways). The frame shows `minLines` lines; with
+`maxLines` above it, the area grows with its visual lines (wrapping included) up to that many and
+then scrolls. `resizable` adds a short bar centered on the bottom edge: dragging it changes the
+height (never below `minLines`), and the arrow keys reach it, where Up and Down change the height by
+a line; the height set this way is kept under the id and wins over the growth. Under the frame one
+line holds the error or help text at the start and, with `counter`, the character count at the end
+("n / maxLength" when limited). `maxLength` also cuts a paste. Writing, Escape, `readOnly`, `mixed`,
+disabled and the buffer form are as for TextField; the width fills the row by default. There is no
+`size` option: the area uses the Regular paddings. Status: ready.
 
 ### InlineRename
 

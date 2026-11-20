@@ -86,12 +86,17 @@ struct TextInputsUi
     std::string queryLoading = "Sample query";
     std::string querySmall;
 
+    // TextArea
+    std::string notes;
+    std::string notesResizable;
+    std::string notesValidated;
+    std::string notesReadOnly = "Read-only sample text\non two lines";
+
     // The planned widgets below.
     std::string filter;
     facet::FilterSettings filterSettings;
     std::string completion;
     std::vector<std::string> tags = {"Option 1"};
-    std::string notes;
     std::string name = "Option 1";
     bool renaming = false;
     std::string masked;
@@ -308,11 +313,35 @@ void SearchFieldSection(facet::demo::PageCtx& ctx)
     ProbeFrame(ctx, "inputs.search.small", facet::ControlSize::Small);
 }
 
+void TextAreaSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("TextArea");
+    Paragraph("Several lines with the label above. Enter starts a line, Ctrl+Enter ends the edit. The area grows with "
+              "its text between a minimum and a maximum number of lines, then scrolls.");
+
+    if (ctx.capture && ctx.captureState == kFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::TextArea("Notes", &ui.notes,
+                    {.placeholder = "Placeholder: several lines", .minLines = 3, .maxLines = 6, .counter = true,
+                     .maxLength = 200});
+    ctx.Probe("inputs.area");
+
+    facet::TextArea("Resizable##resizable", &ui.notesResizable,
+                    {.placeholder = "Drag the bar under the area to change its height", .minLines = 2,
+                     .resizable = true, .helpText = "Arrow keys reach the bar; Up and Down change the height"});
+    ctx.Probe("inputs.area.resizable");
+
+    const bool tooShort = !ui.notesValidated.empty() && ui.notesValidated.size() < 10;
+    facet::TextArea("Validated##validated", &ui.notesValidated,
+                    {.minLines = 2, .error = tooShort ? "Write at least ten characters" : nullptr});
+    ctx.Probe("inputs.area.validated");
+
+    facet::TextArea("Read-only##readonly", &ui.notesReadOnly, {.minLines = 2, .readOnly = true});
+}
+
 void PlannedSections(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Other text fields");
-    LabeledRow("Multi-line");
-    facet::TextArea("##notes", &ui.notes, {.counter = true, .maxLength = 200});
     LabeledRow("Rename in place");
     facet::InlineRename("##rename", &ui.name, &ui.renaming);
 
@@ -362,6 +391,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     TextFieldSection(ctx);
     SecureFieldSection(ctx);
     SearchFieldSection(ctx);
+    TextAreaSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -515,6 +545,26 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.Type("x");
     test.ExpectText("Ctrl+F focuses the search field with its query selected", [] { return ui.query; }, "x");
     test.KeyPress(ImGuiKey_Enter);
+
+    // TextArea: lines, Ctrl+Enter, Tab to the next area.
+    test.Click("inputs.area");
+    test.Type("one");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Type("two");
+    test.ExpectText("Enter starts a new line in the area", [] { return ui.notes; }, "one\ntwo");
+    test.KeyPress(ImGuiKey_Enter | ImGuiMod_Ctrl);
+    test.Type("x");
+    test.ExpectText("Ctrl+Enter ends the edit", [] { return ui.notes; }, "one\ntwo");
+    test.Click("inputs.area");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.area.resizable");
+    test.Type("resized");
+    test.ExpectText("Tab moves to the next area", [] { return ui.notesResizable; }, "resized");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.area.validated");
+    test.Type("short");
+    test.ExpectText("the validated area takes text", [] { return ui.notesValidated; }, "short");
+    test.KeyPress(ImGuiKey_Enter | ImGuiMod_Ctrl);
 
     // The stock checkbox with the planned message under it works.
     test.Click("inputs.stock");
