@@ -260,8 +260,8 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
         if (facet::IconButton("Add", facet::Icon("plus"), {.variant = facet::ButtonVariant::Primary}))
             Pressed(&ui.iconPresses, "Add");
         row.Next();
-        if (facet::IconButton("Delete", facet::Icon("trash"), {.variant = facet::ButtonVariant::Destructive}))
-            Pressed(&ui.iconPresses, "Delete");
+        if (facet::IconButton("Delete item", facet::Icon("trash"), {.variant = facet::ButtonVariant::Destructive}))
+            Pressed(&ui.iconPresses, "Delete item");
     }
     LabeledRow("Sizes");
     {
@@ -278,8 +278,8 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
     {
         const ButtonRow row;
         ImGui::BeginDisabled();
-        if (facet::IconButton("Disabled", facet::Icon("edit"), {.variant = facet::ButtonVariant::Secondary}))
-            Pressed(&ui.iconPresses, "Disabled");
+        if (facet::IconButton("Edit (disabled)", facet::Icon("edit"), {.variant = facet::ButtonVariant::Secondary}))
+            Pressed(&ui.iconPresses, "Edit (disabled)");
         ctx.Probe("button.icon.disabled");
         row.Next();
         facet::IconButton("Disabled and latched", facet::Icon("lock"), {.selected = true});

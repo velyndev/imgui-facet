@@ -2,6 +2,7 @@
 // variants, sizes and states, capture states for its important looks and selftest steps that
 // operate it by mouse and keyboard. A planned widget is called once and draws its placeholder.
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 
@@ -80,8 +81,13 @@ struct SelectionUi
     bool groupError[3] = {false, false, false};
     int checkGroupWrites = 0;
 
-    // Planned widgets below.
+    // CycleSelector
     int cycle = 0;
+    int cycleStop = 0;
+    int cycleNone = -1;
+    int cycleWrites = 0;
+
+    // Planned widgets below.
     facet::BindMode mode = facet::BindMode::Hold;
     int card = 0;
     bool cards[2] = {false, true};
@@ -103,6 +109,7 @@ enum CaptureState
     kSegments,
     kChips,
     kChipGroups,
+    kCycles,
 };
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
@@ -162,6 +169,14 @@ void ProbeEntries(facet::demo::PageCtx& ctx, const char* label, const char* prob
         std::snprintf(name, sizeof(name), "%s.%d", probe, i);
         facet::demo::ProbeRect(ctx, name, ImHashData(&i, sizeof(i), widget), min, max);
     }
+}
+
+// A width option of `units`, but never more than the room left in the row, so a demo control with
+// a set width stays inside a narrow window or at a large scale.
+float DemoWidth(float units)
+{
+    const float room = ImGui::GetContentRegionAvail().x / facet::Px(1.0f);
+    return std::max(1.0f, std::min(units, room));
 }
 
 // Places controls side by side in a regular row, one under the other when the row is compact.
@@ -465,9 +480,9 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
         count(facet::SegmentedControl("##large", &ui.segmentSizes[2], kOptions, {.size = facet::ControlSize::Large}));
     }
     LabeledRow("With a label");
-    count(facet::SegmentedControl("Placeholder setting", &ui.segmentDisabled, kWithDisabled));
+    count(facet::SegmentedControl("Placeholder mode", &ui.segmentDisabled, kWithDisabled));
     ctx.Probe("sel.seg.disabled");
-    ProbeEntries(ctx, "Placeholder setting", "sel.seg.disabled", 3);
+    ProbeEntries(ctx, "Placeholder mode", "sel.seg.disabled", 3);
     LabeledRow("States");
     {
         const ControlRow row;
@@ -491,6 +506,58 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
         count(facet::SegmentedControl("##narrowLabels", &ui.segmentNarrow, kOptions, {.width = 150.0f}));
     }
     Note("Labels: %s. Writes on this section: %d.", kOptions[ui.segment], ui.segmentWrites);
+}
+
+void CycleSection(facet::demo::PageCtx& ctx)
+{
+    RevealSection(ctx, kCycles);
+    SectionHeader("CycleSelector");
+    Paragraph("One value at a time between previous and next arrows, for a choice that is stepped through rather "
+              "than picked from a list. Left and Right, the arrows, the wheel or a click on the value step it.");
+
+    static const facet::ChoiceItem kWithDisabled[] = {
+        {"Option 1"}, {"Option 2 (disabled)", {}, nullptr, nullptr, true}, {"Option 3"}, {"Option 4"}};
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.cycleWrites;
+    };
+
+    LabeledRow("Wrapping");
+    ForceState(ctx, kCycles);
+    // At most this many units wide, and never wider than the row (narrow windows, large scales).
+    const float wide = DemoWidth(320.0f);
+    const float narrow = DemoWidth(200.0f);
+    count(facet::CycleSelector("Placeholder level", &ui.cycle, kWithDisabled, {.pageDots = true, .width = wide}));
+    ctx.Probe("sel.cycle");
+    LabeledRow("Stops at the ends");
+    count(facet::CycleSelector("##stop", &ui.cycleStop, kOptions, {.wrap = false, .width = wide}));
+    ctx.Probe("sel.cycle.stop");
+    LabeledRow("Nothing chosen");
+    count(facet::CycleSelector("##none", &ui.cycleNone, kOptions,
+                               {.width = wide, .error = ui.cycleNone < 0 ? "Placeholder error: choose a value." : nullptr}));
+    ctx.Probe("sel.cycle.none");
+    LabeledRow("Sizes");
+    {
+        const ControlRow row;
+        int fixed = 1;
+        facet::CycleSelector("##cycleSmall", &fixed, kOptions, {.size = facet::ControlSize::Small, .width = narrow});
+        row.Next();
+        facet::CycleSelector("##cycleLarge", &fixed, kOptions, {.size = facet::ControlSize::Large, .width = narrow});
+    }
+    LabeledRow("States");
+    {
+        const ControlRow row;
+        int fixed = 2;
+        facet::CycleSelector("##cycleReadOnly", &fixed, kOptions, {.width = narrow, .readOnly = true});
+        row.Next();
+        ImGui::BeginDisabled();
+        facet::CycleSelector("##cycleDisabled", &fixed, kOptions, {.width = narrow});
+        ImGui::EndDisabled();
+        row.Next();
+        int mixed = 0;
+        facet::CycleSelector("##cycleMixed", &mixed, kOptions, {.width = narrow, .mixed = true});
+    }
+    Note("Wrapping: %s. Writes on this section: %d.", kWithDisabled[ui.cycle].label, ui.cycleWrites);
 }
 
 void ChipSection(facet::demo::PageCtx& ctx)
@@ -628,7 +695,7 @@ void ChipGroupSection(facet::demo::PageCtx& ctx)
         ctx.Probe("sel.chips.restore");
     }
     LabeledRow("Single line");
-    count(facet::ChipGroup("##single", ui.singleLine, kSeries, {.singleLine = true, .width = 300.0f}));
+    count(facet::ChipGroup("##single", ui.singleLine, kSeries, {.singleLine = true, .width = DemoWidth(300.0f)}));
     ctx.Probe("sel.chips.single");
     {
         bool fixed[3] = {true, false, true};
@@ -646,7 +713,7 @@ void ChipGroupSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused", "checkboxes",
-                "radios", "segments", "chips", "chipgroups")
+                "radios", "segments", "chips", "chipgroups", "cycles")
 {
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
@@ -663,10 +730,9 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     SegmentedSection(ctx);
 
-    SectionHeader("One of several");
-    Paragraph("Exclusive choices, from a few labelled options to a compact strip.");
-    LabeledRow("Cycle selector");
-    facet::CycleSelector("##cycle", &ui.cycle, kOptions, {.pageDots = true});
+    CycleSection(ctx);
+
+    SectionHeader("Key bind mode");
     LabeledRow("Bind mode");
     facet::KeybindModeSelector("##mode", &ui.mode);
 
@@ -811,6 +877,27 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseDown();
     test.MouseUp();
     test.ExpectNear("the first press on a mixed control writes", [] { return ui.segmentWrites; }, 8.0, 0.0);
+
+    // CycleSelector: the next arrow skips the disabled item, the keys wrap, the wheel, a click on the value.
+    test.MouseMove(T::Item("sel.cycle", 1.0f, 0.0f).Offset(-14.0f, 14.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the next arrow skips the disabled item", [] { return ui.cycle; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    test.ExpectFocused("sel.cycle");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right steps on and wraps to the first", [] { return ui.cycle; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("Left wraps back to the last", [] { return ui.cycle; }, 3.0, 0.0);
+    test.MouseMove(T::Item("sel.cycle.stop", 0.6f));  // the pointer rests on it before the wheel turns
+    test.Wheel(T::Item("sel.cycle.stop", 0.6f), -1.0f);
+    test.ExpectNear("the wheel steps forward", [] { return ui.cycleStop; }, 1.0, 0.0);
+    test.MouseMove(T::Item("sel.cycle.none", 0.6f, 0.0f).Offset(0.0f, 14.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click on the value of an empty selector takes the first item", [] { return ui.cycleNone; }, 0.0, 0.0);
+    test.ExpectNear("each step wrote once", [] { return ui.cycleWrites; }, 6.0, 0.0);
 
     // Chip: the body flips a filter, the remove button and Delete remove a tag.
     test.Click("sel.chip.filter");

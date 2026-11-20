@@ -254,7 +254,28 @@ bool CycleSelector(const char* label, int* index, std::span<const char* const> i
                    const CycleSelectorOptions& options = {});
 ```
 
-A value between previous and next arrows, stepped with Left and Right. Status: planned.
+The visible label in front (inside the width), then a field frame (the text field frame) with the
+value centered between a previous and a next arrow button. Returns true on the frame it wrote
+`*index`.
+
+- **Input.** The arrow buttons step back and forward (and repeat while held); a click on the value,
+  or Space or Enter, steps forward; Left and Right step while it has keyboard focus; the wheel steps
+  while the pointer is over it (and does not scroll the window then). Items with `disabled` are
+  skipped. The selector is one Tab stop; the arrow buttons are mouse targets only.
+- **Ends.** `wrap` (the default) continues at the other end; without it the arrow at an end is
+  drawn in labelTertiary and does nothing.
+- **Value.** An index out of range shows `Strings::select` in labelSecondary and is written only
+  by a step, which goes to the first (or, backwards, the last) enabled item. `mixed` shows
+  `Strings::mixed` until the first step, which writes even when it lands on the same item. A value
+  that does not fit is cut with an ellipsis and shown in full on hover and keyboard focus.
+- **Page dots.** `pageDots` adds a row under the frame with a dot (the pageDotSize token) per item,
+  the chosen one in label and the others in labelTertiary; it is left out when the dots do not fit.
+- **States.** Disabled: the field frame's disabled look, no Tab stop. `readOnly` (or a null
+  `index`): shown and focusable, never written; the arrows show they cannot step. `error`
+  replaces `helpText` under the frame.
+- **Width.** The available width by default (rule 6).
+
+Status: ready.
 
 ### KeybindModeSelector
 

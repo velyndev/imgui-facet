@@ -1015,6 +1015,126 @@ TEST_CASE("A checkbox group lays its items out in the columns asked for or that 
     CHECK(autoWide == doctest::Approx(row));  // four short labels fit one row of an 800 pixel window
 }
 
+// --- CycleSelector ----------------------------------------------------------------------------
+
+TEST_CASE("A cycle selector steps with its arrows, a click, the keys and the wheel, skipping disabled items")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kItems[] = {{"Low"}, {"Medium", {}, nullptr, nullptr, true}, {"High"}, {"Ultra"}};
+    int index = 0;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::CycleSelector("##quality", &index, kItems, {.width = 300.0f}))
+            ++writes;
+        session.Track("cycle");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("cycle");
+    const float side = facet::ControlHeight(facet::ControlSize::Regular);
+    session.Click(ImVec2(r.Max.x - side * 0.5f, r.GetCenter().y));  // next: Medium is disabled
+    CHECK(index == 2);
+    session.Click(ImVec2(r.Min.x + side * 0.5f, r.GetCenter().y));  // previous
+    CHECK(index == 0);
+    session.Click(r.GetCenter());  // a click on the value steps forward
+    CHECK(index == 2);
+    session.Wheel(r.GetCenter(), -1.0f);  // down: forward
+    CHECK(index == 3);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("cycle"));
+    session.KeyPress(ImGuiKey_RightArrow);  // wraps to the first
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(index == 3);
+    CHECK(writes == 6);
+}
+
+TEST_CASE("A cycle selector without wrap stops at the ends; an index out of range shows the placeholder")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int index = 2;
+    int none = -1;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::CycleSelector("##stop", &index, kItems, {.wrap = false});
+        session.Track("stop");
+        facet::CycleSelector("##none", &none, kItems);
+        session.Track("none");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(index == 1);
+    // From "nothing chosen" the first step goes to the first item.
+    session.Click(session.ItemCenter("none"));
+    CHECK(none == 0);
+}
+
+TEST_CASE("A read-only cycle selector never writes; page dots add a row under the value")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int index = 0;
+    int writes = 0;
+    float plain = 0.0f;
+    float dots = 0.0f;
+    session.SetUi([&] {
+        writes += facet::CycleSelector("##ro", &index, kItems, {.readOnly = true}) ? 1 : 0;
+        session.Track("ro");
+        plain = ImGui::GetItemRectSize().y;
+        facet::CycleSelector("##dots", &index, kItems, {.pageDots = true});
+        dots = ImGui::GetItemRectSize().y;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("ro"));
+    session.Wheel(session.ItemCenter("ro"), -1.0f);
+    CHECK(index == 0);
+    CHECK(writes == 0);
+    CHECK(dots > plain);
+}
+
+TEST_CASE("A cycle selector shows the focus ring for a forced focused state and after keyboard input")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    static const char* const kItems[] = {"One", "Two"};
+    const ImU32 ring = facet::ToU32(facet::internal::FocusRingColor());
+    int index = 0;
+    int ringVertices = 0;
+    bool force = true;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (force)
+            facet::internal::ForceNextItemState(facet::internal::ForcedItemState::Focused);
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::CycleSelector("Placeholder setting", &index, kItems, {.pageDots = true, .width = 320.0f});
+        ringVertices = CountColor(from, ring);
+    });
+    session.Frames(10);
+    CHECK(ringVertices > 0);
+    force = false;
+    session.Frames(10);
+    CHECK(ringVertices == 0);
+    TabFrom(session, 2);
+    session.Frames(10);
+    CHECK(ringVertices > 0);
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;
