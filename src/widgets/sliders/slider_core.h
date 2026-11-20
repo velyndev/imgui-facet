@@ -21,6 +21,7 @@
 #include <imgui_internal.h>
 
 #include "facet/widgets/common.h"
+#include "facet/widgets/sliders.h"
 #include "internal/control.h"
 #include "internal/item.h"
 #include "internal/text_field_number.h"
@@ -119,6 +120,23 @@ float SliderValueWidth(ImGuiID id, double min, double max, double value, const c
 
 // The animation amount of a value bubble: shown while the knob is held or has visible focus.
 float SliderBubbleAmount(ImGuiID id, const ItemState& item);
+
+// ---- The Slider body -----------------------------------------------------------------------
+
+// How a widget built around a Slider (SliderWithInput) runs it.
+struct SliderBodyParams
+{
+    bool valueColumn = true;            // false: no value text at the end
+    float width = 0.0f;                 // pixels; 0: the width rule of the options
+    bool errorLook = false;             // the error look on the track, with the message drawn by the caller
+    const NextItemData* next = nullptr; // the next-item data the caller took; null: taken here
+    ImRect* controlRect = nullptr;      // receives the control area
+};
+
+// facet::Slider on a double (src/widgets/sliders/slider.cpp): writes *value (null: read-only) and
+// returns true when it did. Integer values are written whole.
+bool SliderBody(const char* label, double* value, double min, double max, bool integer, const SliderOptions& options,
+                const SliderBodyParams& params);
 
 // ---- Typed values --------------------------------------------------------------------------
 

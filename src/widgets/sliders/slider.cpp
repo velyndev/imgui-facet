@@ -39,12 +39,30 @@ constexpr int kSliderMaxTicks = 21;
 template <class Value>
 bool SliderImpl(const char* label, Value* value, double min, double max, bool integer, const SliderOptions& o)
 {
+    double edited = value != nullptr ? internal::SliderValueIn(*value) : 0.0;
+    if (!internal::SliderBody(label, value != nullptr ? &edited : nullptr, min, max, integer, o, {}))
+        return false;
+    if constexpr (std::is_integral_v<Value>)
+        *value = static_cast<Value>(std::llround(edited));
+    else
+        *value = static_cast<Value>(edited);
+    return true;
+}
+
+} // namespace
+
+namespace internal
+{
+
+bool SliderBody(const char* label, double* value, double min, double max, bool integer, const SliderOptions& o,
+                const SliderBodyParams& p)
+{
     ImGuiWindow* window = internal::ControlWindow();
     if (window == nullptr)
         return false;
     if (label == nullptr)
         label = "";
-    const internal::NextItemData next = internal::TakeNextItemData();
+    const internal::NextItemData next = p.next != nullptr ? *p.next : internal::TakeNextItemData();
     const internal::SliderMetrics m = internal::GetSliderMetrics(o.size);
     internal::ControlTextScope text(m.control);
     if (min > max)
@@ -62,12 +80,14 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
     // An empty range and a missing value are shown, never written.
     const bool fixed = value == nullptr || !(mapping.max > mapping.min);
     const bool readOnly = o.readOnly || fixed || (next.itemFlags & ImGuiItemFlags_ReadOnly) != 0;
-    const double current = value != nullptr ? internal::SliderValueIn(*value) : mapping.min;
+    const double current = value != nullptr ? *value : mapping.min;
 
-    const float valueWidth = vertical ? 0.0f
-                                      : internal::SliderValueWidth(id, mapping.min, mapping.max, current, o.format,
-                                                                   o.formatter, o.formatterUser, integer);
-    const float width = vertical ? m.control.height : internal::ResolveItemWidth(o.width, next, kFill);
+    const float valueWidth = vertical || !p.valueColumn
+                                 ? 0.0f
+                                 : internal::SliderValueWidth(id, mapping.min, mapping.max, current, o.format,
+                                                              o.formatter, o.formatterUser, integer);
+    const float width = vertical ? m.control.height
+                                 : (p.width > 0.0f ? p.width : internal::ResolveItemWidth(o.width, next, kFill));
     const float length = vertical ? Px(o.height > 0.0f ? o.height : T().metrics.faderLength) : 0.0f;
     const internal::SliderFrame frame = internal::LayoutSliderFrame(window->DC.CursorPos, label, width, valueWidth, m,
                                                                     o.orientation, length);
@@ -136,12 +156,9 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
 
     if (written)
     {
-        if constexpr (std::is_integral_v<Value>)
-            *value = static_cast<Value>(std::llround(edited));
-        else
-            *value = static_cast<Value>(edited);
-        // The written value is what the knob shows from now on.
-        edited = internal::SliderValueIn(*value);
+        if (integer)
+            edited = std::round(edited);
+        *value = edited;
     }
 
     const bool disabled = item.disabled || (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
@@ -155,7 +172,7 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
         const double fraction = internal::ValueToFraction(mapping, std::isnan(edited) ? mapping.min : edited);
         const double from = o.fillFromCenter ? kSliderCenterFraction : 0.0;
         internal::DrawSliderTrack(drawList, frame.track, o.orientation, m, from, mixed ? from : fraction, look,
-                                  o.error != nullptr);
+                                  o.error != nullptr || p.errorLook);
         if (o.step > 0.0)
         {
             double ticks[kSliderMaxTicks + 1];
@@ -194,10 +211,12 @@ bool SliderImpl(const char* label, Value* value, double min, double max, bool in
     }
     ImGui::EndGroup();
     internal::FinishWidgetGroup(id);
+    if (p.controlRect != nullptr)
+        *p.controlRect = frame.control;
     return written;
 }
 
-} // namespace
+} // namespace internal
 
 bool Slider(const char* label, float* value, float min, float max, const SliderOptions& options)
 {

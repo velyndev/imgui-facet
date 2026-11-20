@@ -69,8 +69,11 @@ struct SlidersUi
     float opacity = 0.5f;
     float steppedV = 0.25f;
 
-    // The planned widgets below.
+    // SliderWithInput
+    int amount = 40;
     float field = 0.75f;
+
+    // The planned widgets below.
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
     float handles[3] = {0.2f, 0.5f, 0.8f};
@@ -294,9 +297,20 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     SteppedSection(ctx);
 
-    SectionHeader("With a field and knobs");
-    LabeledRow("With a field");
-    facet::SliderWithInput("##field", &ui.field, 0.0f, 1.0f);
+    SectionHeader("SliderWithInput");
+    Paragraph("A slider and a number field on one value. The field writes on Enter, Tab or focus loss; Up and Down "
+              "in the field step like the arrows on the slider.");
+    LabeledRow("Whole numbers");
+    facet::SliderWithInput("Amount", &ui.amount, 0, 100);
+    ctx.Probe("withInput.amount");
+    LabeledRow("Out of range");
+    facet::SliderWithInput("Scale", &ui.field, 0.0f, 2.0f,
+                           {.format = "%.2f", .allowOutOfRange = true,
+                            .helpText = "The field takes values past 2; the slider then shows its end"});
+    ctx.Probe("withInput.scale");
+    Note("Amount %d, scale %.2f.", ui.amount, ui.field);
+
+    SectionHeader("Knob");
     LabeledRow("Knob");
     facet::Knob("##knob", &ui.knob, 0.0f, 1.0f);
 
@@ -432,7 +446,20 @@ FACET_DEMO_SELFTEST("sliders")
     test.ExpectFocused("stepped.vertical");
     test.KeyPress(ImGuiKey_UpArrow);
     test.ExpectNear("Up moves the vertical stepped slider to the next stop", [] { return ui.steppedV; }, 0.5, 0.0);
+    // SliderWithInput: the slider, then its field; the field writes on Enter.
     test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("withInput.amount");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right on the slider part steps the amount", [] { return ui.amount; }, 41.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.Type("64");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("the field writes the typed amount on Enter", [] { return ui.amount; }, 64.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.Type("3.5");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectNear("the field writes a value past the range on Tab", [] { return ui.field; }, 3.5, 1e-6);
     test.ExpectFocused("range.price.h0");
     test.KeyPress(ImGuiKey_RightArrow);
     test.ExpectNear("Right moves the low handle one hundredth", [] { return ui.low; }, 21.0, 1e-4);
@@ -508,6 +535,11 @@ FACET_DEMO_SELFTEST("sliders")
     test.Drag({T::Item("range.price", 0.5f), T::Display(1.5f, 0.5f), T::Item("range.price", 0.5f)}, 0.4f);
     test.Expect("a span drag out of the window and back ends where it started",
                 [] { return ui.low == 20.0f && ui.high == 80.0f; });
+
+    // SliderWithInput by pointer: the slider part follows a drag.
+    test.Do([] { ui.amount = 0; });
+    test.Drag({Row("withInput.amount", 0.55f), Row("withInput.amount", 0.6f)}, 0.2f);
+    test.Expect("a drag on the slider part writes the amount", [] { return ui.amount > 0; });
 
     // SliderStepped by pointer: a drag always ends on a stop.
     test.Drag({Row("stepped.zoom", 0.9f), Row("stepped.zoom", 0.63f)}, 0.3f);

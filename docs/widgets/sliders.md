@@ -118,8 +118,21 @@ bool SliderWithInput(const char* label, float* value, float min, float max,
 bool SliderWithInput(const char* label, int* value, int min, int max, const SliderWithInputOptions& options = {});
 ```
 
-A slider and a number field bound to the same value; the field may accept values outside the range.
-Status: planned.
+A Slider without its value column, then a number field (the number core) `fieldWidth` units wide
+(numberFieldWidth by default), both on the same value; the label is drawn in front of the track.
+When the track beside the field would get shorter than `layout.minRowControl`, the field drops
+under the track, aligned with it. Two Tab stops: the slider, then the field.
+
+- The slider writes while dragging, with the keys and typed values of Slider. The field writes a
+  typed number on Enter, Tab or focus loss (Dear ImGui's default for scalars); Up and Down in the
+  field step like the slider's arrow keys (one step, or a hundredth of the range), Shift finer and
+  Ctrl or Page Up and Down ten times; Escape restores the value from the start of the edit.
+- The field clamps to the range, unless `allowOutOfRange`: then it writes any number, and the
+  slider shows it at the end of the track and leaves it alone until it is dragged.
+- `error` draws the track's error look and the message under the whole widget; `mixed` hides the
+  knob and empties the field until the first edit; `readOnly` and disabled apply to both parts.
+
+Status: ready.
 
 ### RangeSlider
 

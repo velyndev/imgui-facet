@@ -790,3 +790,65 @@ TEST_CASE("A stepped slider with fewer than two stops is read-only, and stop lab
     CHECK(value == 3.0f);
     CHECK(session.ItemRect("labels").GetHeight() > session.ItemRect("plain").GetHeight());
 }
+// ---- SliderWithInput -----------------------------------------------------------------------
+
+TEST_CASE("A slider with a field has two Tab stops, and the field writes a typed value on Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int value = 40;
+    float free = 0.5f;
+    int changes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::SliderWithInput("Amount", &value, 0, 100, {.width = 400.0f}))
+            ++changes;
+        session.Track("amount");
+        facet::SliderWithInput("Free", &free, 0.0f, 1.0f, {.allowOutOfRange = true, .width = 400.0f});
+        session.Track("free");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("amount").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(value == 41);
+    // The field: the next Tab stop takes the keyboard with the number selected.
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("75");
+    CHECK(value == 41);  // typed numbers write on Enter
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(value == 75);
+    // Clamped to the range without allowOutOfRange.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("500");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(value == 100);
+    // allowOutOfRange: the field writes 3, the slider shows it clamped and does not touch it.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("3");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(free == 3.0f);
+    session.Frames(3);
+    CHECK(free == 3.0f);
+    CHECK(changes >= 3);
+}
+
+TEST_CASE("A narrow slider with a field puts the field under the track")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float value = 0.5f;
+    session.SetUi([&] {
+        facet::SliderWithInput("Amount", &value, 0.0f, 1.0f, {.width = 150.0f});
+        session.Track("narrow");
+    });
+    session.Frame();
+    const float height = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("narrow").GetHeight() > height * 1.5f);
+    CHECK(std::fabs(session.ItemRect("narrow").GetWidth() - facet::Px(150.0f)) <= 1.0f);
+}
