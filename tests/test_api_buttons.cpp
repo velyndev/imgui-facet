@@ -35,7 +35,6 @@ void CallButtonStubs(Values& v)
 {
     using namespace facet;
     const std::span<bool> flags(v.flags);
-    FACET_CHECK_STUB(false, IconButton("Icon button 1", Icon("settings"), {.selected = true}));
     FACET_CHECK_STUB(false, CopyButton("Copy 1", "Sample", {.iconOnly = false}));
     FACET_CHECK_STUB(false, Link("Link 1", {.url = "about:blank"}));
     FACET_CHECK_STUB(false, ToggleButtonGroup("Toggles 1", flags, kChoices));
@@ -45,7 +44,7 @@ void CallButtonStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallButtonStubs.
-constexpr int kButtonStubCalls = 7;
+constexpr int kButtonStubCalls = 6;
 
 } // namespace
 
@@ -54,7 +53,7 @@ TEST_CASE("Every buttons placeholder returns the neutral result, writes nothing 
     FACET_CHECK_FAMILY_STUBS(CallButtonStubs, kButtonStubCalls);
 }
 
-TEST_CASE("Buttons placeholders called outside a frame return the neutral result")
+TEST_CASE("Buttons widgets called outside a frame return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

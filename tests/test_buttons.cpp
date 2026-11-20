@@ -323,6 +323,104 @@ TEST_CASE("After a button the item queries describe it and every stack is as bef
     CHECK(idsAfter == ids);
 }
 
+// --- IconButton -------------------------------------------------------------------------------
+
+TEST_CASE("An icon button is one control height square, activates and shows its label as a tooltip")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    bool tip = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::IconButton("Pin window", facet::Icon("pin")))
+            ++presses;
+        session.Track("pin");
+        tip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
+        facet::IconButton("Large##large", facet::Icon("pin"), {.size = facet::ControlSize::Large});
+        session.Track("large");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("pin");
+    CHECK(r.GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(r.GetHeight() == doctest::Approx(r.GetWidth()));
+    CHECK(session.ItemRect("large").GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Large)));
+    session.MouseMove(session.ItemCenter("pin"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+    session.Click(session.ItemCenter("pin"));
+    CHECK(presses == 1);
+    // Keyboard: a Tab stop that Space and Enter activate; the tooltip shows on keyboard focus too.
+    session.MouseMove(ImVec2(1.0f, 500.0f));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("pin"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(presses == 3);
+}
+
+TEST_CASE("A latched icon button whose label changes keeps its id and shows its tooltip")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool pinned = false;
+    bool tip = false;
+    session.SetUi([&] {
+        if (facet::IconButton(pinned ? "Unpin###pin" : "Pin###pin", facet::Icon(pinned ? "unpin" : "pin"), {.selected = pinned}))
+            pinned = !pinned;
+        session.Track("pin");
+        tip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
+        ImGui::Button("elsewhere");
+        session.Track("elsewhere");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("pin"));
+    CHECK(pinned);
+    session.MouseMove(session.ItemCenter("elsewhere"));
+    session.Frames(3);
+    session.MouseMove(session.ItemCenter("pin"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.3f);
+    CHECK(tip);
+}
+
+TEST_CASE("A selected icon button shows the latched tint; loading and disabled ones do not activate")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 tint = facet::ToU32(facet::T().colors.accentSubtle);
+    int selectedTint = 0;
+    int plainTint = -1;
+    int presses = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        int from = drawList->VtxBuffer.Size;
+        facet::IconButton("Lock", facet::Icon("lock"), {.selected = true});
+        selectedTint = CountColor(from, tint);
+        from = drawList->VtxBuffer.Size;
+        facet::IconButton("Unlock", facet::Icon("unlock"));
+        plainTint = CountColor(from, tint);
+        presses += facet::IconButton("Refresh", facet::Icon("refresh"), {.loading = true}) ? 1 : 0;
+        session.Track("loading");
+        ImGui::BeginDisabled();
+        presses += facet::IconButton("Delete", facet::Icon("trash"), {.variant = facet::ButtonVariant::Destructive}) ? 1 : 0;
+        session.Track("disabled");
+        ImGui::EndDisabled();
+    });
+    session.Frame();
+    CHECK(selectedTint > 0);
+    CHECK(plainTint == 0);
+    session.Click(session.ItemCenter("loading"));
+    session.Click(session.ItemCenter("disabled"));
+    CHECK(presses == 0);
+}
+
 TEST_CASE("A button outside a frame returns false")
 {
     facet::test::Session session;

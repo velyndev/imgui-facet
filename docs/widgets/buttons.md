@@ -52,8 +52,24 @@ hovered, pressed, focused and loading. Status: ready.
 bool IconButton(const char* label, Icon icon, const IconButtonOptions& options = {});
 ```
 
-A square button showing only an icon; the visible label part is its tooltip and name, and
-`selected` shows a latched look. Status: planned.
+A square button one control height wide that shows only `icon`, in the icon size of the control
+text; returns true on the frame it is activated.
+
+- **Name.** The visible label part is required: it shows as a tooltip on hover and on keyboard
+  focus and is the button's name. An empty visible part is a usage error (`IM_ASSERT_USER_ERROR`).
+  A label whose text changes (Pin and Unpin) keeps its id with `###`.
+- **Variants.** The `ButtonVariant` colors of Button; the default is `Plain` (no fill at rest), the
+  usual look in toolbars.
+- **Selected.** `selected` shows the latched look: accentSubtle with a focusRing hairline, so the
+  latch shows by its edge as well as its tint; hover and press tint it further. The caller flips its
+  flag when the result is true.
+- **States.** Disabled: the shared disabled look (fill[1] while also selected), the not-allowed
+  cursor, no Tab stop. `loading`: the spinner in place of the icon, no hover or press feedback, no
+  activation, but it stays a Tab stop.
+- **Sizes.** `size` picks the control height, and the square follows it. `ImGui::SetNextItemWidth`
+  and `PushItemWidth` change the width as rule 6 says.
+
+Status: ready.
 
 ### CopyButton
 

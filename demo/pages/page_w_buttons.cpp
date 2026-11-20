@@ -40,8 +40,15 @@ struct ButtonsUi
     bool loading = false;
     bool narrowTip = false;  // the cut button's tooltip shows (read in the frame, for the selftest)
 
-    // The planned widgets below.
+    // IconButton
     bool pinned = false;
+    bool locked = true;
+    int zoom = 0;
+    int iconPresses = 0;
+    bool iconLoading = false;
+    bool pinTip = false;  // the pin's tooltip shows (read in the frame, for the selftest)
+
+    // The planned widgets below.
     bool latches[3] = {true, false, false};
     int view = 0;
     int textView = 1;
@@ -192,6 +199,93 @@ void ButtonSection(facet::demo::PageCtx& ctx)
         Note("No button activated yet.");
 }
 
+void IconButtonSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("IconButton");
+    Paragraph("A square button for a tool whose icon says what it does; its name shows as a tooltip on hover and "
+              "on keyboard focus. A latched tool passes selected and flips its own flag.");
+
+    LabeledRow("Tools");
+    {
+        const ButtonRow row;
+        if (ctx.capture && ctx.captureState == kHovered)
+            ctx.ForceNextItemState(ForcedItemState::Hovered);
+        else if (ctx.capture && ctx.captureState == kFocused)
+            ctx.ForceNextItemState(ForcedItemState::Focused);
+        if (facet::IconButton("Zoom in", facet::Icon("zoom-in")))
+            Pressed(&ui.zoom, "Zoom in");
+        ctx.Probe("button.icon.zoomIn");
+        row.Next();
+        if (facet::IconButton("Zoom out", facet::Icon("zoom-out")))
+            Pressed(&ui.zoom, "Zoom out");
+        ctx.Probe("button.icon.zoomOut");
+        row.Next();
+        if (facet::IconButton(ui.pinned ? "Unpin###pin" : "Pin###pin", facet::Icon(ui.pinned ? "unpin" : "pin"),
+                              {.selected = ui.pinned}))
+        {
+            ui.pinned = !ui.pinned;
+            Pressed(&ui.iconPresses, "Pin");
+        }
+        ui.pinTip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
+        ctx.Probe("button.icon.pin");
+        row.Next();
+        if (facet::IconButton("Lock layout", facet::Icon("lock"), {.selected = ui.locked}))
+        {
+            ui.locked = !ui.locked;
+            Pressed(&ui.iconPresses, "Lock layout");
+        }
+        ctx.Probe("button.icon.lock");
+    }
+    LabeledRow("Variants");
+    {
+        const ButtonRow row;
+        if (facet::IconButton("Settings", facet::Icon("settings"), {.variant = facet::ButtonVariant::Secondary}))
+            Pressed(&ui.iconPresses, "Settings");
+        row.Next();
+        if (facet::IconButton("Add", facet::Icon("plus"), {.variant = facet::ButtonVariant::Primary}))
+            Pressed(&ui.iconPresses, "Add");
+        row.Next();
+        if (facet::IconButton("Delete", facet::Icon("trash"), {.variant = facet::ButtonVariant::Destructive}))
+            Pressed(&ui.iconPresses, "Delete");
+    }
+    LabeledRow("Sizes");
+    {
+        const ButtonRow row;
+        facet::IconButton("Search##small", facet::Icon("search"),
+                          {.variant = facet::ButtonVariant::Secondary, .size = facet::ControlSize::Small});
+        row.Next();
+        facet::IconButton("Search##regular", facet::Icon("search"), {.variant = facet::ButtonVariant::Secondary});
+        row.Next();
+        facet::IconButton("Search##large", facet::Icon("search"),
+                          {.variant = facet::ButtonVariant::Secondary, .size = facet::ControlSize::Large});
+    }
+    LabeledRow("States");
+    {
+        const ButtonRow row;
+        ImGui::BeginDisabled();
+        if (facet::IconButton("Disabled", facet::Icon("edit"), {.variant = facet::ButtonVariant::Secondary}))
+            Pressed(&ui.iconPresses, "Disabled");
+        ctx.Probe("button.icon.disabled");
+        row.Next();
+        facet::IconButton("Disabled and latched", facet::Icon("lock"), {.selected = true});
+        ImGui::EndDisabled();
+        row.Next();
+        const bool loading = ui.iconLoading || (ctx.capture && ctx.captureState == kLoading);
+        if (facet::IconButton("Refresh", facet::Icon("refresh"), {.variant = facet::ButtonVariant::Secondary, .loading = loading}))
+        {
+            ui.iconLoading = true;
+            Pressed(&ui.iconPresses, "Refresh");
+        }
+        ctx.Probe("button.icon.refresh");
+        row.Next();
+        if (facet::Button("Stop loading", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
+            ui.iconLoading = false;
+        ctx.Probe("button.icon.stop");
+    }
+    Note("Pin %s, layout %s. Refresh %s.", ui.pinned ? "on" : "off", ui.locked ? "locked" : "unlocked",
+         ui.iconLoading ? "runs until Stop loading is pressed" : "is idle");
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pressed", "focused", "loading")
@@ -203,9 +297,7 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pres
 
     ButtonSection(ctx);
 
-    SectionHeader("Icon buttons");
-    LabeledRow("Icon button");
-    facet::IconButton("Pin", facet::Icon("pin"), {.selected = ui.pinned});
+    IconButtonSection(ctx);
 
     SectionHeader("Copy and links");
     LabeledRow("Copy button");
@@ -280,4 +372,28 @@ FACET_DEMO_SELFTEST("buttons")
                 [] { return ui.narrowTip; });
     test.Click("button.wide");
     test.ExpectNear("the full-width button activates", [] { return ui.wide; }, 1.0, 0.0);
+
+    // IconButton: click, keys, latch, tooltip, loading, disabled.
+    test.Click("button.icon.zoomIn");
+    test.ExpectNear("a click activates the icon button", [] { return ui.zoom; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("button.icon.zoomIn");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("button.icon.zoomOut");
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectNear("Space activates the focused icon button", [] { return ui.zoom; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter latches the pin", [] { return ui.pinned; });
+    test.Click("button.icon.lock");
+    test.Expect("a click releases the lock", [] { return !ui.locked; });
+    test.Hover(T::Item("button.icon.pin"), 0.8f);
+    test.Expect("the icon button shows its name as a tooltip", [] { return ui.pinTip; });
+    test.Click("button.icon.disabled");
+    test.Click("button.icon.refresh");
+    test.Expect("Refresh starts loading", [] { return ui.iconLoading; });
+    test.Click("button.icon.refresh");
+    test.ExpectNear("a loading icon button does not activate again", [] { return ui.iconPresses; }, 3.0, 0.0);
+    test.Click("button.icon.stop");
+    test.Expect("the plain button stops loading", [] { return !ui.iconLoading; });
 }
