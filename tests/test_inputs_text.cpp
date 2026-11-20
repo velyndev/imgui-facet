@@ -4,6 +4,7 @@
 // pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
 // tests/test_api_inputs_text.cpp.
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <string>
@@ -14,7 +15,9 @@
 
 #include <facet/facet.h>
 
+#include "internal/text_field.h"
 #include "support/session.h"
+#include "widgets/inputs/text_inputs_shared.h"
 
 namespace
 {
@@ -436,4 +439,260 @@ TEST_CASE("TextField leaves the Dear ImGui stacks and the item width as it found
     session.Click(session.ItemCenter("field"));
     session.Frame();
     CHECK(same);
+}
+
+// ---- SecureField -------------------------------------------------------------------------------
+
+namespace
+{
+
+// The center of the trailing button `index` (0 the rightmost) of a field frame at control size
+// Regular, as the text field core places slot and clear buttons.
+ImVec2 TrailingButtonCenter(const ImRect& frame, int index = 0)
+{
+    const float gap = facet::Px(facet::T().spacing.xs);
+    const float side = facet::ControlHeight(facet::ControlSize::Regular) - 2.0f * gap;
+    return ImVec2(frame.Max.x - gap - side * 0.5f - static_cast<float>(index) * (side + gap), frame.GetCenter().y);
+}
+
+// The caret x of the active field `id`, relative to the start of its text: masked text advances by
+// the password advance, shown text by the glyphs.
+float CaretOffset(ImGuiID id, float textLeft)
+{
+    ImRect caret;
+    if (!facet::internal::TextFieldCaretRect(id, &caret))
+        return -1.0f;
+    return caret.Min.x - textLeft;
+}
+
+} // namespace
+
+TEST_CASE("SecureField writes per keystroke and never puts its text on the clipboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string secret;
+    Signals signals;
+    ImRect frame;
+    session.SetUi([&] {
+        signals.Count(facet::SecureField("##secret", &secret));
+        session.Track("field");
+    });
+    session.Frame();
+    frame = session.ItemRect("field");
+    session.Click(ImVec2(frame.Min.x + 20.0f, frame.GetCenter().y));
+    session.Type("hunter2");
+    CHECK(secret == "hunter2");
+    CHECK(signals.writes == 1);  // the session types the whole text in one frame
+    session.SetClipboard("unchanged");
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "unchanged");
+    // Shown: still no copy, and no cut.
+    session.Click(TrailingButtonCenter(frame));
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_X | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_Insert | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "unchanged");
+    CHECK(secret == "hunter2");
+    // Plain Delete still deletes the selection.
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(secret.empty());
+}
+
+TEST_CASE("The SecureField reveal button shows the text until the focus leaves the field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string secret;
+    std::string other;
+    ImGuiID id = 0;
+    ImRect frame;
+    session.SetUi([&] {
+        facet::SecureField("##secret", &secret);
+        session.Track("field");
+        id = ImGui::GetID("##secret");
+        facet::TextField("##other", &other);
+        session.Track("other");
+    });
+    session.Frame();
+    frame = session.ItemRect("field");
+    const float textLeft = frame.Min.x + facet::Px(facet::T().field.padding);
+    session.Click(ImVec2(frame.Min.x + 20.0f, frame.GetCenter().y));
+    session.Type("iiii");
+    const float masked = CaretOffset(id, textLeft);
+    REQUIRE(masked > 0.0f);
+    // A click on the eye shows the text and gives the keyboard back to the field.
+    session.Click(TrailingButtonCenter(frame));
+    session.Frames(2);
+    const float shown = CaretOffset(id, textLeft);
+    REQUIRE(shown > 0.0f);
+    CHECK(shown != doctest::Approx(masked));
+    session.Type("i");
+    CHECK(secret == "iiiii");
+    // The keyboard reaches the button with Tab; Space hides the text again.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ImGui::GetIDWithSeed("reveal", nullptr, id));
+    session.KeyPress(ImGuiKey_Space);
+    session.Click(ImVec2(frame.Min.x + 20.0f, frame.GetCenter().y));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(CaretOffset(id, textLeft) == doctest::Approx(masked * 5.0f / 4.0f));
+    // Shown, then the focus goes to another field: back to dots.
+    session.Click(TrailingButtonCenter(frame));
+    session.Frames(2);
+    session.Click(session.ItemCenter("other"));
+    session.Click(ImVec2(frame.Min.x + 20.0f, frame.GetCenter().y));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(CaretOffset(id, textLeft) == doctest::Approx(masked * 5.0f / 4.0f));
+}
+
+TEST_CASE("SecureField with Hold shows the text only while the button is held, and None has no button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string held = "iiii";
+    std::string none = "iiii";
+    ImGuiID heldId = 0;
+    ImGuiID noneId = 0;
+    float glyphRight = 0.0f;  // right edge of the glyphs the held field drew this frame
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int first = drawList->VtxBuffer.Size;
+        facet::SecureField("##held", &held, {.reveal = facet::SecureReveal::Hold});
+        session.Track("held");
+        heldId = ImGui::GetID("##held");
+        // Text glyphs are textured quads in the label color; the frame and icons are not both.
+        const ImVec2 white = drawList->_Data->TexUvWhitePixel;
+        const ImU32 textRgb = facet::ToU32(facet::T().colors.label) & ~IM_COL32_A_MASK;
+        const float iconLeft = session.ItemRect("held").Max.x - facet::ControlHeight(facet::ControlSize::Regular);
+        glyphRight = 0.0f;
+        for (int i = first; i < drawList->VtxBuffer.Size; ++i)
+        {
+            const ImDrawVert& v = drawList->VtxBuffer[i];
+            if ((v.uv.x == white.x && v.uv.y == white.y) || (v.col & ~IM_COL32_A_MASK) != textRgb || v.pos.x > iconLeft)
+                continue;
+            glyphRight = std::max(glyphRight, v.pos.x);
+        }
+        facet::SecureField("##none", &none, {.reveal = facet::SecureReveal::None});
+        session.Track("none");
+        noneId = ImGui::GetID("##none");
+    });
+    session.Frame();
+    const ImRect heldFrame = session.ItemRect("held");
+    const ImRect noneFrame = session.ItemRect("none");
+    const float pad = facet::Px(facet::T().field.padding);
+    // Hold: the button belongs to the slot; while it is down the field is not active, so the
+    // shown state is read from the draw list: the dots use the bullet glyph's advance.
+    session.Click(ImVec2(heldFrame.Min.x + 20.0f, heldFrame.GetCenter().y));
+    session.KeyPress(ImGuiKey_End);
+    const float masked = CaretOffset(heldId, heldFrame.Min.x + pad);
+    REQUIRE(masked > 0.0f);
+    const float dotsRight = glyphRight;
+    REQUIRE(dotsRight > heldFrame.Min.x);
+    // While the button is down the field is not active; the drawn glyphs show the text instead
+    // of the wider dots ("i" is narrower than the bullet advance).
+    session.MouseMove(TrailingButtonCenter(heldFrame));
+    session.MouseDown();
+    session.Frames(2);
+    CHECK(glyphRight < dotsRight - 1.0f);
+    session.MouseUp();
+    session.Frames(2);
+    CHECK(glyphRight == doctest::Approx(dotsRight));
+    // Released: the keyboard is back in the field and the text is dots again.
+    session.KeyPress(ImGuiKey_End);
+    CHECK(CaretOffset(heldId, heldFrame.Min.x + pad) == doctest::Approx(masked));
+    // None: a click at the end of the frame lands in the text, no button takes it.
+    session.Click(TrailingButtonCenter(noneFrame));
+    CHECK(ImGui::GetActiveID() == noneId);
+    CHECK(CaretOffset(noneId, noneFrame.Min.x + pad) == doctest::Approx(masked));
+}
+
+TEST_CASE("SecureField shows the Caps Lock hint while it is focused and letters arrive in upper case")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string secret;
+    std::string plain;
+    session.SetUi([&] {
+        facet::SecureField("##secret", &secret);
+        session.Track("field");
+        facet::SecureField("##plain", &plain, {.capsLockHint = false});
+        session.Track("plain");
+    });
+    session.Frame();
+    const float rest = session.ItemRect("field").GetHeight();
+    session.Click(session.ItemCenter("field"));
+    session.Type("ab");
+    session.Frame();
+    CHECK(session.ItemRect("field").GetHeight() == doctest::Approx(rest));
+    session.Type("CD");  // upper case without Shift: Caps Lock is on
+    session.Frame();
+    CHECK(secret == "abCD");
+    CHECK(facet::internal::text_inputs::CapsLockLikelyOn());
+    const float hinted = session.ItemRect("field").GetHeight();
+    CHECK(hinted > rest);
+    session.KeyPress(ImGuiKey_CapsLock);  // flips what is known
+    session.Frame();
+    CHECK(session.ItemRect("field").GetHeight() == doctest::Approx(rest));
+    session.KeyPress(ImGuiKey_CapsLock);
+    session.Frame();
+    CHECK(session.ItemRect("field").GetHeight() == doctest::Approx(hinted));
+    // Without the option, or without focus, nothing shows.
+    session.Click(session.ItemCenter("plain"));
+    session.Type("EF");
+    session.Frame();
+    CHECK(session.ItemRect("plain").GetHeight() == doctest::Approx(rest));
+    CHECK(session.ItemRect("field").GetHeight() == doctest::Approx(rest));
+    session.KeyPress(ImGuiKey_Escape);
+}
+
+TEST_CASE("The SecureField strength meter sits under the frame and the message line under it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string secret = "abc";
+    float meter = 0.0f;
+    float message = 0.0f;
+    session.SetUi([&] {
+        meter = facet::PxSnapped(facet::T().metrics.progressHeightSmall) + facet::Px(facet::T().spacing.xs);
+        facet::SecureField("##plain", &secret);
+        session.Track("plain");
+        facet::SecureField("##meter", &secret, {.strength = 0.5f});
+        session.Track("meter");
+        facet::SecureField("##both", &secret, {.strength = 0.9f, .helpText = "Message"});
+        session.Track("both");
+        facet::SecureField("##help", &secret, {.helpText = "Message"});
+        session.Track("help");
+    });
+    session.Frame();
+    const float plain = session.ItemRect("plain").GetHeight();
+    message = session.ItemRect("help").GetHeight() - plain;
+    CHECK(message > 0.0f);
+    CHECK(session.ItemRect("meter").GetHeight() == doctest::Approx(plain + meter).epsilon(0.02));
+    CHECK(session.ItemRect("both").GetHeight() == doctest::Approx(plain + meter + message).epsilon(0.02));
+}
+
+TEST_CASE("A read-only SecureField takes no text and a null text returns false")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string secret = "abc";
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::SecureField("##ro", &secret, {.readOnly = true}) ? 1 : 0;
+        session.Track("ro");
+        writes += facet::SecureField("##null", static_cast<std::string*>(nullptr)) ? 1 : 0;
+        session.Track("null");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("ro"));
+    session.Type("x");
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Click(session.ItemCenter("null"));
+    session.Type("y");
+    CHECK(secret == "abc");
+    CHECK(writes == 0);
+    CHECK_FALSE(facet::SecureField("##outside", &secret));
 }

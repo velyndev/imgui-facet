@@ -28,4 +28,13 @@ inline bool TextWritable(const char* buffer, std::size_t bufferSize)
 // of `events` is dropped.
 ImGuiInputTextFlags TextCallbackEvents(ImGuiInputTextFlags events);
 
+// Whether Caps Lock is on, as far as the input Dear ImGui received tells (Facet reads input only
+// from ImGuiIO, which has no lock state): a letter typed in upper case without Shift, or in lower
+// case with Shift, means on; the opposite means off; a press of the Caps Lock key flips what is
+// known. Unknown, and so false, until the first letter. Updated once per frame by the text inputs'
+// frame hook (text_inputs_frame.cpp).
+bool CapsLockLikelyOn();
+void UpdateCapsLockGuess();
+void ResetCapsLockGuess();
+
 } // namespace facet::internal::text_inputs

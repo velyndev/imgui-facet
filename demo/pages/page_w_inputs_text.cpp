@@ -69,8 +69,14 @@ struct TextInputsUi
     std::string narrow;
     Sessions textSessions;
 
-    // The planned widgets below.
+    // SecureField
     std::string secret;
+    std::string secretHold;
+    std::string secretNone;
+    std::string secretStrength;
+    std::string secretDisabled = kSample;
+
+    // The planned widgets below.
     std::string query;
     std::string filter;
     facet::FilterSettings filterSettings;
@@ -89,6 +95,15 @@ TextInputsUi ui;
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
 
+// Records the frame of the last field (its first control height, without the meter and message
+// lines under it) for the selftest, so a click lands in the text at every size.
+void ProbeFrame(facet::demo::PageCtx& ctx, const char* name, facet::ControlSize size = facet::ControlSize::Regular)
+{
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    facet::demo::ProbeRect(ctx, name, ImGui::GetItemID(), min, ImVec2(max.x, min.y + facet::ControlHeight(size)));
+}
+
 // The texts a capture of the filled state shows.
 void FillSamples()
 {
@@ -102,6 +117,10 @@ void FillSamples()
     ui.regular = kSample;
     ui.large = kSample;
     ui.narrow = kSampleLong;
+    ui.secret = kSample;
+    ui.secretHold = kSample;
+    ui.secretNone = kSample;
+    ui.secretStrength = "Sample";
 }
 
 void TextFieldSection(facet::demo::PageCtx& ctx)
@@ -176,11 +195,59 @@ void TextFieldSection(facet::demo::PageCtx& ctx)
          ui.textSessions.commits, ui.textSessions.cancels);
 }
 
+void SecureFieldSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SecureField");
+    Paragraph("Masked text. The eye shows the text until the focus leaves the field; copy and cut stay off either "
+              "way. A hint appears under the focused field while letters arrive in upper case without Shift.");
+
+    LabeledRow("Show and hide");
+    // The capture of the hovered state rests the pointer on the eye button (part 1).
+    if (ctx.capture && ctx.captureState == kHovered)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 1);
+    const ImGuiID secretId = ImGui::GetID("##secret");
+    facet::SecureField("##secret", &ui.secret, {.placeholder = "Password placeholder"});
+    ctx.Probe("inputs.secure");
+    {
+        // The eye button: the rightmost slot button, as the text field core places it.
+        const float gap = facet::Px(facet::T().spacing.xs);
+        const float side = facet::ControlHeight(facet::ControlSize::Regular) - 2.0f * gap;
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const float centerY = (ImGui::GetItemRectMin().y + max.y) * 0.5f;
+        facet::demo::ProbeRect(ctx, "inputs.secure.reveal", ImGui::GetIDWithSeed("reveal", nullptr, secretId),
+                               ImVec2(max.x - gap - side, centerY - side * 0.5f), ImVec2(max.x - gap, centerY + side * 0.5f));
+    }
+
+    LabeledRow("Hold to show");
+    facet::SecureField("##secretHold", &ui.secretHold,
+                       {.placeholder = "Password placeholder", .reveal = facet::SecureReveal::Hold});
+    ctx.Probe("inputs.secure.hold");
+
+    LabeledRow("Always masked");
+    facet::SecureField("##secretNone", &ui.secretNone,
+                       {.placeholder = "Password placeholder", .reveal = facet::SecureReveal::None});
+    ctx.Probe("inputs.secure.none");
+
+    LabeledRow("Strength");
+    // Placeholder rule for the demo: the meter follows the length up to 16 characters.
+    const float strength = static_cast<float>(ui.secretStrength.size()) / 16.0f;
+    const bool tooShort = !ui.secretStrength.empty() && ui.secretStrength.size() < 6;
+    facet::SecureField("##secretStrength", &ui.secretStrength,
+                       {.placeholder = "Password placeholder",
+                        .strength = strength,
+                        .error = tooShort ? "Use at least six characters" : nullptr,
+                        .helpText = "Placeholder rule: the meter follows the length"});
+    ProbeFrame(ctx, "inputs.secure.strength");
+
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::SecureField("##secretDisabled", &ui.secretDisabled);
+    ImGui::EndDisabled();
+}
+
 void PlannedSections(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Other text fields");
-    LabeledRow("Secure field");
-    facet::SecureField("##secret", &ui.secret);
     LabeledRow("Multi-line");
     facet::TextArea("##notes", &ui.notes, {.counter = true, .maxLength = 200});
     LabeledRow("Rename in place");
@@ -232,6 +299,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     facet::demo::PlannedFamilyNote("inputs");
 
     TextFieldSection(ctx);
+    SecureFieldSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -321,6 +389,35 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
     test.ExpectClipboard("a double click selects a word", "second");
     test.KeyPress(ImGuiKey_Escape);
+
+    // SecureField: typing, no copy, the eye by mouse and by keyboard.
+    test.Click("inputs.secure");
+    test.Type("secret");
+    test.ExpectText("the secure field takes typed text", [] { return ui.secret; }, "secret");
+    test.SetClipboard("unchanged");
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    test.ExpectClipboard("masked text is not copied", "unchanged");
+    test.Click("inputs.secure.reveal");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_End);
+    test.Type("2");
+    test.ExpectText("after a click on the eye typing goes on in the field", [] { return ui.secret; }, "secret2");
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    test.ExpectClipboard("shown text is not copied either", "unchanged");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.secure.reveal");
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectFocused("inputs.secure.reveal");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.secure.hold");
+    test.Type("abc");
+    test.ExpectText("Tab reaches the next secure field", [] { return ui.secretHold; }, "abc");
+    test.Click("inputs.secure.strength");
+    test.Type("abc");
+    test.ExpectText("the strength field takes text", [] { return ui.secretStrength; }, "abc");
+    test.KeyPress(ImGuiKey_Enter);
 
     // The stock checkbox with the planned message under it works.
     test.Click("inputs.stock");

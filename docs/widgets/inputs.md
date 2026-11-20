@@ -55,8 +55,20 @@ bool SecureField(const char* label, std::string* text, const SecureFieldOptions&
 bool SecureField(const char* label, char* buffer, std::size_t bufferSize, const SecureFieldOptions& options = {});
 ```
 
-Masked text with a reveal button, a Caps Lock hint and a strength meter the caller computes.
-Status: planned.
+A TextField that shows the font's bullet for every character. Copy and cut are off, and they stay
+off while the text is shown too, so the secret never reaches the clipboard; the text never appears
+in a tooltip, and a capture shows only dots. `reveal` picks the eye button at the end of the frame:
+`Toggle` (a Tab stop; a click or Space switches between dots and text, a click gives the keyboard
+back to the field), `Hold` (the text shows while the button is held) or `None` (no button). The
+shown state resets to dots as soon as the focus leaves both the field and its button.
+
+Under the frame: the strength meter when `strength` is 0 or more (a progressHeightSmall track the
+frame's width, filled to the value in destructive below a third, warning below two thirds and success
+above), then one message line: the error, else the Caps Lock hint, else the help text. Dear ImGui
+reports no lock state, so the hint follows the typed letters: an upper-case letter without Shift (or a
+lower-case one with Shift) turns it on, the opposite turns it off, and a press of the Caps Lock key
+flips it; it shows only while the field has the keyboard, and it adds a line where there was none.
+Writing, Escape, `readOnly`, disabled, width and sizes are as for TextField. Status: ready.
 
 ### SearchField
 
