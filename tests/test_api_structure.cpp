@@ -1,14 +1,14 @@
-// The frozen API of the structure families (lists, navigation, containers, layout, overlays):
+// The frozen API of the structure families that are still grouped (navigation, layout, overlays):
 // every options struct follows the conventions, every planned widget is safe to call inside a
-// real frame (stacks balanced, no value written, the neutral result), and the shared
-// placeholder of src/widgets/structure_stub.h sizes, truncates and closes as documented.
+// real frame (stacks balanced, no value written, the neutral result), and the shared placeholder
+// of src/widgets/structure_stub.h sizes, truncates and closes as documented. The lists and
+// containers families have their own API tests (tests/test_api_lists.cpp,
+// tests/test_api_containers.cpp); the tests here use only widgets of the grouped families.
 
-#include <array>
-#include <cstddef>
+#include <cfloat>
 #include <span>
 #include <string>
 #include <type_traits>
-#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -16,48 +16,17 @@
 
 #include <facet/facet.h>
 
-#include "core/core_internal.h"
-#include "internal/scope_stack.h"
 #include "support/options_check.h"
 #include "support/session.h"
+#include "support/structure_stub_check.h"
 #include "widgets/structure_stub.h"
 
 namespace
 {
 
 using facet::test::OptionsFollowConventions;
+using namespace facet::test::structure;
 
-// lists.h
-static_assert(OptionsFollowConventions<facet::DropdownOptions>());
-static_assert(OptionsFollowConventions<facet::MultiDropdownOptions>());
-static_assert(OptionsFollowConventions<facet::ComboOptions>());
-static_assert(OptionsFollowConventions<facet::ComboItemOptions>());
-static_assert(OptionsFollowConventions<facet::ListBoxOptions>());
-static_assert(OptionsFollowConventions<facet::SelectableListOptions>());
-static_assert(OptionsFollowConventions<facet::ReorderableListOptions>());
-static_assert(OptionsFollowConventions<facet::TreeViewOptions>());
-static_assert(OptionsFollowConventions<facet::TreeNodeOptions>());
-static_assert(OptionsFollowConventions<facet::CheckboxTreeOptions>());
-static_assert(OptionsFollowConventions<facet::TransferListOptions>());
-static_assert(OptionsFollowConventions<facet::SearchableChecklistOptions>());
-// containers.h
-static_assert(OptionsFollowConventions<facet::ShellOptions>());
-static_assert(OptionsFollowConventions<facet::AppFrameOptions>());
-static_assert(OptionsFollowConventions<facet::TitleBarOptions>());
-static_assert(OptionsFollowConventions<facet::OverlayOptions>());
-static_assert(OptionsFollowConventions<facet::MiniWindowOptions>());
-static_assert(OptionsFollowConventions<facet::ToolbarOptions>());
-static_assert(OptionsFollowConventions<facet::ToolbarButtonOptions>());
-static_assert(OptionsFollowConventions<facet::StatusBarOptions>());
-static_assert(OptionsFollowConventions<facet::StatusItemOptions>());
-static_assert(OptionsFollowConventions<facet::AccordionOptions>());
-static_assert(OptionsFollowConventions<facet::AccordionSectionOptions>());
-static_assert(OptionsFollowConventions<facet::DisclosureOptions>());
-static_assert(OptionsFollowConventions<facet::CardOptions>());
-static_assert(OptionsFollowConventions<facet::GroupBoxOptions>());
-static_assert(OptionsFollowConventions<facet::ScrollAreaOptions>());
-static_assert(OptionsFollowConventions<facet::VirtualListOptions>());
-static_assert(OptionsFollowConventions<facet::InspectorPaneOptions>());
 // layout.h
 static_assert(OptionsFollowConventions<facet::StackOptions>());
 static_assert(OptionsFollowConventions<facet::GridOptions>());
@@ -99,323 +68,14 @@ static_assert(OptionsFollowConventions<facet::CommandPaletteOptions>());
 static_assert(OptionsFollowConventions<facet::WatermarkOptions>());
 static_assert(OptionsFollowConventions<facet::UnsavedChangesBarOptions>());
 
-// Rule 7 of the conventions: a data view carries the data block (`state`, `emptyText`,
-// `errorText`) in that order, after its own members and before the common block.
-template <class T>
-consteval bool HasDataBlock()
-{
-    if constexpr (!requires { &T::state; &T::emptyText; &T::errorText; })
-    {
-        return false;
-    }
-    else
-    {
-        bool ok = std::is_same_v<decltype(T::state), facet::DataState> &&
-                  std::is_same_v<decltype(T::emptyText), const char*> &&
-                  std::is_same_v<decltype(T::errorText), const char*> &&
-                  offsetof(T, state) < offsetof(T, emptyText) && offsetof(T, emptyText) < offsetof(T, errorText);
-        const std::size_t end = offsetof(T, errorText);
-        if constexpr (requires { &T::size; })
-            ok = ok && end < offsetof(T, size);
-        if constexpr (requires { &T::width; })
-            ok = ok && end < offsetof(T, width);
-        if constexpr (requires { &T::height; })
-            ok = ok && end < offsetof(T, height);
-        if constexpr (requires { &T::readOnly; })
-            ok = ok && end < offsetof(T, readOnly);
-        return ok;
-    }
-}
-
-// Every data view of the structure families: the lists that show caller data, the tree, the
-// virtualized containers and the item grid.
-static_assert(HasDataBlock<facet::ListBoxOptions>());
-static_assert(HasDataBlock<facet::SelectableListOptions>());
-static_assert(HasDataBlock<facet::ReorderableListOptions>());
-static_assert(HasDataBlock<facet::TreeViewOptions>());
-static_assert(HasDataBlock<facet::CheckboxTreeOptions>());
-static_assert(HasDataBlock<facet::TransferListOptions>());
-static_assert(HasDataBlock<facet::SearchableChecklistOptions>());
-static_assert(HasDataBlock<facet::VirtualListOptions>());
+// The item grid is a data view (rule 7).
 static_assert(HasDataBlock<facet::ItemGridOptions>());
 
-// The framed lists that are fields of a form carry the validation members of rule 7.
-template <class T>
-consteval bool HasFieldMessages()
-{
-    return requires { &T::error; &T::helpText; };
-}
-static_assert(HasFieldMessages<facet::ListBoxOptions>());
-static_assert(HasFieldMessages<facet::SelectableListOptions>());
-static_assert(HasFieldMessages<facet::SearchableChecklistOptions>());
-
-// Every value a stub receives through a pointer or a writable span. The stubs must leave all
-// of it alone.
-struct Values
-{
-    int index = 2;
-    std::array<bool, 3> checked = {true, false, true};
-    std::array<facet::CheckState, 3> states = {facet::CheckState::On, facet::CheckState::Mixed,
-                                               facet::CheckState::Off};
-    facet::ReorderMove move = {7, 8};
-    bool open = true;
-    bool closed = false;
-    bool pinned = true;
-    bool visible = true;
-    float ratio = 0.25f;
-    std::array<float, 2> sizes = {0.4f, 0.6f};
-    int step = 1;
-    int page = 3;
-    int picked = 4;
-    facet::ShortcutId pickedShortcut = {5};
-    facet::FramePlacement placement = {
-        .position = {10.0f, 20.0f}, .restoredSize = {300.0f, 200.0f}, .scale = 1.5f, .maximized = true};
-
-    bool operator==(const Values& o) const
-    {
-        const facet::FramePlacement& p = placement;
-        const facet::FramePlacement& q = o.placement;
-        return index == o.index && checked == o.checked && states == o.states && move.from == o.move.from &&
-               move.to == o.move.to && open == o.open && closed == o.closed && pinned == o.pinned &&
-               visible == o.visible && ratio == o.ratio && sizes == o.sizes && step == o.step && page == o.page &&
-               picked == o.picked && pickedShortcut == o.pickedShortcut && p.position.x == q.position.x &&
-               p.position.y == q.position.y && p.restoredSize.x == q.restoredSize.x && p.restoredSize.y == q.restoredSize.y &&
-               p.scale == q.scale && p.maximized == q.maximized;
-    }
-};
-
-// The Dear ImGui and Facet stacks a stub must leave as it found them (rule 11 of the
-// conventions), the placeholder frame's narrowing of the window included, plus the values and
-// the usage error count.
-struct Snapshot
-{
-    int ids = 0;
-    int windows = 0;
-    int groups = 0;
-    int fonts = 0;
-    int styleVars = 0;
-    int colors = 0;
-    int itemFlagStack = 0;
-    int focusScopes = 0;
-    int itemWidths = 0;
-    int textWrapPos = 0;
-    int scopes = 0;
-    int errors = 0;
-    ImGuiItemFlags itemFlags = 0;
-    float indent = 0.0f;
-    float workMaxX = 0.0f;
-    float contentMaxX = 0.0f;
-    Values values;
-
-    static Snapshot Take(const Values& values)
-    {
-        ImGuiContext& g = *GImGui;
-        Snapshot s;
-        s.ids = g.CurrentWindow->IDStack.Size;
-        s.windows = g.CurrentWindowStack.Size;
-        s.groups = g.GroupStack.Size;
-        s.fonts = g.FontStack.Size;
-        s.styleVars = g.StyleVarStack.Size;
-        s.colors = g.ColorStack.Size;
-        s.itemFlagStack = g.ItemFlagsStack.Size;
-        s.focusScopes = g.FocusScopeStack.Size;
-        s.itemWidths = g.CurrentWindow->DC.ItemWidthStack.Size;
-        s.textWrapPos = g.CurrentWindow->DC.TextWrapPosStack.Size;
-        s.scopes = facet::internal::OpenScopeCount();
-        s.errors = facet::internal::UsageErrorCount();
-        s.itemFlags = g.CurrentItemFlags;
-        s.indent = g.CurrentWindow->DC.Indent.x;
-        s.workMaxX = g.CurrentWindow->WorkRect.Max.x;
-        s.contentMaxX = g.CurrentWindow->ContentRegionRect.Max.x;
-        s.values = values;
-        return s;
-    }
-
-    bool operator==(const Snapshot&) const = default;
-};
-
-// Runs a statement and checks that it left every stack, the window rect and the values as they
-// were and reported no usage error.
-#define CHECK_BALANCED(...)                                                                        \
-    do                                                                                             \
-    {                                                                                              \
-        const Snapshot before_ = Snapshot::Take(v);                                                \
-        __VA_ARGS__;                                                                               \
-        const Snapshot after_ = Snapshot::Take(v);                                                 \
-        CHECK_MESSAGE(after_ == before_, #__VA_ARGS__);                                            \
-    } while (false)
-
-const facet::ChoiceItem kItems[] = {{"Option 1"}, {"Option 2"}, {"Option 3"}};
-const char* const kLabels[] = {"Option 1", "Option 2", "Option 3"};
-const facet::CheckTreeItem kTree[] = {{"Group 1"}, {.label = "Option 1", .depth = 1}, {.label = "Option 2", .depth = 1}};
-const facet::WatermarkField kFields[] = {{"Field 1", "Value 1"}};
-
-bool Getter(void*, int index, facet::ChoiceItem* out)
-{
-    out->label = kLabels[index % 3];
-    return true;
-}
-
-// Calls every function of the five headers once, checking balance and the neutral result.
+// Calls every function of layout.h, navigation.h and overlays.h once, checking balance and the
+// neutral result.
 void CallEveryStub(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
-    const std::span<bool> checked(v.checked);
-    const std::span<facet::CheckState> states(v.states);
-
-    // --- lists.h
-    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown", &v.index, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown labels", &v.index, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown getter", &v.index, 3, &Getter, nullptr)));
-    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi", checked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi labels", checked, kLabels)));
-    CHECK_BALANCED(if (facet::BeginCombo("Combo", "Option 1")) {
-        FAIL("BeginCombo opened");
-        facet::EndCombo();
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::ComboItem("Option 1", true)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List", &v.index, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List labels", &v.index, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List getter", &v.index, 3, &Getter, nullptr)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable", &selection, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable labels", &selection, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable getter", &selection, 3, &Getter, nullptr)));
-    CHECK_BALANCED(CHECK(facet::SelectableListActivatedRow() == -1));
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
-    CHECK_BALANCED({
-        const bool open = facet::BeginTreeView("Tree", &selection);
-        CHECK(open);
-        if (open)
-        {
-            if (facet::BeginTreeNode("Node"))
-            {
-                FAIL("BeginTreeNode opened");
-                facet::EndTreeNode();
-            }
-            CHECK_FALSE(facet::TreeLeaf("Leaf"));
-            facet::EndTreeView();
-        }
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::TreeViewSelectionChanged()));
-    CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
-    CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist", checked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist labels", checked, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist getter", checked, 3, &Getter, nullptr)));
-    CHECK(selection.Size == 0);
-
-    // --- containers.h
-    CHECK_BALANCED(if (facet::BeginShell("Shell", &v.open)) {
-        FAIL("BeginShell opened");
-        facet::EndShell();
-    });
-    CHECK_BALANCED(if (facet::BeginShell("Shell without close", nullptr)) {
-        FAIL("BeginShell opened");
-        facet::EndShell();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginAppFrame("App");
-        CHECK(open);
-        if (open)
-        {
-            ImGui::TextUnformatted("child");
-            facet::EndAppFrame();
-        }
-    });
-    CHECK_BALANCED(CHECK(facet::AppFrameHitTest(ImVec2(1.0f, 1.0f)) == facet::FrameHit::Client));
-    CHECK_BALANCED(CHECK(facet::AppFrameMinSize().x == 0.0f));
-    CHECK_BALANCED(CHECK(facet::AppFrameMaxSize().y == 0.0f));
-    CHECK_BALANCED(facet::SaveAppFramePlacement("app", v.placement));
-    CHECK_BALANCED(CHECK_FALSE(facet::LoadAppFramePlacement("app", &v.placement)));
-    CHECK_BALANCED({
-        facet::BeginTitleBar("Title", {.windowButtons = true});
-        ImGui::TextUnformatted("child");
-        facet::EndTitleBar();
-    });
-    CHECK_BALANCED(CHECK(facet::TitleBarButtonPressed() == facet::WindowButton::None));
-    CHECK_BALANCED({
-        const bool open = facet::BeginOverlay("Overlay", &v.visible);
-        CHECK(open);
-        if (open)
-            facet::EndOverlay();
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayWantsMouse()));
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayWantsKeyboard()));
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayHitTest(ImVec2(1.0f, 1.0f))));
-    CHECK_BALANCED({
-        std::array<facet::ScreenRegion, 2> regions;
-        CHECK(facet::GetOverlayInputRegions(regions) == 0);
-    });
-    CHECK_BALANCED(if (facet::BeginMiniWindow("Mini", &v.pinned)) {
-        FAIL("BeginMiniWindow opened");
-        facet::EndMiniWindow();
-    });
-    CHECK_BALANCED({
-        facet::BeginToolbar("Toolbar");
-        CHECK_FALSE(facet::ToolbarButton("Add", facet::Icon("plus")));
-        facet::ToolbarSeparator();
-        facet::ToolbarSpacer();
-        facet::EndToolbar();
-    });
-    CHECK_BALANCED({
-        facet::BeginStatusBar("Status");
-        facet::StatusItem("Item 1");
-        facet::EndStatusBar();
-    });
-    CHECK_BALANCED({
-        facet::BeginAccordion("Accordion");
-        if (facet::BeginAccordionSection("Section"))
-        {
-            FAIL("BeginAccordionSection opened");
-            facet::EndAccordionSection();
-        }
-        facet::EndAccordion();
-    });
-    CHECK_BALANCED(if (facet::BeginDisclosure("Disclosure", &v.open)) {
-        FAIL("BeginDisclosure opened");
-        facet::EndDisclosure();
-    });
-    CHECK_BALANCED({
-        facet::BeginCard("Title##card");
-        ImGui::TextUnformatted("child");
-        facet::EndCard();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginGroupBox("Group");
-        CHECK(open);
-        if (open)
-            facet::EndGroupBox();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginScrollArea("Scroll");
-        CHECK(open);
-        if (open)
-            facet::EndScrollArea();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginVirtualList("Virtual", 100, &selection);
-        CHECK(open);
-        if (open)
-        {
-            facet::RowRange rows;
-            while (facet::NextVisibleRows(&rows))
-                for (int row = rows.first; row < rows.last; ++row)
-                    facet::VirtualListRow(row);
-            CHECK_FALSE(facet::VirtualListRow(0));
-            facet::EndVirtualList();
-        }
-    });
-    CHECK_BALANCED(facet::SetNextVirtualListScrollTo(10));
-    CHECK_BALANCED({
-        facet::BeginInspectorPane("Inspector", &v.visible);
-        ImGui::TextUnformatted("main");
-        if (facet::InspectorPaneNext())
-            ImGui::TextUnformatted("pane");
-        facet::EndInspectorPane();
-    });
-
     // --- layout.h
     CHECK_BALANCED({
         facet::BeginStack("Stack");
@@ -576,27 +236,7 @@ void CallEveryStub(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Shortcuts palette", &v.open, &v.pickedShortcut)));
     CHECK_BALANCED(facet::WatermarkOverlay("Watermark", kFields));
     CHECK_BALANCED(CHECK(facet::UnsavedChangesBar("Changes", 2) == facet::UnsavedChangesAction::None));
-}
-
-// Every vertex the draw list received since `from` lies within `rect`, give or take the
-// anti-aliasing fringe.
-bool VerticesInside(const ImDrawList* drawList, int from, const ImRect& rect)
-{
-    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
-    {
-        const ImVec2 p = drawList->VtxBuffer[i].pos;
-        if (p.x < rect.Min.x - 1.0f || p.x > rect.Max.x + 1.0f || p.y < rect.Min.y - 1.0f || p.y > rect.Max.y + 1.0f)
-            return false;
-    }
-    return true;
-}
-
-int VerticesWithColor(const ImDrawList* drawList, int from, ImU32 color)
-{
-    int count = 0;
-    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
-        count += drawList->VtxBuffer[i].col == color ? 1 : 0;
-    return count;
+    CHECK(selection.Size == 0);
 }
 
 } // namespace
@@ -630,24 +270,24 @@ TEST_CASE("A structure placeholder takes its width by the precedence of rule 6")
     session.SetUi([&] {
         available = ImGui::GetContentRegionAvail().x;
         defaultId = ImGui::GetID("default");
-        facet::Dropdown("units", &index, kItems, {.width = 100.0f});
+        facet::TabBar("units", &index, kItems, {.width = 100.0f});
         session.Track("units");
-        facet::Dropdown("fill", &index, kItems, {.width = facet::kFill});
+        facet::TabBar("fill", &index, kItems, {.width = facet::kFill});
         session.Track("fill");
-        facet::Dropdown("minus", &index, kItems, {.width = -20.0f});
+        facet::TabBar("minus", &index, kItems, {.width = -20.0f});
         session.Track("minus");
         ImGui::SetNextItemWidth(150.0f);
-        facet::Dropdown("next", &index, kItems);
+        facet::TabBar("next", &index, kItems);
         session.Track("next");
         ImGui::PushItemWidth(170.0f);
-        facet::Dropdown("pushed", &index, kItems);
+        facet::TabBar("pushed", &index, kItems);
         session.Track("pushed");
         ImGui::PopItemWidth();
-        facet::Dropdown("default", &index, kItems);
+        facet::TabBar("default", &index, kItems);
         session.Track("default");
         facet::Pagination("content", &index, 10);
         session.Track("content");
-        facet::Dropdown("small", &index, kItems, {.size = facet::ControlSize::Small});
+        facet::TabBar("small", &index, kItems, {.size = facet::ControlSize::Small});
         session.Track("small");
     });
     session.Frame();
@@ -666,30 +306,6 @@ TEST_CASE("A structure placeholder takes its width by the precedence of rule 6")
     CHECK(session.ItemId("default") == defaultId);
 }
 
-TEST_CASE("A reorderable list placeholder takes one row per item or one row for its state")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    facet::ReorderMove move;
-    session.SetUi([&] {
-        facet::ReorderableList("ready", &move, kItems);
-        session.Track("ready");
-        facet::ReorderableList("loading", &move, kItems, {.state = facet::DataState::Loading});
-        session.Track("loading");
-        facet::ReorderableList("error", &move, kLabels, {.state = facet::DataState::Error});
-        session.Track("error");
-        facet::ReorderableList("empty", &move, std::span<const facet::ChoiceItem>());
-        session.Track("empty");
-    });
-    session.Frame();
-    const float row = facet::ControlHeight(facet::ControlSize::Regular);
-    CHECK(session.ItemRect("ready").GetHeight() == doctest::Approx(row * static_cast<float>(std::size(kItems))));
-    CHECK(session.ItemRect("loading").GetHeight() == doctest::Approx(row));
-    CHECK(session.ItemRect("error").GetHeight() == doctest::Approx(row));
-    CHECK(session.ItemRect("empty").GetHeight() == doctest::Approx(row));
-    CHECK_FALSE(move.IsValid());
-}
-
 TEST_CASE("A narrow structure placeholder truncates its text inside its outline")
 {
     facet::test::Session session;
@@ -700,7 +316,7 @@ TEST_CASE("A narrow structure placeholder truncates its text inside its outline"
     session.SetUi([&] {
         drawList = ImGui::GetWindowDrawList();
         from = drawList->VtxBuffer.Size;
-        facet::Dropdown("A label that is far too long for the box", &index, kItems, {.width = 60.0f});
+        facet::TabBar("A label that is far too long for the box", &index, kItems, {.width = 60.0f});
         session.Track("narrow");
         CHECK(VerticesInside(drawList, from, ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax())));
         CHECK(drawList->VtxBuffer.Size > from);
@@ -725,11 +341,11 @@ TEST_CASE("A structure placeholder dims its text inside BeginDisabled")
     session.SetUi([&] {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         int from = drawList->VtxBuffer.Size;
-        facet::Dropdown("enabled", &index, kItems);
+        facet::TabBar("enabled", &index, kItems);
         enabledSecondary = VerticesWithColor(drawList, from, secondary);
         ImGui::BeginDisabled();
         from = drawList->VtxBuffer.Size;
-        facet::Dropdown("disabled", &index, kItems);
+        facet::TabBar("disabled", &index, kItems);
         disabledSecondary = VerticesWithColor(drawList, from, secondary);
         disabledTertiary = VerticesWithColor(drawList, from, tertiary);
         ImGui::EndDisabled();
@@ -740,7 +356,6 @@ TEST_CASE("A structure placeholder dims its text inside BeginDisabled")
     CHECK(disabledSecondary == 0);
     CHECK(disabledTertiary > 0);
 }
-
 TEST_CASE("Menu item placeholders name their own function in the caption")
 {
     facet::test::Session session;
@@ -787,12 +402,12 @@ TEST_CASE("Tab skips structure placeholders and a click on one activates nothing
     session.SetUi([&] {
         ImGui::Button("before");
         session.Track("before");
-        facet::Dropdown("planned", &index, kItems);
+        facet::TabBar("planned", &index, kItems);
         session.Track("planned");
-        facet::BeginCard("card");
+        facet::BeginStack("stack");
         ImGui::Button("inside");
         session.Track("inside");
-        facet::EndCard();
+        facet::EndStack();
         ImGui::Button("after");
         session.Track("after");
     });
@@ -819,22 +434,22 @@ TEST_CASE("A structure container placeholder frames its content inside the avail
     session.SetUi([&] {
         available = ImGui::GetContentRegionAvail().x;
         const float left = ImGui::GetCursorScreenPos().x;
-        facet::BeginCard("card");
+        facet::BeginStack("stack");
         ImGui::Button("inside", ImVec2(-FLT_MIN, 0.0f));
         session.Track("inside");
         contentRight = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-        facet::EndCard();
-        session.Track("card");
+        facet::EndStack();
+        session.Track("stack");
         inside = ImRect(ImVec2(left, 0.0f), ImVec2(left + available, 0.0f));
     });
     session.Frame();
-    const ImRect card = session.ItemRect("card");
+    const ImRect stack = session.ItemRect("stack");
     const ImRect button = session.ItemRect("inside");
-    // The card spans the available width and its content sits inside it with the inset.
-    CHECK(card.GetWidth() == doctest::Approx(available));
-    CHECK(button.Min.x > card.Min.x);
-    CHECK(button.Max.x < card.Max.x);
-    CHECK(button.Max.y < card.Max.y);
+    // The frame spans the available width and its content sits inside it with the inset.
+    CHECK(stack.GetWidth() == doctest::Approx(available));
+    CHECK(button.Min.x > stack.Min.x);
+    CHECK(button.Max.x < stack.Max.x);
+    CHECK(button.Max.y < stack.Max.y);
     CHECK(contentRight < inside.Max.x);
 }
 
@@ -847,9 +462,9 @@ TEST_CASE("An End without its Begin is reported and changes no stack")
     session.SetUi([&] {
         const int before = facet::internal::UsageErrorCount();
         const Snapshot start = Snapshot::Take(v);
-        facet::EndCard();
-        facet::EndCombo();
-        facet::EndShell();
+        facet::EndStack();
+        facet::EndGrid();
+        facet::EndModal();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;
         end.errors = start.errors;
@@ -868,10 +483,10 @@ TEST_CASE("An outer End closes the placeholder frames left open inside it")
     session.SetUi([&] {
         const int before = facet::internal::UsageErrorCount();
         const Snapshot start = Snapshot::Take(v);
-        facet::BeginCard("outer");
+        facet::BeginStack("outer");
         facet::BeginSettingsRow("row");   // pushes an id and is never ended
-        facet::BeginStack("stack");       // never ended
-        facet::EndCard();
+        facet::BeginGrid("grid");         // never ended
+        facet::EndStack();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;
         end.errors = start.errors;
@@ -891,20 +506,20 @@ TEST_CASE("A placeholder frame left open at the end of a frame is reported and f
     session.SetUi([&] {
         if (leaveOpen)
         {
-            facet::BeginCard("open");
+            facet::BeginStack("open");
             return;
         }
         // The next frame starts clean: a balanced pair reports nothing and draws its frame.
         windowLeft = ImGui::GetCursorScreenPos().x;
         CHECK_BALANCED({
-            facet::BeginCard("next");
+            facet::BeginStack("next");
             ImGui::Button("inside");
             session.Track("inside");
-            facet::EndCard();
+            facet::EndStack();
         });
     });
     // More frames left open than the placeholder stack holds: if they were kept, the stack
-    // would be full and the next card would draw no frame.
+    // would be full and the next frame placeholder would draw no frame.
     const int before = facet::internal::UsageErrorCount();
     constexpr int kLeftOpen = facet::internal::kScopeStackDepth + 4;
     session.Frames(kLeftOpen);
@@ -924,11 +539,10 @@ TEST_CASE("Structure stubs outside a frame draw nothing and return the neutral r
     // Between frames: no frame scope.
     const int before = facet::internal::UsageErrorCount();
     int index = 1;
-    CHECK_FALSE(facet::Dropdown("outside", &index, kItems));
-    CHECK_FALSE(facet::BeginScrollArea("outside"));
-    CHECK_FALSE(facet::BeginTreeView("outside", nullptr));
-    facet::BeginCard("outside");
-    facet::EndCard();
+    CHECK_FALSE(facet::TabBar("outside", &index, kItems));
+    CHECK_FALSE(facet::BeginSidebar("outside"));
+    facet::BeginStack("outside");
+    facet::EndStack();
     CHECK(index == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK(facet::internal::UsageErrorCount() == before);
@@ -941,17 +555,8 @@ TEST_CASE("Scope classes of the structure families end only what began")
     Values v;
     session.SetUi([&] {
         CHECK_BALANCED({
-            facet::CardScope card("card");
             facet::StackScope stack("stack");
             facet::SettingsRowScope row("row");
-        });
-        CHECK_BALANCED({
-            facet::ComboScope combo("combo", "Option 1");
-            CHECK_FALSE(static_cast<bool>(combo));
-        });
-        CHECK_BALANCED({
-            facet::ScrollAreaScope area("area");
-            CHECK(static_cast<bool>(area));
         });
         CHECK_BALANCED({
             facet::ModalScope modal("modal", &v.open);
@@ -967,17 +572,6 @@ TEST_CASE("Structure stubs return false where their own arguments hide the conte
     REQUIRE(session.Ready());
     Values v;
     session.SetUi([&] {
-        bool hidden = false;
-        CHECK_BALANCED({
-            facet::BeginInspectorPane("Hidden pane", &hidden);
-            CHECK_FALSE(facet::InspectorPaneNext());
-            facet::EndInspectorPane();
-        });
-        CHECK_BALANCED({
-            facet::BeginInspectorPane("Pane without a flag", nullptr);
-            CHECK(facet::InspectorPaneNext());
-            facet::EndInspectorPane();
-        });
         CHECK_BALANCED(CHECK_FALSE(facet::BeginDependentGroup("Hidden group", false, {.mode = facet::DependentMode::Hide})));
         CHECK_BALANCED({
             const bool open = facet::BeginDependentGroup("Shown group", true, {.mode = facet::DependentMode::Hide});
@@ -987,19 +581,11 @@ TEST_CASE("Structure stubs return false where their own arguments hide the conte
         });
         CHECK_BALANCED(CHECK_FALSE(facet::BeginSidebar("Hidden sidebar", {.mode = facet::SidebarMode::Hidden})));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginSidebarSection("Closed section", {.collapsible = true, .defaultOpen = false})));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Hidden overlay", &hidden)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Overlay without a flag", nullptr)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginGroupBox("Closed group box", {.collapsible = true, .defaultOpen = false})));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Loading list", 10, nullptr, {.state = facet::DataState::Loading})));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Empty list", 0, nullptr)));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginItemGrid("Failed grid", 10, nullptr, {.state = facet::DataState::Error})));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginItemGrid("Empty grid", 0, nullptr)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginTreeView("Loading tree", nullptr, {.state = facet::DataState::Loading})));
-        CHECK(hidden == false);
     });
     session.Frame();
 }
-
 TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both otherwise")
 {
     facet::test::Session session;
@@ -1046,7 +632,7 @@ TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both 
     CHECK(regular.detail);
 }
 
-TEST_CASE("An outer list-detail or inspector pane placeholder keeps its state past a nested one")
+TEST_CASE("An outer list-detail placeholder keeps its state past a nested one")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -1054,8 +640,6 @@ TEST_CASE("An outer list-detail or inspector pane placeholder keeps its state pa
     bool outerList = false;
     bool innerDetail = false;
     bool outerDetail = true;
-    bool outerPane = false;
-    bool innerPane = true;
     session.SetUi([&] {
         const facet::Theme& theme = facet::T();
         const float height = facet::Px(theme.metrics.controlHeightLarge * 8.0f);
@@ -1083,61 +667,12 @@ TEST_CASE("An outer list-detail or inspector pane placeholder keeps its state pa
             facet::EndListDetail();
         });
         ImGui::EndChild();
-        CHECK_BALANCED({
-            bool outerVisible = true;
-            bool innerVisible = false;
-            facet::BeginInspectorPane("Outer pane", &outerVisible);
-            facet::BeginInspectorPane("Inner pane", &innerVisible);
-            innerPane = facet::InspectorPaneNext();
-            facet::EndInspectorPane();
-            outerPane = facet::InspectorPaneNext();
-            facet::EndInspectorPane();
-        });
     });
     session.Frame();
     CHECK(outerList);
     CHECK(innerDetail);
     CHECK_FALSE(outerDetail);
-    CHECK_FALSE(innerPane);
-    CHECK(outerPane);
 }
 
 // MenuItem has no overload, so MenuItem("Save", {}) cannot bind to a value form with a null pointer.
 static_assert(std::is_same_v<decltype(&facet::MenuItem), bool (*)(const char*, const facet::MenuItemOptions&)>);
-
-TEST_CASE("ApplyReorderMove moves one element and shifts the others")
-{
-    // `to` is the moved element's index after the move.
-    std::vector<int> data = {0, 1, 2, 3, 4};
-    facet::ApplyReorderMove(data, {1, 3});
-    CHECK(data == std::vector<int>{0, 2, 3, 1, 4});
-    CHECK(data[3] == 1);
-    facet::ApplyReorderMove(data, {3, 0});
-    CHECK(data == std::vector<int>{1, 0, 2, 3, 4});
-    facet::ApplyReorderMove(data, {4, 4});
-    facet::ApplyReorderMove(data, {-1, 2});
-    facet::ApplyReorderMove(data, {2, 5});
-    CHECK(data == std::vector<int>{1, 0, 2, 3, 4});
-    CHECK_FALSE(facet::ReorderMove{}.IsValid());
-    CHECK(facet::ReorderMove{0, 1}.IsValid());
-}
-
-TEST_CASE("ApplyReorderMove takes the caller's containers as they are")
-{
-    // A C array, a std::array, a std::span and a std::vector<bool> without spelling a span.
-    int array[3] = {0, 1, 2};
-    facet::ApplyReorderMove(array, {0, 2});
-    CHECK(array[0] == 1);
-    CHECK(array[1] == 2);
-    CHECK(array[2] == 0);
-    std::array<facet::ChoiceItem, 3> items = {{{"Option 1"}, {"Option 2"}, {"Option 3"}}};
-    facet::ApplyReorderMove(items, {2, 0});
-    CHECK(std::string(items[0].label) == "Option 3");
-    CHECK(std::string(items[1].label) == "Option 1");
-    std::vector<int> data = {0, 1, 2};
-    facet::ApplyReorderMove(std::span<int>(data).subspan(1), {0, 1});
-    CHECK(data == std::vector<int>{0, 2, 1});
-    std::vector<bool> flags = {true, false, false};
-    facet::ApplyReorderMove(flags, {0, 2});
-    CHECK(flags == std::vector<bool>{false, false, true});
-}
