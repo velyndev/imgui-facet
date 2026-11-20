@@ -950,6 +950,71 @@ TEST_CASE("Chips wrap inside the width, and the single-line form moves the rest 
     CHECK((flags[1] || flags[2] || flags[3]));
 }
 
+// --- CheckboxGroup ----------------------------------------------------------------------------
+
+TEST_CASE("A checkbox group flips items, select-all sets every enabled item and items are Tab stops")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kItems[] = {{"First"}, {"Second", {}, nullptr, nullptr, true}, {"Third"}, {"Fourth"}};
+    bool flags[3] = {true, false, false};  // the fourth item has no flag: drawn disabled
+    int writes = 0;
+    ImGuiID ids[4] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 4; ++i)
+            ids[i] = EntryIdOf("##group", i);
+        if (facet::CheckboxGroup("##group", flags, kItems, {.selectAll = true, .columns = 1}))
+            ++writes;
+        session.Track("group");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    TabFrom(session, 2);  // the select-all box
+    session.KeyPress(ImGuiKey_Space);  // Mixed (one of two enabled items) writes On
+    CHECK(flags[0]);
+    CHECK_FALSE(flags[1]);  // disabled: left alone
+    CHECK(flags[2]);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(flags[0]);
+    CHECK_FALSE(flags[2]);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(flags[0]);
+    session.KeyPress(ImGuiKey_Tab);  // the disabled second item is passed over
+    CHECK(ImGui::GetFocusID() == ids[2]);
+    session.KeyPress(ImGuiKey_Tab);  // so is the fourth, which has no flag
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(writes == 3);
+}
+
+TEST_CASE("A checkbox group lays its items out in the columns asked for or that fit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First", "Second", "Third", "Fourth"};
+    bool flags[4] = {};
+    float one = 0.0f;
+    float two = 0.0f;
+    float autoWide = 0.0f;
+    session.SetUi([&] {
+        facet::CheckboxGroup("##one", flags, kItems, {.columns = 1});
+        one = ImGui::GetItemRectSize().y;
+        facet::CheckboxGroup("##two", flags, kItems, {.columns = 2});
+        two = ImGui::GetItemRectSize().y;
+        facet::CheckboxGroup("##auto", flags, kItems);
+        autoWide = ImGui::GetItemRectSize().y;
+    });
+    session.Frame();
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(one == doctest::Approx(row * 4.0f));
+    CHECK(two == doctest::Approx(row * 2.0f));
+    CHECK(autoWide == doctest::Approx(row));  // four short labels fit one row of an 800 pixel window
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;

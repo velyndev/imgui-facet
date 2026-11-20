@@ -38,8 +38,6 @@ void CallSelectionStubs(Values& v)
 {
     using namespace facet;
     const std::span<bool> flags(v.flags);
-    FACET_CHECK_STUB(false, CheckboxGroup("Checkboxes 1", flags, kChoices, {.selectAll = true}));
-    FACET_CHECK_STUB(false, CheckboxGroup("Checkboxes 2", flags, kLabels));
     FACET_CHECK_STUB(false, CycleSelector("Cycle 1", &v.index, kChoices));
     FACET_CHECK_STUB(false, CycleSelector("Cycle 2", &v.index, kLabels, {.pageDots = true}));
     FACET_CHECK_STUB(false, KeybindModeSelector("Mode 1", &v.mode, {.allowOff = false}));
@@ -48,7 +46,7 @@ void CallSelectionStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSelectionStubs.
-constexpr int kSelectionStubCalls = 7;
+constexpr int kSelectionStubCalls = 5;
 
 } // namespace
 

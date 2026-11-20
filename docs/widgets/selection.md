@@ -86,7 +86,25 @@ bool CheckboxGroup(const char* label, std::span<bool> checked, std::span<const c
                    const CheckboxGroupOptions& options = {});
 ```
 
-A labelled list of checkboxes in one or more columns, with an optional select-all box. Status: planned.
+A list of checkboxes (the Checkbox look and input, drag painting included) with the visible label
+part above it. Returns true when any flag was written.
+
+- **Items.** One box per item; `checked` holds one flag per item. Extra flags are ignored, items
+  without a flag and items with `disabled` are drawn disabled and are no Tab stop. Every enabled box
+  is a Tab stop, in reading order.
+- **Select all.** `selectAll` adds a box named `Strings::selectAll` above the list, which shows On
+  when every enabled item is checked, Off when none is, and the mixed mark otherwise. Activating it
+  from Off or Mixed checks every enabled item, from On unchecks them. The items are indented so
+  their boxes line up with its label.
+- **Columns.** `columns` 0 fits as many columns of the widest item (plus spacing.xl between
+  columns) as the width holds, at most one per item; a set number divides the width equally. Items
+  fill the columns row by row, so the Tab order follows the reading order. Labels that do not fit a
+  column are cut with an ellipsis and shown in full on hover and keyboard focus.
+- **States.** `ImGui::BeginDisabled` disables every box. `readOnly`: shown and focusable, never
+  written. `error` replaces `helpText` under the list.
+- **Width.** The available width by default (rule 6).
+
+Status: ready.
 
 ### RadioGroup
 

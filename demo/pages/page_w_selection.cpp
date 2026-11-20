@@ -74,8 +74,13 @@ struct SelectionUi
     int chipGroupWrites = 0;
     int chipGroupRemoved = -1;
 
-    // Planned widgets below.
+    // CheckboxGroup
     bool group[3] = {true, false, true};
+    bool columns[6] = {true, false, false, true, false, false};
+    bool groupError[3] = {false, false, false};
+    int checkGroupWrites = 0;
+
+    // Planned widgets below.
     int cycle = 0;
     facet::BindMode mode = facet::BindMode::Hold;
     int card = 0;
@@ -325,6 +330,45 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
     Note("Options checked: %d of 4. Tri-state: %s. Writes on this section: %d.", checked,
          ui.triState == facet::CheckState::On ? "on" : ui.triState == facet::CheckState::Off ? "off" : "mixed",
          ui.checkWrites);
+}
+
+void CheckboxGroupSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("CheckboxGroup");
+    Paragraph("A labelled list of checkboxes, each a Tab stop. The select-all box above the list shows the mixed "
+              "mark while only some items are checked and sets every enabled item.");
+
+    static const char* const kSix[] = {"Option 1", "Option 2", "Option 3", "Option 4", "Option 5", "Option 6"};
+    static const facet::ChoiceItem kWithDisabled[] = {{"Option 1"}, {"Option 2 (disabled)", {}, nullptr, nullptr, true}, {"Option 3"}};
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.checkGroupWrites;
+    };
+
+    LabeledRow("Select all");
+    count(facet::CheckboxGroup("Placeholder list", ui.group, kWithDisabled, {.selectAll = true}));
+    ctx.Probe("sel.checks.all");
+    LabeledRow("Columns");
+    count(facet::CheckboxGroup("##columns", ui.columns, kSix, {.columns = 3}));
+    ctx.Probe("sel.checks.columns");
+    LabeledRow("Messages");
+    {
+        const bool any = ui.groupError[0] || ui.groupError[1] || ui.groupError[2];
+        count(facet::CheckboxGroup("##errors", ui.groupError, kOptions,
+                                   {.error = any ? nullptr : "Placeholder error: check at least one option.",
+                                    .helpText = "Placeholder help text under the list."}));
+    }
+    {
+        bool fixed[3] = {true, false, true};
+        LabeledRow("Read-only");
+        facet::CheckboxGroup("##checksReadOnly", fixed, kOptions, {.readOnly = true});
+        LabeledRow("Disabled");
+        ImGui::BeginDisabled();
+        facet::CheckboxGroup("##checksDisabled", fixed, kOptions);
+        ImGui::EndDisabled();
+    }
+    Note("Placeholder list: %d of 2 enabled options checked. Writes on this section: %d.", ui.group[0] + ui.group[2],
+         ui.checkGroupWrites);
 }
 
 void RadioSection(facet::demo::PageCtx& ctx)
@@ -613,9 +657,7 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     CheckboxSection(ctx);
 
-    SectionHeader("Checkbox groups");
-    LabeledRow("Checkbox group");
-    facet::CheckboxGroup("##group", ui.group, kOptions, {.selectAll = true});
+    CheckboxGroupSection(ctx);
 
     RadioSection(ctx);
 
@@ -701,6 +743,22 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseDown();
     test.MouseUp();
     test.Expect("checking the box clears its placeholder error", [] { return ui.checkError; });
+
+    // CheckboxGroup: the select-all box, an item by keyboard, an item in the second row of columns.
+    test.MouseMove(T::Item("sel.checks.all", 0.0f, 0.0f).Offset(8.0f, 31.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("select-all clears both enabled options", [] { return !ui.group[0] && !ui.group[2]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space checks the first option", [] { return ui.group[0] && !ui.group[2]; });
+    // On through the third option to the columns: the first box of their second row is the fourth stop.
+    for (int i = 0; i < 5; ++i)
+        test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the first box of the second row unchecks it", [] { return !ui.columns[3]; });
+    test.ExpectNear("each change wrote once", [] { return ui.checkGroupWrites; }, 3.0, 0.0);
 
     // RadioGroup: a click on the middle option, then the arrows inside one Tab stop.
     test.MouseMove(T::Item("sel.radio", 0.01f, 0.56f));
