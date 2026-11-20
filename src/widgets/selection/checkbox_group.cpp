@@ -60,8 +60,11 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
     int columns = options.columns > 0 ? options.columns
                                       : static_cast<int>((itemsWidth + columnGap) / std::max(1.0f, natural + columnGap));
     columns = std::clamp(columns, 1, std::max(1, count));
-    const float columnWidth =
+    // Columns as wide as the widest item, so the boxes stay close to their labels in a wide row;
+    // narrower when the width shares out less than that.
+    const float share =
         std::max(1.0f, std::floor((itemsWidth - columnGap * static_cast<float>(columns - 1)) / static_cast<float>(columns)));
+    const float columnWidth = std::min(natural, share);
     const int rows = (count + columns - 1) / columns;
     const float listTop = above.height + (options.selectAll ? m.height : 0.0f);
     const float height = listTop + static_cast<float>(rows) * m.height;

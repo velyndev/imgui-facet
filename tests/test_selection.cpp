@@ -706,6 +706,39 @@ TEST_CASE("The selection pill springs to the new segment, rests on whole pixels 
     CHECK(IsWhole(pill.Min.x));
 }
 
+TEST_CASE("The selection pill follows a scale change with its spring and comes to rest on the new segment")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    const float savedScale = facet::UiScale();
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int index = 2;
+    ImRect pill;
+    session.SetUi([&] {
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::SegmentedControl("##segments", &index, kItems, {.width = 300.0f});
+        pill = ColorBounds(from, facet::ToU32(facet::T().colors.accentSubtle));
+        session.Track("segments");
+    });
+    session.Frames(30);
+    const ImRect before = pill;
+    facet::SetUiScale(savedScale * 2.0f);
+    session.Frame();
+    session.Frame();
+    const ImRect segments = session.ItemRect("segments");
+    // The first frames at the new scale: the pill moves from where it was, it does not jump there.
+    CHECK(pill.Max.x < segments.Max.x - 1.0f);
+    CHECK(pill.Max.x >= before.Max.x - 1.0f);
+    session.Seconds(1.5f);
+    CHECK(pill.Max.x == doctest::Approx(segments.Max.x - std::max(1.0f, std::round(facet::Px(facet::T().metrics.segmentInset))) - 0.5f)
+                             .epsilon(0.01));
+    CHECK(IsWhole(pill.Min.x));
+    facet::SetUiScale(savedScale);
+    session.Frame();
+}
+
 TEST_CASE("A read-only or mixed segmented control shows no write until an edit, read-only never writes")
 {
     facet::test::Session session;

@@ -12,8 +12,9 @@ Dropdowns, list boxes and trees are in [lists](lists.md).
 
 The visible label part is drawn by the widget's shape (rule 6): in front of one-line controls
 (segmented control, cycle selector, key bind mode selector), above groups that wrap into rows
-(checkbox and radio groups, chip groups, option cards), and after the mark for toggles and
-checkboxes. `"##name"` hides it, as in settings rows.
+(checkbox and radio groups, chip groups, option cards), after the mark for checkboxes, and in front
+of the switch for toggles, as the Toggle declaration states (its `width` puts the switch at the end
+of a wider row). `"##name"` hides it, as in settings rows.
 
 ## Widgets
 
@@ -97,7 +98,8 @@ part above it. Returns true when any flag was written.
   from Off or Mixed checks every enabled item, from On unchecks them. The items are indented so
   their boxes line up with its label.
 - **Columns.** `columns` 0 fits as many columns of the widest item (plus spacing.xl between
-  columns) as the width holds, at most one per item; a set number divides the width equally. Items
+  columns) as the width holds, at most one per item; a set number divides the width equally. A
+  column is as wide as the widest item, or narrower when the share of the width is less. Items
   fill the columns row by row, so the Tab order follows the reading order. Labels that do not fit a
   column are cut with an ellipsis and shown in full on hover and keyboard focus.
 - **States.** `ImGui::BeginDisabled` disables every box. `readOnly`: shown and focusable, never
