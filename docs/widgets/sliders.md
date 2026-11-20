@@ -92,7 +92,23 @@ bool SliderStepped(const char* label, float* value, std::span<const float> stops
                    const SliderSteppedOptions& options = {});
 ```
 
-A slider over non-uniform stops with tick marks and optional stop labels. Status: planned.
+A slider over a list of ascending stop values (at most 64 take part), drawn like Slider: label in
+front, value at the end, a tick per stop. The stops are evenly spaced on the track whatever their
+values, so a list such as 0.25, 0.5, 1, 2, 4, 8 reads as six equal choices; a value between two
+stops is drawn at the same share of the way between their ticks.
+
+- Without `magnetic` every drag, click, key and typed value lands on a stop: the arrows go to the
+  next stop, Page Up and Down a tenth of the stops (at least one), Home and End the first and last,
+  and a typed value goes to the nearest stop. With `magnetic` a drag moves freely and snaps only
+  within spacing.sm of a stop, a typed value is written clamped to the first and last stop, and
+  the arrow keys still go to the next stop.
+- `stopLabels` draws one Caption label per stop under its tick, which adds a line to the widget's
+  height; a label that would touch the one before it is left out, and the last label is always
+  kept. Vertical sliders draw no stop labels.
+- States, typed values, the vertical form and the item queries are as Slider. Fewer than two
+  stops show the value read-only.
+
+Status: ready.
 
 ### SliderWithInput
 

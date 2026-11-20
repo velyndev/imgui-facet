@@ -64,8 +64,12 @@ struct SlidersUi
     float vLow = 0.25f;
     float vHigh = 0.75f;
 
+    // SliderStepped
+    float zoom = 1.0f;
+    float opacity = 0.5f;
+    float steppedV = 0.25f;
+
     // The planned widgets below.
-    float steppedStops = 0.25f;
     float field = 0.75f;
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
@@ -91,8 +95,9 @@ enum CaptureState
     kDragging,
 };
 
-const float kStops[] = {0.0f, 0.25f, 0.5f, 1.0f};
-const char* const kStopLabels[] = {"Option 1", "Option 2", "Option 3", "Option 4"};
+const float kZoomStops[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
+const char* const kZoomLabels[] = {"0.25x", "0.5x", "1x", "2x", "4x", "8x"};
+const float kOpacityStops[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
 // Placeholder distribution for the histogram: an even ramp, not measured data.
 const float kBins[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
 const char* const kSegments[] = {"Option 1", "Option 2", "Option 3"};
@@ -174,6 +179,24 @@ void SliderSection(facet::demo::PageCtx& ctx)
 
     Note("Level %.2f: written on %d frames, %d finished edits. Count %d, gain %+.1f dB, frequency %.0f Hz.", ui.level,
          ui.levelEdits, ui.levelCommits, ui.count, ui.gain, ui.frequency);
+}
+
+void SteppedSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SliderStepped");
+    Paragraph("Stops of any spacing, evenly placed on the track. The arrows go to the next stop; magnetic moves "
+              "freely and snaps only near a stop.");
+    LabeledRow("On stops");
+    facet::SliderStepped("Zoom", &ui.zoom, kZoomStops, {.format = "%.2gx", .stopLabels = kZoomLabels});
+    ctx.Probe("stepped.zoom");
+    LabeledRow("Magnetic");
+    facet::SliderStepped("Opacity", &ui.opacity, kOpacityStops, {.format = "%.2f", .magnetic = true});
+    ctx.Probe("stepped.opacity");
+    LabeledRow("Vertical");
+    facet::SliderStepped("Steps", &ui.steppedV, kOpacityStops, {.format = "%.2f", .orientation = facet::Orientation::Vertical,
+                                                                .height = 96.0f});
+    ctx.Probe("stepped.vertical");
+    Note("Zoom %.2gx, opacity %.2f.", ui.zoom, ui.opacity);
 }
 
 // Probes for the handles of the widget submitted last under `label`: each handle's id with the
@@ -269,9 +292,9 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     SliderSection(ctx);
 
-    SectionHeader("Stepped and with a field");
-    LabeledRow("Stepped");
-    facet::SliderStepped("##stepped", &ui.steppedStops, kStops, {.stopLabels = kStopLabels});
+    SteppedSection(ctx);
+
+    SectionHeader("With a field and knobs");
     LabeledRow("With a field");
     facet::SliderWithInput("##field", &ui.field, 0.0f, 1.0f);
     LabeledRow("Knob");
@@ -394,6 +417,21 @@ FACET_DEMO_SELFTEST("sliders")
     // other handle, Enter types a value.
     test.Click("slider.faderB");
     test.KeyPress(ImGuiKey_Tab);
+    // SliderStepped on the way: the arrows go from stop to stop, magnetic too.
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("stepped.zoom");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right moves the zoom to the next stop", [] { return ui.zoom; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End moves the zoom to the last stop", [] { return ui.zoom; }, 8.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("stepped.opacity");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right moves the magnetic slider to the next stop", [] { return ui.opacity; }, 0.75, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("stepped.vertical");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up moves the vertical stepped slider to the next stop", [] { return ui.steppedV; }, 0.5, 0.0);
     test.KeyPress(ImGuiKey_Tab);
     test.ExpectFocused("range.price.h0");
     test.KeyPress(ImGuiKey_RightArrow);
@@ -470,6 +508,15 @@ FACET_DEMO_SELFTEST("sliders")
     test.Drag({T::Item("range.price", 0.5f), T::Display(1.5f, 0.5f), T::Item("range.price", 0.5f)}, 0.4f);
     test.Expect("a span drag out of the window and back ends where it started",
                 [] { return ui.low == 20.0f && ui.high == 80.0f; });
+
+    // SliderStepped by pointer: a drag always ends on a stop.
+    test.Drag({Row("stepped.zoom", 0.9f), Row("stepped.zoom", 0.63f)}, 0.3f);
+    test.Expect("a drag on the stepped slider ends on a stop", [] {
+        for (const float stop : kZoomStops)
+            if (ui.zoom == stop)
+                return ui.zoom < 8.0f;
+        return false;
+    });
 
     // States.
     test.Drag({T::Item("range.readOnly", 0.5f), T::Item("range.readOnly", 0.9f)}, 0.2f);

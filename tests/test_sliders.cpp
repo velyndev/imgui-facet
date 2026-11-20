@@ -709,3 +709,84 @@ TEST_CASE("A range slider is one item for the queries while idle and keeps the w
     CHECK(rig.low == 20);
     CHECK(rig.high == 60);
 }
+
+// ---- SliderStepped -------------------------------------------------------------------------
+
+TEST_CASE("A stepped slider moves from stop to stop with the keys and rests on stops when dragged")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float kStops[] = {1.0f, 2.0f, 5.0f, 10.0f, 50.0f};
+    float value = 2.0f;
+    float magnetic = 2.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::SliderStepped("##s", &value, kStops, {.width = kSliderWidth});
+        session.Track("stepped");
+        facet::SliderStepped("##m", &magnetic, kStops, {.magnetic = true, .width = kSliderWidth});
+        session.Track("magnetic");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(value == 5.0f);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(value == 50.0f);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(value == 1.0f);
+    // Typed: the nearest stop.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    session.Type("8");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(value == 10.0f);
+    // A drag anywhere lands on a stop.
+    const ImRect rect = session.ItemRect("stepped");
+    for (float x = rect.Min.x + 15.0f; x < rect.Max.x - 40.0f; x += 17.0f)
+    {
+        session.Drag({ImVec2(rect.Min.x + 15.0f, rect.GetCenter().y), ImVec2(x, rect.GetCenter().y)});
+        const bool onStop = value == 1.0f || value == 2.0f || value == 5.0f || value == 10.0f || value == 50.0f;
+        REQUIRE(onStop);
+    }
+    // Magnetic: free between the stops, the keys still go to the next stop. After the clicks the
+    // first Tab shows the focus where it is, the second moves it on.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(magnetic == 5.0f);
+    const ImRect m = session.ItemRect("magnetic");
+    const float knob = KnobSize();
+    session.Drag({ImVec2(m.Min.x + knob * 0.5f, m.GetCenter().y), ImVec2(m.Min.x + 90.0f, m.GetCenter().y)});
+    const bool between = magnetic != 1.0f && magnetic != 2.0f && magnetic != 5.0f && magnetic != 10.0f;
+    CHECK(between);
+}
+
+TEST_CASE("A stepped slider with fewer than two stops is read-only, and stop labels add one line")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float kOne[] = {3.0f};
+    static const float kStops[] = {0.0f, 0.5f, 1.0f};
+    static const char* const kLabels[] = {"Low", "Middle", "High"};
+    float value = 3.0f;
+    float labelled = 0.5f;
+    bool written = false;
+    session.SetUi([&] {
+        written |= facet::SliderStepped("##one", &value, kOne, {.width = kSliderWidth});
+        session.Track("one");
+        facet::SliderStepped("##plain", &labelled, kStops, {.width = kSliderWidth});
+        session.Track("plain");
+        facet::SliderStepped("##labels", &labelled, kStops, {.stopLabels = kLabels, .width = kSliderWidth});
+        session.Track("labels");
+    });
+    session.Frame();
+    const ImRect one = session.ItemRect("one");
+    session.Drag({ImVec2(one.Min.x + 10.0f, one.GetCenter().y), ImVec2(one.Max.x - 10.0f, one.GetCenter().y)});
+    CHECK_FALSE(written);
+    CHECK(value == 3.0f);
+    CHECK(session.ItemRect("labels").GetHeight() > session.ItemRect("plain").GetHeight());
+}
