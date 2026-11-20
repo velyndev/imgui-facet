@@ -732,6 +732,84 @@ TEST_CASE("A read-only or mixed segmented control shows no write until an edit, 
     CHECK(writes == 1);
 }
 
+// --- Chip -------------------------------------------------------------------------------------
+
+TEST_CASE("A chip activates on its body; the remove button and Delete report a removal instead")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    int removes = 0;
+    bool selected = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::Chip("Placeholder tag", {.selected = selected, .removable = true}))
+        {
+            ++presses;
+            selected = !selected;
+        }
+        session.Track("chip");
+        if (facet::ChipRemovePressed())
+            ++removes;
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("chip");
+    session.Click(ImVec2(r.Min.x + r.GetWidth() * 0.3f, r.GetCenter().y));
+    CHECK(presses == 1);
+    CHECK(selected);
+    CHECK(removes == 0);
+    // The remove button sits at the end of the pill.
+    session.MouseMove(ImVec2(r.Max.x - r.GetHeight() * 0.5f, r.GetCenter().y));
+    session.Click(ImVec2(r.Max.x - r.GetHeight() * 0.5f, r.GetCenter().y));
+    CHECK(removes == 1);
+    CHECK(presses == 1);
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("chip"));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(presses == 2);
+    session.KeyPress(ImGuiKey_Delete);
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(removes == 3);
+    CHECK_FALSE(facet::ChipRemovePressed());  // outside the frame of the press
+}
+
+TEST_CASE("A selected chip shows the selection tint, a disabled chip does nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 tint = facet::ToU32(facet::T().colors.accentSubtle);
+    int selectedTint = 0;
+    int plainTint = -1;
+    int presses = 0;
+    float plainWidth = 0.0f;
+    float withExtras = 0.0f;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        int from = drawList->VtxBuffer.Size;
+        facet::Chip("Selected", {.selected = true});
+        selectedTint = CountColor(from, tint);
+        from = drawList->VtxBuffer.Size;
+        facet::Chip("Plain");
+        plainTint = CountColor(from, tint);
+        plainWidth = ImGui::GetItemRectSize().x;
+        facet::Chip("Plain##extras", {.icon = facet::Icon("star"), .color = facet::ToU32(facet::T().colors.chart[0])});
+        withExtras = ImGui::GetItemRectSize().x;
+        ImGui::BeginDisabled();
+        presses += facet::Chip("Disabled", {.removable = true}) ? 1 : 0;
+        session.Track("disabled");
+        ImGui::EndDisabled();
+    });
+    session.Frames(10);
+    CHECK(selectedTint > 0);
+    CHECK(plainTint == 0);
+    CHECK(withExtras > plainWidth);
+    session.Click(session.ItemCenter("disabled"));
+    CHECK(presses == 0);
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;

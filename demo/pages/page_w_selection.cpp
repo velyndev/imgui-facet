@@ -59,6 +59,12 @@ struct SelectionUi
     int segmentNarrow = 1;
     int segmentWrites = 0;
 
+    // Chip
+    bool tags[4] = {true, true, true, true};  // which removable tags are still there
+    bool filterChip = false;
+    int chipPresses = 0;
+    int chipRemoves = 0;
+
     // Planned widgets below.
     bool group[3] = {true, false, true};
     bool chips[3] = {true, false, false};
@@ -407,6 +413,81 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
     Note("Labels: %s. Writes on this section: %d.", kOptions[ui.segment], ui.segmentWrites);
 }
 
+void ChipSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Chip");
+    Paragraph("A small pill for a tag or a filter. Activating it flips a filter; the remove button, or Delete and "
+              "Backspace on the focused chip, asks the caller to remove it.");
+
+    LabeledRow("Removable");
+    {
+        static const char* const kTags[] = {"Tag 1", "Tag 2", "Tag 3", "Tag 4"};
+        static const char* const kProbes[] = {"sel.chip.tag0", "sel.chip.tag1", "sel.chip.tag2", "sel.chip.tag3"};
+        const float right = facet::demo::ContentRight();
+        bool first = true;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (!ui.tags[i])
+                continue;
+            if (!first)
+                facet::demo::SameLineIfFits(right, facet::Px(80.0f), facet::Px(facet::T().spacing.sm));
+            first = false;
+            ImGui::PushID(i);
+            if (facet::Chip(kTags[i], {.removable = true}))
+                ++ui.chipPresses;
+            ctx.Probe(kProbes[i]);
+            const bool removed = facet::ChipRemovePressed();
+            ImGui::PopID();
+            if (removed)
+            {
+                ui.tags[i] = false;
+                ++ui.chipRemoves;
+            }
+        }
+        if (!first)
+            ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.lg));
+        if (facet::Button("Restore tags", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
+            for (bool& tag : ui.tags)
+                tag = true;
+        ctx.Probe("sel.chip.restore");
+    }
+    LabeledRow("Filter");
+    {
+        const ControlRow row;
+        ForceState(ctx);
+        if (facet::Chip("Placeholder filter", {.selected = ui.filterChip, .icon = facet::Icon("filter")}))
+        {
+            ui.filterChip = !ui.filterChip;
+            ++ui.chipPresses;
+        }
+        ctx.Probe("sel.chip.filter");
+        row.Next();
+        facet::Chip("Series 1", {.color = facet::ToU32(facet::T().colors.chart[0])});
+        row.Next();
+        facet::Chip("Series 2", {.color = facet::ToU32(facet::T().colors.chart[1])});
+    }
+    LabeledRow("Sizes");
+    {
+        const ControlRow row;
+        facet::Chip("Small", {.removable = true, .size = facet::ControlSize::Small});
+        row.Next();
+        facet::Chip("Regular", {.removable = true});
+        row.Next();
+        facet::Chip("Large", {.removable = true, .size = facet::ControlSize::Large});
+    }
+    LabeledRow("States");
+    {
+        const ControlRow row;
+        ImGui::BeginDisabled();
+        facet::Chip("Disabled", {.removable = true});
+        ctx.Probe("sel.chip.disabled");
+        row.Next();
+        facet::Chip("Disabled and selected", {.selected = true});
+        ImGui::EndDisabled();
+    }
+    Note("Filter %s. Chips activated: %d, removed: %d.", ui.filterChip ? "on" : "off", ui.chipPresses, ui.chipRemoves);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused")
@@ -435,9 +516,9 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
     LabeledRow("Bind mode");
     facet::KeybindModeSelector("##mode", &ui.mode);
 
-    SectionHeader("Chips");
-    LabeledRow("Chip");
-    facet::Chip("Option 1##chip", {.selected = true, .removable = true});
+    ChipSection(ctx);
+
+    SectionHeader("Chip groups");
     LabeledRow("Filter chips");
     facet::ChipGroup("##filters", ui.chips, kChoices, {.clearAll = true});
     LabeledRow("Choice chips");
@@ -564,4 +645,26 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseDown();
     test.MouseUp();
     test.ExpectNear("the first press on a mixed control writes", [] { return ui.segmentWrites; }, 8.0, 0.0);
+
+    // Chip: the body flips a filter, the remove button and Delete remove a tag.
+    test.Click("sel.chip.filter");
+    test.Expect("a click on the filter chip turns it on", [] { return ui.filterChip; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus on the chip
+    test.ExpectFocused("sel.chip.filter");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the focused chip turns it off", [] { return !ui.filterChip; });
+    test.MouseMove(T::Item("sel.chip.tag1", 1.0f).Offset(-14.0f, 0.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("the remove button removes the second tag", [] { return !ui.tags[1] && ui.tags[0]; });
+    test.MouseMove(T::Item("sel.chip.tag0", 0.25f));
+    test.MouseDown();
+    test.MouseUp();
+    test.KeyPress(ImGuiKey_Delete);
+    test.Expect("Delete on the focused chip removes the first tag", [] { return !ui.tags[0]; });
+    test.ExpectNear("two chips were removed and three activated", [] { return ui.chipRemoves * 10 + ui.chipPresses; }, 23.0,
+                    0.0);
+    test.Click("sel.chip.disabled");
+    test.Click("sel.chip.restore");
+    test.Expect("the plain button restores the tags", [] { return ui.tags[0] && ui.tags[1]; });
 }

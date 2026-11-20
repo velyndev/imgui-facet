@@ -199,4 +199,40 @@ struct SelectionCheckboxDesc
 bool SelectionCheckbox(const char* label, ImGuiID id, SelectionMark* mark, const NextItemData& next,
                        const SelectionCheckboxDesc& desc);
 
+// ---- The chip item ---------------------------------------------------------------------------
+
+// What a chip shows (Chip, ChipGroup).
+struct SelectionChipDesc
+{
+    bool selected = false;
+    bool removable = false;
+    Icon icon;
+    ImU32 color = 0;               // leading dot; 0 for none
+    const char* detail = nullptr;  // a count after the label, labelSecondary
+    ControlSize size = ControlSize::Inherit;
+    bool disabled = false;         // in addition to ImGui::BeginDisabled
+    bool readOnly = false;         // focusable, never activated
+    bool tabStop = true;
+    bool selectedFill = true;      // false: a group's selection pill draws the selected tint instead
+    const ForcedItemRequest* forced = nullptr;  // a group's forced capture request; null takes the pending one
+    int part = -1;                 // the chip's part index in a group, for forced states
+};
+
+struct SelectionChipResult
+{
+    ItemState body;                // the chip's item behaviour
+    bool pressed = false;          // the body was activated (click, Space, Enter)
+    bool removed = false;          // the remove button was activated, or Delete or Backspace on the focused chip
+    ImRect rect;                   // the whole chip, screen pixels
+};
+
+// The width (pixels) a chip with `label` and `desc` takes by default, in the current scale.
+float SelectionChipWidth(const char* label, const SelectionChipDesc& desc);
+
+// One chip at the cursor under `id`, `width` pixels wide (SelectionChipWidth for its content): a
+// pill with the optional dot, icon, the visible label, the detail and the remove button, which is a
+// separate mouse target named Strings::remove. Lays out one item; a narrower width cuts the label
+// with an ellipsis and a tooltip.
+SelectionChipResult SelectionChip(const char* label, ImGuiID id, float width, const SelectionChipDesc& desc);
+
 } // namespace facet::internal

@@ -167,8 +167,25 @@ bool Chip(const char* label, const ChipOptions& options = {});
 bool ChipRemovePressed();
 ```
 
-A pill-shaped tag that can be selected and can carry a remove button; `ChipRemovePressed` reports
-the remove button of the last chip. Status: planned.
+A pill-shaped tag one control height tall with the visible label, an optional leading dot in a data
+color (`color`) and an optional icon. Returns true when the chip body is activated (a click, or
+Space or Enter while focused); a chip used as a filter flips its own `selected` flag then.
+
+- **Remove.** `removable` adds a close button inside the end of the pill: a separate mouse target
+  named `Strings::remove` (its tooltip). Delete or Backspace on the focused chip press it too.
+  `ChipRemovePressed()`, called right after the chip, is true on that frame; the caller removes the
+  chip from its data. The button is not a Tab stop of its own, so a row of chips has one stop per
+  chip.
+- **Look.** Unselected: the neutral fill with the 3:1 boundary hairline, like a secondary button.
+  `selected`: the selection tint (accentSubtle) with a focusRing hairline and a semibold label,
+  faded in over `motion.durationFast`. The focus ring follows the pill shape.
+- **States.** Disabled: fill[3] (fill[1] while selected), labelTertiary, no Tab stop, nothing
+  reported. The dot keeps its data color unless disabled.
+- **Width.** Its content (measured with the semibold label, so selecting never cuts it);
+  `ImGui::SetNextItemWidth` sets another width as rule 6 says, and a narrower one cuts the label
+  with an ellipsis and a tooltip.
+
+Status: ready.
 
 ### ChipGroup
 
