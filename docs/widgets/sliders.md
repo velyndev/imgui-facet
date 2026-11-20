@@ -187,8 +187,21 @@ bool RangeInput(const char* label, float* low, float* high, float min, float max
 bool RangeInput(const char* label, int* low, int* high, int min, int max, const RangeInputOptions& options = {});
 ```
 
-A range slider between a low and a high number field; typed values follow the same handle rules.
-Status: planned.
+The two-handle track of RangeSlider between a low and a high number field (`fieldWidth` units,
+numberFieldWidth by default), with the label in front. With `slider` false the two fields stand
+alone with a short bar between them. When the track beside the fields would get shorter than
+`layout.minRowControl`, the fields drop under it: the low field under its start, the high field
+under its end. Four Tab stops: low field, low handle, high handle, high field.
+
+- A typed value writes on Enter, Tab or focus loss and obeys the rules of a dragged handle: it
+  keeps the order and `minGap`, and `collision` decides whether it stops at the other value or
+  pushes it. It is clamped to the range and snapped to the step, unless `allowOutOfRange`, which
+  writes it as typed. Up and Down in a field step like the arrows on a handle.
+- The handles, the span, `dragSpan`, `doubleClickReset` and the item queries are as RangeSlider.
+  `mixed` empties both fields and hides the handles until the first edit; `error` draws the track's
+  error look and the message under the whole widget.
+
+Status: ready.
 
 ### RangeSliderHistogram
 

@@ -89,8 +89,6 @@ static_assert(facet::KnobVariant{} == facet::KnobVariant::Arc);
 void CallSliderStubs(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, RangeInput("Range input 1", &v.low, &v.high, 0.0f, 1.0f));
-    FACET_CHECK_STUB(false, RangeInput("Range input 2", &v.lowInt, &v.highInt, 0, 10, {.slider = false}));
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 1", &v.low, &v.high, 0.0f, 1.0f, kBins));
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 2", &v.lowInt, &v.highInt, 0, 10, kBins));
     FACET_CHECK_STUB(false, MultiSlider("Multi 1", std::span<float>(v.handles), 0.0f, 1.0f));
@@ -111,7 +109,7 @@ void CallSliderStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 16;
+constexpr int kSliderStubCalls = 14;
 
 } // namespace
 

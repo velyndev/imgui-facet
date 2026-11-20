@@ -852,3 +852,63 @@ TEST_CASE("A narrow slider with a field puts the field under the track")
     CHECK(session.ItemRect("narrow").GetHeight() > height * 1.5f);
     CHECK(std::fabs(session.ItemRect("narrow").GetWidth() - facet::Px(150.0f)) <= 1.0f);
 }
+// ---- RangeInput ----------------------------------------------------------------------------
+
+TEST_CASE("A range input has four Tab stops and a typed value follows the handle rules")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int low = 20, high = 60;
+    int pLow = 20, pHigh = 60;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::RangeInput("Range", &low, &high, 0, 100, {.minGap = 10.0, .width = 500.0f});
+        session.Track("range");
+        facet::RangeInput("Pushing", &pLow, &pHigh, 0, 100,
+                          {.minGap = 10.0, .collision = facet::HandleCollision::Push, .slider = false, .width = 500.0f});
+        session.Track("push");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("range").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    // Low field: a value past the high one stops one gap before it.
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("90");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(low == 50);
+    CHECK(high == 60);
+    // Low handle, then high handle.
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(low == 49);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(high == 61);
+    // High field.
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("5");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(high == 59);
+    CHECK(low == 49);
+    // Fields only, with Push: a typed low pushes the high value.
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("95");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(pLow == 90);
+    CHECK(pHigh == 100);
+}
+
+TEST_CASE("A narrow range input puts its fields under the track")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float low = 0.2f, high = 0.8f;
+    session.SetUi([&] {
+        facet::RangeInput("Range", &low, &high, 0.0f, 1.0f, {.width = 220.0f});
+        session.Track("narrow");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("narrow").GetHeight() > facet::ControlHeight(facet::ControlSize::Regular) * 1.5f);
+    CHECK(std::fabs(session.ItemRect("narrow").GetWidth() - facet::Px(220.0f)) <= 1.0f);
+}

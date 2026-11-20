@@ -73,6 +73,12 @@ struct SlidersUi
     int amount = 40;
     float field = 0.75f;
 
+    // RangeInput
+    int yearLow = 1990;
+    int yearHigh = 2020;
+    float fieldLow = 0.25f;
+    float fieldHigh = 0.75f;
+
     // The planned widgets below.
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
@@ -316,11 +322,21 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     RangeSection(ctx);
 
+    SectionHeader("RangeInput");
+    Paragraph("The range track between two number fields. A typed value keeps the order and the gap like a dragged "
+              "handle; Tab goes through the low field, both handles and the high field.");
+    LabeledRow("With the track");
+    facet::RangeInput("Years", &ui.yearLow, &ui.yearHigh, 1900, 2100,
+                      {.minGap = 1.0, .collision = facet::HandleCollision::Push});
+    ctx.Probe("rangeInput.years");
+    LabeledRow("Fields only");
+    facet::RangeInput("Limits", &ui.fieldLow, &ui.fieldHigh, 0.0f, 1.0f, {.format = "%.2f", .minGap = 0.05, .slider = false});
+    ctx.Probe("rangeInput.fields");
+    Note("Years %d to %d, limits %.2f to %.2f.", ui.yearLow, ui.yearHigh, ui.fieldLow, ui.fieldHigh);
+
     SectionHeader("Ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
               "and either stop at each other or push each other.");
-    LabeledRow("Range with fields");
-    facet::RangeInput("##rangeInput", &ui.lowInt, &ui.highInt, 0, 100, {.collision = facet::HandleCollision::Push});
     LabeledRow("Range over bars");
     facet::RangeSliderHistogram("##histogram", &ui.histogramLow, &ui.histogramHigh, 0.0f, 1.0f, kBins);
     LabeledRow("Several handles");
@@ -511,6 +527,30 @@ FACET_DEMO_SELFTEST("sliders")
     test.ExpectFocused("range.vertical.h0");
     test.KeyPress(ImGuiKey_UpArrow);
     test.ExpectNear("Up raises the low handle of the vertical range", [] { return ui.vLow; }, 0.26, 1e-6);
+
+    // RangeInput: low field, low handle, high handle, high field; typed values keep the order.
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.Type("2050");
+    test.KeyPress(ImGuiKey_Tab);
+    test.Expect("a typed low year past the high one pushes it along",
+                [] { return ui.yearLow == 2050 && ui.yearHigh == 2051; });
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("the low handle follows the arrows", [] { return ui.yearLow; }, 2049.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.Type("1950");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("a typed high year below the low one pushes it down",
+                [] { return ui.yearHigh == 1950 && ui.yearLow == 1949; });    test.KeyPress(ImGuiKey_Tab);
+    test.Type("0.9");
+    test.KeyPress(ImGuiKey_Tab);
+    test.Expect("the fields-only form stops the low value one gap before the high one",
+                [] { return ui.fieldLow > 0.69f && ui.fieldLow < 0.71f; });
+    test.Do([] { ui.yearLow = 1990; ui.yearHigh = 2020; });
+    test.Drag({Row("rangeInput.years", 0.55f), Row("rangeInput.years", 0.5f)}, 0.2f);
+    test.Expect("a drag on the track of the range input moves the years",
+                [] { return ui.yearLow != 1990 || ui.yearHigh != 2020; });
 
     // Pointer: the span drags both handles and keeps their distance; a click between the handles
     // grabs the span without moving it; a click on the empty track moves the nearer handle.
