@@ -97,7 +97,29 @@ bool RadioGroup(const char* label, int* index, std::span<const char* const> item
                 const RadioGroupOptions& options = {});
 ```
 
-Mutually exclusive options, one Tab stop, arrow keys move the selection. Status: planned.
+Mutually exclusive options, each a radio mark (the checkboxSize token) with its label after it and
+`ChoiceItem::detail` as a second line in Footnote labelSecondary. The visible label part is drawn
+above the group. Returns true on the frame it wrote `*index`; -1 means none is selected.
+
+- **Input.** A click on an option (mark, label or detail) or Space or Enter on the focused one
+  selects it. The group is one Tab stop: the selected option, or the first enabled one when none
+  is selected. The four arrow keys move the focus and the selection to the previous or next
+  enabled option and wrap at the ends; Home and End go to the first and last enabled option.
+  Options with `disabled` are drawn disabled and skipped. Escape does not undo a choice.
+- **Look.** Unselected: the boundary hairline circle, fill[1] on hover. Selected: an accent disc
+  with an onAccent dot and a focusRing hairline; the dot grows in over `motion.durationFast`. The
+  focus ring is round, around the mark.
+- **Layout.** `Orientation::Vertical` (the default) puts one option under the other, each one
+  control height tall plus its detail line. `Horizontal` places them side by side, spacing.xl
+  apart, and starts a new row when the next option does not fit. Default width: the available
+  width (rule 6); an option is as wide as its mark, label and detail, at most the group width, and
+  a label or detail that does not fit is cut with an ellipsis and shown in full on hover and
+  keyboard focus.
+- **States.** `ImGui::BeginDisabled` disables every option. `readOnly` (or a null `index`): the
+  selection shows in labelSecondary, the arrows still move the focus, nothing is written.
+  `error` replaces `helpText` under the group.
+
+Status: ready.
 
 ### SegmentedControl
 

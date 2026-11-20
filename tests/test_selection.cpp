@@ -414,6 +414,131 @@ TEST_CASE("A checkbox outside a frame returns false")
     CHECK_FALSE(facet::Checkbox("Check", &state));
 }
 
+// --- RadioGroup -------------------------------------------------------------------------------
+
+namespace
+{
+
+// Probes the parts of a group by the id they use: entry `index` of the widget `label`.
+ImGuiID EntryIdOf(const char* label, int index)
+{
+    const ImGuiID widget = ImGui::GetID(label);
+    return ImHashData(&index, sizeof(index), widget);
+}
+
+} // namespace
+
+TEST_CASE("A radio group is one Tab stop, arrows move and write and wrap, a disabled option is skipped")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kItems[] = {{"First"}, {"Second", {}, nullptr, nullptr, true}, {"Third"}, {"Fourth"}};
+    int index = 2;
+    int writes = 0;
+    ImGuiID ids[4] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 4; ++i)
+            ids[i] = EntryIdOf("Choice", i);
+        if (facet::RadioGroup("Choice", &index, kItems))
+            ++writes;
+        session.Track("group");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == ids[2]);  // the selected option is the Tab stop
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(index == 3);
+    CHECK(ImGui::GetFocusID() == ids[3]);
+    session.KeyPress(ImGuiKey_DownArrow);  // wraps to the first
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_RightArrow);  // the disabled second is skipped
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(index == 3);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(index == 0);
+    CHECK(writes == 6);
+    session.KeyPress(ImGuiKey_Tab);  // one Tab leaves the group
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);  // and one comes back, on the selected option
+    CHECK(ImGui::GetFocusID() == ids[0]);
+}
+
+TEST_CASE("A click selects a radio option, a disabled one is not selectable")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kItems[] = {{"First"}, {"Second", {}, "Placeholder detail"}, {"Third", {}, nullptr, nullptr, true}};
+    int index = -1;
+    float top = 0.0f;
+    session.SetUi([&] {
+        top = ImGui::GetCursorScreenPos().y;
+        facet::RadioGroup("##choice", &index, kItems);
+        session.Track("group");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("group");
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    session.Click(ImVec2(r.Min.x + 6.0f, top + row * 1.5f));
+    CHECK(index == 1);
+    // The second option has a detail line, so the third starts below it.
+    session.Click(ImVec2(r.Min.x + 6.0f, r.Max.y - 4.0f));
+    CHECK(index == 1);
+}
+
+TEST_CASE("A read-only radio group moves the focus with the arrows but never the selection")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First", "Second", "Third"};
+    int index = 0;
+    ImGuiID second = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        second = EntryIdOf("Choice", 1);
+        facet::RadioGroup("Choice", &index, kItems, {.readOnly = true});
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == second);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(index == 0);
+}
+
+TEST_CASE("A horizontal radio group wraps into rows that never leave its width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First option", "Second option", "Third option", "Fourth option"};
+    int index = 0;
+    float wideHeight = 0.0f;
+    float narrowHeight = 0.0f;
+    float narrowWidth = 0.0f;
+    float available = 0.0f;
+    session.SetUi([&] {
+        facet::RadioGroup("##wide", &index, kItems, {.orientation = facet::Orientation::Horizontal});
+        wideHeight = ImGui::GetItemRectSize().y;
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(160.0f), facet::Px(300.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::RadioGroup("##narrow", &index, kItems, {.orientation = facet::Orientation::Horizontal});
+        narrowHeight = ImGui::GetItemRectSize().y;
+        narrowWidth = ImGui::GetItemRectSize().x;
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(wideHeight == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(narrowHeight > wideHeight * 2.0f);
+    CHECK(narrowWidth <= available + 0.5f);
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;

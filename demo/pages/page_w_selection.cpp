@@ -2,9 +2,11 @@
 // variants, sizes and states, capture states for its important looks and selftest steps that
 // operate it by mouse and keyboard. A planned widget is called once and draws its placeholder.
 
+#include <cstdio>
 #include <string>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
@@ -39,9 +41,15 @@ struct SelectionUi
     bool checkError = false;
     int checkWrites = 0;
 
+    // RadioGroup
+    int radio = 0;
+    int radioRow = 1;
+    int radioDisabled = 0;
+    int radioError = -1;
+    int radioWrites = 0;
+
     // Planned widgets below.
     bool group[3] = {true, false, true};
-    int radio = 0;
     int segment = 1;
     bool chips[3] = {true, false, false};
     int chipChoice = 0;
@@ -84,6 +92,24 @@ void ForceState(facet::demo::PageCtx& ctx, int part = -1)
         ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Pressed, part);
     else if (ctx.captureState == kFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused, part);
+}
+
+// Records "<probe>.<i>" for the first `count` entries of the group widget `label` just submitted,
+// by the id the widget gives entry i (its index hashed with the widget id), so a selftest can check
+// which entry has the focus. The rectangle is the whole widget's.
+void ProbeEntries(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImGuiID widget = ImGui::GetID(label);
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    char name[64];
+    for (int i = 0; i < count; ++i)
+    {
+        std::snprintf(name, sizeof(name), "%s.%d", probe, i);
+        facet::demo::ProbeRect(ctx, name, ImHashData(&i, sizeof(i), widget), min, max);
+    }
 }
 
 // Places controls side by side in a regular row, one under the other when the row is compact.
@@ -253,6 +279,54 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
          ui.checkWrites);
 }
 
+void RadioSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("RadioGroup");
+    Paragraph("One choice out of a few that all stay visible. The group is one Tab stop; the arrow keys move the "
+              "selection and wrap at the ends, Home and End jump to the first and last option.");
+
+    static const facet::ChoiceItem kWithDisabled[] = {
+        {"Option 1"},
+        {"Option 2 (disabled)", {}, nullptr, nullptr, true},
+        {"Option 3"},
+    };
+
+    LabeledRow("Vertical");
+    ForceState(ctx, 1);
+    if (facet::RadioGroup("Placeholder choice", &ui.radio, kChoices))
+        ++ui.radioWrites;
+    ctx.Probe("sel.radio");
+    ProbeEntries(ctx, "Placeholder choice", "sel.radio", 3);
+    LabeledRow("Horizontal");
+    if (facet::RadioGroup("##row", &ui.radioRow, kOptions, {.orientation = facet::Orientation::Horizontal}))
+        ++ui.radioWrites;
+    ctx.Probe("sel.radio.row");
+    ProbeEntries(ctx, "##row", "sel.radio.row", 3);
+    LabeledRow("Disabled option");
+    if (facet::RadioGroup("##disabled", &ui.radioDisabled, kWithDisabled, {.orientation = facet::Orientation::Horizontal}))
+        ++ui.radioWrites;
+    ctx.Probe("sel.radio.disabled");
+    ProbeEntries(ctx, "##disabled", "sel.radio.disabled", 3);
+    LabeledRow("States");
+    {
+        int fixed = 2;
+        facet::RadioGroup("Read-only##ro", &fixed, kOptions,
+                          {.orientation = facet::Orientation::Horizontal, .readOnly = true});
+        ImGui::BeginDisabled();
+        facet::RadioGroup("Disabled##dis", &fixed, kOptions, {.orientation = facet::Orientation::Horizontal});
+        ImGui::EndDisabled();
+    }
+    LabeledRow("Messages");
+    if (facet::RadioGroup("##error", &ui.radioError, kOptions,
+                          {.orientation = facet::Orientation::Horizontal,
+                           .error = ui.radioError < 0 ? "Placeholder error: choose one option." : nullptr,
+                           .helpText = "Placeholder help text under the group."}))
+        ++ui.radioWrites;
+    ctx.Probe("sel.radio.error");
+    Note("Vertical: %s. Horizontal: %s. Writes on this section: %d.", kChoices[ui.radio].label, kOptions[ui.radioRow],
+         ui.radioWrites);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused")
@@ -270,10 +344,10 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
     LabeledRow("Checkbox group");
     facet::CheckboxGroup("##group", ui.group, kOptions, {.selectAll = true});
 
+    RadioSection(ctx);
+
     SectionHeader("One of several");
     Paragraph("Exclusive choices, from a few labelled options to a compact strip.");
-    LabeledRow("Radio group");
-    facet::RadioGroup("##radio", &ui.radio, kChoices);
     LabeledRow("Segmented");
     facet::SegmentedControl("##segment", &ui.segment, kOptions);
     LabeledRow("Cycle selector");
@@ -358,4 +432,27 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseDown();
     test.MouseUp();
     test.Expect("checking the box clears its placeholder error", [] { return ui.checkError; });
+
+    // RadioGroup: a click on the middle option, then the arrows inside one Tab stop.
+    test.MouseMove(T::Item("sel.radio", 0.01f, 0.56f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click selects the middle option", [] { return ui.radio; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down selects the next option", [] { return ui.radio; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("and wraps to the first", [] { return ui.radio; }, 0.0, 0.0);
+    test.ExpectFocused("sel.radio.0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.radio.row.1");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right selects the next option of a row", [] { return ui.radioRow; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.radio.disabled.0");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("the disabled option is skipped", [] { return ui.radioDisabled; }, 2.0, 0.0);
+    test.ExpectFocused("sel.radio.disabled.2");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("sel.radio.row.2");
+    test.ExpectNear("each move wrote once", [] { return ui.radioWrites; }, 5.0, 0.0);
 }

@@ -20,13 +20,45 @@
 //
 // `enabled(i)` says whether entry i can take the focus, `idOf(i)` gives its id.
 
+#include <span>
+
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "facet/widgets/common.h"
 #include "internal/item.h"
 
 namespace facet::internal
 {
+
+// ---- Items -----------------------------------------------------------------------------------
+
+// The items of a choice widget: a span of ChoiceItem, or of labels for the label-only overloads.
+struct SelectionItems
+{
+    std::span<const ChoiceItem> choices;
+    std::span<const char* const> labels;
+
+    int Count() const { return static_cast<int>(labels.empty() ? choices.size() : labels.size()); }
+    // Item `index` (in range); a null label reads as "".
+    ChoiceItem At(int index) const
+    {
+        ChoiceItem item = labels.empty() ? choices[static_cast<std::size_t>(index)] : ChoiceItem{labels[static_cast<std::size_t>(index)]};
+        if (item.label == nullptr)
+            item.label = "";
+        return item;
+    }
+};
+
+// The id of entry `index` of a widget: ChoiceItem::id when it is set, else the index, hashed
+// with the widget id (docs/api-conventions.md rule 2). The two kinds hash with different seeds,
+// so an item id never equals the id of an index.
+inline ImGuiID SelectionEntryId(ImGuiID widgetId, ImGuiID itemId, int index)
+{
+    if (itemId != 0)
+        return ImHashData(&itemId, sizeof(itemId), ~widgetId);
+    return ImHashData(&index, sizeof(index), widgetId);
+}
 
 // ---- Roving focus --------------------------------------------------------------------------
 

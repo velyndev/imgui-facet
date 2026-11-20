@@ -40,8 +40,6 @@ void CallSelectionStubs(Values& v)
     const std::span<bool> flags(v.flags);
     FACET_CHECK_STUB(false, CheckboxGroup("Checkboxes 1", flags, kChoices, {.selectAll = true}));
     FACET_CHECK_STUB(false, CheckboxGroup("Checkboxes 2", flags, kLabels));
-    FACET_CHECK_STUB(false, RadioGroup("Radio 1", &v.index, kChoices));
-    FACET_CHECK_STUB(false, RadioGroup("Radio 2", &v.index, kLabels, {.orientation = Orientation::Horizontal}));
     FACET_CHECK_STUB(false, SegmentedControl("Segments 1", &v.index, kChoices));
     FACET_CHECK_STUB(false, SegmentedControl("Segments 2", &v.index, kLabels, {.width = kFill}));
     FACET_CHECK_STUB(false, Chip("Chip 1", {.selected = true, .removable = true}));
@@ -59,7 +57,7 @@ void CallSelectionStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSelectionStubs.
-constexpr int kSelectionStubCalls = 16;
+constexpr int kSelectionStubCalls = 14;
 
 } // namespace
 
