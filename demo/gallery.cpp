@@ -656,12 +656,11 @@ void Note(const char* fmt, ...)
 
 void PlannedFamilyNote(const char* family)
 {
-    Note("Every widget on this page is a placeholder of its declared size until Phase 2 implements it: it shows its "
-         "name and the word planned (a narrow box only its label, or its name when it has none, with the whole text "
-         "on hover), cannot be operated "
-         "and returns nothing. Declared in facet/widgets/%s.h; the "
-         "declarations and usage examples are in docs/widgets/%s.md.",
-         family, family);
+    Note("Widgets whose entry in docs/widgets/%s.md says \"Status: ready.\" work as documented. Every other widget on "
+         "this page is a placeholder of its declared size: it shows its name and the word planned (a narrow box only "
+         "its label, or its name when it has none, with the whole text on hover), cannot be operated and returns "
+         "nothing. Declared in facet/widgets/%s.h; the declarations and usage examples are in docs/widgets/%s.md.",
+         family, family, family);
 }
 
 void NoteBeside(const char* fmt, ...)

@@ -1,8 +1,10 @@
-// Demo page: Inputs. Calls every widget of facet/widgets/inputs.h once, grouped by purpose.
-// The widgets are planned, so each call draws its placeholder at the widget's default size;
-// Phase 2 replaces them one by one without touching this page's layout.
+// Demo page: Text inputs. Calls every text-like widget of facet/widgets/inputs.h once (TextField,
+// SecureField, SearchField, TextArea, Autocomplete, CopyField, FilterField, TagInput,
+// InlineRename, MaskedInput, PinCodeInput, PathField, FieldValidation, ValidationSummary),
+// grouped by purpose. The number-like inputs have their own page (page_w_inputs_value.cpp). A
+// planned widget draws its placeholder at the widget's default size; implementing it changes
+// nothing in this page's layout.
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -20,7 +22,7 @@ using facet::demo::LabeledRow;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
 
-struct InputsUi
+struct TextInputsUi
 {
     std::string text;
     std::string secret;
@@ -32,39 +34,29 @@ struct InputsUi
     std::string notes;
     std::string name = "Option 1";
     bool renaming = false;
-    int count = 3;
-    float amount = 0.5f;
-    double duration = 0.25;
-    int durationUnit = 0;
-    float vector[3] = {0.0f, 1.0f, 0.0f};
-    ImVec2 size = {640.0f, 480.0f};
-    std::uint32_t hex = 0;
     std::string masked;
     std::string pin;
-    double seconds = 90.0;
     std::string path;
-    facet::Keybind bind = {.primary = ImGuiKey_F5, .mode = facet::BindMode::Toggle};
-    int rating = 3;
     bool stockCheck = false;
 };
 
-InputsUi ui;
+TextInputsUi ui;
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
-const facet::UnitItem kTimeUnits[] = {{"ms", 0.001}, {"s", 1.0}, {"min", 60.0}};
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs", "Inputs", "Widgets", 40)
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40)
 {
-    facet::demo::PageHeader("Inputs",
-                            "Text, search and number fields, drag and vector fields, special-purpose fields, key "
-                            "bind capture and ratings.");
+    facet::demo::PageHeader("Text inputs",
+                            "Text, secure and multi-line fields, search, filter and suggestion fields, tags, "
+                            "formatted fields, and validation messages.");
     facet::demo::PlannedFamilyNote("inputs");
 
     SectionHeader("Text");
     LabeledRow("Text field");
     facet::TextField("##text", &ui.text, {.placeholder = "Placeholder", .clearButton = true});
+    ctx.Probe("inputs.text");
     LabeledRow("Secure field");
     facet::SecureField("##secret", &ui.secret);
     LabeledRow("Multi-line");
@@ -82,24 +74,7 @@ FACET_DEMO_PAGE("inputs", "Inputs", "Widgets", 40)
     LabeledRow("Tags");
     facet::TagInput("##tags", &ui.tags, {.suggestions = kOptions});
 
-    SectionHeader("Numbers");
-    Paragraph("Typed numbers are written on Enter, Tab or focus loss; steppers and drags write at once.");
-    LabeledRow("Number");
-    facet::NumberInput("##count", &ui.count, {.min = 0, .max = 10});
-    LabeledRow("Drag number");
-    facet::DragNumber("##amount", &ui.amount, {.min = 0.0, .max = 1.0, .speed = 0.005});
-    LabeledRow("With units");
-    facet::UnitInput("##duration", &ui.duration, &ui.durationUnit, kTimeUnits);
-    LabeledRow("Vector");
-    facet::VectorInput("##vector", std::span<float>(ui.vector), {.linkToggle = true});
-    LabeledRow("Size");
-    facet::SizeInput("##size", &ui.size);
-    LabeledRow("Duration");
-    facet::DurationInput("##seconds", &ui.seconds);
-
     SectionHeader("Formatted fields");
-    LabeledRow("Hexadecimal");
-    facet::HexInput("##hex", &ui.hex, {.prefix = true});
     LabeledRow("Masked");
     facet::MaskedInput("##masked", &ui.masked, "9999-9999", {.placeholder = "0"});
     LabeledRow("Code");
@@ -109,17 +84,24 @@ FACET_DEMO_PAGE("inputs", "Inputs", "Widgets", 40)
     LabeledRow("Copy field");
     facet::CopyField("##copy", "Sample text");
 
-    SectionHeader("Keys and ratings");
-    LabeledRow("Key bind");
-    facet::KeybindCapture("##bind", &ui.bind, {.showMode = true});
-    LabeledRow("Rating");
-    facet::Rating("##rating", &ui.rating);
-
     SectionHeader("Validation");
     Paragraph("Messages for items without an error option, and a summary of the errors in a window.");
     facet::ValidationSummary("Errors");
     // A stock Dear ImGui checkbox (it works), with the planned message under it.
     LabeledRow("Stock control");
     ImGui::Checkbox("Option 1##stock", &ui.stockCheck);
+    ctx.Probe("inputs.stock");
     facet::FieldValidation("Placeholder message", {.tone = facet::Tone::Warning});
+}
+
+FACET_DEMO_SELFTEST("inputs-text")
+{
+    test.Do([] { ui = {}; });
+    // The planned fields are placeholders: typing into one writes nothing.
+    test.Click("inputs.text");
+    test.Type("abc");
+    test.ExpectText("the text field placeholder writes nothing", [] { return ui.text; }, "");
+    // The stock checkbox with the message under it works.
+    test.Click("inputs.stock");
+    test.Expect("the stock checkbox under a message turns on", [] { return ui.stockCheck; });
 }
