@@ -229,9 +229,29 @@ int MultiSliderAddedHandle();
 int MultiSliderRemovedHandle();
 ```
 
-N ordered handles on one track dividing it into colored segments; the storage and count form and the
-vector form can add and remove handles, while the fixed span forms report `allowAdd` and
-`allowRemove` as a usage error. Status: planned.
+Up to 16 ordered handles on the shared slider track, with the label in front and no value column;
+each handle shows its value in a bubble while it is dragged or has keyboard focus. Handle `i` is
+`values[i]`, each its own Tab stop, with the keys, `minGap`, `collision`, the repair of values
+passed in and the item queries of RangeSlider. `dragSpan` (off by default) lets a drag between the
+first and the last handle move all of them.
+
+- **Segments:** without `segmentColors` one accent fill runs from the first handle to the last
+  (from the start of the track with one handle). With `segmentColors`, the n handles make n + 1
+  segments, segment k in entry `k % size`, and a 0 entry takes the chart palette color of index k.
+- **Growable overloads** (storage and count, vector): with `allowAdd` a double click on the empty
+  track (not on a handle or the span) inserts a handle there, where it keeps the order and the gap
+  (the first click of the double click, which moved the nearest handle, is undone); with
+  `allowRemove` Delete or Backspace on a focused handle removes it, and so does a handle dragged
+  more than two control heights away from the track and released there (it takes the disabled look
+  while it would go). The focus moves to the handle that takes the removed one's place. Removing
+  stops at `minHandles`, adding at `maxHandles` and at the storage capacity. Handles keep their
+  identity (item id, focus, animations) through inserts and removals. The vector overload allocates
+  only when a handle is added. `MultiSliderAddedHandle` and `MultiSliderRemovedHandle` report the
+  index of the last call's insert or removal this frame, -1 otherwise.
+- **Fixed overloads** keep the count; `allowAdd` or `allowRemove` there is reported as a usage
+  error and ignored.
+
+Status: ready.
 
 ### Knob
 

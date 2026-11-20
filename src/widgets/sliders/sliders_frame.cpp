@@ -15,9 +15,13 @@ Subsystem WidgetsSlidersSubsystem()
     subsystem.name = "widgets_sliders";
     subsystem.init = [] {
         ResetSliderTyping();
+        ResetMultiSliderEvents();
         return true;
     };
-    subsystem.shutdown = [] { ResetSliderTyping(); };
+    subsystem.shutdown = [] {
+        ResetSliderTyping();
+        ResetMultiSliderEvents();
+    };
     return subsystem;
 }
 

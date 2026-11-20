@@ -91,13 +91,6 @@ void CallSliderStubs(Values& v)
     using namespace facet;
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 1", &v.low, &v.high, 0.0f, 1.0f, kBins));
     FACET_CHECK_STUB(false, RangeSliderHistogram("Histogram 2", &v.lowInt, &v.highInt, 0, 10, kBins));
-    FACET_CHECK_STUB(false, MultiSlider("Multi 1", std::span<float>(v.handles), 0.0f, 1.0f));
-    FACET_CHECK_STUB(false, MultiSlider("Multi 2", std::span<int>(v.handlesInt), 0, 10));
-    FACET_CHECK_STUB(false, MultiSlider("Multi 3", &v.handleVector, 0.0f, 1.0f, {.allowAdd = true, .allowRemove = true}));
-    FACET_CHECK_STUB(false, MultiSlider("Multi 4", std::span<float>(v.handleStorage), &v.handleCount, 0.0f, 1.0f,
-                                        {.allowAdd = true, .allowRemove = true}));
-    CHECK(MultiSliderAddedHandle() == -1);
-    CHECK(MultiSliderRemovedHandle() == -1);
     FACET_CHECK_STUB(false, Knob("Knob 1", &v.number, 0.0f, 1.0f, {.variant = KnobVariant::Dot}));
     FACET_CHECK_STUB(false, Knob("Knob 2", &v.integer, 0, 10));
     FACET_CHECK_STUB(false, XYPad("Pad 1", &v.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.grid = true}));
@@ -109,7 +102,7 @@ void CallSliderStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 14;
+constexpr int kSliderStubCalls = 10;
 
 } // namespace
 

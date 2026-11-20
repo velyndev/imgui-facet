@@ -79,10 +79,16 @@ struct SlidersUi
     float fieldLow = 0.25f;
     float fieldHigh = 0.75f;
 
+    // MultiSlider
+    float handles[3] = {0.25f, 0.5f, 0.75f};
+    std::vector<float> marks = {20.0f, 60.0f};
+    int marksAdded = 0;
+    int marksRemoved = 0;
+    int levels[3] = {2, 5, 8};
+
     // The planned widgets below.
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
-    float handles[3] = {0.2f, 0.5f, 0.8f};
     float knob = 0.4f;
     ImVec2 point = {0.5f, 0.5f};
     ImVec2 stick = {0.0f, 0.0f};
@@ -110,6 +116,8 @@ const float kOpacityStops[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
 // Placeholder distribution for the histogram: an even ramp, not measured data.
 const float kBins[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
 const char* const kSegments[] = {"Option 1", "Option 2", "Option 3"};
+// Segment colors of the fixed splits: 0 takes the chart palette color of each segment.
+const ImU32 kSegmentColors[] = {0, 0, 0, 0};
 
 // Asks the next widget for the look of the current capture state (part -1: the widget, or a
 // handle index for widgets with several).
@@ -190,6 +198,35 @@ void SliderSection(facet::demo::PageCtx& ctx)
          ui.levelEdits, ui.levelCommits, ui.count, ui.gain, ui.frequency);
 }
 
+void ProbeHandles(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count, int keyBase = 0);
+
+void MultiSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("MultiSlider");
+    Paragraph("Several handles on one track, in order and a minimum gap apart. The growable form adds a handle on a "
+              "double click on the empty track and removes the focused one with Delete, or one dragged off the "
+              "track.");
+    LabeledRow("Fixed splits");
+    facet::MultiSlider("Splits", std::span<float>(ui.handles), 0.0f, 1.0f,
+                       {.format = "%.2f", .minGap = 0.05, .segmentColors = kSegmentColors});
+    ctx.Probe("multi.splits");
+    ProbeHandles(ctx, "Splits", "multi.splits", 3, 1);
+    LabeledRow("Growable");
+    facet::MultiSlider("Marks", &ui.marks, 0.0f, 100.0f,
+                       {.format = "%.0f", .minGap = 2.0, .allowAdd = true, .allowRemove = true, .minHandles = 1,
+                        .maxHandles = 8});
+    if (facet::MultiSliderAddedHandle() >= 0)
+        ++ui.marksAdded;
+    if (facet::MultiSliderRemovedHandle() >= 0)
+        ++ui.marksRemoved;
+    ctx.Probe("multi.marks");
+    LabeledRow("Whole numbers");
+    facet::MultiSlider("Levels", std::span<int>(ui.levels), 0, 10, {.step = 1.0, .collision = facet::HandleCollision::Push});
+    ctx.Probe("multi.levels");
+    Note("Splits %.2f, %.2f, %.2f. Marks: %d handles, %d added, %d removed.", ui.handles[0], ui.handles[1],
+         ui.handles[2], static_cast<int>(ui.marks.size()), ui.marksAdded, ui.marksRemoved);
+}
+
 void SteppedSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("SliderStepped");
@@ -209,8 +246,9 @@ void SteppedSection(facet::demo::PageCtx& ctx)
 }
 
 // Probes for the handles of the widget submitted last under `label`: each handle's id with the
-// widget's rectangle, so a selftest can check which handle has the keyboard focus.
-void ProbeHandles(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count)
+// widget's rectangle, so a selftest can check which handle has the keyboard focus. Handles are
+// numbered from `keyBase` (a multi slider keys its handles from 1).
+void ProbeHandles(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count, int keyBase)
 {
     const ImGuiID widget = ImGui::GetID(label);
     const ImVec2 min = ImGui::GetItemRectMin();
@@ -219,7 +257,7 @@ void ProbeHandles(facet::demo::PageCtx& ctx, const char* label, const char* prob
     for (int i = 0; i < count; ++i)
     {
         ImGui::PushOverrideID(widget);
-        const ImGuiID id = ImGui::GetID(i);
+        const ImGuiID id = ImGui::GetID(i + keyBase);
         ImGui::PopID();
         std::snprintf(name, sizeof(name), "%s.h%d", probe, i);
         facet::demo::ProbeRect(ctx, name, id, min, max);
@@ -334,13 +372,13 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     ctx.Probe("rangeInput.fields");
     Note("Years %d to %d, limits %.2f to %.2f.", ui.yearLow, ui.yearHigh, ui.fieldLow, ui.fieldHigh);
 
-    SectionHeader("Ranges");
+    MultiSection(ctx);
+
+    SectionHeader("More ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
               "and either stop at each other or push each other.");
     LabeledRow("Range over bars");
     facet::RangeSliderHistogram("##histogram", &ui.histogramLow, &ui.histogramHigh, 0.0f, 1.0f, kBins);
-    LabeledRow("Several handles");
-    facet::MultiSlider("##multi", std::span<float>(ui.handles), 0.0f, 1.0f, {.minGap = 0.05});
     LabeledRow("Arc range");
     facet::ArcRangeSlider("##arc", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f});
     LabeledRow("Shares");
@@ -547,6 +585,30 @@ FACET_DEMO_SELFTEST("sliders")
     test.KeyPress(ImGuiKey_Tab);
     test.Expect("the fields-only form stops the low value one gap before the high one",
                 [] { return ui.fieldLow > 0.69f && ui.fieldLow < 0.71f; });
+    // MultiSlider: three handle stops that keep the gap; Delete removes the focused growable handle.
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("multi.splits.h0");
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End stops the first split one gap before the second", [] { return ui.handles[0]; }, 0.45, 1e-6);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("multi.splits.h2");
+    test.KeyPress(ImGuiKey_Home);
+    test.ExpectNear("Home stops the last split one gap after the second", [] { return ui.handles[2]; }, 0.55, 1e-6);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Delete);
+    test.Expect("Delete removes the focused mark", [] { return ui.marks.size() == 1 && ui.marksRemoved == 1; });
+    test.KeyPress(ImGuiKey_Delete);
+    test.Expect("the last mark stays: minHandles is 1", [] { return ui.marks.size() == 1; });
+    test.MouseMove(Row("multi.marks", 0.92f));
+    test.MouseDown();
+    test.MouseUp();
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a double click on the empty track adds a mark", [] { return ui.marks.size() == 2 && ui.marksAdded >= 1; });
+    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
+    test.Expect("a drag pushes the whole-number levels down", [] { return ui.levels[2] < 8; });
+
     test.Do([] { ui.yearLow = 1990; ui.yearHigh = 2020; });
     test.Drag({Row("rangeInput.years", 0.55f), Row("rangeInput.years", 0.5f)}, 0.2f);
     test.Expect("a drag on the track of the range input moves the years",

@@ -912,3 +912,107 @@ TEST_CASE("A narrow range input puts its fields under the track")
     CHECK(session.ItemRect("narrow").GetHeight() > facet::ControlHeight(facet::ControlSize::Regular) * 1.5f);
     CHECK(std::fabs(session.ItemRect("narrow").GetWidth() - facet::Px(220.0f)) <= 1.0f);
 }
+// ---- MultiSlider ---------------------------------------------------------------------------
+
+TEST_CASE("Multi slider handles are Tab stops in order, keep the gap and never pass each other")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float values[3] = {0.2f, 0.5f, 0.8f};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::MultiSlider("##m", std::span<float>(values), 0.0f, 1.0f, {.minGap = 0.1, .width = kSliderWidth});
+        session.Track("multi");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(values[0] == doctest::Approx(0.4f));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(values[1] == doctest::Approx(0.5f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(values[1] == doctest::Approx(0.7f));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(values[2] == doctest::Approx(0.8f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(values[2] == 1.0f);
+    CHECK(values[0] < values[1]);
+    CHECK(values[1] < values[2]);
+}
+
+TEST_CASE("A growable multi slider adds a handle on a double click and removes one with Delete")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<float> values = {0.2f, 0.8f};
+    float storage[3] = {0.3f, 0.6f, 0.0f};
+    int count = 2;
+    int added = -2;
+    int removed = -2;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::MultiSlider("##v", &values, 0.0f, 1.0f,
+                           {.allowAdd = true, .allowRemove = true, .minHandles = 1, .width = kSliderWidth});
+        session.Track("vector");
+        if (facet::MultiSliderAddedHandle() >= 0)
+            added = facet::MultiSliderAddedHandle();
+        if (facet::MultiSliderRemovedHandle() >= 0)
+            removed = facet::MultiSliderRemovedHandle();
+        facet::MultiSlider("##s", std::span<float>(storage), &count, 0.0f, 1.0f,
+                           {.allowAdd = true, .allowRemove = true, .width = kSliderWidth});
+        session.Track("storage");
+    });
+    session.Frame();
+    // A double click on the empty track after the last handle: a third handle at the end.
+    const ImRect rect = session.ItemRect("vector");
+    session.DoubleClick(ImVec2(rect.Max.x - KnobSize(), rect.GetCenter().y));
+    REQUIRE(values.size() == 3);
+    CHECK(added == 2);
+    CHECK(values[0] == 0.2f);
+    CHECK(values[1] == 0.8f);
+    CHECK(values[2] > 0.9f);
+    // Delete on the first handle removes it; the minimum of one handle stops further removals.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Delete);
+    REQUIRE(values.size() == 2);
+    CHECK(removed == 0);
+    CHECK(values[0] == 0.8f);
+    session.KeyPress(ImGuiKey_Delete);
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(values.size() == 1);
+    // The storage overload stops at its capacity.
+    const ImRect s = session.ItemRect("storage");
+    session.DoubleClick(ImVec2(s.Min.x + KnobSize(), s.GetCenter().y));
+    CHECK(count == 3);
+    session.DoubleClick(ImVec2(s.Max.x - KnobSize(), s.GetCenter().y));
+    CHECK(count == 3);
+    CHECK(storage[0] < storage[1]);
+    CHECK(storage[1] < storage[2]);
+}
+
+TEST_CASE("A multi slider handle dragged off the track and released there is removed")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<float> values = {0.0f, 1.0f};
+    session.SetUi([&] {
+        facet::MultiSlider("##v", &values, 0.0f, 1.0f, {.allowRemove = true, .width = kSliderWidth});
+        session.Track("vector");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("vector");
+    const ImVec2 first(rect.Min.x + KnobSize() * 0.5f, rect.GetCenter().y);
+    session.Drag({first, ImVec2(first.x + 20.0f, first.y + 30.0f)});
+    CHECK(values.size() == 2);  // still within two control heights: kept
+    session.Drag({first, ImVec2(first.x, first.y + facet::ControlHeight(facet::ControlSize::Regular) * 3.0f)});
+    REQUIRE(values.size() == 1);
+    CHECK(values[0] == 1.0f);
+}

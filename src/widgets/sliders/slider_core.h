@@ -167,4 +167,8 @@ SliderTypeResult SliderTypeField(ImGuiID widgetId, int part, const ImRect& rect,
 // Forgets every typing session (facet::Shutdown through the family subsystem).
 void ResetSliderTyping();
 
+// Forgets the insert and removal MultiSliderAddedHandle and MultiSliderRemovedHandle report
+// (src/widgets/sliders/multi_slider.cpp; facet::Init and Shutdown through the family subsystem).
+void ResetMultiSliderEvents();
+
 } // namespace facet::internal
