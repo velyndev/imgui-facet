@@ -2,6 +2,8 @@
 
 #include "widgets/inputs/text_inputs_shared.h"
 
+#include <cstring>
+
 namespace facet::internal::text_inputs
 {
 
@@ -44,6 +46,41 @@ void UpdateCapsLockGuess()
 void ResetCapsLockGuess()
 {
     CapsLockKnown() = -1;
+}
+
+bool WriteFieldText(std::string* text, char* buffer, std::size_t bufferSize, const char* value)
+{
+    if (value == nullptr)
+        value = "";
+    if (text != nullptr)
+    {
+        if (*text == value)
+            return false;
+        try
+        {
+            text->assign(value);
+        }
+        catch (...)
+        {
+            return false;  // out of memory: the old text stays
+        }
+        return true;
+    }
+    if (buffer == nullptr || bufferSize == 0)
+        return false;
+    std::size_t length = std::strlen(value);
+    if (length > bufferSize - 1)
+    {
+        length = bufferSize - 1;
+        // Back onto the start of a code point.
+        while (length > 0 && (static_cast<unsigned char>(value[length]) & 0xC0) == 0x80)
+            --length;
+    }
+    if (std::strncmp(buffer, value, length) == 0 && buffer[length] == '\0')
+        return false;
+    std::memmove(buffer, value, length);
+    buffer[length] = '\0';
+    return true;
 }
 
 ImGuiInputTextFlags TextCallbackEvents(ImGuiInputTextFlags events)

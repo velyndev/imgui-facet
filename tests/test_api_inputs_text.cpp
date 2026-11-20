@@ -50,8 +50,6 @@ void CallTextInputStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, SearchField("Search 1", &v.text, {.recent = std::span(kLabels)}));
-    FACET_CHECK_STUB(false, SearchField("Search 2", buffer, bufferSize, {.loading = true}));
     FACET_CHECK_STUB(false, FilterField("Filter 1", &v.text, &v.filter));
     FACET_CHECK_STUB(false, FilterField("Filter 2", buffer, bufferSize, nullptr, {.placeholder = "Placeholder"}));
     CHECK(PassesFilter(v.text, v.filter, "Sample text"));
@@ -80,7 +78,7 @@ void CallTextInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 24;
+constexpr int kTextInputStubCalls = 22;
 
 } // namespace
 

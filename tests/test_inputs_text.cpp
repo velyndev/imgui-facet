@@ -15,6 +15,8 @@
 
 #include <facet/facet.h>
 
+#include "internal/list_view.h"
+#include "internal/popup_host.h"
 #include "internal/text_field.h"
 #include "support/session.h"
 #include "widgets/inputs/text_inputs_shared.h"
@@ -695,4 +697,210 @@ TEST_CASE("A read-only SecureField takes no text and a null text returns false")
     CHECK(secret == "abc");
     CHECK(writes == 0);
     CHECK_FALSE(facet::SecureField("##outside", &secret));
+}
+
+// ---- SearchField -------------------------------------------------------------------------------
+
+namespace
+{
+
+const char* const kRecentQueries[] = {"Option 1", "Option 2", "Option 3"};
+
+// The completion list of the last tracked field, as seen inside the latest frame (the popup host
+// answers only inside a frame). Each test tracks it in every frame, so nothing carries over.
+struct CompletionSeen
+{
+    bool open = false;
+    ImRect rect;
+};
+CompletionSeen gCompletionSeen;
+
+// Call inside the ui code, after the field.
+void TrackCompletion(ImGuiID fieldId)
+{
+    const ImGuiID level = ImGui::GetIDWithSeed("##completion", nullptr, fieldId);
+    gCompletionSeen.open = facet::internal::IsPopupLevelOpen(level);
+    gCompletionSeen.rect = facet::internal::PopupLevelRect(level);
+}
+
+bool CompletionOpen()
+{
+    return gCompletionSeen.open;
+}
+
+// The center of row `row` of the open list (rows of the Regular size inside the level's padding).
+ImVec2 CompletionRowCenter(int row)
+{
+    const ImRect& rect = gCompletionSeen.rect;
+    const float pad = facet::Px(facet::T().spacing.xs);
+    const float height = facet::internal::ListRowHeight(facet::ControlSize::Regular);
+    return ImVec2(rect.GetCenter().x, rect.Min.y + pad + height * (static_cast<float>(row) + 0.5f));
+}
+
+} // namespace
+
+TEST_CASE("SearchField: Escape empties a query as an edit, then ends the session")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    Signals signals;
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        signals.Count(facet::SearchField("##search", &query));
+        session.Track("field");
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("abc");
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(query.empty());
+    CHECK(ImGui::GetActiveID() == id);
+    CHECK(signals.cancels == 0);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(ImGui::GetActiveID() != id);
+    CHECK(query.empty());
+    CHECK(signals.cancels == 0);
+}
+
+TEST_CASE("SearchField lists recent entries under the empty focused field; Down and Enter take one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    int writes = 0;
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        writes += facet::SearchField("##search", &query, {.recent = kRecentQueries}) ? 1 : 0;
+        session.Track("field");
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+    });
+    session.Frame();
+    CHECK_FALSE(CompletionOpen());
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    CHECK(CompletionOpen());
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(query == "Option 2");
+    CHECK(writes == 1);
+    CHECK(ImGui::GetActiveID() == id);  // Enter went to the list, the field keeps the keyboard
+    session.Frames(2);
+    CHECK_FALSE(CompletionOpen());
+    session.Type("x");
+    CHECK(query == "Option 2x");  // the caret moved after the accepted text
+}
+
+TEST_CASE("SearchField: a click on a recent entry takes it and gives the keyboard back to the field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        facet::SearchField("##search", &query, {.recent = kRecentQueries});
+        session.Track("field");
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frames(3);
+    REQUIRE(CompletionOpen());
+    session.Click(CompletionRowCenter(2));
+    CHECK(query == "Option 3");
+    session.Frames(2);
+    CHECK(ImGui::GetActiveID() == id);
+    session.Type("!");
+    CHECK(query == "Option 3!");
+}
+
+TEST_CASE("SearchField: Escape closes the recent list first, Enter and Tab with no active row reach the field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    std::string next;
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        facet::SearchField("##search", &query, {.recent = kRecentQueries});
+        session.Track("field");
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+        facet::TextField("##next", &next);
+        session.Track("next");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    REQUIRE(CompletionOpen());
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(CompletionOpen());
+    CHECK(ImGui::GetActiveID() == id);
+    session.Frames(2);
+    CHECK_FALSE(CompletionOpen());  // stays closed until the next edit
+    session.Type("a");
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Frames(2);
+    CHECK(CompletionOpen());  // edited back to empty: open again
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(query.empty());
+    CHECK(ImGui::GetFocusID() == session.ItemId("next"));
+    // Enter with no active row ends the edit.
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    REQUIRE(CompletionOpen());
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(query.empty());
+    CHECK(ImGui::GetActiveID() != id);
+}
+
+TEST_CASE("SearchField: a registered focus shortcut gives the field the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId shortcut = facet::RegisterShortcut("test.search.focus", ImGuiMod_Ctrl | ImGuiKey_F);
+    REQUIRE(shortcut.IsValid());
+    std::string query = "abc";
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        facet::SearchField("##search", &query, {.focusShortcut = shortcut});
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+    });
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_F | ImGuiMod_Ctrl);
+    session.Frames(2);
+    CHECK(ImGui::GetActiveID() == id);
+    session.Type("x");
+    CHECK(query == "x");  // the query was selected, as after Tab
+    facet::UnregisterShortcut(shortcut);
+}
+
+TEST_CASE("A read-only SearchField shows no recent list and takes no text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    int writes = 0;
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        writes += facet::SearchField("##search", &query, {.recent = kRecentQueries, .readOnly = true}) ? 1 : 0;
+        session.Track("field");
+        id = ImGui::GetID("##search");
+        TrackCompletion(id);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Frames(2);
+    CHECK_FALSE(CompletionOpen());
+    session.Type("x");
+    CHECK(query.empty());
+    CHECK(writes == 0);
 }

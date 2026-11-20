@@ -5,14 +5,18 @@
 // one draws its placeholder at the widget's default size. The number-like inputs have their own
 // page (page_w_inputs_value.cpp). Texts are labelled samples and placeholders, not data.
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/list_view.h"
+#include "internal/popup_host.h"
 #include "pages/pages.h"
 
 namespace
@@ -31,6 +35,7 @@ enum CaptureState
     kHovered,
     kFocused,
     kFilled,
+    kOpen,
 };
 
 constexpr const char* kSample = "Sample text";
@@ -76,8 +81,12 @@ struct TextInputsUi
     std::string secretStrength;
     std::string secretDisabled = kSample;
 
-    // The planned widgets below.
+    // SearchField
     std::string query;
+    std::string queryLoading = "Sample query";
+    std::string querySmall;
+
+    // The planned widgets below.
     std::string filter;
     facet::FilterSettings filterSettings;
     std::string completion;
@@ -94,6 +103,7 @@ struct TextInputsUi
 TextInputsUi ui;
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
+const char* const kRecent[] = {"Sample query 1", "Sample query 2", "Sample query 3"};
 
 // Records the frame of the last field (its first control height, without the meter and message
 // lines under it) for the selftest, so a click lands in the text at every size.
@@ -102,6 +112,25 @@ void ProbeFrame(facet::demo::PageCtx& ctx, const char* name, facet::ControlSize 
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
     facet::demo::ProbeRect(ctx, name, ImGui::GetItemID(), min, ImVec2(max.x, min.y + facet::ControlHeight(size)));
+}
+
+// Records the first `count` rows of the open completion list of field `fieldId` as
+// "<prefix>.<row>", where the text inputs place them: list rows inside the level's padding.
+void ProbeCompletionRows(facet::demo::PageCtx& ctx, ImGuiID fieldId, const char* prefix, int count)
+{
+    const ImGuiID level = ImGui::GetIDWithSeed("##completion", nullptr, fieldId);
+    if (!facet::internal::IsPopupLevelOpen(level))
+        return;
+    const ImRect rect = facet::internal::PopupLevelRect(level);
+    const float pad = facet::Px(facet::T().spacing.xs);
+    const float row = facet::internal::ListRowHeight(facet::ControlSize::Regular);
+    for (int i = 0; i < count; ++i)
+    {
+        char name[64];
+        std::snprintf(name, sizeof(name), "%s.%d", prefix, i);
+        const float top = rect.Min.y + pad + row * static_cast<float>(i);
+        facet::demo::ProbeRect(ctx, name, 0, ImVec2(rect.Min.x + pad, top), ImVec2(rect.Max.x - pad, top + row));
+    }
 }
 
 // The texts a capture of the filled state shows.
@@ -150,7 +179,7 @@ void TextFieldSection(facet::demo::PageCtx& ctx)
     LabeledRow("Length limit");
     facet::TextField("##limited", &ui.limited, {.placeholder = "Placeholder", .maxLength = 12,
                                                 .helpText = "Up to 12 characters"});
-    ctx.Probe("inputs.text.limited");
+    ProbeFrame(ctx, "inputs.text.limited");
 
     LabeledRow("Validation");
     const bool tooShort = !ui.validated.empty() && ui.validated.size() < 3;
@@ -158,7 +187,7 @@ void TextFieldSection(facet::demo::PageCtx& ctx)
                      {.placeholder = "At least three characters",
                       .error = tooShort ? "Use at least three characters" : nullptr,
                       .helpText = "The caller checks the text and passes the message"});
-    ctx.Probe("inputs.text.validated");
+    ProbeFrame(ctx, "inputs.text.validated");
 
     LabeledRow("Loading");
     facet::TextField("##loading", &ui.loading, {.loading = true});
@@ -245,6 +274,40 @@ void SecureFieldSection(facet::demo::PageCtx& ctx)
     ImGui::EndDisabled();
 }
 
+// The shortcut that focuses the search field, registered once like an app would.
+facet::ShortcutId SearchFocusShortcut()
+{
+    static const facet::ShortcutId id = facet::RegisterShortcut(
+        "inputs.search.focus", ImGuiMod_Ctrl | ImGuiKey_F,
+        {.label = "Focus the search field", .group = "Text inputs page", .scope = facet::ShortcutScope::Window});
+    return id;
+}
+
+void SearchFieldSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SearchField");
+    Paragraph("A query with a clear button. Escape empties a query, a second Escape leaves the field. The empty "
+              "focused field lists recent entries: Up and Down pick one, Enter or a click takes it.");
+
+    LabeledRow("Recent entries");
+    if (ctx.capture && ctx.captureState == kOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    const ImGuiID searchId = ImGui::GetID("##search");
+    facet::SearchField("##search", &ui.query, {.recent = kRecent, .focusShortcut = SearchFocusShortcut()});
+    ProbeFrame(ctx, "inputs.search");
+    ProbeCompletionRows(ctx, searchId, "inputs.search.recent", 3);
+    if (ctx.capture && ctx.captureState == kOpen)
+        ctx.RevealInCapture(0.3f);
+    Note("Ctrl+F focuses this field. Query: \"%s\".", ui.query.c_str());
+
+    LabeledRow("Loading");
+    facet::SearchField("##searchLoading", &ui.queryLoading, {.loading = true});
+
+    LabeledRow("Small");
+    facet::SearchField("##searchSmall", &ui.querySmall, {.size = facet::ControlSize::Small});
+    ProbeFrame(ctx, "inputs.search.small", facet::ControlSize::Small);
+}
+
 void PlannedSections(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Other text fields");
@@ -254,8 +317,6 @@ void PlannedSections(facet::demo::PageCtx& ctx)
     facet::InlineRename("##rename", &ui.name, &ui.renaming);
 
     SectionHeader("Search and suggestions");
-    LabeledRow("Search field");
-    facet::SearchField("##search", &ui.query, {.recent = kOptions});
     LabeledRow("Filter field");
     facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
     LabeledRow("Autocomplete");
@@ -285,7 +346,7 @@ void PlannedSections(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled")
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open")
 {
     if (ctx.capture)
     {
@@ -300,6 +361,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
 
     TextFieldSection(ctx);
     SecureFieldSection(ctx);
+    SearchFieldSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -417,6 +479,41 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.Click("inputs.secure.strength");
     test.Type("abc");
     test.ExpectText("the strength field takes text", [] { return ui.secretStrength; }, "abc");
+    test.KeyPress(ImGuiKey_Enter);
+
+    // SearchField: recent entries by keyboard and by mouse, Escape in steps, the shortcut.
+    test.Click("inputs.search");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Down twice and Enter take the second recent entry", [] { return ui.query; }, "Sample query 2");
+    test.ExpectFocused("inputs.search");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape empties the query", [] { return ui.query; }, "");
+    test.ExpectFocused("inputs.search");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectFocused("inputs.search");
+    test.Type("q");
+    test.ExpectText("after Escape closed the list the field still takes text", [] { return ui.query; }, "q");
+    test.KeyPress(ImGuiKey_Backspace);
+    test.Wait(2);
+    test.Click("inputs.search.recent.0");
+    test.ExpectText("a click on a recent entry takes it", [] { return ui.query; }, "Sample query 1");
+    test.Wait(2);
+    test.Type("!");
+    test.ExpectText("and the keyboard goes back to the field", [] { return ui.query; }, "Sample query 1!");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Click("inputs.search.small");
+    test.Type("abc");
+    test.ExpectText("the small search field takes text", [] { return ui.querySmall; }, "abc");
+    test.KeyPress(ImGuiKey_Escape);
+    test.KeyPress(ImGuiKey_Escape);
+    test.KeyPress(ImGuiKey_F | ImGuiMod_Ctrl);
+    test.Wait(2);
+    test.ExpectFocused("inputs.search");
+    test.Type("x");
+    test.ExpectText("Ctrl+F focuses the search field with its query selected", [] { return ui.query; }, "x");
     test.KeyPress(ImGuiKey_Enter);
 
     // The stock checkbox with the planned message under it works.

@@ -77,8 +77,20 @@ bool SearchField(const char* label, std::string* query, const SearchFieldOptions
 bool SearchField(const char* label, char* buffer, std::size_t bufferSize, const SearchFieldOptions& options = {});
 ```
 
-A search box with a clear button, recent entries, a busy spinner and an optional focus shortcut.
-Status: planned.
+A TextField with the search icon in front, the placeholder `Strings::search` by default and a clear
+button while there is a query. Escape empties a non-empty query (an edit, not a cancel); with the
+query empty, Escape ends the session. While `loading`, the spinner takes the place of the search
+icon and the query stays editable. The corners are the control radius of every field.
+
+`recent` entries (read during the call) are listed under the field while it has the keyboard and
+the query is empty, with the clock icon. The list is a completion list that leaves the keyboard in
+the field: Up and Down (Page Up and Page Down by a page) move the active row, Enter or Tab writes it
+into the query, a click writes it and gives the keyboard back to the field with the caret at the end,
+and the pointer and the keys share one active row. With no active row, Enter and Tab close the list
+and act on the field as usual. Escape closes the list; it stays closed until the query is edited. The
+list follows the field when the window scrolls or resizes. `focusShortcut` names a shortcut the host
+registered (core/input.h); when it fires, the field takes the keyboard with the query selected.
+`readOnly` shows no list. Status: ready.
 
 ### FilterField
 
