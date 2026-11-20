@@ -201,8 +201,31 @@ bool ChipGroup(const char* label, int* index, std::span<const char* const> items
 int ChipGroupRemovedItem();
 ```
 
-Wrapping chips as filters (flags) or as one choice (index), with optional remove buttons and a
-clear-all chip. Status: planned.
+Chips (the Chip look) that wrap into rows inside the width, one per item, with the visible label
+part above them; `ChoiceItem::detail` shows as a count after the label and `icon` before it. Each
+chip is a Tab stop that a click, Space or Enter activates. Returns true when a flag or the index was
+written.
+
+- **Filters.** The `std::span<bool>` forms flip the item's flag on activation. Items without a flag
+  are drawn disabled. `clearAll` adds a trailing chip with `Strings::clear` that unsets every flag
+  of an enabled item (with nothing set it writes nothing; it stays enabled so the keyboard focus
+  is never left on a disabled chip).
+- **One choice.** The `int*` forms write the activated chip's index (-1 means none). The chosen chip
+  sits on the selection pill, which slides from chip to chip with the same spring as in segmented
+  controls, also across rows.
+- **Remove.** `removable` gives every chip its remove button (Delete or Backspace on the focused
+  chip press it too); `ChipGroupRemovedItem()` returns the item on that frame, or -1. The caller
+  removes the item from its data.
+- **Single line.** `singleLine` keeps one row: chips that do not fit move into a chip named
+  `Strings::more` at the end of the row, which opens a menu of them (checked when set or chosen);
+  the selected or set chips stay in the row longest, and the "more" chip shows the selected look
+  while one of them is in the menu. Chips in the menu can be chosen or flipped there, not removed.
+- **States.** `ImGui::BeginDisabled` disables every chip. `readOnly` (or a null `index`): shown
+  and focusable, never written. Disabled items are drawn disabled and are no Tab stop.
+- **Width.** The available width by default (rule 6); a chip wider than the group is cut to it.
+  A single-line group ranks at most 64 chips; a longer one wraps.
+
+Status: ready.
 
 ### CycleSelector
 

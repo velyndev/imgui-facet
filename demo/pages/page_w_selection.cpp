@@ -65,10 +65,17 @@ struct SelectionUi
     int chipPresses = 0;
     int chipRemoves = 0;
 
-    // Planned widgets below.
-    bool group[3] = {true, false, true};
+    // ChipGroup
     bool chips[3] = {true, false, false};
     int chipChoice = 0;
+    bool groupTags[5] = {false, true, false, false, true};
+    bool groupPresent[5] = {true, true, true, true, true};
+    bool singleLine[6] = {false, false, true, false, false, false};
+    int chipGroupWrites = 0;
+    int chipGroupRemoved = -1;
+
+    // Planned widgets below.
+    bool group[3] = {true, false, true};
     int cycle = 0;
     facet::BindMode mode = facet::BindMode::Hold;
     int card = 0;
@@ -77,13 +84,20 @@ struct SelectionUi
 
 SelectionUi ui;
 
-// The capture states, in the order of the FACET_DEMO_PAGE line below.
+// The capture states, in the order of the FACET_DEMO_PAGE line below. The first four show the top
+// of the page (the toggles) at rest, hovered, pressed and focused; each later one scrolls its section
+// to the top of the image and shows its main widget focused and another one hovered.
 enum CaptureState
 {
     kDefault,
     kHovered,
     kPressed,
     kFocused,
+    kCheckboxes,
+    kRadios,
+    kSegments,
+    kChips,
+    kChipGroups,
 };
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
@@ -97,17 +111,34 @@ const facet::OptionCard kCards[] = {
     {"Option 2", "Placeholder description of the second choice.", facet::Icon("list")},
 };
 
-// Asks the next widget for the look of the page's capture state.
-void ForceState(facet::demo::PageCtx& ctx, int part = -1)
+// Asks the next widget for the look of the page's capture state: in the top states for the toggle
+// (`section` kDefault), and in a section's own state the focused look for its main widget.
+void ForceState(facet::demo::PageCtx& ctx, int section, int part = -1)
 {
     if (!ctx.capture)
         return;
-    if (ctx.captureState == kHovered)
+    if (section == kDefault && ctx.captureState == kHovered)
         ctx.ForceNextItemState(ForcedItemState::Hovered, part);
-    else if (ctx.captureState == kPressed)
+    else if (section == kDefault && ctx.captureState == kPressed)
         ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Pressed, part);
-    else if (ctx.captureState == kFocused)
+    else if (section == kDefault && ctx.captureState == kFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused, part);
+    else if (section != kDefault && ctx.captureState == section)
+        ctx.ForceNextItemState(ForcedItemState::Focused, part);
+}
+
+// The hovered look for a second widget of a section, in the section's capture state.
+void ForceHover(facet::demo::PageCtx& ctx, int section, int part = -1)
+{
+    if (ctx.capture && ctx.captureState == section)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, part);
+}
+
+// In a section's capture state, scrolls the section heading to the top of the image.
+void RevealSection(facet::demo::PageCtx& ctx, int section)
+{
+    if (ctx.capture && ctx.captureState == section)
+        ctx.RevealInCapture(0.04f);
 }
 
 // Records "<probe>.<i>" for the first `count` entries of the group widget `label` just submitted,
@@ -151,7 +182,7 @@ void ToggleSection(facet::demo::PageCtx& ctx)
     LabeledRow("On and off");
     {
         const ControlRow row;
-        ForceState(ctx);
+        ForceState(ctx, kDefault);
         if (facet::Toggle("Wi-Fi", &ui.wifi))
             ++ui.toggleWrites;
         ctx.Probe("sel.toggle.wifi");
@@ -160,7 +191,6 @@ void ToggleSection(facet::demo::PageCtx& ctx)
             ++ui.toggleWrites;
         ctx.Probe("sel.toggle.bluetooth");
     }
-    ctx.RevealInCapture(0.3f);
 
     LabeledRow("Sizes");
     {
@@ -216,6 +246,7 @@ void ToggleSection(facet::demo::PageCtx& ctx)
 
 void CheckboxSection(facet::demo::PageCtx& ctx)
 {
+    RevealSection(ctx, kCheckboxes);
     SectionHeader("Checkbox");
     Paragraph("A box for an option that is on or off. The label is part of the target; dragging from one box "
               "across others gives them all the first box's new value.");
@@ -230,7 +261,9 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
             if (i > 0)
                 row.Next();
             if (i == 1)
-                ForceState(ctx);
+                ForceState(ctx, kCheckboxes);
+            if (i == 2)
+                ForceHover(ctx, kCheckboxes);
             if (facet::Checkbox(kNames[i], &ui.checks[i]))
                 ++ui.checkWrites;
             ctx.Probe(kProbes[i]);
@@ -252,11 +285,11 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
     LabeledRow("Sizes");
     {
         const ControlRow row;
-        facet::Checkbox("Small", &ui.checkSizes[0], {.size = facet::ControlSize::Small});
+        facet::Checkbox("Small##check", &ui.checkSizes[0], {.size = facet::ControlSize::Small});
         row.Next();
-        facet::Checkbox("Regular", &ui.checkSizes[1]);
+        facet::Checkbox("Regular##check", &ui.checkSizes[1]);
         row.Next();
-        facet::Checkbox("Large", &ui.checkSizes[2], {.size = facet::ControlSize::Large});
+        facet::Checkbox("Large##check", &ui.checkSizes[2], {.size = facet::ControlSize::Large});
     }
 
     LabeledRow("States");
@@ -266,17 +299,17 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
         bool off = false;
         facet::CheckState partly = facet::CheckState::Mixed;
         ImGui::BeginDisabled();
-        facet::Checkbox("Disabled", &on);
+        facet::Checkbox("Disabled##check", &on);
         ctx.Probe("sel.check.disabled");
         row.Next();
-        facet::Checkbox("Disabled##off", &off);
+        facet::Checkbox("Disabled##checkOff", &off);
         row.Next();
-        facet::Checkbox("Disabled##mixed", &partly);
+        facet::Checkbox("Disabled##checkMixed", &partly);
         ImGui::EndDisabled();
         row.Next();
-        facet::Checkbox("Read-only", &on, {.readOnly = true});
+        facet::Checkbox("Read-only##check", &on, {.readOnly = true});
         row.Next();
-        facet::Checkbox("Read-only##mixed", &partly, {.readOnly = true});
+        facet::Checkbox("Read-only##checkMixed", &partly, {.readOnly = true});
     }
     LabeledRow("Messages");
     {
@@ -288,7 +321,6 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
         bool help = false;
         facet::Checkbox("Another option", &help, {.helpText = "Placeholder help text under the box."});
     }
-    ctx.RevealInCapture(0.5f);
     const int checked = ui.checks[0] + ui.checks[1] + ui.checks[2] + ui.checks[3];
     Note("Options checked: %d of 4. Tri-state: %s. Writes on this section: %d.", checked,
          ui.triState == facet::CheckState::On ? "on" : ui.triState == facet::CheckState::Off ? "off" : "mixed",
@@ -297,6 +329,7 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
 
 void RadioSection(facet::demo::PageCtx& ctx)
 {
+    RevealSection(ctx, kRadios);
     SectionHeader("RadioGroup");
     Paragraph("One choice out of a few that all stay visible. The group is one Tab stop; the arrow keys move the "
               "selection and wrap at the ends, Home and End jump to the first and last option.");
@@ -308,12 +341,13 @@ void RadioSection(facet::demo::PageCtx& ctx)
     };
 
     LabeledRow("Vertical");
-    ForceState(ctx, 1);
+    ForceState(ctx, kRadios, 1);
     if (facet::RadioGroup("Placeholder choice", &ui.radio, kChoices))
         ++ui.radioWrites;
     ctx.Probe("sel.radio");
     ProbeEntries(ctx, "Placeholder choice", "sel.radio", 3);
     LabeledRow("Horizontal");
+    ForceHover(ctx, kRadios, 2);
     if (facet::RadioGroup("##row", &ui.radioRow, kOptions, {.orientation = facet::Orientation::Horizontal}))
         ++ui.radioWrites;
     ctx.Probe("sel.radio.row");
@@ -323,13 +357,14 @@ void RadioSection(facet::demo::PageCtx& ctx)
         ++ui.radioWrites;
     ctx.Probe("sel.radio.disabled");
     ProbeEntries(ctx, "##disabled", "sel.radio.disabled", 3);
-    LabeledRow("States");
     {
         int fixed = 2;
-        facet::RadioGroup("Read-only##ro", &fixed, kOptions,
+        LabeledRow("Read-only");
+        facet::RadioGroup("##radioReadOnly", &fixed, kOptions,
                           {.orientation = facet::Orientation::Horizontal, .readOnly = true});
+        LabeledRow("Disabled");
         ImGui::BeginDisabled();
-        facet::RadioGroup("Disabled##dis", &fixed, kOptions, {.orientation = facet::Orientation::Horizontal});
+        facet::RadioGroup("##radioDisabled", &fixed, kOptions, {.orientation = facet::Orientation::Horizontal});
         ImGui::EndDisabled();
     }
     LabeledRow("Messages");
@@ -345,6 +380,7 @@ void RadioSection(facet::demo::PageCtx& ctx)
 
 void SegmentedSection(facet::demo::PageCtx& ctx)
 {
+    RevealSection(ctx, kSegments);
     SectionHeader("SegmentedControl");
     Paragraph("A compact one-of-several choice. The selection pill slides to the chosen segment; a press, a drag "
               "across the segments or Left and Right move it, and the control is one Tab stop.");
@@ -360,11 +396,12 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
     };
 
     LabeledRow("Labels");
-    ForceState(ctx, 2);
+    ForceState(ctx, kSegments, 2);
     count(facet::SegmentedControl("##labels", &ui.segment, kOptions));
     ctx.Probe("sel.seg");
     ProbeEntries(ctx, "##labels", "sel.seg", 3);
     LabeledRow("Icons and labels");
+    ForceHover(ctx, kSegments, 1);
     count(facet::SegmentedControl("##icons", &ui.segmentIcons, kChoices));
     ctx.Probe("sel.seg.icons");
     ProbeEntries(ctx, "##icons", "sel.seg.icons", 3);
@@ -409,12 +446,12 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
         row.Next();
         count(facet::SegmentedControl("##narrowLabels", &ui.segmentNarrow, kOptions, {.width = 150.0f}));
     }
-    ctx.RevealInCapture(0.5f);
     Note("Labels: %s. Writes on this section: %d.", kOptions[ui.segment], ui.segmentWrites);
 }
 
 void ChipSection(facet::demo::PageCtx& ctx)
 {
+    RevealSection(ctx, kChips);
     SectionHeader("Chip");
     Paragraph("A small pill for a tag or a filter. Activating it flips a filter; the remove button, or Delete and "
               "Backspace on the focused chip, asks the caller to remove it.");
@@ -454,7 +491,7 @@ void ChipSection(facet::demo::PageCtx& ctx)
     LabeledRow("Filter");
     {
         const ControlRow row;
-        ForceState(ctx);
+        ForceState(ctx, kChips);
         if (facet::Chip("Placeholder filter", {.selected = ui.filterChip, .icon = facet::Icon("filter")}))
         {
             ui.filterChip = !ui.filterChip;
@@ -462,6 +499,7 @@ void ChipSection(facet::demo::PageCtx& ctx)
         }
         ctx.Probe("sel.chip.filter");
         row.Next();
+        ForceHover(ctx, kChips);
         facet::Chip("Series 1", {.color = facet::ToU32(facet::T().colors.chart[0])});
         row.Next();
         facet::Chip("Series 2", {.color = facet::ToU32(facet::T().colors.chart[1])});
@@ -469,17 +507,17 @@ void ChipSection(facet::demo::PageCtx& ctx)
     LabeledRow("Sizes");
     {
         const ControlRow row;
-        facet::Chip("Small", {.removable = true, .size = facet::ControlSize::Small});
+        facet::Chip("Small##chip", {.removable = true, .size = facet::ControlSize::Small});
         row.Next();
-        facet::Chip("Regular", {.removable = true});
+        facet::Chip("Regular##chip", {.removable = true});
         row.Next();
-        facet::Chip("Large", {.removable = true, .size = facet::ControlSize::Large});
+        facet::Chip("Large##chip", {.removable = true, .size = facet::ControlSize::Large});
     }
     LabeledRow("States");
     {
         const ControlRow row;
         ImGui::BeginDisabled();
-        facet::Chip("Disabled", {.removable = true});
+        facet::Chip("Disabled##chip", {.removable = true});
         ctx.Probe("sel.chip.disabled");
         row.Next();
         facet::Chip("Disabled and selected", {.selected = true});
@@ -488,9 +526,83 @@ void ChipSection(facet::demo::PageCtx& ctx)
     Note("Filter %s. Chips activated: %d, removed: %d.", ui.filterChip ? "on" : "off", ui.chipPresses, ui.chipRemoves);
 }
 
+void ChipGroupSection(facet::demo::PageCtx& ctx)
+{
+    RevealSection(ctx, kChipGroups);
+    SectionHeader("ChipGroup");
+    Paragraph("Chips that wrap into rows: filters that each flip a flag, or one choice that the selection pill marks. "
+              "Each chip is a Tab stop.");
+
+    static const char* const kSeries[] = {"Series 1", "Series 2", "Series 3", "Series 4", "Series 5", "Series 6"};
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.chipGroupWrites;
+    };
+
+    LabeledRow("Filters");
+    ForceState(ctx, kChipGroups, 1);
+    count(facet::ChipGroup("Placeholder filters", ui.chips, kChoices, {.clearAll = true}));
+    ctx.Probe("sel.chips.filters");
+    ProbeEntries(ctx, "Placeholder filters", "sel.chips.filters", 3);
+    LabeledRow("One choice");
+    ForceHover(ctx, kChipGroups, 2);
+    count(facet::ChipGroup("##choice", &ui.chipChoice, kOptions));
+    ctx.Probe("sel.chips.choice");
+    ProbeEntries(ctx, "##choice", "sel.chips.choice", 3);
+    LabeledRow("Removable");
+    {
+        // The removable group lists only the series still present; the indices map back.
+        const char* present[5];
+        bool flags[5];
+        int map[5];
+        int shown = 0;
+        for (int i = 0; i < 5; ++i)
+            if (ui.groupPresent[i])
+            {
+                present[shown] = kSeries[i];
+                flags[shown] = ui.groupTags[i];
+                map[shown] = i;
+                ++shown;
+            }
+        const float column = ImGui::GetCursorPosX();
+        count(facet::ChipGroup("##removable", std::span<bool>(flags, static_cast<std::size_t>(shown)),
+                               std::span<const char* const>(present, static_cast<std::size_t>(shown)), {.removable = true}));
+        ctx.Probe("sel.chips.removable");
+        ProbeEntries(ctx, "##removable", "sel.chips.removable", shown);
+        const int removed = facet::ChipGroupRemovedItem();
+        for (int k = 0; k < shown; ++k)
+            ui.groupTags[map[k]] = flags[k];
+        if (removed >= 0)
+        {
+            ui.groupPresent[map[removed]] = false;
+            ui.chipGroupRemoved = map[removed];
+        }
+        ImGui::SetCursorPosX(column);
+        if (facet::Button("Restore series", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
+            for (bool& p : ui.groupPresent)
+                p = true;
+        ctx.Probe("sel.chips.restore");
+    }
+    LabeledRow("Single line");
+    count(facet::ChipGroup("##single", ui.singleLine, kSeries, {.singleLine = true, .width = 300.0f}));
+    ctx.Probe("sel.chips.single");
+    {
+        bool fixed[3] = {true, false, true};
+        LabeledRow("Read-only");
+        facet::ChipGroup("##chipsReadOnly", fixed, kOptions, {.readOnly = true});
+        LabeledRow("Disabled");
+        ImGui::BeginDisabled();
+        facet::ChipGroup("##chipsDisabled", fixed, kOptions);
+        ImGui::EndDisabled();
+    }
+    Note("Filters on: %d of 3. Choice: %s. Writes on this section: %d.", ui.chips[0] + ui.chips[1] + ui.chips[2],
+         kOptions[ui.chipChoice], ui.chipGroupWrites);
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused")
+FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused", "checkboxes",
+                "radios", "segments", "chips", "chipgroups")
 {
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
@@ -518,11 +630,7 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     ChipSection(ctx);
 
-    SectionHeader("Chip groups");
-    LabeledRow("Filter chips");
-    facet::ChipGroup("##filters", ui.chips, kChoices, {.clearAll = true});
-    LabeledRow("Choice chips");
-    facet::ChipGroup("##choice", &ui.chipChoice, kOptions);
+    ChipGroupSection(ctx);
 
     SectionHeader("Option cards");
     Paragraph("Large cards for choices that need a description.");
@@ -667,4 +775,34 @@ FACET_DEMO_SELFTEST("selection")
     test.Click("sel.chip.disabled");
     test.Click("sel.chip.restore");
     test.Expect("the plain button restores the tags", [] { return ui.tags[0] && ui.tags[1]; });
+
+    // ChipGroup: a click and the keys on filters, the clear chip, a choice and a removal.
+    // The first chip: 10 units in from the left, in the middle of the first row under the label line.
+    test.MouseMove(T::Item("sel.chips.filters", 0.0f, 0.0f).Offset(10.0f, 31.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click flips the first filter off", [] { return !ui.chips[0]; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    test.ExpectFocused("sel.chips.filters.0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.chips.filters.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space flips the second filter on", [] { return ui.chips[1]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("the clear chip turns every filter off", [] { return !ui.chips[0] && !ui.chips[1] && !ui.chips[2]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.chips.choice.0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectNear("Space chooses the second chip", [] { return ui.chipChoice; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.chips.removable.0");
+    test.KeyPress(ImGuiKey_Delete);
+    test.Expect("Delete removes the focused series", [] { return !ui.groupPresent[0] && ui.chipGroupRemoved == 0; });
+    test.ExpectNear("each change wrote once", [] { return ui.chipGroupWrites; }, 4.0, 0.0);
+    test.Click("sel.chips.restore");
+    test.Expect("the plain button restores the series", [] { return ui.groupPresent[0]; });
 }

@@ -92,7 +92,8 @@ float SelectionChipWidth(const char* label, const SelectionChipDesc& desc)
         content += cm.dot + m.iconGap;
     if (desc.icon.IsValid())
         content += cm.iconSize + m.iconGap;
-    const float trailing = desc.removable ? cm.removeSide + cm.inset : m.paddingX;
+    // With a remove button: the inset before it, the button and the inset after it (see SelectionChip).
+    const float trailing = desc.removable ? cm.removeSide + cm.inset * 2.0f : m.paddingX;
     return std::ceil(m.paddingX + content + trailing);
 }
 
@@ -174,7 +175,13 @@ SelectionChipResult SelectionChip(const char* label, ImGuiID id, float width, co
             ItemState look = body;
             if (desc.removable && remove.hovered)
                 look.hoverAmount = 0.0f;
-            fill = body.readOnly ? WithAlpha(c.fill[2], 0.0f) : NeutralFill(look);
+            const ImVec4 clear = WithAlpha(c.fill[2], 0.0f);
+            if (body.readOnly)
+                fill = clear;
+            else if (desc.selected && !desc.selectedFill)
+                fill = StateFill(clear, c.fill[2], c.fill[1], look);  // the group's pill shows through
+            else
+                fill = NeutralFill(look);
             outline = Mix(ControlBoundaryColor(c), body.readOnly ? c.labelSecondary : c.focusRing, selectedAmount);
         }
         FillRect(drawList, r.Min, r.Max, ToU32(fill), radius);

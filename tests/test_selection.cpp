@@ -810,6 +810,146 @@ TEST_CASE("A selected chip shows the selection tint, a disabled chip does nothin
     CHECK(presses == 0);
 }
 
+// --- ChipGroup --------------------------------------------------------------------------------
+
+TEST_CASE("Filter chips flip their flags, each is a Tab stop, and the clear chip unsets them all")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First", "Second", "Third"};
+    bool flags[3] = {false, true, false};
+    int writes = 0;
+    ImGuiID ids[3] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 3; ++i)
+            ids[i] = EntryIdOf("##filters", i);
+        if (facet::ChipGroup("##filters", flags, kItems, {.clearAll = true}))
+            ++writes;
+        session.Track("group");
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(flags[0]);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ids[1]);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(flags[1]);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(flags[2]);
+    session.KeyPress(ImGuiKey_Tab);  // the clear chip
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(flags[0]);
+    CHECK_FALSE(flags[2]);
+    CHECK(writes == 4);
+}
+
+TEST_CASE("Choice chips write the index and the selection pill rests on the chosen chip")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    static const char* const kItems[] = {"First", "Second", "Third"};
+    int index = 0;
+    ImRect pill;
+    session.SetUi([&] {
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::ChipGroup("##choice", &index, kItems);
+        pill = ColorBounds(from, facet::ToU32(facet::T().colors.accentSubtle));
+        session.Track("group");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("group");
+    const float firstRight = pill.Max.x;
+    session.Click(ImVec2(r.Min.x + (firstRight - r.Min.x) * 2.2f, r.GetCenter().y));
+    CHECK(index == 1);
+    session.Seconds(1.5f);
+    CHECK(pill.Min.x > firstRight);
+}
+
+TEST_CASE("A removable chip group reports the removed item on the frame of the press")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First", "Second"};
+    bool flags[2] = {false, false};
+    int removed = -1;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::ChipGroup("##tags", flags, kItems, {.removable = true});
+        const int item = facet::ChipGroupRemovedItem();
+        if (item >= 0)
+            removed = item;
+    });
+    session.Frame();
+    TabFrom(session, 3);  // the second chip
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(removed == 1);
+    CHECK_FALSE(flags[1]);
+}
+
+TEST_CASE("Chips wrap inside the width, and the single-line form moves the rest into a menu")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"First option", "Second option", "Third option", "Fourth option"};
+    bool flags[4] = {false, false, false, false};
+    float wrapped = 0.0f;
+    float single = 0.0f;
+    float wrappedWidth = 0.0f;
+    float available = 0.0f;
+    bool menuOpen = false;
+    bool moreHovered = false;
+    session.SetUi([&] {
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(220.0f), facet::Px(400.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::ChipGroup("##wrap", flags, kItems);
+        wrapped = ImGui::GetItemRectSize().y;
+        wrappedWidth = ImGui::GetItemRectSize().x;
+        const ImGuiID singleId = ImGui::GetID("##single");
+        facet::ChipGroup("##single", flags, kItems, {.singleLine = true});
+        single = ImGui::GetItemRectSize().y;
+        session.Track("single");
+        menuOpen = facet::internal::IsPopupLevelOpen(ImGui::GetIDWithSeed("more menu", nullptr, singleId));
+        moreHovered = GImGui->HoveredId == ImGui::GetIDWithSeed("more", nullptr, singleId);
+        ImGui::EndChild();
+    });
+    session.Frame();
+    session.Frame();
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(wrapped > row * 2.0f);
+    CHECK(wrappedWidth <= available + 0.5f);
+    CHECK(single == doctest::Approx(row));
+    // The "more" chip is the last one in the row; it opens the menu.
+    const ImRect r = session.ItemRect("single");
+    CHECK(r.GetWidth() <= available + 0.5f);
+    // Find the "more" chip along the row, open its menu and choose the first hidden chip.
+    float x = r.Max.x - 2.0f;
+    while (!moreHovered && x > r.Min.x)
+    {
+        session.MouseMove(ImVec2(x, r.GetCenter().y));
+        session.Frame();
+        if (!moreHovered)
+            x -= 6.0f;
+    }
+    REQUIRE(moreHovered);
+    CHECK_FALSE(menuOpen);
+    session.Click(ImVec2(x, r.GetCenter().y));
+    session.Frames(2);
+    CHECK(menuOpen);
+    session.KeyPress(ImGuiKey_DownArrow);  // shows the focus in the menu
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK_FALSE(menuOpen);
+    CHECK((flags[1] || flags[2] || flags[3]));
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;
