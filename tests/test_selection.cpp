@@ -1135,6 +1135,109 @@ TEST_CASE("A cycle selector shows the focus ring for a forced focused state and 
     CHECK(ringVertices > 0);
 }
 
+// --- OptionCardGroup --------------------------------------------------------------------------
+
+TEST_CASE("Single-choice option cards are one Tab stop; the arrows move in the grid and skip disabled cards")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::OptionCard kCards[] = {
+        {"First", "Placeholder description."},
+        {"Second", nullptr, {}, {}, nullptr, true},
+        {"Third"},
+        {"Fourth", "Placeholder description that is long enough to wrap onto a second line in a narrow card."},
+    };
+    int index = 0;
+    int writes = 0;
+    ImGuiID ids[4] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 4; ++i)
+            ids[i] = EntryIdOf("##cards", i);
+        if (facet::OptionCardGroup("##cards", &index, kCards, {.columns = 2}))
+            ++writes;
+        session.Track("cards");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_RightArrow);  // the second is disabled: on to the third
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(index == 3);
+    session.KeyPress(ImGuiKey_UpArrow);  // above the fourth is the disabled second: nothing there
+    CHECK(index == 3);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(index == 0);
+    CHECK(writes == 4);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    // A click on the fourth card (bottom right) chooses it.
+    const ImRect r = session.ItemRect("cards");
+    session.Click(ImVec2(r.Max.x - 10.0f, r.Max.y - 10.0f));
+    CHECK(index == 3);
+}
+
+TEST_CASE("Multi-choice option cards are each a Tab stop that Space flips")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::OptionCard kCards[] = {{"First"}, {"Second"}, {"Third"}};
+    bool flags[2] = {false, true};  // the third card has no flag: drawn disabled
+    int writes = 0;
+    ImGuiID ids[3] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 3; ++i)
+            ids[i] = EntryIdOf("##multi", i);
+        if (facet::OptionCardGroup("##multi", std::span<bool>(flags), kCards))
+            ++writes;
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(flags[0]);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ids[1]);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(flags[1]);
+    session.KeyPress(ImGuiKey_Tab);  // the flagless third is passed over
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(writes == 2);
+}
+
+TEST_CASE("Option cards fit as many columns of the card width as the width holds")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::OptionCard kCards[] = {{"First"}, {"Second"}, {"Third"}};
+    int index = 0;
+    float three = 0.0f;
+    float fitted = 0.0f;
+    float narrow = 0.0f;
+    session.SetUi([&] {
+        facet::OptionCardGroup("##three", &index, kCards, {.columns = 3});  // one row
+        three = ImGui::GetItemRectSize().y;
+        facet::OptionCardGroup("##fitted", &index, kCards, {.width = 600.0f});  // two cards of 256 units fit
+        fitted = ImGui::GetItemRectSize().y;
+        facet::OptionCardGroup("##narrow", &index, kCards, {.width = 300.0f});  // one card per row
+        narrow = ImGui::GetItemRectSize().y;
+    });
+    session.Frame();
+    const float gap = std::round(facet::Px(facet::T().spacing.md));
+    CHECK(fitted == doctest::Approx(three * 2.0f + gap));
+    CHECK(narrow == doctest::Approx(three * 3.0f + gap * 2.0f));
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;

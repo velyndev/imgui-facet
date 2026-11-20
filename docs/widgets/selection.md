@@ -295,8 +295,30 @@ bool OptionCardGroup(const char* label, std::span<bool> selected, std::span<cons
                      const OptionCardGroupOptions& options = {});
 ```
 
-Large selectable cards with a title, a description, an icon or picture and a badge, for one or
-several choices. Status: planned.
+Large selectable cards in a grid, for choices that need a picture or a description, with the
+visible label part above them. Returns true when the index or a flag was written.
+
+- **Card.** bgSecondary with radii.card corners and the 3:1 boundary hairline. Inside (spacing.md
+  padding): `image` across the top (the thumbnailSize token tall, filling the width, cropped to
+  fit), then the title line in Headline with `icon` in front of it when there is no image, `badge`
+  as a small pill and the mark at the end of the line, then `description` wrapped in Footnote
+  labelSecondary. A title that does not fit is cut with an ellipsis and shown in full on hover and
+  keyboard focus. The cards of one row share the height of the tallest.
+- **Selected.** The selection tint (accentSubtle) with a focusRing hairline, and the mark: a radio
+  mark for one choice, a checkbox mark for several, so the two forms read differently.
+- **One choice** (`int*`): one Tab stop (the chosen card, else the first enabled one). Left and
+  Right move along the reading order, Up and Down by a row; disabled cards are skipped and the
+  movement stops at the edges. A click, Space or Enter chooses the card. -1 means none.
+- **Several** (`std::span<bool>`): every enabled card is a Tab stop that a click, Space or Enter
+  flips. Cards without a flag are drawn disabled.
+- **Grid.** `columns` 0 fits as many cards of `cardWidth` (the cardWidth token, 256 units, by
+  default) as the width holds, at least one; the cards then share the width equally. `width` 0
+  takes the available width.
+- **States.** Disabled cards (`OptionCard::disabled`, or `ImGui::BeginDisabled` for all): fill[3],
+  labelTertiary, no Tab stop. `readOnly` (or a null `index`): shown and focusable, never written;
+  the selection shows in labelSecondary. `error` replaces `helpText` under the grid.
+
+Status: ready.
 
 ## Usage
 

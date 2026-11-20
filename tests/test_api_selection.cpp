@@ -39,12 +39,10 @@ void CallSelectionStubs(Values& v)
     using namespace facet;
     const std::span<bool> flags(v.flags);
     FACET_CHECK_STUB(false, KeybindModeSelector("Mode 1", &v.mode, {.allowOff = false}));
-    FACET_CHECK_STUB(false, OptionCardGroup("Cards 1", &v.index, kCards));
-    FACET_CHECK_STUB(false, OptionCardGroup("Cards 2", std::span<bool>(v.thumbnailFlags), kCards, {.columns = 2}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallSelectionStubs.
-constexpr int kSelectionStubCalls = 3;
+constexpr int kSelectionStubCalls = 1;
 
 } // namespace
 

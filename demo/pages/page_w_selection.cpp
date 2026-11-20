@@ -89,11 +89,22 @@ struct SelectionUi
 
     // Planned widgets below.
     facet::BindMode mode = facet::BindMode::Hold;
+    // OptionCardGroup
     int card = 0;
-    bool cards[2] = {false, true};
+    bool cards[3] = {false, true, false};
+    int cardWrites = 0;
 };
 
 SelectionUi ui;
+
+// The placeholder picture of the option cards; kept apart from ui, which the selftest resets.
+struct CardAssets
+{
+    facet::ImageHandle picture;
+    bool dark = false;
+};
+
+CardAssets cardAssets;
 
 // The capture states, in the order of the FACET_DEMO_PAGE line below. The first four show the top
 // of the page (the toggles) at rest, hovered, pressed and focused; each later one scrolls its section
@@ -110,6 +121,7 @@ enum CaptureState
     kChips,
     kChipGroups,
     kCycles,
+    kCards,
 };
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
@@ -117,10 +129,6 @@ const facet::ChoiceItem kChoices[] = {
     {"Option 1", facet::Icon("sun"), "Placeholder detail"},
     {"Option 2", facet::Icon("moon"), "Placeholder detail"},
     {"Option 3", facet::Icon("monitor"), "Placeholder detail"},
-};
-const facet::OptionCard kCards[] = {
-    {"Option 1", "Placeholder description of the first choice.", facet::Icon("grid")},
-    {"Option 2", "Placeholder description of the second choice.", facet::Icon("list")},
 };
 
 // Asks the next widget for the look of the page's capture state: in the top states for the toggle
@@ -560,6 +568,78 @@ void CycleSection(facet::demo::PageCtx& ctx)
     Note("Wrapping: %s. Writes on this section: %d.", kWithDisabled[ui.cycle].label, ui.cycleWrites);
 }
 
+// "#RRGGBB" of a theme color, for the placeholder picture.
+std::string HexColor(const ImVec4& color)
+{
+    const ImU32 packed = facet::ToU32(color);
+    char text[8];
+    std::snprintf(text, sizeof(text), "#%02X%02X%02X", static_cast<unsigned>((packed >> IM_COL32_R_SHIFT) & 0xFF),
+                  static_cast<unsigned>((packed >> IM_COL32_G_SHIFT) & 0xFF),
+                  static_cast<unsigned>((packed >> IM_COL32_B_SHIFT) & 0xFF));
+    return text;
+}
+
+// A placeholder picture for an option card: a soft diagonal blend of two theme colors, built as an
+// SVG document again after a theme switch or a restart of Facet (capture and selftest runs).
+facet::ImageHandle CardPicture(bool dark)
+{
+    if (cardAssets.picture.IsValid() && cardAssets.dark == dark &&
+        facet::GetImageStatus(cardAssets.picture) != facet::ImageStatus::Invalid)
+        return cardAssets.picture;
+    facet::ReleaseImage(cardAssets.picture);
+    const facet::Colors& c = facet::T().colors;
+    std::string svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"32\" viewBox=\"0 0 64 32\">"
+                      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">";
+    svg += "<stop offset=\"0\" stop-color=\"" + HexColor(c.accent) + "\"/>";
+    svg += "<stop offset=\"1\" stop-color=\"" + HexColor(c.success) + "\"/>";
+    svg += "</linearGradient></defs><rect width=\"64\" height=\"32\" fill=\"url(#g)\"/></svg>";
+    cardAssets.picture = facet::LoadSvgMemory(svg.c_str(), svg.size(), ImVec2(facet::T().metrics.cardWidth, facet::T().metrics.thumbnailSize));
+    cardAssets.dark = dark;
+    return cardAssets.picture;
+}
+
+void OptionCardSection(facet::demo::PageCtx& ctx)
+{
+    RevealSection(ctx, kCards);
+    SectionHeader("OptionCardGroup");
+    Paragraph("Large cards for a choice that needs a description or a picture. One choice is one Tab stop with the "
+              "arrow keys inside; with several, each card is a Tab stop that Space flips.");
+
+    const facet::OptionCard single[] = {
+        {"Placeholder option 1", "Placeholder description of the first choice, long enough to wrap.", facet::Icon("grid")},
+        {"Placeholder option 2", "Placeholder description of the second choice.", facet::Icon("list"), {},
+         "Placeholder badge"},
+        {"Placeholder option 3", "Not available here.", facet::Icon("layers"), {}, nullptr, true},
+    };
+    const facet::OptionCard several[] = {
+        {"Placeholder picture 1", "A picture across the top of the card.", {}, CardPicture(ctx.dark)},
+        {"Placeholder picture 2", "The same placeholder picture.", {}, CardPicture(ctx.dark)},
+        {"Placeholder option", "A card without a picture."},
+    };
+
+    LabeledRow("One choice");
+    ForceState(ctx, kCards, 0);
+    if (facet::OptionCardGroup("##cardsSingle", &ui.card, single))
+        ++ui.cardWrites;
+    ctx.Probe("sel.cards.single");
+    ProbeEntries(ctx, "##cardsSingle", "sel.cards.single", 3);
+    LabeledRow("Several");
+    ForceHover(ctx, kCards, 2);
+    if (facet::OptionCardGroup("##cardsSeveral", std::span<bool>(ui.cards), several,
+                               {.error = ui.cards[0] || ui.cards[1] || ui.cards[2] ? nullptr
+                                                                                  : "Placeholder error: choose at least one card."}))
+        ++ui.cardWrites;
+    ctx.Probe("sel.cards.several");
+    ProbeEntries(ctx, "##cardsSeveral", "sel.cards.several", 3);
+    LabeledRow("Read-only");
+    {
+        int fixed = 0;
+        facet::OptionCardGroup("##cardsReadOnly", &fixed, single, {.cardWidth = 200.0f, .readOnly = true});
+    }
+    Note("One choice: %s. Several: %d of 3. Writes on this section: %d.", single[ui.card].label,
+         ui.cards[0] + ui.cards[1] + ui.cards[2], ui.cardWrites);
+}
+
 void ChipSection(facet::demo::PageCtx& ctx)
 {
     RevealSection(ctx, kChips);
@@ -713,7 +793,7 @@ void ChipGroupSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused", "checkboxes",
-                "radios", "segments", "chips", "chipgroups", "cycles")
+                "radios", "segments", "chips", "chipgroups", "cycles", "cards")
 {
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
@@ -740,11 +820,7 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     ChipGroupSection(ctx);
 
-    SectionHeader("Option cards");
-    Paragraph("Large cards for choices that need a description.");
-    facet::OptionCardGroup("Single choice", &ui.card, kCards);
-    ImGui::Spacing();
-    facet::OptionCardGroup("Several choices", ui.cards, kCards);
+    OptionCardSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("selection")
@@ -898,6 +974,26 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseUp();
     test.ExpectNear("a click on the value of an empty selector takes the first item", [] { return ui.cycleNone; }, 0.0, 0.0);
     test.ExpectNear("each step wrote once", [] { return ui.cycleWrites; }, 6.0, 0.0);
+
+    // OptionCardGroup: a click on the first card, the arrows skip the disabled one; several cards by keyboard.
+    test.Do([] { ui.card = 1; });
+    test.MouseMove(T::Item("sel.cards.single", 0.0f, 0.0f).Offset(20.0f, 20.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click chooses the first card", [] { return ui.card; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right chooses the next card", [] { return ui.card; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("the disabled third card is not chosen", [] { return ui.card; }, 1.0, 0.0);
+    test.ExpectFocused("sel.cards.single.1");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.cards.several.0");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space flips the first of several cards on", [] { return ui.cards[0]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter flips the second off", [] { return !ui.cards[1]; });
+    test.ExpectNear("each change wrote once", [] { return ui.cardWrites; }, 4.0, 0.0);
 
     // Chip: the body flips a filter, the remove button and Delete remove a tag.
     test.Click("sel.chip.filter");
