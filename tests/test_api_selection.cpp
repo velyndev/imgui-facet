@@ -1,8 +1,7 @@
 // The public API of the selection family (facet/widgets/selection.h): every options struct
-// follows the conventions, and every widget that is still a placeholder is safe to call, submits
-// one item that cannot be operated, leaves the Dear ImGui stacks as it found them, returns the
-// neutral result and writes nothing. Behaviour tests of implemented widgets go into
-// tests/test_selection.cpp.
+// follows the conventions, the widgets give the neutral result outside a frame, and the one-line
+// controls never outgrow a short row. Every widget of the family is implemented; their behaviour
+// tests are in tests/test_selection.cpp.
 
 #include <span>
 
@@ -33,33 +32,33 @@ static_assert(OptionsFollowConventions<facet::CycleSelectorOptions>());
 static_assert(OptionsFollowConventions<facet::KeybindModeSelectorOptions>());
 static_assert(OptionsFollowConventions<facet::OptionCardGroupOptions>());
 
-// Every placeholder of the family once, with the overloads, as an app would call it.
-void CallSelectionStubs(Values& v)
-{
-    using namespace facet;
-    const std::span<bool> flags(v.flags);
-    FACET_CHECK_STUB(false, KeybindModeSelector("Mode 1", &v.mode, {.allowOff = false}));
-}
-
-// Number of FACET_CHECK_STUB calls in CallSelectionStubs.
-constexpr int kSelectionStubCalls = 1;
-
 } // namespace
 
-TEST_CASE("Every selection placeholder returns the neutral result, writes nothing and keeps the stacks")
-{
-    FACET_CHECK_FAMILY_STUBS(CallSelectionStubs, kSelectionStubCalls);
-}
-
-TEST_CASE("Selection placeholders called outside a frame return the neutral result")
+TEST_CASE("Selection widgets called outside a frame return the neutral result and write nothing")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
-    bool flag = true;
-    CHECK_FALSE(facet::Checkbox("Checkbox 1", &flag));
-    CHECK(flag);
+    Values v;
+    const bool flag = v.flag;
+    const int index = v.index;
+    const facet::BindMode mode = v.mode;
+    CHECK_FALSE(facet::Toggle("Toggle 1", &v.flag));
+    CHECK_FALSE(facet::Checkbox("Checkbox 1", &v.flag));
+    CHECK_FALSE(facet::Checkbox("Checkbox 2", &v.check));
+    CHECK_FALSE(facet::CheckboxGroup("Checkboxes", std::span<bool>(v.flags), kLabels, {.selectAll = true}));
+    CHECK_FALSE(facet::RadioGroup("Radio", &v.index, kChoices));
+    CHECK_FALSE(facet::SegmentedControl("Segments", &v.index, kLabels));
+    CHECK_FALSE(facet::Chip("Chip", {.removable = true}));
+    CHECK_FALSE(facet::ChipRemovePressed());
+    CHECK_FALSE(facet::ChipGroup("Chips", &v.index, kLabels, {.removable = true}));
+    CHECK(facet::ChipGroupRemovedItem() == -1);
+    CHECK_FALSE(facet::CycleSelector("Cycle", &v.index, kChoices));
+    CHECK_FALSE(facet::KeybindModeSelector("Mode", &v.mode));
+    CHECK_FALSE(facet::OptionCardGroup("Cards", &v.index, kCards));
+    CHECK(v.flag == flag);
+    CHECK(v.index == index);
+    CHECK(v.mode == mode);
 }
-
 TEST_CASE("Controls that narrow themselves never outgrow a short row")
 {
     facet::test::Session session;

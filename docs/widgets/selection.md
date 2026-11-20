@@ -283,8 +283,25 @@ Status: ready.
 bool KeybindModeSelector(const char* label, BindMode* mode, const KeybindModeSelectorOptions& options = {});
 ```
 
-Chooses how a key bind activates (`BindMode` from `core/input.h`): Hold, Toggle, Always or Off.
-Status: planned.
+Chooses how a key bind activates (`BindMode` from `core/input.h`): Hold, Toggle, Always and Off
+with the `Strings::bindHold`, `bindToggle`, `bindAlways` and `bindOff` names. Returns true on the
+frame it wrote `*mode`.
+
+- **Form.** A SegmentedControl (the same strip, pill, keys and looks): the visible label in front,
+  one Tab stop, a press or a drag picks a mode, Left, Right, Home and End move the selection.
+- **Offered modes.** `allowAlways` and `allowOff` leave those modes out. A current mode that is
+  not offered is shown, as a disabled segment, until another mode is chosen; then it is gone and
+  cannot be chosen again.
+- **Narrow rows.** When the resolved width is shorter than the label and the segments at their
+  content, the selector draws a `Dropdown` (lists.h) with the same modes, options, error and help
+  text instead, so it never outgrows the row. The dropdown is the lists family's widget and looks
+  and works as that widget does.
+- **States.** `readOnly` (or a null `mode`) shows the mode and never writes; `mixed` shows no pill
+  until the first choice; `error` replaces `helpText` under the segments.
+- **Width.** `width` 0 fits the segments, at most the available width; a set width divides it
+  into equal segments while they fit.
+
+Status: ready.
 
 ### OptionCardGroup
 

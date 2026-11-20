@@ -64,6 +64,11 @@ struct SegmentStripDesc
     const char* helpText = nullptr;
 };
 
+// The width (pixels) a strip with these items takes by default when nothing narrows it: the label
+// in front and every segment at its content. A widget that switches to another form when the row
+// is too short compares it with its resolved width.
+float SegmentStripContentWidth(const char* label, const SelectionItems& items, ControlSize size, bool iconOnly);
+
 // Submits the strip. `index` is the Choice value (null: read-only), `flags` the Latches values
 // (items without a flag are drawn disabled). Returns true when a value was written.
 bool SegmentStrip(const char* label, const SelectionItems& items, int* index, std::span<bool> flags,

@@ -1105,6 +1105,28 @@ TEST_CASE("A read-only cycle selector never writes; page dots add a row under th
     CHECK(dots > plain);
 }
 
+TEST_CASE("The wheel over a cycle selector steps it and leaves the scrolling window around it alone")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int index = 0;
+    float scroll = -1.0f;
+    session.SetUi([&] {
+        ImGui::BeginChild("scrolling", ImVec2(facet::Px(300.0f), facet::Px(120.0f)));
+        facet::CycleSelector("##cycle", &index, kItems);
+        session.Track("cycle");
+        ImGui::Dummy(ImVec2(10.0f, facet::Px(600.0f)));
+        scroll = ImGui::GetScrollY();
+        ImGui::EndChild();
+    });
+    session.Frames(2);
+    session.Wheel(session.ItemCenter("cycle"), -1.0f);
+    session.Seconds(0.5f);
+    CHECK(index == 1);
+    CHECK(scroll == doctest::Approx(0.0f));
+}
+
 TEST_CASE("A cycle selector shows the focus ring for a forced focused state and after keyboard input")
 {
     facet::test::Session session;
@@ -1236,6 +1258,97 @@ TEST_CASE("Option cards fit as many columns of the card width as the width holds
     const float gap = std::round(facet::Px(facet::T().spacing.md));
     CHECK(fitted == doctest::Approx(three * 2.0f + gap));
     CHECK(narrow == doctest::Approx(three * 3.0f + gap * 2.0f));
+}
+
+// --- KeybindModeSelector ----------------------------------------------------------------------
+
+namespace
+{
+
+// The id KeybindModeSelector gives the segment of `mode`: the mode number plus one as the item id.
+ImGuiID ModeEntryId(const char* label, facet::BindMode mode)
+{
+    const ImGuiID itemId = static_cast<ImGuiID>(mode) + 1;
+    return ImHashData(&itemId, sizeof(itemId), ~ImGui::GetID(label));
+}
+
+} // namespace
+
+TEST_CASE("The key bind mode selector writes the mode by click and arrows as a segmented control")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::BindMode mode = facet::BindMode::Hold;
+    int writes = 0;
+    ImGuiID toggleId = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        toggleId = ModeEntryId("##mode", facet::BindMode::Toggle);
+        if (facet::KeybindModeSelector("##mode", &mode))
+            ++writes;
+        session.Track("mode");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("mode");
+    session.Click(ImVec2(r.Min.x + r.GetWidth() * 0.97f, r.GetCenter().y));  // the last segment, Off
+    CHECK(mode == facet::BindMode::Off);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(mode == facet::BindMode::Hold);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(mode == facet::BindMode::Toggle);
+    CHECK(ImGui::GetFocusID() == toggleId);
+    CHECK(writes == 3);
+}
+
+TEST_CASE("A mode that is not offered is shown while set and cannot be chosen again once left")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::BindMode mode = facet::BindMode::Always;
+    float withAlways = 0.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::KeybindModeSelector("##mode", &mode, {.allowAlways = false, .allowOff = false});
+        withAlways = ImGui::GetItemRectSize().x;
+        session.Track("mode");
+    });
+    session.Frame();
+    const float shown = withAlways;
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);  // the Tab stop is the first enabled segment: Hold
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(mode == facet::BindMode::Toggle);
+    session.Frame();
+    CHECK(withAlways < shown);  // Always is gone from the strip
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(mode == facet::BindMode::Toggle);
+}
+
+TEST_CASE("A key bind mode selector in a short row becomes a dropdown that fills it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::BindMode mode = facet::BindMode::Hold;
+    float available = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+    session.SetUi([&] {
+        ImGui::BeginChild("short", ImVec2(facet::Px(90.0f), facet::Px(100.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::KeybindModeSelector("##mode", &mode);
+        width = ImGui::GetItemRectSize().x;
+        height = ImGui::GetItemRectSize().y;
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(width == doctest::Approx(available));
+    CHECK(height <= facet::ControlHeight(facet::ControlSize::Regular) * 2.0f);
 }
 
 TEST_CASE("A toggle outside a frame returns false")

@@ -71,7 +71,33 @@ bool DrawSegmentContent(ImDrawList* drawList, const ImRect& rect, const ChoiceIt
     return hasLabel && (!showLabel || shown.truncated);
 }
 
+// The width of a segment at its content, in the current (semibold) font: one control height for an
+// icon only, else the paddings, the icon and its gap, and the label.
+float SegmentNaturalWidth(const ChoiceItem& item, bool iconOnly, const ControlMetrics& m, float iconSize, float* labelWidth)
+{
+    const bool hasIcon = item.icon.IsValid();
+    *labelWidth = ImGui::CalcTextSize(item.label, ImGui::FindRenderedTextEnd(item.label)).x;
+    if (iconOnly && hasIcon)
+        return m.height;
+    return std::ceil(m.paddingX * 2.0f + (hasIcon ? iconSize + (*labelWidth > 0.0f ? m.iconGap : 0.0f) : 0.0f) + *labelWidth);
+}
+
 } // namespace
+
+float SegmentStripContentWidth(const char* label, const SelectionItems& items, ControlSize size, bool iconOnly)
+{
+    const ControlMetrics m = GetControlMetrics(size);
+    ControlTextScope text(m);
+    const float iconSize = text.IconSize();
+    float total = MeasureFrontLabel(label != nullptr ? label : "", m.size, 1.0e9f).width;
+    PushPillLabelStyle(m.textStyle, true);
+    const int count = std::min(items.Count(), kSegmentStripMax);
+    float labelWidth = 0.0f;
+    for (int i = 0; i < count; ++i)
+        total += SegmentNaturalWidth(items.At(i), iconOnly, m, iconSize, &labelWidth);
+    PopTextStyle();
+    return total;
+}
 
 bool SegmentStrip(const char* label, const SelectionItems& items, int* index, std::span<bool> flags,
                   const SegmentStripDesc& desc)
@@ -106,15 +132,9 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
     {
         const ChoiceItem item = items.At(i);
         SegmentSlot& slot = slots[i];
-        const char* end = ImGui::FindRenderedTextEnd(item.label);
         slot.hasIcon = item.icon.IsValid();
-        slot.labelWidth = ImGui::CalcTextSize(item.label, end).x;
+        slot.natural = SegmentNaturalWidth(item, desc.iconOnly, m, iconSize, &slot.labelWidth);
         allIcons = allIcons && slot.hasIcon;
-        if (desc.iconOnly && slot.hasIcon)
-            slot.natural = m.height;
-        else
-            slot.natural = std::ceil(m.paddingX * 2.0f + (slot.hasIcon ? iconSize + (slot.labelWidth > 0.0f ? m.iconGap : 0.0f) : 0.0f) +
-                                     slot.labelWidth);
         naturalTotal += slot.natural;
     }
     PopTextStyle();

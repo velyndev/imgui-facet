@@ -87,8 +87,11 @@ struct SelectionUi
     int cycleNone = -1;
     int cycleWrites = 0;
 
-    // Planned widgets below.
+    // KeybindModeSelector
     facet::BindMode mode = facet::BindMode::Hold;
+    facet::BindMode limitedMode = facet::BindMode::Always;  // set to a mode the selector does not offer
+    int modeWrites = 0;
+
     // OptionCardGroup
     int card = 0;
     bool cards[3] = {false, true, false};
@@ -122,6 +125,7 @@ enum CaptureState
     kChipGroups,
     kCycles,
     kCards,
+    kModes,
 };
 
 const char* const kOptions[] = {"Option 1", "Option 2", "Option 3"};
@@ -568,6 +572,58 @@ void CycleSection(facet::demo::PageCtx& ctx)
     Note("Wrapping: %s. Writes on this section: %d.", kWithDisabled[ui.cycle].label, ui.cycleWrites);
 }
 
+// The name of a bind mode as the selector shows it.
+const char* ModeName(facet::BindMode mode)
+{
+    const facet::Strings& s = facet::GetStrings();
+    switch (mode)
+    {
+    case facet::BindMode::Toggle:
+        return s.bindToggle;
+    case facet::BindMode::Always:
+        return s.bindAlways;
+    case facet::BindMode::Off:
+        return s.bindOff;
+    case facet::BindMode::Hold:
+    default:
+        return s.bindHold;
+    }
+}
+
+void KeybindModeSection(facet::demo::PageCtx& ctx)
+{
+    RevealSection(ctx, kModes);
+    SectionHeader("KeybindModeSelector");
+    Paragraph("How a key bind activates, as a segmented control: Hold, Toggle, Always or Off. Modes the caller does "
+              "not offer are left out; when the row is too short for the segments it becomes a dropdown.");
+
+    LabeledRow("Every mode");
+    ForceState(ctx, kModes, 1);
+    if (facet::KeybindModeSelector("##mode", &ui.mode))
+        ++ui.modeWrites;
+    ctx.Probe("sel.mode");
+    // Always is set but not offered: it shows until another mode is chosen, then it is gone. This
+    // one has the whole row, so its segments fit even a narrow window at a large scale.
+    Note("Hold and Toggle only:");
+    if (facet::KeybindModeSelector("##limited", &ui.limitedMode, {.allowAlways = false, .allowOff = false}))
+        ++ui.modeWrites;
+    ctx.Probe("sel.mode.limited");
+    LabeledRow("With a label");
+    {
+        facet::BindMode fixed = facet::BindMode::Toggle;
+        facet::KeybindModeSelector("Placeholder bind", &fixed, {.readOnly = true, .helpText = "Read-only."});
+    }
+    LabeledRow("Narrow");
+    {
+        // 110 units cannot hold the four segments: the selector shows a dropdown instead (lists.h).
+        facet::BindMode narrow = ui.mode;
+        if (facet::KeybindModeSelector("##narrowMode", &narrow, {.width = DemoWidth(110.0f)}))
+            ui.mode = narrow;
+    }
+    Note("Every mode: %s. Hold and Toggle: %s. Writes on this section: %d.", ModeName(ui.mode), ModeName(ui.limitedMode),
+         ui.modeWrites);
+}
+
 // "#RRGGBB" of a theme color, for the placeholder picture.
 std::string HexColor(const ImVec4& color)
 {
@@ -793,7 +849,7 @@ void ChipGroupSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused", "checkboxes",
-                "radios", "segments", "chips", "chipgroups", "cycles", "cards")
+                "radios", "segments", "chips", "chipgroups", "cycles", "cards", "modes")
 {
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
@@ -812,9 +868,7 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     CycleSection(ctx);
 
-    SectionHeader("Key bind mode");
-    LabeledRow("Bind mode");
-    facet::KeybindModeSelector("##mode", &ui.mode);
+    KeybindModeSection(ctx);
 
     ChipSection(ctx);
 
@@ -974,6 +1028,24 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseUp();
     test.ExpectNear("a click on the value of an empty selector takes the first item", [] { return ui.cycleNone; }, 0.0, 0.0);
     test.ExpectNear("each step wrote once", [] { return ui.cycleWrites; }, 6.0, 0.0);
+
+    // KeybindModeSelector: the selector with Hold and Toggle fits every selftest size as segments (the
+    // one with all four modes is a dropdown in the 900 pixel run at scale 2). A press picks a mode,
+    // the arrows move it, and the mode that is not offered goes once left.
+    test.Reveal("sel.mode.limited");
+    test.WaitSeconds(0.6f);  // the reveal scrolls smoothly; let it settle before pointing
+    test.MouseMove(T::Item("sel.mode.limited", 0.1f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a press on the first segment picks Hold", [] { return ui.limitedMode == facet::BindMode::Hold; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("Right picks Toggle", [] { return ui.limitedMode == facet::BindMode::Toggle; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("and Always, no longer offered, cannot be picked again",
+                [] { return ui.limitedMode == facet::BindMode::Toggle; });
+    test.KeyPress(ImGuiKey_Home);
+    test.Expect("Home picks Hold", [] { return ui.limitedMode == facet::BindMode::Hold; });
+    test.ExpectNear("each change wrote once", [] { return ui.modeWrites; }, 3.0, 0.0);
 
     // OptionCardGroup: a click on the first card, the arrows skip the disabled one; several cards by keyboard.
     test.Do([] { ui.card = 1; });

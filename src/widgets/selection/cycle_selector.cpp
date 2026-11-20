@@ -18,6 +18,7 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/scroll.h"
 #include "widgets/selection/selection_parts.h"
 
 namespace facet
@@ -123,11 +124,16 @@ bool CycleSelectorImpl(const char* label, int* index, const internal::SelectionI
             else if (body.keyboardPressed)
                 step = 1;  // Space and Enter step forward too
         }
-        // The wheel steps while the pointer is over the selector; it does not scroll the window then.
-        if (prev.hovered || nextArrow.hovered || body.hovered)
+        // The wheel steps while the pointer rests on the selector, and does not scroll the window
+        // then: the selector claims the wheel (key ownership) while the pointer is over it, and
+        // reads it once it owned it from the previous frame, so the scroll core (scroll.h) leaves
+        // it alone. A scroll gesture that is still running keeps the wheel.
+        const bool pointerOver = g.HoveredWindow == window && ImGui::IsMouseHoveringRect(frame.Min, frame.Max);
+        if (pointerOver && !internal::ScrollWheelBelongsToScroll())
         {
+            const bool owned = ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, id);
             ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, id);
-            if (g.IO.MouseWheel != 0.0f)
+            if (owned && g.IO.MouseWheel != 0.0f)
                 step = g.IO.MouseWheel > 0.0f ? -1 : 1;
         }
     }
