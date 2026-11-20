@@ -591,7 +591,8 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     const ImGuiID id = window->GetID(label);
     result.id = id;
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
-    const bool hasLabel = labelEnd != label;
+    // A widget that draws the label itself (above the field, as a heading) hides it here.
+    const bool hasLabel = labelEnd != label && !params.labelHidden;
     const ControlSize size = ResolveControlSize(params.size);
     const bool disabled = (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
     const bool multiline = params.multiline && !params.password;

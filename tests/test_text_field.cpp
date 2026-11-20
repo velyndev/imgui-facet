@@ -1676,3 +1676,24 @@ TEST_CASE("Text field: a field with a visible label ends at its frame, also in t
     CHECK(plainItem.GetWidth() == doctest::Approx(200.0f));
     CHECK(idealRight <= plain.frame.Max.x + 0.5f);
 }
+
+TEST_CASE("Text field: a hidden label leaves the whole width to the frame and keeps the id")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    TextFieldResult shown;
+    TextFieldResult hidden;
+    ImRect hiddenItem;
+    ImGuiID expected = 0;
+    session.SetUi([&] {
+        shown = TextFieldBehavior("Visible label##shown", &text);
+        hidden = TextFieldBehavior("Visible label##hidden", &text, {.labelHidden = true});
+        hiddenItem = GImGui->LastItemData.Rect;
+        expected = ImGui::GetID("Visible label##hidden");
+    });
+    session.Frame();
+    CHECK(shown.frame.GetWidth() < hidden.frame.GetWidth());
+    CHECK(hidden.frame.Min.x == doctest::Approx(hiddenItem.Min.x));
+    CHECK(hidden.id == expected);
+}

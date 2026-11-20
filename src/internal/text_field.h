@@ -124,6 +124,9 @@ struct TextFieldParams
     // cells, a skeleton while loading).
     bool hideText = false;
     bool spinnerReplacesIcon = false;    // while loading, the spinner sits where the leading icon is (search fields)
+    // The visible label part is not drawn: it only names the field (the item id stays ImGui::GetID
+    // of the label). For widgets that draw the label elsewhere, such as above a text area.
+    bool labelHidden = false;
 };
 
 // What a field did this frame, and where it is.
