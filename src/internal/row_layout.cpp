@@ -14,6 +14,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/state_storage.h"
@@ -292,27 +293,13 @@ bool EndRow()
     }
 
     // The message under the control: the error, or else the help text.
-    const char* message = row.options.error != nullptr ? row.options.error : row.options.helpText;
-    if (message != nullptr && message[0] != '\0')
+    const ControlMessage message = PickControlMessage(row.options.error, row.options.helpText);
+    if (message.IsSet())
     {
-        const bool error = row.options.error != nullptr;
-        PushTextStyle(TextStyle::Footnote);
-        const float lineHeight = ImGui::GetFontSize();
         const float top = controlBottom + Px(theme.spacing.xs);
-        float textX = layout.control.Min.x;
-        const ImU32 color = Color(error ? c.destructive : (layout.disabled ? c.labelTertiary : c.labelSecondary));
-        if (error)
-        {
-            const float iconSize = std::round(lineHeight);
-            DrawIcon(drawList, Icon("error"), ImVec2(textX, top), iconSize, color);
-            textX += iconSize + Px(theme.spacing.xs);
-        }
-        const float wrap = std::max(1.0f, layout.control.Max.x - textX);
-        const ImVec2 textSize = ImGui::CalcTextSize(message, nullptr, false, wrap);
-        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(textX, top), color, message, nullptr, wrap);
-        PopTextStyle();
+        const float bottom = DrawControlMessage(message, ImVec2(layout.control.Min.x, controlBottom), slotWidth, layout.disabled);
         ImGui::SetCursorScreenPos(ImVec2(layout.control.Min.x, top));
-        ImGui::Dummy(ImVec2(slotWidth, std::max(textSize.y, lineHeight)));
+        ImGui::Dummy(ImVec2(slotWidth, bottom - top));
     }
 
     // The description of a row beside its control, right under the label line. Nothing under the
@@ -320,7 +307,7 @@ bool EndRow()
     const char* description = row.options.description;
     if (!layout.stacked && description != nullptr && description[0] != '\0')
     {
-        const bool controlColumnFree = (message == nullptr || message[0] == '\0') && controlBottom <= layout.control.Max.y + 0.5f;
+        const bool controlColumnFree = !message.IsSet() && controlBottom <= layout.control.Max.y + 0.5f;
         const float right = controlColumnFree ? layout.control.Max.x : row.columnRight;
         const float top = row.origin.y + row.controlHeight;
         PushTextStyle(TextStyle::Footnote);

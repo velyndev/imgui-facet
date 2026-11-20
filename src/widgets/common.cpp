@@ -11,6 +11,7 @@
 
 #include "core/core_internal.h"
 #include "facet/core/scale.h"
+#include "internal/control.h"
 #include "internal/list_core.h"
 #include "internal/row_layout.h"
 #include "internal/subsystem.h"
@@ -51,6 +52,7 @@ void CommonShutdown()
     ControlSizeStack& stack = SizeStack();
     stack.depth = 0;
     stack.overflow = 0;
+    internal::ClearFieldErrors();
 }
 
 // Every member of Strings. The static_assert below fails when a member is added to the struct
@@ -206,7 +208,8 @@ const Strings& GetStrings()
 namespace internal
 {
 
-// Checks the control size stack at the end of every frame.
+// Checks the control size stack at the end of every frame; Shutdown also forgets the reported
+// field errors (src/internal/control.h).
 Subsystem WidgetsCommonSubsystem()
 {
     Subsystem subsystem;

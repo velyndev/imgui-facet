@@ -23,6 +23,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/loading.h"
 #include "internal/state_storage.h"
@@ -40,9 +41,6 @@ namespace
 constexpr int kFieldAnimHover = 1;
 constexpr int kFieldAnimFocus = 2;
 constexpr int kFieldAnimFloat = 3;
-
-// The spinner stroke as a share of the spinner size.
-constexpr float kSpinnerStrokeShare = 0.125f;
 
 // Pending selection, insert and focus requests: a few at once is plenty (one field has the
 // keyboard at a time), and a request waits this many frames for its field.
@@ -563,28 +561,6 @@ void FadeTextFieldEdges(ImDrawList* drawList, int vertexStart, float left, float
     }
 }
 
-// The message line under a field: the error (with the error icon) or the help text, wrapped
-// across `width`. Returns its height; draws only when `draw`.
-float TextFieldMessage(const char* message, bool error, bool disabled, ImVec2 at, float width, bool draw)
-{
-    const Colors& c = T().colors;
-    TextFieldFontScope font(TextStyle::Footnote);
-    ImGuiContext& g = *GImGui;
-    const float iconSize = error ? std::round(g.FontSize) : 0.0f;
-    const float gap = error ? Px(T().spacing.xs) : 0.0f;
-    const float wrap = std::max(1.0f, width - iconSize - gap);
-    const ImVec2 size = ImGui::CalcTextSize(message, nullptr, false, wrap);
-    if (draw)
-    {
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        const ImVec4 color = error ? c.destructive : (disabled ? c.labelTertiary : c.labelSecondary);
-        if (error)
-            DrawIcon(drawList, Icon("error"), ImVec2(at.x, at.y), iconSize, U32(color));
-        drawList->AddText(g.Font, g.FontSize, ImVec2(at.x + iconSize + gap, at.y), U32(color), message, nullptr, wrap);
-    }
-    return std::max(size.y, iconSize);
-}
-
 } // namespace
 
 // ---- The field -------------------------------------------------------------------------------
@@ -703,7 +679,10 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         frameHeight = std::round(params.height > 0.0f ? std::max(Px(params.height), controlHeight) : lines);
     }
 
-    const float labelWidth = (hasLabel && !floating) ? std::round(ImGui::CalcTextSize(label, labelEnd).x + gapSm) : 0.0f;
+    const float totalWidth = ResolveItemWidth(params.width, next, kFill);
+    // The label in front (rule 6), cut when it would take more than its share of the width.
+    const FrontLabel front = (hasLabel && !floating) ? MeasureFrontLabel(label, size, totalWidth) : FrontLabel{};
+    const float labelWidth = front.width;
     const float leftInset = pad + (params.icon.IsValid() ? iconSize + gapSm : 0.0f);
     const bool leadingSpinner = params.loading && params.spinnerReplacesIcon && params.icon.IsValid();
     const bool trailingSpinner = params.loading && !leadingSpinner;
@@ -724,7 +703,6 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         rightInset += suffixWidth + gapSm;
     }
 
-    const float totalWidth = ResolveItemWidth(params.width, next, kFill);
     // Never narrower than one em of text between the insets: the text stays clear of every adornment.
     const float frameWidth = std::round(std::max(totalWidth - labelWidth, leftInset + rightInset + fontSize));
 
@@ -752,19 +730,17 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
               t.motion.durationFast);
     if (!params.frameless)
     {
-        ImVec4 fill = disabled ? c.fill[3] : (readOnly ? WithAlpha(c.fill[3], 0.0f) : Mix(c.fill[2], c.fill[1], hoverAmount));
-        FillRect(drawList, frame.Min, frame.Max, U32(fill), radius);
-        ImVec4 outline = disabled ? c.separator : ControlBoundaryColor(c);
-        if ((activeBefore || forcedFocus) && !disabled)
-            outline = c.focusRing;
-        if (params.error != nullptr)
-            outline = c.destructive;
-        StrokeRect(drawList, frame.Min, frame.Max, U32(outline), radius, HairlineThickness());
+        FieldFrameLook look;
+        look.hoverAmount = hoverAmount;
+        look.active = activeBefore || forcedFocus;
+        look.disabled = disabled;
+        look.readOnly = readOnly;
+        look.error = params.error != nullptr;
+        DrawFieldFrame(drawList, frame, look);
     }
 
     // ---- The label in front ----
-    if (hasLabel && !floating)
-        drawList->AddText(ImVec2(origin.x, textTop), U32(disabled ? c.labelTertiary : c.label), label, labelEnd);
+    DrawFrontLabel(drawList, front, ImVec2(origin.x, textTop), size, disabled);
 
     // ---- Text ----
     const bool showDisplayText = params.displayText != nullptr && !activeBefore && !hooks.activate && !params.hideText;
@@ -1023,10 +999,9 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     const ImVec4 secondary = disabled ? c.labelTertiary : c.labelSecondary;
 
     // ---- Leading icon, suffix, spinner ----
-    const float spinnerThickness = std::max(HairlineThickness(), std::round(iconSize * kSpinnerStrokeShare));
     if (leadingSpinner)
-        DrawSpinner(drawList, ImVec2(std::round(frame.Min.x + pad + iconSize * 0.5f), std::round(frame.GetCenter().y)),
-                    iconSize * 0.5f - spinnerThickness * 0.5f, U32(secondary), spinnerThickness);
+        DrawControlSpinner(drawList, ImVec2(frame.Min.x + pad + iconSize * 0.5f, frame.GetCenter().y), iconSize,
+                           U32(secondary));
     else if (params.icon.IsValid())
         DrawIcon(drawList, params.icon, ImVec2(frame.Min.x + pad, std::round(frame.GetCenter().y - iconSize * 0.5f)),
                  iconSize, U32(secondary));
@@ -1044,8 +1019,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     }
     if (trailingSpinner)
     {
-        const ImVec2 center(std::round(trailingX - buttonSide * 0.5f), std::round(frame.GetCenter().y));
-        DrawSpinner(drawList, center, iconSize * 0.5f - spinnerThickness * 0.5f, U32(secondary), spinnerThickness);
+        DrawControlSpinner(drawList, ImVec2(trailingX - buttonSide * 0.5f, frame.GetCenter().y), iconSize, U32(secondary));
         trailingX -= buttonSide + gapXs;
     }
     if (suffixWidth > 0.0f)
@@ -1158,14 +1132,18 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
     if (focusAmount > 0.0f && !params.frameless)
         DrawFocusRing(drawList, frame, radius, focusAmount);
 
-    // ---- Message line ----
-    float bottom = frame.Max.y;
-    const char* message = params.error != nullptr ? params.error : params.helpText;
-    if (message != nullptr && message[0] != 0)
+    // A label cut to its share shows in full on hover and on keyboard focus (rule 11).
+    if (front.shown.truncated)
     {
-        const ImVec2 at(frame.Min.x, frame.Max.y + gapXs);
-        bottom = at.y + TextFieldMessage(message, params.error != nullptr, disabled, at, frame.GetWidth(), true);
+        const ImRect labelRect(origin.x, frame.Min.y, frame.Min.x, frame.Max.y);
+        const bool overLabel = ImGui::IsMouseHoveringRect(labelRect.Min, labelRect.Max) && g.HoveredWindow == window;
+        CutTextTooltip(ImGui::GetIDWithSeed("label tooltip", nullptr, id), labelRect, overLabel, focusVisible, label,
+                       labelEnd, true);
     }
+
+    // ---- Message line (errors are reported for ValidationSummary) ----
+    const ControlMessage message = PickControlMessage(params.error, params.helpText);
+    const float bottom = DrawControlMessage(message, ImVec2(frame.Min.x, frame.Max.y), frame.GetWidth(), disabled, id, frame);
     window->DC.CursorMaxPos = ImMax(window->DC.CursorMaxPos, ImVec2(frame.Max.x, bottom));
     ImGui::EndGroup();
     FinishWidgetGroup(id);
