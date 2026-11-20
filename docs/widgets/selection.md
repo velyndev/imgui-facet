@@ -53,8 +53,29 @@ bool Checkbox(const char* label, bool* value, const CheckboxOptions& options = {
 bool Checkbox(const char* label, CheckState* state, const CheckboxOptions& options = {});
 ```
 
-A box and its label; the `CheckState` overload adds the mixed look that only the caller sets.
-Status: planned.
+A box (the checkboxSize token, 16 units) and the visible label after it; the label is part of the
+hit area. Returns true on the frame it wrote the value.
+
+- **Input.** A click, or Space or Enter while it has keyboard focus, flips the value. In the
+  `CheckState` overload Off and Mixed become On, and On becomes Off; only the caller sets Mixed.
+  A mouse press that then crosses other checkboxes of the same window with the button held gives
+  each of them the first box's new value, the first box included (one write per box that changes),
+  and the release does not flip the first box back.
+- **Look.** Unchecked: no fill at rest (fill[1] on hover, fill[0] while pressed) and the 3:1
+  boundary hairline. Checked: the accent with an onAccent check and a focusRing hairline. Mixed:
+  the same fill with a minus, so it differs from both other states by its shape and not only by
+  its color. The corners are radii.element, at most a quarter of the box, so a box never looks like
+  a radio mark. The fill fades over `motion.durationFast` (at once with reduced motion). The focus
+  ring goes around the box after keyboard input.
+- **States.** Disabled: fill[3] with a labelTertiary glyph, no Tab stop. `readOnly` (or a null
+  value pointer): checked and mixed boxes are labelSecondary instead of the accent, focusable,
+  never written. `error` replaces `helpText` under the box.
+- **Sizes and width.** `size` sets the item height and the label text; the box keeps its token
+  size. The default width is the box, spacing.sm and the label; `ImGui::SetNextItemWidth` and
+  `PushItemWidth` apply as rule 6 says, and a narrower width cuts the label with an ellipsis and
+  shows it in full on hover and keyboard focus.
+
+Status: ready.
 
 ### CheckboxGroup
 

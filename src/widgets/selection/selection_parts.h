@@ -127,7 +127,11 @@ enum class SelectionMark
 // on `centerY`, on whole pixels.
 ImRect SelectionMarkRect(float x, float centerY);
 
-// Draws a checkbox: a box with radii.element corners. Off is the hover fill of a neutral control
+// The corner radius of a checkbox box (pixels): radii.element, at most a quarter of the side, so a
+// box never reads as the circle of a radio mark. The focus ring takes it too.
+float SelectionCheckboxRadius(const ImRect& box);
+
+// Draws a checkbox: a box with SelectionCheckboxRadius corners. Off is the hover fill of a neutral control
 // with the 3:1 boundary hairline; On and Mixed fill it with the accent (labelSecondary while
 // read-only) and draw the check or minus glyph in onAccent, so the mixed state differs from both
 // others by its shape. `onAmount` (0 to 1) fades between Off and the mark; `shown` is the glyph

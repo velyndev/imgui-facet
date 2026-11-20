@@ -233,6 +233,187 @@ TEST_CASE("The toggle focus ring shows after keyboard input only")
     CHECK(ringVertices > 0);
 }
 
+// --- Checkbox ---------------------------------------------------------------------------------
+
+TEST_CASE("A checkbox flips on a click on box or label, Space and Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool value = false;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::Checkbox("Show hidden files", &value))
+            ++writes;
+        session.Track("check");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("check");
+    session.Click(ImVec2(r.Max.x - 4.0f, r.GetCenter().y));  // on the label
+    CHECK(value);
+    session.Click(ImVec2(r.Min.x + 4.0f, r.GetCenter().y));  // on the box
+    CHECK_FALSE(value);
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("check"));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(value);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(value);
+    CHECK(writes == 4);
+}
+
+TEST_CASE("A tri-state checkbox goes from Off and Mixed to On and from On to Off")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::CheckState state = facet::CheckState::Mixed;
+    session.SetUi([&] {
+        facet::Checkbox("Select all", &state);
+        session.Track("check");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("check"));
+    CHECK(state == facet::CheckState::On);
+    session.Click(session.ItemCenter("check"));
+    CHECK(state == facet::CheckState::Off);
+    session.Click(session.ItemCenter("check"));
+    CHECK(state == facet::CheckState::On);
+}
+
+TEST_CASE("Dragging from one checkbox across others paints the first box's new value")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool values[4] = {false, true, false, false};
+    int writes = 0;
+    session.SetUi([&] {
+        for (int i = 0; i < 4; ++i)
+        {
+            ImGui::PushID(i);
+            writes += facet::Checkbox("Item", &values[i]) ? 1 : 0;
+            session.Track(i == 0 ? "c0" : i == 1 ? "c1" : i == 2 ? "c2" : "c3");
+            ImGui::PopID();
+        }
+    });
+    session.Frame();
+    // Down on the first box, over the second and third, up on the third: all three on.
+    session.Drag({session.ItemCenter("c0"), session.ItemCenter("c1"), session.ItemCenter("c2")}, 4);
+    session.Frame();
+    CHECK(values[0]);
+    CHECK(values[1]);
+    CHECK(values[2]);
+    CHECK_FALSE(values[3]);
+    CHECK(writes == 2);  // the first and the third changed; the second was on already
+    // From an on box: paints off, and the release on another box does not flip the first back.
+    session.Drag({session.ItemCenter("c2"), session.ItemCenter("c1"), session.ItemCenter("c2")}, 4);
+    session.Frame();
+    CHECK_FALSE(values[2]);
+    CHECK_FALSE(values[1]);
+    CHECK(values[0]);
+}
+
+TEST_CASE("A read-only, disabled or null checkbox never writes and a disabled one is no Tab stop")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool readOnly = false;
+    bool disabled = false;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        writes += facet::Checkbox("Read only", &readOnly, {.readOnly = true}) ? 1 : 0;
+        session.Track("readOnly");
+        ImGui::BeginDisabled();
+        writes += facet::Checkbox("Disabled", &disabled) ? 1 : 0;
+        session.Track("disabled");
+        ImGui::EndDisabled();
+        writes += facet::Checkbox("Null", static_cast<bool*>(nullptr)) ? 1 : 0;
+        session.Track("null");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("readOnly"));
+    session.Click(session.ItemCenter("disabled"));
+    session.Click(session.ItemCenter("null"));
+    CHECK(writes == 0);
+    CHECK_FALSE(readOnly);
+    CHECK_FALSE(disabled);
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("readOnly"));  // read-only stays focusable
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(readOnly);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("null"));  // the disabled box is passed over
+}
+
+TEST_CASE("Checked and mixed boxes fill with the accent and an unchecked one does not")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 accent = facet::ToU32(facet::T().colors.accent);
+    const ImU32 glyph = facet::ToU32(facet::T().colors.onAccent);
+    int off = -1;
+    int on = 0;
+    int mixed = 0;
+    int mixedGlyph = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        bool no = false;
+        bool yes = true;
+        facet::CheckState partly = facet::CheckState::Mixed;
+        int from = drawList->VtxBuffer.Size;
+        facet::Checkbox("Off", &no);
+        off = CountColor(from, accent);
+        from = drawList->VtxBuffer.Size;
+        facet::Checkbox("On", &yes);
+        on = CountColor(from, accent);
+        from = drawList->VtxBuffer.Size;
+        facet::Checkbox("Mixed", &partly);
+        mixed = CountColor(from, accent);
+        mixedGlyph = CountColor(from, glyph);
+    });
+    session.Frames(3);
+    CHECK(off == 0);
+    CHECK(on > 0);
+    CHECK(mixed > 0);
+    CHECK(mixedGlyph > 0);
+}
+
+TEST_CASE("A checkbox narrower than its label cuts it and shows the label on hover")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool value = false;
+    bool tip = false;
+    session.SetUi([&] {
+        ImGui::SetNextItemWidth(70.0f);
+        facet::Checkbox("Remember the window position between sessions", &value);
+        session.Track("check");
+        tip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
+        facet::Checkbox("Large##large", &value, {.size = facet::ControlSize::Large});
+        session.Track("large");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("check").GetWidth() == doctest::Approx(70.0f));
+    CHECK(session.ItemRect("large").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Large)));
+    session.MouseMove(session.ItemCenter("check"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+}
+
+TEST_CASE("A checkbox outside a frame returns false")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool value = false;
+    facet::CheckState state = facet::CheckState::Off;
+    CHECK_FALSE(facet::Checkbox("Check", &value));
+    CHECK_FALSE(facet::Checkbox("Check", &state));
+}
+
 TEST_CASE("A toggle outside a frame returns false")
 {
     facet::test::Session session;

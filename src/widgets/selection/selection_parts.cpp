@@ -132,11 +132,16 @@ ImRect SelectionMarkRect(float x, float centerY)
     return ImRect(left, top, left + side, top + side);
 }
 
+float SelectionCheckboxRadius(const ImRect& box)
+{
+    return std::min(Px(T().radii.element), std::round(box.GetWidth() * kCheckboxRadiusShare));
+}
+
 void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMark shown, float onAmount,
                            const ItemState& item)
 {
     const MarkColors look = MarkLook(onAmount, item);
-    const float radius = std::min(Px(T().radii.element), std::round(box.GetWidth() * kCheckboxRadiusShare));
+    const float radius = SelectionCheckboxRadius(box);
     FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);
     StrokeRect(drawList, box.Min, box.Max, ToU32(look.outline), radius, HairlineThickness());
     if (shown != SelectionMark::Off && look.glyph.w > 0.0f)

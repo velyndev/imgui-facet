@@ -32,9 +32,14 @@ struct SelectionUi
     bool errorToggle = false;
     int toggleWrites = 0;
 
+    // Checkbox
+    bool checks[4] = {true, false, false, true};
+    facet::CheckState triState = facet::CheckState::Mixed;
+    bool checkSizes[3] = {true, true, true};
+    bool checkError = false;
+    int checkWrites = 0;
+
     // Planned widgets below.
-    bool check = false;
-    facet::CheckState mixed = facet::CheckState::Mixed;
     bool group[3] = {true, false, true};
     int radio = 0;
     int segment = 1;
@@ -167,6 +172,87 @@ void ToggleSection(facet::demo::PageCtx& ctx)
          ui.toggleWrites);
 }
 
+void CheckboxSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Checkbox");
+    Paragraph("A box for an option that is on or off. The label is part of the target; dragging from one box "
+              "across others gives them all the first box's new value.");
+
+    LabeledRow("Options");
+    {
+        static const char* const kNames[] = {"Option 1", "Option 2", "Option 3", "Option 4"};
+        static const char* const kProbes[] = {"sel.check.0", "sel.check.1", "sel.check.2", "sel.check.3"};
+        const ControlRow row;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (i > 0)
+                row.Next();
+            if (i == 1)
+                ForceState(ctx);
+            if (facet::Checkbox(kNames[i], &ui.checks[i]))
+                ++ui.checkWrites;
+            ctx.Probe(kProbes[i]);
+        }
+    }
+
+    LabeledRow("Tri-state");
+    {
+        const ControlRow row;
+        if (facet::Checkbox("Partly chosen", &ui.triState))
+            ++ui.checkWrites;
+        ctx.Probe("sel.check.tri");
+        row.Next();
+        if (facet::Button("Set mixed again", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
+            ui.triState = facet::CheckState::Mixed;
+        ctx.Probe("sel.check.reset");
+    }
+
+    LabeledRow("Sizes");
+    {
+        const ControlRow row;
+        facet::Checkbox("Small", &ui.checkSizes[0], {.size = facet::ControlSize::Small});
+        row.Next();
+        facet::Checkbox("Regular", &ui.checkSizes[1]);
+        row.Next();
+        facet::Checkbox("Large", &ui.checkSizes[2], {.size = facet::ControlSize::Large});
+    }
+
+    LabeledRow("States");
+    {
+        const ControlRow row;
+        bool on = true;
+        bool off = false;
+        facet::CheckState partly = facet::CheckState::Mixed;
+        ImGui::BeginDisabled();
+        facet::Checkbox("Disabled", &on);
+        ctx.Probe("sel.check.disabled");
+        row.Next();
+        facet::Checkbox("Disabled##off", &off);
+        row.Next();
+        facet::Checkbox("Disabled##mixed", &partly);
+        ImGui::EndDisabled();
+        row.Next();
+        facet::Checkbox("Read-only", &on, {.readOnly = true});
+        row.Next();
+        facet::Checkbox("Read-only##mixed", &partly, {.readOnly = true});
+    }
+    LabeledRow("Messages");
+    {
+        const ControlRow row;
+        facet::Checkbox("Placeholder agreement", &ui.checkError,
+                        {.error = ui.checkError ? nullptr : "Placeholder error: check the box to clear it."});
+        ctx.Probe("sel.check.error");
+        row.Next();
+        bool help = false;
+        facet::Checkbox("Another option", &help, {.helpText = "Placeholder help text under the box."});
+    }
+    ctx.RevealInCapture(0.5f);
+    const int checked = ui.checks[0] + ui.checks[1] + ui.checks[2] + ui.checks[3];
+    Note("Options checked: %d of 4. Tri-state: %s. Writes on this section: %d.", checked,
+         ui.triState == facet::CheckState::On ? "on" : ui.triState == facet::CheckState::Off ? "off" : "mixed",
+         ui.checkWrites);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused")
@@ -178,11 +264,9 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     ToggleSection(ctx);
 
-    SectionHeader("Checkboxes");
-    LabeledRow("Checkbox");
-    facet::Checkbox("Option 1##check", &ui.check);
-    LabeledRow("Tri-state");
-    facet::Checkbox("Option 2##mixed", &ui.mixed);
+    CheckboxSection(ctx);
+
+    SectionHeader("Checkbox groups");
     LabeledRow("Checkbox group");
     facet::CheckboxGroup("##group", ui.group, kOptions, {.selectAll = true});
 
@@ -244,4 +328,34 @@ FACET_DEMO_SELFTEST("selection")
     test.MouseDown();
     test.MouseUp();
     test.Expect("turning the toggle on clears its placeholder error", [] { return ui.errorToggle; });
+
+    // Checkbox: click, keys, painting, tri-state, disabled.
+    test.Click("sel.check.1");
+    test.Expect("a click checks the box", [] { return ui.checks[1]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.check.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space unchecks the focused box", [] { return !ui.checks[1]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.check.2");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter checks the focused box", [] { return ui.checks[2]; });
+    test.Drag({T::Item("sel.check.0", 0.1f), T::Item("sel.check.1", 0.1f), T::Item("sel.check.2", 0.1f),
+               T::Item("sel.check.3", 0.1f)},
+              0.4f);
+    test.Expect("dragging from a checked box unchecks every box it crosses",
+                [] { return !ui.checks[0] && !ui.checks[1] && !ui.checks[2] && !ui.checks[3]; });
+    test.Click("sel.check.tri");
+    test.Expect("a click on a mixed box writes on", [] { return ui.triState == facet::CheckState::On; });
+    test.Click("sel.check.tri");
+    test.Expect("and the next one off", [] { return ui.triState == facet::CheckState::Off; });
+    test.Click("sel.check.reset");
+    test.Expect("the plain button sets mixed again", [] { return ui.triState == facet::CheckState::Mixed; });
+    const int writes = 8;
+    test.Click("sel.check.disabled");
+    test.ExpectNear("the disabled box does not write", [] { return ui.checkWrites; }, writes, 0.0);
+    test.MouseMove(T::Item("sel.check.error", 0.1f, 0.2f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("checking the box clears its placeholder error", [] { return ui.checkError; });
 }
