@@ -212,8 +212,18 @@ bool RangeSliderHistogram(const char* label, int* low, int* high, int min, int m
                           const RangeSliderHistogramOptions& options = {});
 ```
 
-A range slider under a bar chart of the distribution; bars outside the range are dimmed.
-Status: planned.
+The two-handle track of RangeSlider (label in front, both values at the end) under a bar area
+`histogramHeight` units high (histogramHeight by default). The bins divide `[min, max]` evenly;
+each bar stands where its values lie on the track (narrower toward `max` on a logarithmic track),
+with a hairline gap between bars, its height relative to the largest bin, and its top corners
+rounded. The parts of the bars between the two handles are drawn in the accent (labelSecondary
+read-only, labelTertiary disabled), the rest in fill[0]; while `mixed` every bar is drawn in the
+accent. Hovering a bar shows its interval in interval notation (`[a, b)`, the last one closed)
+and its weight in a tooltip. Negative, NaN and infinite bins count as 0; no bins, or bins that
+are all 0, keep the bar area empty. Only the track row takes the mouse. Handles, keys, typed
+values, `allowOutOfRange`, `doubleClickReset`, states and item queries are as RangeSlider.
+
+Status: ready.
 
 ### MultiSlider
 

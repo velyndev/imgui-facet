@@ -93,9 +93,13 @@ struct SlidersUi
     float knobPan = 0.0f;
     float knobFixed = 0.6f;
 
-    // The planned widgets below.
+    // RangeSliderHistogram
     float histogramLow = 0.3f;
     float histogramHigh = 0.6f;
+    int emptyLow = 2;
+    int emptyHigh = 8;
+
+    // The planned widgets below.
     ImVec2 point = {0.5f, 0.5f};
     ImVec2 stick = {0.0f, 0.0f};
     float arcLow = 45.0f;
@@ -415,6 +419,17 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     MultiSection(ctx);
     KnobSection(ctx);
 
+    SectionHeader("RangeSliderHistogram");
+    Paragraph("A range over a bar chart of the caller's counts; bars outside the range are dimmed, and hovering a bar "
+              "shows its interval and count.");
+    LabeledRow("Over bars");
+    facet::RangeSliderHistogram("Spread", &ui.histogramLow, &ui.histogramHigh, 0.0f, 1.0f, kBins,
+                                {.format = "%.2f", .minGap = 0.05});
+    ctx.Probe("histogram.spread");
+    LabeledRow("No data");
+    facet::RangeSliderHistogram("Empty", &ui.emptyLow, &ui.emptyHigh, 0, 10, {}, {.helpText = "No bins: the track alone"});
+    ctx.Probe("histogram.empty");
+
     SectionHeader("More ranges");
     Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
               "and either stop at each other or push each other.");
@@ -664,7 +679,16 @@ FACET_DEMO_SELFTEST("sliders")
     test.Drag({T::Item("knob.arc", 0.5f, 0.3f), T::Item("knob.arc", 0.5f, 0.3f).Offset(0.0f, 50.0f)}, 0.3f);
     test.Expect("a downward drag turns the knob down", [] { return ui.knobArc < 0.5f; });
     test.Drag({T::Item("knob.pan", 0.5f, 0.3f), T::Item("knob.pan", 0.5f, 0.3f).Offset(-60.0f, 0.0f)}, 0.3f);
-    test.Expect("a drag to the left of the circular knob turns it left", [] { return ui.knobPan < -0.3f; });    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
+    test.Expect("a drag to the left of the circular knob turns it left", [] { return ui.knobPan < -0.3f; });    // RangeSliderHistogram: a click on the track row left of the low handle moves it there and
+    // focuses it; End then stops it one gap before the high handle.
+    test.Do([] { ui.histogramLow = 0.7f; ui.histogramHigh = 0.9f; });
+    test.MouseMove(T::Item("histogram.spread", 0.55f, 1.0f).Offset(0.0f, -14.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click left of the low handle moves it down", [] { return ui.histogramLow < 0.7f; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End stops the low handle one gap before the high one", [] { return ui.histogramLow; }, 0.85, 1e-6);    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
     test.Expect("a drag pushes the whole-number levels down", [] { return ui.levels[2] < 8; });
 
     test.Do([] { ui.yearLow = 1990; ui.yearHigh = 2020; });

@@ -1096,3 +1096,39 @@ TEST_CASE("A circular knob follows the pointer angle, and a read-only knob write
     session.Drag({f.GetCenter(), ImVec2(f.GetCenter().x, f.GetCenter().y - 80.0f)});
     CHECK(fixed == 0.5f);
 }
+// ---- RangeSliderHistogram ------------------------------------------------------------------
+
+TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float kBins[] = {1.0f, 3.0f, 0.0f, 2.0f};
+    int low = 20, high = 60;
+    float emptyLow = 0.2f, emptyHigh = 0.4f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::RangeSliderHistogram("Spread", &low, &high, 0, 100, kBins, {.minGap = 10.0, .width = 400.0f});
+        session.Track("histogram");
+        facet::RangeSliderHistogram("Empty", &emptyLow, &emptyHigh, 0.0f, 1.0f, {}, {.width = 400.0f});
+        session.Track("empty");
+    });
+    session.Frame();
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    const float barsHeight = std::round(facet::Px(facet::T().metrics.histogramHeight));
+    CHECK(session.ItemRect("histogram").GetHeight() == doctest::Approx(row + barsHeight));
+    CHECK(session.ItemRect("empty").GetHeight() == doctest::Approx(row + barsHeight));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(low == 50);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(high == 100);
+    // A drag on the bars does not move the handles: only the track row takes the mouse.
+    const ImRect rect = session.ItemRect("histogram");
+    session.Drag({ImVec2(rect.GetCenter().x, rect.Min.y + 4.0f), ImVec2(rect.Max.x - 60.0f, rect.Min.y + 4.0f)});
+    CHECK(low == 50);
+    CHECK(high == 100);
+}
