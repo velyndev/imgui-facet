@@ -48,9 +48,19 @@ struct SelectionUi
     int radioError = -1;
     int radioWrites = 0;
 
+    // SegmentedControl
+    int segment = 1;
+    int segmentIcons = 0;
+    int segmentIconOnly = 2;
+    int segmentFill = 0;
+    int segmentSizes[3] = {0, 1, 2};
+    int segmentDisabled = 0;
+    int segmentMixed = 0;
+    int segmentNarrow = 1;
+    int segmentWrites = 0;
+
     // Planned widgets below.
     bool group[3] = {true, false, true};
-    int segment = 1;
     bool chips[3] = {true, false, false};
     int chipChoice = 0;
     int cycle = 0;
@@ -327,6 +337,76 @@ void RadioSection(facet::demo::PageCtx& ctx)
          ui.radioWrites);
 }
 
+void SegmentedSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SegmentedControl");
+    Paragraph("A compact one-of-several choice. The selection pill slides to the chosen segment; a press, a drag "
+              "across the segments or Left and Right move it, and the control is one Tab stop.");
+
+    static const facet::ChoiceItem kWithDisabled[] = {
+        {"Option 1"},
+        {"Option 2 (disabled)", {}, nullptr, nullptr, true},
+        {"Option 3"},
+    };
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.segmentWrites;
+    };
+
+    LabeledRow("Labels");
+    ForceState(ctx, 2);
+    count(facet::SegmentedControl("##labels", &ui.segment, kOptions));
+    ctx.Probe("sel.seg");
+    ProbeEntries(ctx, "##labels", "sel.seg", 3);
+    LabeledRow("Icons and labels");
+    count(facet::SegmentedControl("##icons", &ui.segmentIcons, kChoices));
+    ctx.Probe("sel.seg.icons");
+    ProbeEntries(ctx, "##icons", "sel.seg.icons", 3);
+    LabeledRow("Icons only");
+    count(facet::SegmentedControl("##iconOnly", &ui.segmentIconOnly, kChoices, {.iconOnly = true}));
+    ctx.Probe("sel.seg.iconOnly");
+    LabeledRow("Full width");
+    count(facet::SegmentedControl("##fill", &ui.segmentFill, kOptions, {.width = facet::kFill}));
+    ctx.Probe("sel.seg.fill");
+    LabeledRow("Sizes");
+    {
+        const ControlRow row;
+        count(facet::SegmentedControl("##small", &ui.segmentSizes[0], kOptions, {.size = facet::ControlSize::Small}));
+        row.Next();
+        count(facet::SegmentedControl("##regular", &ui.segmentSizes[1], kOptions));
+        row.Next();
+        count(facet::SegmentedControl("##large", &ui.segmentSizes[2], kOptions, {.size = facet::ControlSize::Large}));
+    }
+    LabeledRow("With a label");
+    count(facet::SegmentedControl("Placeholder setting", &ui.segmentDisabled, kWithDisabled));
+    ctx.Probe("sel.seg.disabled");
+    ProbeEntries(ctx, "Placeholder setting", "sel.seg.disabled", 3);
+    LabeledRow("States");
+    {
+        const ControlRow row;
+        int fixed = 1;
+        facet::SegmentedControl("##readOnly", &fixed, kOptions, {.readOnly = true});
+        row.Next();
+        ImGui::BeginDisabled();
+        facet::SegmentedControl("##disabledAll", &fixed, kOptions);
+        ImGui::EndDisabled();
+        row.Next();
+        count(facet::SegmentedControl("##mixed", &ui.segmentMixed, kOptions, {.mixed = true}));
+        ctx.Probe("sel.seg.mixed");
+    }
+    LabeledRow("Narrow");
+    {
+        const ControlRow row;
+        // 150 units hold neither set of labels: icons replace them where every item has one,
+        // and labels are cut where they do not.
+        count(facet::SegmentedControl("##narrowIcons", &ui.segmentNarrow, kChoices, {.width = 150.0f}));
+        row.Next();
+        count(facet::SegmentedControl("##narrowLabels", &ui.segmentNarrow, kOptions, {.width = 150.0f}));
+    }
+    ctx.RevealInCapture(0.5f);
+    Note("Labels: %s. Writes on this section: %d.", kOptions[ui.segment], ui.segmentWrites);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "pressed", "focused")
@@ -346,10 +426,10 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
 
     RadioSection(ctx);
 
+    SegmentedSection(ctx);
+
     SectionHeader("One of several");
     Paragraph("Exclusive choices, from a few labelled options to a compact strip.");
-    LabeledRow("Segmented");
-    facet::SegmentedControl("##segment", &ui.segment, kOptions);
     LabeledRow("Cycle selector");
     facet::CycleSelector("##cycle", &ui.cycle, kOptions, {.pageDots = true});
     LabeledRow("Bind mode");
@@ -455,4 +535,33 @@ FACET_DEMO_SELFTEST("selection")
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.ExpectFocused("sel.radio.row.2");
     test.ExpectNear("each move wrote once", [] { return ui.radioWrites; }, 5.0, 0.0);
+
+    // SegmentedControl: press, drag, arrows inside one Tab stop, the disabled segment.
+    test.MouseMove(T::Item("sel.seg", 0.9f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a press selects the last segment", [] { return ui.segment; }, 2.0, 0.0);
+    test.Drag({T::Item("sel.seg", 0.85f), T::Item("sel.seg", 0.5f), T::Item("sel.seg", 0.1f)}, 0.3f);
+    test.ExpectNear("a drag across moves the selection to the first", [] { return ui.segment; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right selects the next segment", [] { return ui.segment; }, 1.0, 0.0);
+    test.ExpectFocused("sel.seg.1");
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End selects the last", [] { return ui.segment; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("and Right stops there", [] { return ui.segment; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("sel.seg.icons.0");
+    test.Do([] { ui.segmentDisabled = 0; });
+    test.MouseMove(T::Item("sel.seg.disabled", 0.98f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a press on the last segment of the labelled control", [] { return ui.segmentDisabled; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("Left skips the disabled segment", [] { return ui.segmentDisabled; }, 0.0, 0.0);
+    test.ExpectFocused("sel.seg.disabled.0");
+    test.MouseMove(T::Item("sel.seg.mixed", 0.15f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the first press on a mixed control writes", [] { return ui.segmentWrites; }, 8.0, 0.0);
 }

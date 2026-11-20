@@ -4,6 +4,7 @@
 // pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
 // tests/test_api_selection.cpp.
 
+#include <cfloat>
 #include <cmath>
 #include <string>
 
@@ -13,6 +14,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/popup_host.h"
 #include "support/session.h"
@@ -537,6 +539,197 @@ TEST_CASE("A horizontal radio group wraps into rows that never leave its width")
     CHECK(wideHeight == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
     CHECK(narrowHeight > wideHeight * 2.0f);
     CHECK(narrowWidth <= available + 0.5f);
+}
+
+// --- SegmentedControl -------------------------------------------------------------------------
+
+namespace
+{
+
+// The bounding box of the vertices of `color` the window draw list received since `from`: for a
+// filled shape, its opaque inner part (anti-aliasing puts it half a pixel inside the edge).
+ImRect ColorBounds(int from, ImU32 color)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImRect bounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        if (drawList->VtxBuffer[i].col == color)
+            bounds.Add(drawList->VtxBuffer[i].pos);
+    return bounds;
+}
+
+// A filled edge on a whole pixel: its opaque vertices lie on the pixel, or half a pixel inside it
+// where anti-aliasing adds a fringe.
+bool IsWhole(float pixels)
+{
+    const float twice = pixels * 2.0f;
+    return std::fabs(twice - std::round(twice)) < 0.02f;
+}
+
+} // namespace
+
+TEST_CASE("A segmented control is one Tab stop; Left and Right stop at the ends and skip disabled segments")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kItems[] = {{"Day"}, {"Week", {}, nullptr, nullptr, true}, {"Month"}, {"Year"}};
+    int index = 0;
+    int writes = 0;
+    ImGuiID ids[4] = {};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        for (int i = 0; i < 4; ++i)
+            ids[i] = EntryIdOf("Range", i);
+        if (facet::SegmentedControl("Range", &index, kItems))
+            ++writes;
+        session.Track("segments");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    TabFrom(session, 2);
+    CHECK(ImGui::GetFocusID() == ids[0]);
+    session.KeyPress(ImGuiKey_LeftArrow);  // stops at the first
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_RightArrow);  // skips the disabled Week
+    CHECK(index == 2);
+    CHECK(ImGui::GetFocusID() == ids[2]);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_RightArrow);  // stops at the last
+    CHECK(index == 3);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(index == 3);
+    CHECK(writes == 4);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(ImGui::GetFocusID() == ids[3]);
+}
+
+TEST_CASE("A press selects a segment and a drag across the segments moves the selection")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three", "Four"};
+    int index = 0;
+    session.SetUi([&] {
+        facet::SegmentedControl("##segments", &index, kItems, {.width = 400.0f});
+        session.Track("segments");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("segments");
+    const float y = r.GetCenter().y;
+    const float quarter = r.GetWidth() * 0.25f;
+    session.Click(ImVec2(r.Min.x + quarter * 1.5f, y));
+    CHECK(index == 1);
+    session.Drag({ImVec2(r.Min.x + quarter * 0.5f, y), ImVec2(r.Min.x + quarter * 3.5f, y)}, 6);
+    CHECK(index == 3);
+}
+
+TEST_CASE("Segments fit their content by default, share a set width equally and fill a short row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"A", "Longer label"};
+    static const facet::ChoiceItem kIcons[] = {{"Grid", facet::Icon("grid")}, {"List", facet::Icon("list")}};
+    int index = 0;
+    float available = 0.0f;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        facet::SegmentedControl("##fit", &index, kItems);
+        session.Track("fit");
+        facet::SegmentedControl("##fill", &index, kItems, {.width = facet::kFill});
+        session.Track("fill");
+        facet::SegmentedControl("##icons", &index, kIcons, {.iconOnly = true});
+        session.Track("icons");
+        facet::SegmentedControl("##large", &index, kItems, {.size = facet::ControlSize::Large});
+        session.Track("large");
+    });
+    session.Frame();
+    const facet::internal::ControlMetrics m = facet::internal::GetControlMetrics(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("fit").GetWidth() < available);
+    CHECK(session.ItemRect("fill").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("icons").GetWidth() == doctest::Approx(m.height * 2.0f));
+    CHECK(session.ItemRect("large").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Large)));
+}
+
+TEST_CASE("The selection pill springs to the new segment, rests on whole pixels and jumps with reduced motion")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Light(), false);
+    static const char* const kItems[] = {"One", "Two", "Three", "Four"};
+    int index = 0;
+    float width = 401.0f;  // an odd width, so the segment edges need rounding
+    ImRect pill;
+    session.SetUi([&] {
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::SegmentedControl("##segments", &index, kItems, {.width = width});
+        pill = ColorBounds(from, facet::ToU32(facet::T().colors.accentSubtle));
+        session.Track("segments");
+    });
+    session.Frame();
+    const ImRect start = pill;
+    REQUIRE(start.Min.x < start.Max.x);
+    index = 3;
+    session.Frame();
+    session.Frame();
+    // On its way: past the start, short of the end.
+    CHECK(pill.Min.x > start.Min.x);
+    session.Seconds(1.5f);
+    const ImRect r = session.ItemRect("segments");
+    CHECK(pill.Max.x > r.Max.x - r.GetWidth() * 0.25f - 1.0f);
+    CHECK(IsWhole(pill.Min.x));
+    CHECK(IsWhole(pill.Max.x));
+    CHECK(IsWhole(pill.Min.y));
+    // A width change: the pill follows its segment and comes to rest on whole pixels again.
+    const ImRect before = pill;
+    width = 300.0f;
+    session.Frame();
+    CHECK(pill.Max.x > session.ItemRect("segments").Max.x);  // still on its way, no jump
+    session.Seconds(1.5f);
+    CHECK(pill.Max.x < before.Max.x);
+    CHECK(IsWhole(pill.Min.x));
+    // Reduced motion: at the new segment in the next frame.
+    facet::Theme reduced = facet::T();
+    reduced.motion.reduceMotion = true;
+    facet::SetTheme(reduced, false);
+    const ImRect rested = pill;
+    index = 0;
+    session.Frame();
+    session.Frame();
+    CHECK(pill.Min.x < rested.Min.x - 100.0f);
+    CHECK(IsWhole(pill.Min.x));
+}
+
+TEST_CASE("A read-only or mixed segmented control shows no write until an edit, read-only never writes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int fixed = 0;
+    int mixed = 1;
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::SegmentedControl("##ro", &fixed, kItems, {.width = 300.0f, .readOnly = true}) ? 1 : 0;
+        session.Track("ro");
+        writes += facet::SegmentedControl("##mixed", &mixed, kItems, {.width = 300.0f, .mixed = true}) ? 1 : 0;
+        session.Track("mixed");
+    });
+    session.Frame();
+    const ImRect ro = session.ItemRect("ro");
+    session.Click(ImVec2(ro.Max.x - 10.0f, ro.GetCenter().y));
+    CHECK(fixed == 0);
+    CHECK(writes == 0);
+    // Choosing the segment that is already set still counts as the edit that ends the mixed look.
+    const ImRect mr = session.ItemRect("mixed");
+    session.Click(mr.GetCenter());
+    CHECK(mixed == 1);
+    CHECK(writes == 1);
 }
 
 TEST_CASE("A toggle outside a frame returns false")

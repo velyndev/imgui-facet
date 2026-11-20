@@ -139,6 +139,7 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
     const int stop = internal::SelectionRovingStop(count, selected, enabled, idOf);
     int chosen = selected;
     int focused = -1;
+    ImGuiID editor = widgetId;  // the part that made the edit, for Dear ImGui's edit queries
     PlaceOptions(items, layout, optionsOrigin, [&](int i, const ImRect& rect) {
         const ChoiceItem item = items.At(i);
         const ImGuiID entryId = idOf(i);
@@ -153,7 +154,10 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
         if (entry.focused && g.NavId == entryId && entry.forced == internal::ForcedItemState::None)
             focused = i;
         if (entry.pressed && !entry.readOnly && entry.forced == internal::ForcedItemState::None)
+        {
             chosen = i;
+            editor = entryId;
+        }
 
         const bool on = i == selected;
         const float onAmount = internal::SelectionMarkAmount(entryId, on);
@@ -194,7 +198,10 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
         {
             internal::SelectionMoveFocus(idOf(moved));
             if (!readOnly)
+            {
                 chosen = moved;
+                editor = idOf(moved);
+            }
         }
     }
 
@@ -203,7 +210,6 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
     {
         *index = chosen;
         written = true;
-        ImGui::MarkItemEdited(widgetId);
     }
 
     const float bottom = internal::DrawControlMessage(message, ImVec2(origin.x, optionsOrigin.y + optionsHeight),
@@ -213,7 +219,7 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_Edited;
+        ImGui::MarkItemEdited(editor);
     return written;
 }
 

@@ -130,7 +130,35 @@ bool SegmentedControl(const char* label, int* index, std::span<const char* const
                       const SegmentedControlOptions& options = {});
 ```
 
-Joined segments with the sliding selection pill. Status: planned.
+Joined segments on one track with the sliding selection pill behind the chosen one, and the
+visible label part in front (rule 6). Returns true on the frame it wrote `*index`; -1 shows no
+segment selected.
+
+- **Input.** Pressing a segment selects it at once, and a drag across the segments with the button
+  held moves the selection to the segment under the pointer. The control is one Tab stop (the
+  selected segment, else the first enabled one); Left and Right move the focus and the selection
+  and stop at the ends, Home and End go to the first and last enabled segment. Items with
+  `disabled` are drawn disabled and skipped.
+- **Look.** The track is fill[2] with the 3:1 boundary hairline. The pill is accentSubtle,
+  metrics.segmentInset inside the track with concentric corners, and the selected label is
+  semibold, so the choice does not depend on the tint alone. Hover and press tint a segment inside
+  the same inset; hairline dividers stand between segments where the pill is not. The pill springs
+  to a new segment with the standard spring (its leading edge a little faster, so it stretches on
+  the way), comes to rest on whole pixels, follows a change of width or scale with the same
+  spring, and moves at once with reduced motion. The focus ring goes around the focused segment.
+- **Width.** `width` 0 fits the segments (each its content plus the control padding, measured in
+  semibold so the bold label of the selected one fits), at most the available width; `kFill`, a
+  set width, `ImGui::SetNextItemWidth` or a row shorter than the content divide the track into
+  equal segments. `iconOnly` shows the item icons in square segments with the labels as tooltips.
+  When labels do not fit their segments they collapse to icons if every item has one, and are cut
+  with an ellipsis otherwise; either way the full label shows on hover and keyboard focus.
+- **States.** `ImGui::BeginDisabled`: fill[3], a neutral pill and labelTertiary labels.
+  `readOnly` (or a null `index`): no track fill, a neutral pill, focusable, never written.
+  `mixed`: no pill until the first press or arrow key, which writes even when it picks the segment
+  that was already set.
+- **Limits.** At most 64 segments are shown.
+
+Status: ready.
 
 ### Chip
 
