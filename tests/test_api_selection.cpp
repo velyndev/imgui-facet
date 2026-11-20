@@ -38,7 +38,6 @@ void CallSelectionStubs(Values& v)
 {
     using namespace facet;
     const std::span<bool> flags(v.flags);
-    FACET_CHECK_STUB(false, Toggle("Toggle 1", &v.flag, {.helpText = "Help"}));
     FACET_CHECK_STUB(false, Checkbox("Checkbox 1", &v.flag));
     FACET_CHECK_STUB(false, Checkbox("Checkbox 2", &v.check));
     FACET_CHECK_STUB(false, CheckboxGroup("Checkboxes 1", flags, kChoices, {.selectAll = true}));
@@ -62,7 +61,7 @@ void CallSelectionStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSelectionStubs.
-constexpr int kSelectionStubCalls = 19;
+constexpr int kSelectionStubCalls = 18;
 
 } // namespace
 
@@ -76,7 +75,6 @@ TEST_CASE("Selection placeholders called outside a frame return the neutral resu
     facet::test::Session session;
     REQUIRE(session.Ready());
     bool flag = true;
-    CHECK_FALSE(facet::Toggle("Toggle 1", &flag));
     CHECK_FALSE(facet::Checkbox("Checkbox 1", &flag));
     CHECK(flag);
 }

@@ -23,7 +23,28 @@ checkboxes. `"##name"` hides it, as in settings rows.
 bool Toggle(const char* label, bool* value, const ToggleOptions& options = {});
 ```
 
-An on/off switch with the label in front; a click, Space or Enter flips the value. Status: planned.
+An on/off switch with the visible label in front and the switch (the toggle tokens, 38 by 22 units)
+after it; returns true on the frame it wrote `*value`.
+
+- **Input.** A click on the label or the switch, or Space or Enter while it has keyboard focus,
+  flips the value. A press on the switch that moves further than the drag threshold drags the knob,
+  and letting go sets the side the knob is on (also when the pointer left the toggle).
+- **Look.** Off: the neutral fill with the 3:1 boundary hairline and a labelSecondary knob. On: the
+  accent track with an onAccent knob and a focusRing hairline. The knob springs between the ends
+  (the quick spring) and the colors follow over `motion.durationFast`; with reduced motion both
+  jump. The focus ring goes around the track after keyboard input.
+- **States.** Disabled (`ImGui::BeginDisabled`): fill[3], labelTertiary knob and label, the
+  not-allowed cursor, no Tab stop. `readOnly` (or a null `value`): labelSecondary instead of the
+  accent, focusable, never written, and the arrow cursor. `loading`: a spinner in the knob and no
+  input, but it stays a Tab stop. `mixed`: the knob in the middle of a neutral track until the
+  first edit, which writes on; after that the toggle shows its value until `mixed` is switched off
+  and on again. `error` replaces `helpText` under the toggle, in destructive with the error icon.
+- **Sizes and width.** `size` sets the item height (the control height) and the label text; the
+  switch keeps the toggle tokens at every size. The default width is the label, spacing.sm and the
+  switch. A wider width puts the switch at the end of the row; a narrower one cuts the label with an
+  ellipsis and shows it in full as a tooltip on hover and keyboard focus.
+
+Status: ready.
 
 ### Checkbox
 
