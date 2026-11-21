@@ -280,6 +280,36 @@ TEST_CASE("DataTable: a table with rows opens, and only the visible rows are sub
     CHECK(session.ItemVisible("row99999"));
 }
 
+TEST_CASE("DataTable: the wheel scrolls the rows, and the overlay bars leave the header free")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TableUi ui(200);
+    ui.width = 300.0f;  // narrower than its columns: a horizontal bar too
+    ui.options.frozenColumns = 1;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(3);
+    ImGuiWindow* inner = ui.Table()->InnerWindow;
+    // No stock bar takes room: the inner rect is the whole window.
+    CHECK(inner->InnerRect.GetWidth() == doctest::Approx(inner->Rect().GetWidth()));
+    session.Wheel(session.ItemCenter("row2"), -2.0f);
+    session.Frames(20);
+    CHECK(inner->Scroll.y > 0.0f);
+    ImRect track;
+    ImRect thumb;
+    REQUIRE(fi::ScrollAreaBarRects(inner, ImGuiAxis_Y, &track, &thumb));
+    CHECK(track.Min.y >= ui.Header(0).Max.y);
+    REQUIRE(fi::ScrollAreaBarRects(inner, ImGuiAxis_X, &track, &thumb));
+    CHECK(track.Min.x >= ui.Header(0).Max.x);
+    // Shift turns the wheel sideways (row 2 scrolled away: aim at the table's middle).
+    session.KeyDown(ImGuiMod_Shift);
+    session.Wheel(inner->Rect().GetCenter(), -2.0f);
+    session.KeyUp(ImGuiMod_Shift);
+    session.Frames(20);
+    CHECK(inner->Scroll.x > 0.0f);
+}
+
 TEST_CASE("DataTable: a frame with a hundred thousand rows allocates nothing")
 {
     MotionGuard guard;
