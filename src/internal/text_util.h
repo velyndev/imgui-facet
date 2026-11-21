@@ -20,6 +20,7 @@ enum class TruncateMode
 {
     End,     // "A long file na..."
     Middle,  // "A long f...ame.txt": keeps the end, for paths and file names
+    Start,   // "...file name.txt": keeps only the end
 };
 
 struct TruncateResult

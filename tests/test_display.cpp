@@ -279,6 +279,47 @@ TEST_CASE("A disabled progress bar draws no tone color")
     CHECK(fill.Empty());
 }
 
+// ==== Truncation block ====
+
+TEST_CASE("Start truncation keeps the end of a text and cuts it on a character boundary")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        ImFont* font = ImGui::GetFont();
+        const float size = ImGui::GetFontSize();
+        const float full = font->CalcTextSizeA(size, FLT_MAX, 0.0f, kUtf8Text).x;
+        for (float width = 0.0f; width < full; width += 1.0f)
+        {
+            char out[128];
+            for (const auto mode : {facet::internal::TruncateMode::Start, facet::internal::TruncateMode::Middle,
+                                    facet::internal::TruncateMode::End})
+            {
+                const auto result = facet::internal::TruncateText(font, size, kUtf8Text, nullptr, width, mode, out, sizeof(out));
+                CHECK(ValidUtf8(out));
+                CHECK(result.truncated);
+                CHECK(result.width <= width + 0.5f);
+                if (mode == facet::internal::TruncateMode::Start && result.length > 0)
+                {
+                    // What follows the ellipsis (one code point) is the end of the text.
+                    const std::string text(kUtf8Text);
+                    const std::string shown(out);
+                    std::size_t start = 1;
+                    while (start < shown.size() && (static_cast<unsigned char>(shown[start]) & 0xC0) == 0x80)
+                        ++start;
+                    const std::string kept = shown.substr(start);
+                    REQUIRE(text.size() >= kept.size());
+                    CHECK(text.compare(text.size() - kept.size(), kept.size(), kept) == 0);
+                }
+            }
+            ++checked;
+        }
+    });
+    session.Frame();
+    CHECK(checked > 10);
+}
+
 // ==== StyledText ====
 
 TEST_CASE("Styled text takes its own width, wraps at the available width and aligns its lines")

@@ -172,6 +172,15 @@ TruncateResult TruncateText(ImFont* font, float size, const char* text, const ch
         Append(out, outSize, result.length, text, cut);
         Append(out, outSize, result.length, ellipsis, ellipsis + ellipsisLength);
     }
+    else if (mode == TruncateMode::Start)
+    {
+        const char* tailBegin = FitSuffix(font, size, text, textEnd, room);
+        // Do not start the kept text with a space after the ellipsis.
+        while (tailBegin < textEnd && *tailBegin == ' ')
+            ++tailBegin;
+        Append(out, outSize, result.length, ellipsis, ellipsis + ellipsisLength);
+        Append(out, outSize, result.length, tailBegin, textEnd);
+    }
     else
     {
         const char* headEnd = FitPrefix(font, size, text, textEnd, room * 0.5f);
