@@ -7,9 +7,9 @@ Header: `facet/widgets/charts.h`. Every declaration follows [the API conventions
 and the header comments are the full reference. The demo gallery shows every widget on the page
 Widgets > Charts.
 
-Every widget here is **planned**: each one below is declared, compiles and can be called; until
-Phase 2 implements it, a call draws a placeholder of the widget's default size and returns the
-neutral result. Each entry ends with its status.
+Each entry ends with its status. A widget whose status is planned is declared, compiles and can be
+called; until it is implemented, a call draws a placeholder of the widget's default size and
+returns the neutral result.
 
 ## One data form, one axis pattern
 
@@ -36,7 +36,23 @@ void Sparkline(const char* label, std::span<const float> values, const Sparkline
 void Sparkline(const char* label, int count, ChartGetter getter, void* user, const SparklineOptions& options = {});
 ```
 
-Small trend line or bar row without axes. Status: planned.
+A small trend without axes, for a table cell or the side of a number. It draws a line (`area`
+fills under it at low opacity), or one bar per value with `bars` (bars grow from 0, so an
+automatic range includes 0; more values than pixel columns draw each column's extremes).
+`markMinMax` puts a dot on the smallest and the largest value. The range is `min` to `max` when
+they differ, else the range of the values; a range of zero draws a flat line in the middle.
+
+- **Data:** NaN values (and a getter returning false) break the line; a stretch of one value
+  between gaps is a dot. Without values it draws a hairline through the middle of its box.
+- **Color:** `color`, or the first color of the chart palette (the accent hue at 3:1 on every
+  surface); disabled, labelTertiary.
+- **Hover:** the nearest value gets a dot and, after the tooltip delay, a tooltip with the visible
+  label part and the value ("Trend: 4.25"). It is not a Tab stop and has no keys: the number
+  it stands next to carries the meaning.
+- **Size:** `width` 0 fills the available width (rule 6), `height` 0 is the control height of the
+  inherited size. Everything is clipped to its box, down to a few pixels.
+
+Status: ready.
 
 ### LineChart
 

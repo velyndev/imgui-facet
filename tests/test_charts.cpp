@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <limits>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <doctest/doctest.h>
@@ -19,7 +20,10 @@
 #include <facet/facet.h>
 
 #include "internal/chart_core.h"
+#include "internal/focus.h"
+#include "internal/popup_host.h"
 #include "support/session.h"
+#include "widgets/charts/chart_parts.h"
 
 namespace
 {
@@ -27,6 +31,52 @@ namespace
 namespace fi = facet::internal;
 
 constexpr float kNaN = std::numeric_limits<float>::quiet_NaN();
+
+// The theme and the motion settings a test changes, restored at the end.
+struct ChartGuard
+{
+    facet::Theme saved = facet::T();
+    bool follow = facet::FollowsSystemMotion();
+    ChartGuard()
+    {
+        facet::SetFollowSystemMotion(false);
+        facet::SetTheme(facet::Theme::Light(), false);
+    }
+    ~ChartGuard()
+    {
+        facet::SetTheme(saved, false);
+        facet::SetFollowSystemMotion(follow);
+    }
+};
+
+// Vertices of exactly `color` the window draw list received since `from`.
+int CountColor(int from, ImU32 color)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    int count = 0;
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        count += drawList->VtxBuffer[i].col == color ? 1 : 0;
+    return count;
+}
+
+int VertexCount()
+{
+    return ImGui::GetWindowDrawList()->VtxBuffer.Size;
+}
+
+// Whether every vertex since `from` lies inside `rect` grown by `slack` pixels (antialiasing
+// fringes reach half a pixel out).
+bool VerticesInside(int from, const ImRect& rect, float slack = 1.0f)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+    {
+        const ImVec2 p = drawList->VtxBuffer[i].pos;
+        if (p.x < rect.Min.x - slack || p.x > rect.Max.x + slack || p.y < rect.Min.y - slack || p.y > rect.Max.y + slack)
+            return false;
+    }
+    return true;
+}
 
 // A reader over `values` where NaN is a gap, x = 10 * index.
 bool ReadTens(const void* source, int slot, double* x, double* y)
@@ -138,4 +188,144 @@ TEST_CASE("Chart core: a band fills two triangles between each pair of points")
         CHECK(drawList->IdxBuffer.Size - indices == 12);
     });
     session.Frame();
+}
+
+// ---- Chart parts -----------------------------------------------------------------------------------
+
+TEST_CASE("Readout values show four significant digits in their shortest form")
+{
+    char text[48];
+    const facet::ChartAxis axis;
+    const fi::TickSet none;
+    fi::ChartReadoutText(axis, 4.25, none, text, sizeof(text));
+    CHECK(std::string(text) == "4.25");
+    fi::ChartReadoutText(axis, static_cast<double>(0.3f), none, text, sizeof(text));
+    CHECK(std::string(text) == "0.3");
+    fi::ChartReadoutText(axis, 1234567.0, none, text, sizeof(text));
+    CHECK(std::string(text) == "1.235e6");
+    fi::ChartReadoutText(axis, -0.0, none, text, sizeof(text));
+    CHECK(std::string(text) == "0");
+    // With the ticks of an axis: one digit more than the ticks need.
+    fi::Tick ticks[fi::kMaxTicks];
+    const fi::TickSet set = fi::LinearTicks(0.0, 10.0, 6, ticks);
+    fi::ChartReadoutText(axis, 4.26, set, text, sizeof(text));
+    CHECK(std::string(text) == "4.3");
+    // The axis format wins.
+    const facet::ChartAxis percent{.format = "%.0f %%"};
+    fi::ChartReadoutText(percent, 42.4, set, text, sizeof(text));
+    CHECK(std::string(text) == "42 %");
+}
+
+// ---- Sparkline ------------------------------------------------------------------------------------
+
+TEST_CASE("A sparkline fills the available width at the control height in the accent series color")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float values[] = {1.0f, 3.0f, 2.0f, 5.0f, 4.0f};
+    int lineVertices = 0;
+    float available = 0.0f;
+    ImVec2 size;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        const int from = VertexCount();
+        facet::Sparkline("Trend", values);
+        size = ImGui::GetItemRectSize();
+        lineVertices = CountColor(from, facet::ToU32(fi::SeriesColor(facet::T().colors, 0)));
+    });
+    session.Frame();
+    CHECK(size.x == doctest::Approx(available));
+    CHECK(size.y == doctest::Approx(facet::ControlHeight(facet::ControlSize::Inherit)));
+    CHECK(lineVertices > 0);
+}
+
+TEST_CASE("A sparkline with no values, one value, gaps, a zero range or a tiny size stays in its rect")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float one[] = {3.0f};
+    static const float gaps[] = {1.0f, kNaN, 2.0f, 3.0f, kNaN, kNaN, 1.0f};
+    static const float flat[] = {2.0f, 2.0f, 2.0f};
+    static const float huge[] = {-3e30f, 1e30f, 2e30f};
+    int checked = 0;
+    session.SetUi([&] {
+        const auto check = [&](const char* label, std::span<const float> values, const facet::SparklineOptions& options) {
+            INFO(label);
+            const int from = VertexCount();
+            facet::Sparkline(label, values, options);
+            const ImRect rect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            CHECK(rect.GetWidth() >= 1.0f);
+            // Lines and dots reach past their points by half their width; the clip rect cuts them there.
+            CHECK(VerticesInside(from, rect, facet::Px(facet::T().charts.lineWidth) + 1.0f));
+            ++checked;
+        };
+        check("empty", {}, {});
+        check("one", one, {});
+        check("one bar", one, {.bars = true});
+        check("gaps", gaps, {.area = true, .markMinMax = true});
+        check("gap bars", gaps, {.bars = true, .markMinMax = true});
+        check("flat", flat, {});
+        check("huge", huge, {.area = true});
+        check("fixed range", gaps, {.min = 5.0, .max = 5.0});
+        check("tiny", gaps, {.width = 3.0f, .height = 2.0f});
+    });
+    session.Frame();
+    CHECK(checked == 9);
+}
+
+TEST_CASE("A sparkline through a getter draws like the same values in a span")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float values[] = {1.0f, 4.0f, 2.0f, kNaN, 3.0f};
+    const facet::ChartGetter getter = [](void*, int index, facet::ChartPoint* out) {
+        if (std::isnan(values[index]))
+            return false;
+        out->x = index;
+        out->y = values[index];
+        return true;
+    };
+    int fromSpan = 0;
+    int fromGetter = 0;
+    session.SetUi([&] {
+        int from = VertexCount();
+        facet::Sparkline("span", values, {.width = 120.0f});
+        fromSpan = VertexCount() - from;
+        from = VertexCount();
+        facet::Sparkline("getter", 5, getter, nullptr, {.width = 120.0f});
+        fromGetter = VertexCount() - from;
+    });
+    session.Frame();
+    CHECK(fromSpan > 0);
+    CHECK(fromSpan == fromGetter);
+}
+
+TEST_CASE("A hovered sparkline names its nearest value in a tooltip and is not a Tab stop")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float values[] = {1.0f, 3.0f, 2.0f};
+    bool tip = false;  // the popup host answers inside the frame
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Sparkline("Trend", values, {.width = 120.0f});
+        session.Track("spark");
+        tip = fi::IsPopupLevelOpen(fi::PopupTooltipLevel(ImGui::GetItemID()));
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("spark"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
