@@ -149,7 +149,9 @@ below). Not interactive. Status: ready.
 void CountBadge(int count, const CountBadgeOptions& options = {});
 ```
 
-Counter pill with a "99+" cap. Status: planned.
+A counter in a solid pill of the tone (Accent by default): a circle for one digit, wider for more,
+"99+" above `maxCount`. Negative counts draw as 0; a count of 0 submits an empty item unless
+`showZero`. It sits on the text baseline like a badge. Not interactive. Status: ready.
 
 ### StatusDot
 

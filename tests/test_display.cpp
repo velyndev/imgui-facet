@@ -553,6 +553,38 @@ TEST_CASE("A badge draws its tone as a wash with label text, or solid with the t
     CHECK(onSolid > 0);
 }
 
+// ==== CountBadge ====
+
+TEST_CASE("A count badge caps large counts, hides zero unless asked and is never narrower than tall")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        facet::CountBadge(7);
+        session.Track("one");
+        facet::CountBadge(150);
+        session.Track("capped");
+        facet::CountBadge(99);
+        session.Track("ninety");
+        facet::CountBadge(0);
+        session.Track("hidden");
+        facet::CountBadge(0, {.showZero = true});
+        session.Track("zero");
+        facet::CountBadge(-4, {.showZero = true});
+        session.Track("negative");
+        facet::CountBadge(1000, {.maxCount = 999});
+        session.Track("custom");
+    });
+    session.Frame();
+    const ImRect one = session.ItemRect("one");
+    CHECK(one.GetWidth() >= one.GetHeight());
+    CHECK(session.ItemRect("capped").GetWidth() > session.ItemRect("ninety").GetWidth());  // "99+"
+    CHECK(session.ItemRect("hidden").GetWidth() == 0.0f);
+    CHECK(session.ItemRect("zero").GetWidth() == doctest::Approx(one.GetWidth()));
+    CHECK(session.ItemRect("negative").GetWidth() == doctest::Approx(one.GetWidth()));  // drawn as 0
+    CHECK(session.ItemRect("custom").GetWidth() > session.ItemRect("capped").GetWidth());
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
