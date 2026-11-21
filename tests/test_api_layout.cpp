@@ -46,13 +46,6 @@ void CallLayoutStubs(Values& v)
         facet::EndFlow();
     });
     CHECK_BALANCED({
-        facet::BeginSplitView("Split", &v.ratio);
-        ImGui::TextUnformatted("first");
-        facet::SplitViewNext();
-        ImGui::TextUnformatted("second");
-        facet::EndSplitView();
-    });
-    CHECK_BALANCED({
         facet::BeginPanels("Panels", v.sizes);
         const bool open = facet::BeginPanel("Panel");
         CHECK(open);

@@ -72,7 +72,6 @@ LayoutDividerInput LayoutDivider(ImGuiID id, const ImRect& band, ImGuiAxis axis,
     LayoutDividerInput input;
     ImGuiContext& g = *GImGui;
     const Theme& theme = T();
-    const Colors& c = theme.colors;
     const ImGuiIO& io = g.IO;
 
     ItemOptions itemOptions = options;
@@ -107,8 +106,16 @@ LayoutDividerInput LayoutDivider(ImGuiID id, const ImRect& band, ImGuiAxis axis,
     }
     if (!item.disabled && (item.hovered || input.dragging))
         ImGui::SetMouseCursor(axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
-    if (real && item.hovered && !item.disabled && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+    if (real && (item.hovered || item.active) && !item.disabled && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+    {
+        // The second press of a double click resets; it does not start a drag.
         input.reset = true;
+        input.dragging = false;
+        input.started = false;
+        grab.mouse = false;
+        if (item.active)
+            ImGui::ClearActiveID();
+    }
 
     // Keys while the divider has the keyboard focus.
     if (real && item.focused && g.NavId == id && !item.disabled && !input.dragging)
@@ -133,9 +140,15 @@ LayoutDividerInput LayoutDivider(ImGuiID id, const ImRect& band, ImGuiAxis axis,
         input.stepPixels = Px(theme.spacing.xs);
     else
         input.stepPixels = Px(theme.spacing.lg);
+    return input;
+}
 
+void DrawLayoutDivider(const ItemState& item, const ImRect& band, ImGuiAxis axis)
+{
     if (!item.visible)
-        return input;
+        return;
+    const Theme& theme = T();
+    const Colors& c = theme.colors;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 center = band.GetCenter();
     const float hairline = HairlineThickness();
@@ -159,8 +172,9 @@ LayoutDividerInput LayoutDivider(ImGuiID id, const ImRect& band, ImGuiAxis axis,
             grip = c.labelTertiary;
         FillRect(drawList, gripMin, gripMax, ToU32(grip), thickness * 0.5f);
     }
-    DrawItemFocusRing(item, Px(theme.radii.element));
-    return input;
+    ItemState ring = item;
+    ring.rect = band;
+    DrawItemFocusRing(ring, Px(theme.radii.element));
 }
 
 } // namespace facet::internal

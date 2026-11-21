@@ -617,6 +617,266 @@ TEST_CASE("A separator text is one footnote line, cut to the width, and takes no
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
 
+// ---- SplitView ----------------------------------------------------------------------------------
+
+namespace
+{
+
+// A split view with a button in each pane. Every test uses its own id: the remembered ratios are
+// persistent state, which outlives a session in this process.
+struct SplitUi
+{
+    const char* id = "split";
+    float ratio = 0.5f;
+    facet::SplitViewOptions options{.minFirst = 100.0f, .minSecond = 100.0f, .width = 600.0f, .height = 200.0f};
+    bool callNext = true;
+    ImRect view;
+    int firstPresses = 0;
+    int secondPresses = 0;
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginSplitView(id, &ratio, options);
+        if (ImGui::Button("first", ImVec2(-FLT_MIN, 0.0f)))
+            ++firstPresses;
+        session.Track("first");
+        if (callNext)
+        {
+            facet::SplitViewNext();
+            if (ImGui::Button("second", ImVec2(-FLT_MIN, 0.0f)))
+                ++secondPresses;
+            session.Track("second");
+        }
+        facet::EndSplitView();
+        view = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        ImGui::Button("after");
+        session.Track("after");
+    }
+
+    float Band() const { return facet::Px(facet::T().layout.dividerBand); }
+    float Room() const { return view.GetWidth() - Band(); }
+    // The divider's center for the current ratio (side by side, no clamping in play).
+    ImVec2 DividerAt(float r) const
+    {
+        return ImVec2(view.Min.x + r * Room() + Band() * 0.5f, view.GetCenter().y);
+    }
+};
+
+} // namespace
+
+TEST_CASE("A split view gives its panes the ratio and a drag of the divider writes it within the minimums")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split drag";
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    CHECK(ui.view.GetWidth() == doctest::Approx(600.0f));
+    CHECK(ui.view.GetHeight() == doctest::Approx(200.0f));
+    // The first pane ends at the divider.
+    CHECK(session.ItemRect("first").Max.x <= ui.DividerAt(0.5f).x);
+    CHECK(session.ItemRect("second").Min.x >= ui.DividerAt(0.5f).x);
+    const ImVec2 from = ui.DividerAt(0.5f);
+    session.Drag({from, ImVec2(from.x + 60.0f, from.y)});
+    CHECK(ui.ratio == doctest::Approx(0.5f + 60.0f / ui.Room()).epsilon(0.01));
+    // Far past the end: the second pane keeps its minimum.
+    session.Drag({ui.DividerAt(ui.ratio), ImVec2(ui.view.Max.x + 100.0f, from.y)});
+    CHECK(ui.ratio * ui.Room() == doctest::Approx(ui.Room() - 100.0f).epsilon(0.01));
+    // The panes keep working.
+    session.Click(session.ItemCenter("second"));
+    CHECK(ui.secondPresses == 1);
+}
+
+TEST_CASE("A collapsible split view collapses a pane past half its minimum, and Escape cancels a drag")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split collapse";
+    ui.options.collapsible = true;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    const ImVec2 from = ui.DividerAt(0.5f);
+    session.Drag({from, ImVec2(ui.view.Min.x + 20.0f, from.y)});
+    CHECK(ui.ratio == 0.0f);
+    // The collapsed pane takes no input: its button is not drawn where the band now is.
+    session.Drag({ui.DividerAt(0.0f), ImVec2(ui.view.Max.x - 10.0f, from.y)});
+    CHECK(ui.ratio == 1.0f);
+    // Escape during a drag puts the ratio from its start back.
+    ui.ratio = 0.5f;
+    session.Frames(2);
+    session.MouseMove(ui.DividerAt(0.5f));
+    session.MouseDown();
+    session.MouseMove(ImVec2(ui.DividerAt(0.5f).x + 80.0f, from.y));
+    CHECK(ui.ratio > 0.55f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(ui.ratio == doctest::Approx(0.5f));
+    session.MouseUp();
+    CHECK(ui.ratio == doctest::Approx(0.5f));
+}
+
+TEST_CASE("The divider of a split view is a Tab stop between the panes and moves with the keys")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split keys";
+    ui.options.collapsible = true;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("first"));
+    REQUIRE(ui.firstPresses == 1);
+    session.KeyPress(ImGuiKey_Tab);   // shows the focus on the first button
+    session.KeyPress(ImGuiKey_Tab);   // to the divider
+    CHECK(GImGui->NavId != session.ItemId("first"));
+    CHECK(GImGui->NavId != session.ItemId("second"));
+    const float step = facet::Px(facet::T().spacing.lg);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.ratio * ui.Room() == doctest::Approx(0.5f * ui.Room() + step).epsilon(0.01));
+    session.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    CHECK(ui.ratio * ui.Room() == doctest::Approx(0.5f * ui.Room() + step - facet::Px(facet::T().spacing.xs)).epsilon(0.01));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ui.ratio * ui.Room() == doctest::Approx(100.0f).epsilon(0.01));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(ui.ratio * ui.Room() == doctest::Approx(ui.Room() - 100.0f).epsilon(0.01));
+    // Enter collapses the first pane, and brings it back to the ratio it had.
+    const float before = ui.ratio;
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.ratio == 0.0f);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.ratio == doctest::Approx(before));
+    // Tab goes on into the second pane.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("second"));
+}
+
+TEST_CASE("A double click on the divider resets the split view to the ratio it first had")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split reset";
+    ui.ratio = 0.4f;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    const ImVec2 from = ui.DividerAt(0.4f);
+    session.Drag({from, ImVec2(from.x + 90.0f, from.y)});
+    REQUIRE(ui.ratio > 0.5f);
+    session.DoubleClick(ui.DividerAt(ui.ratio));
+    CHECK(ui.ratio == doctest::Approx(0.4f));
+}
+
+TEST_CASE("A split view keeps its ratio across a resize and holds a parent smaller than both minimums")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split resize";
+    ui.ratio = 0.3f;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    CHECK(session.ItemRect("second").Min.x - ui.view.Min.x == doctest::Approx(0.3f * ui.Room() + ui.Band()).epsilon(0.02));
+    ui.options.width = 760.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("second").Min.x - ui.view.Min.x == doctest::Approx(0.3f * ui.Room() + ui.Band()).epsilon(0.02));
+    CHECK(ui.ratio == 0.3f);
+    // Smaller than both minimums: the panes share the room by their minimums and nothing overlaps.
+    ui.options.width = 120.0f;
+    ui.options.orientation = facet::Orientation::Vertical;
+    ui.options.height = 120.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("first").Max.y <= session.ItemRect("second").Min.y);
+    CHECK(session.ItemRect("second").Max.y <= ui.view.Max.y + 0.5f);
+    const ImVec2 band(ui.view.GetCenter().x, ui.view.Min.y + (ui.view.GetHeight() - ui.Band()) * 0.5f + ui.Band() * 0.5f);
+    session.Drag({band, ImVec2(band.x, band.y + 30.0f)});
+    CHECK(ui.ratio == 0.3f);
+}
+
+TEST_CASE("A split view stacks its panes in a Compact width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split compact";
+    ui.options.width = facet::T().layout.regularFrom * 0.75f;
+    ui.options.height = 300.0f;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    CHECK(session.ItemRect("second").Min.y > session.ItemRect("first").Max.y);
+    CHECK(session.ItemRect("second").Min.x == doctest::Approx(session.ItemRect("first").Min.x));
+}
+
+TEST_CASE("A split view writes its saved ratio back once in a later run")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SplitUi ui;
+    ui.id = "split restart";
+    ImGuiID id = 0;
+    session.SetUi([&] { id = ImGui::GetID(ui.id); });
+    session.Frame();
+    // What an ini file of an earlier run holds.
+    char record[64];
+    std::snprintf(record, sizeof(record), "SplitView,0x%08X", id);
+    fi::StateStore& store = fi::GlobalStateStore();
+    REQUIRE(store.BeginRecord(record));
+    store.RecordLine("ratio=0.7000");
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frame();
+    CHECK(ui.ratio == doctest::Approx(0.7f));
+    // Only once: the caller's later writes stand.
+    ui.ratio = 0.2f;
+    session.Frames(2);
+    CHECK(ui.ratio == doctest::Approx(0.2f));
+}
+
+TEST_CASE("Split views leave every stack balanced, nested, disabled, with one pane and outside a frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    const int errorsBefore = fi::UsageErrorCount();
+    float inner = 0.5f;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::BeginSplitView("outer", &v.ratio, {.height = 200.0f});
+            ImGui::TextUnformatted("first");
+            facet::SplitViewNext();
+            facet::BeginSplitView("inner", &inner, {.orientation = facet::Orientation::Vertical});
+            ImGui::TextUnformatted("inner first");
+            facet::SplitViewNext();
+            ImGui::TextUnformatted("inner second");
+            facet::EndSplitView();
+            facet::EndSplitView();
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::SplitViewScope split("disabled", &v.ratio, {.height = 100.0f});
+            ImGui::Button("inside");
+        });
+        ImGui::EndDisabled();
+        CHECK_BALANCED({
+            facet::BeginSplitView("null", nullptr, {.height = 100.0f});
+            facet::EndSplitView();
+        });
+    });
+    session.Frames(2);
+    CHECK(fi::UsageErrorCount() == errorsBefore);
+    CHECK(fi::OpenScopeCount() == 0);
+    facet::BeginSplitView("outside", &inner);
+    facet::SplitViewNext();
+    facet::EndSplitView();
+    CHECK(fi::OpenScopeCount() == 0);
+}
+
 // ---- DependentGroup -----------------------------------------------------------------------------
 
 namespace

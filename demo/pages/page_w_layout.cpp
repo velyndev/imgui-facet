@@ -3,6 +3,7 @@
 // of the other families; their labels are placeholders, not real settings. Widgets of this family
 // that are still planned draw their placeholder.
 
+#include <algorithm>
 #include <cmath>
 
 #include <imgui.h>
@@ -27,7 +28,17 @@ enum CaptureState
 {
     kCaptureDefault = 0,
     kCaptureFocused = 1,
+    kCaptureArrange = 2,
+    kCaptureSplit = 3,
+    kCaptureDependent = 4,
 };
+
+// Split views: the width slider's lowest share, the first pane's minimum and the vertical minimums
+// (units), and the placeholder lines of the first pane.
+constexpr int kMinSplitShare = 20;
+constexpr float kSplitMin = 160.0f;
+constexpr float kSplitMinVertical = 48.0f;
+constexpr int kSplitLines = 8;
 
 constexpr int kDefaultLevel = 40;
 // The narrow card of the settings rows: too narrow for the label column and a control.
@@ -68,11 +79,21 @@ struct LayoutState
     // Grid
     int gridColumns = 0;
     float gridCellX[kGridCells] = {};
-    // Placeholders of the planned widgets
+    // Split view
+    int splitWidth = 100;
     float splitRatio = 0.4f;
+    float splitVertical = 0.5f;
+    int splitPresses = 0;
+    float endRatio = 0.0f;          // the ratio End gave, for the selftest
+    // Dependent group
+    bool parentEnabled = false;
+    bool childToggle = false;
+    int childLevel = 50;
+    bool hideParent = false;
+    bool hiddenToggle = false;
+    // Placeholders of the planned widgets
     float panelSizes[3] = {0.25f, 0.5f, 0.25f};
     bool detailOpen = false;
-    bool parentEnabled = false;
     ImGuiSelectionBasicStorage selection;
 };
 
@@ -296,14 +317,62 @@ void Arrange()
     facet::EndFlow();
 }
 
+// Records the divider of the split view that just ended as a probe.
+void ProbeDivider(facet::demo::PageCtx& ctx, const char* name)
+{
+    const facet::internal::LayoutDividerRecord& divider = facet::internal::LastSplitViewDivider();
+    facet::demo::ProbeRect(ctx, name, divider.id, divider.band.Min, divider.band.Max);
+}
+
+void SplitViews(facet::demo::PageCtx& ctx, LayoutState& s)
+{
+    SectionHeader("Split view");
+    Paragraph("Two panes with a divider. Drag the divider or focus it with Tab and use the arrow keys, "
+              "Home and End; a double click goes back to the first ratio. The first view is "
+              "collapsible: dragging past half a minimum, or Enter, collapses its first pane. Narrow the "
+              "width to see the minimums hold and, in a Compact width, the panes stack. The pane texts "
+              "are placeholders.");
+    facet::BeginSettingsRow("Width");
+    facet::Slider("##value", &s.splitWidth, kMinSplitShare, 100, {.format = "%d %%"});
+    ctx.Probe("layout.split.width");
+    facet::EndSettingsRow();
+    const float share = static_cast<float>(s.splitWidth) / 100.0f;
+    const float width = std::max(1.0f, facet::AvailableWidthUnits() * share);
+    if (ctx.capture && ctx.captureState == kCaptureSplit)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 0);
+    // Stacked in a Compact width, the panes need the height of both minimums.
+    const float height = RegionHeight() * (facet::WidthClassOf(width) == facet::WidthClass::Compact ? 2.0f : 1.0f);
+    facet::BeginSplitView("split", &s.splitRatio,
+                          {.minFirst = kSplitMin, .collapsible = true, .width = width, .height = height});
+    if (facet::Button("Count a press", {.width = facet::kFill}))
+        ++s.splitPresses;
+    ctx.Probe("layout.split.first");
+    for (int line = 0; line < kSplitLines; ++line)
+        Note("Placeholder line %d of the first pane.", line + 1);
+    facet::SplitViewNext();
+    Note("Second pane. Ratio %.2f, button presses %d.", s.splitRatio, s.splitPresses);
+    if (facet::Button("Count a press##second"))
+        ++s.splitPresses;
+    ctx.Probe("layout.split.second");
+    facet::EndSplitView();
+    ProbeDivider(ctx, "layout.split.divider");
+    if (ctx.capture && ctx.captureState == kCaptureSplit)
+        ctx.RevealInCapture();
+
+    ImGui::Spacing();
+    facet::BeginSplitView("vertical", &s.splitVertical,
+                          {.orientation = facet::Orientation::Vertical, .minFirst = kSplitMinVertical,
+                           .minSecond = kSplitMinVertical, .width = width, .height = RegionHeight()});
+    Note("Top pane of a vertical split.");
+    facet::SplitViewNext();
+    Note("Bottom pane. Ratio %.2f.", s.splitVertical);
+    facet::EndSplitView();
+    ProbeDivider(ctx, "layout.split.vertical");
+}
+
 void Divide(LayoutState& s)
 {
     SectionHeader("Divide a region");
-    facet::BeginSplitView("split", &s.splitRatio, {.collapsible = true, .height = RegionHeight()});
-    Note("First pane.");
-    facet::SplitViewNext();
-    Note("Second pane.");
-    facet::EndSplitView();
     facet::BeginPanels("panels", s.panelSizes, {.height = RegionHeight()});
     const char* const titles[] = {"Panel 1", "Panel 2", "Panel 3"};
     for (const char* title : titles)
@@ -329,14 +398,43 @@ void Divide(LayoutState& s)
     facet::EndListDetail();
 }
 
-void Dependent(LayoutState& s)
+void Dependent(facet::demo::PageCtx& ctx, LayoutState& s)
 {
-    SectionHeader("Dependent group and separators");
-    if (facet::BeginDependentGroup("dependent", s.parentEnabled))
+    SectionHeader("Dependent group");
+    Paragraph("Settings that only apply while the setting above them is on. Off, the first group stays "
+              "visible and disabled, and Tab skips it; the second group collapses. The labels are "
+              "placeholders.");
+    facet::BeginSettingsRow("Parent setting");
+    facet::Toggle("##value", &s.parentEnabled);
+    ctx.Probe("layout.dep.parent");
+    facet::EndSettingsRow();
+    if (facet::BeginDependentGroup("disable", s.parentEnabled))
     {
-        Note("Content of the group.");
+        facet::BeginSettingsRow("Child switch");
+        facet::Toggle("##value", &s.childToggle);
+        ctx.Probe("layout.dep.child");
+        facet::EndSettingsRow();
+        facet::BeginSettingsRow("Child level");
+        facet::Slider("##value", &s.childLevel, 0, 100);
+        facet::EndSettingsRow();
         facet::EndDependentGroup();
     }
+    facet::BeginSettingsRow("Second parent");
+    facet::Toggle("##value", &s.hideParent);
+    ctx.Probe("layout.dep.hideparent");
+    facet::EndSettingsRow();
+    if (facet::BeginDependentGroup("hide", s.hideParent, {.mode = facet::DependentMode::Hide}))
+    {
+        facet::BeginSettingsRow("Shown while on");
+        facet::Toggle("##value", &s.hiddenToggle);
+        ctx.Probe("layout.dep.hidden");
+        facet::EndSettingsRow();
+        facet::EndDependentGroup();
+    }
+    if (ctx.capture && ctx.captureState == kCaptureDependent)
+        ctx.RevealInCapture();
+    Note("Child switch %s, level %d; the second group's switch %s.", s.childToggle ? "on" : "off", s.childLevel,
+         s.hiddenToggle ? "on" : "off");
 }
 
 void Tiles(LayoutState& s)
@@ -355,25 +453,31 @@ void Tiles(LayoutState& s)
 
 } // namespace
 
-FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused")
+FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrange", "split", "dependent")
 {
     facet::demo::PageHeader("Layout",
                             "Stacks, grids, flow layout, split views, panels, list and detail, settings rows, "
                             "dependent groups, separators and item grids.");
     facet::demo::PlannedFamilyNote("layout");
     LayoutState& s = State();
+    if (ctx.capture)
+        s.parentEnabled = s.hideParent = ctx.captureState == kCaptureDependent;
     SettingsRows(ctx, s);
+    Dependent(ctx, s);
     Stacks(ctx, s);
     Grids(ctx, s);
+    if (ctx.capture && ctx.captureState == kCaptureArrange)
+        ctx.RevealInCapture();
     Separators();
     Arrange();
+    SplitViews(ctx, s);
     Divide(s);
-    Dependent(s);
     Tiles(s);
 }
 
 FACET_DEMO_SELFTEST("layout")
 {
+    using T = facet::demo::Target;
     test.Do([] {
         LayoutState& s = State();
         s.toggle = false;
@@ -381,6 +485,15 @@ FACET_DEMO_SELFTEST("layout")
         s.level = kDefaultLevel;
         s.smallPresses = 0;
         s.largePresses = 0;
+        for (int& presses : s.stackPresses)
+            presses = 0;
+        s.otherPresses = 0;
+        s.stackAlign = 1;
+        s.stackGap = 2;
+        s.gridColumns = 0;
+        s.hiddenToggle = false;
+        s.childLevel = 50;
+        s.splitVertical = 0.5f;
     });
 
     // Settings rows: one column, the label on the control's text line, stacked when narrow.
@@ -471,4 +584,87 @@ FACET_DEMO_SELFTEST("layout")
         return s.gridColumns == 2 && s.gridCellX[1] > s.gridCellX[0] + 1.0f && std::fabs(s.gridCellX[2] - s.gridCellX[0]) < 0.5f;
     });
     test.Do([] { State().gridColumns = 0; });
+
+    // Dependent group: off, the content is disabled and Tab skips it; on, it works.
+    test.Do([] {
+        LayoutState& s = State();
+        s.parentEnabled = false;
+        s.childToggle = false;
+        s.hideParent = false;
+    });
+    test.Wait(2);
+    test.Click("layout.dep.child");
+    test.Expect("a click on a disabled child does nothing", [] { return !State().childToggle; });
+    test.Click("layout.dep.parent");
+    test.Click("layout.dep.parent");
+    test.Expect("the parent is off again", [] { return !State().parentEnabled; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.dep.hideparent");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("layout.dep.parent");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space turns the parent on", [] { return State().parentEnabled; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.dep.child");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("the child switch works while the parent is on", [] { return State().childToggle; });
+    test.Click("layout.dep.hideparent");
+    test.WaitSeconds(0.5f);
+    test.Reveal("layout.dep.hidden");
+    test.ExpectVisible("layout.dep.hidden");
+    test.Click("layout.dep.hidden");
+    test.Expect("the shown child of the second group works", [] { return State().hiddenToggle; });
+    test.Click("layout.dep.hideparent");
+    test.WaitSeconds(0.5f);
+    test.ExpectNotVisible("layout.dep.hidden");
+
+    // Split view: drag, keys, collapse, reset and Escape.
+    test.Do([] {
+        LayoutState& s = State();
+        s.splitWidth = 100;
+        s.splitRatio = 0.4f;
+        s.splitPresses = 0;
+    });
+    test.Reveal("layout.split.divider");
+    test.Wait(2);
+    // The offsets go along both axes: in a Compact width the panes stack and the divider moves on y.
+    test.Drag({T::Item("layout.split.divider"), T::Item("layout.split.divider").Offset(60.0f, 60.0f)}, 0.3f);
+    test.Expect("dragging the divider widens the first pane", [] { return State().splitRatio > 0.42f; });
+    test.DoubleClick("layout.split.divider");
+    test.ExpectNear("a double click goes back to the first ratio", [] { return State().splitRatio; }, 0.4, 0.001);
+    test.Click("layout.split.first");
+    test.Expect("the button of the first pane works", [] { return State().splitPresses == 1; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.split.divider");
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End moves the focused divider to the second pane's minimum", [] { return State().splitRatio > 0.5f; });
+    test.Do([] { State().endRatio = State().splitRatio; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter collapses the first pane", [] { return State().splitRatio == 0.0f; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter brings it back", [] { return State().splitRatio == State().endRatio; });
+    test.KeyPress(ImGuiKey_Home);
+    test.Expect("Home moves the divider to the first pane's minimum",
+                [] { return State().splitRatio > 0.0f && State().splitRatio < State().endRatio; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.split.second");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Tab goes on to the second pane, whose button works", [] { return State().splitPresses == 2; });
+    test.Do([] { State().splitRatio = 0.4f; });
+    test.Wait(2);
+    test.Reveal("layout.split.divider");
+    test.WaitSeconds(0.4f);
+    test.MouseMove(T::Item("layout.split.divider"));
+    test.MouseDown();
+    test.MouseMove(T::Item("layout.split.divider").Offset(80.0f, 80.0f));
+    test.MouseMove(T::Item("layout.split.divider").Offset(40.0f, 40.0f));
+    test.KeyPress(ImGuiKey_Escape);
+    test.MouseUp();
+    test.ExpectNear("Escape during a drag puts the ratio back", [] { return State().splitRatio; }, 0.4, 0.001);
+    test.Reveal("layout.split.vertical");
+    test.WaitSeconds(0.4f);
+    test.Drag({T::Item("layout.split.vertical"), T::Item("layout.split.vertical").Offset(0.0f, 20.0f)}, 0.3f);
+    test.Expect("the vertical divider drags along y", [] { return State().splitVertical > 0.5f; });
 }

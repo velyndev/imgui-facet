@@ -101,8 +101,6 @@ Items of different widths that wrap onto new lines, with a "+N" chip past the li
 
 ### BeginSplitView
 
-Status: planned
-
 ```cpp
 void BeginSplitView(const char* id, float* ratio, const SplitViewOptions& options = {});
 void SplitViewNext();
@@ -110,7 +108,41 @@ void EndSplitView();
 class SplitViewScope;
 ```
 
-Two panes with a draggable, keyboard-movable divider, minimum sizes and optional collapse.
+Two panes with a divider between them. The view is `width` x `height` units (0 fills the available
+width and height; with no height left it takes `metrics.panelHeight`). The divider is a band of
+`layout.dividerBand` between the panes: a hairline in `separator` with a short grip in the middle in
+`scrollThumb` (`scrollThumbHover` while hovered, dragged or focused), the part that reaches 3:1, and
+the resize cursor over it.
+
+- Sizes: the first pane gets `*ratio` of the room (the view less the band), kept between `minFirst`
+  and the room less `minSecond` (0: `layout.minRowControl` each). When the room is smaller than both
+  minimums together, the panes share it in the proportion of their minimums and the divider moves
+  nothing. The ratio is read every frame, so the panes keep their shares when the view is resized.
+- Mouse: dragging the divider writes `*ratio` while it moves; with `collapsible`, dragging past half a
+  minimum collapses that pane (`*ratio` 0 or 1). A double click goes back to the ratio the view had
+  the first time it was shown.
+- Keyboard: the divider is a Tab stop between the panes (Tab goes from the first pane's items to the
+  divider to the second pane's). The arrows of its axis move it by `spacing.lg` (Shift `spacing.xs`,
+  Ctrl four times `spacing.xxxl`), Home and End to the first and second pane's minimum. With
+  `collapsible`, Enter or Space collapses the first pane, and on a collapsed pane brings back the
+  ratio it had. Escape during a drag puts back the ratio from the drag's start.
+- Each pane is a scroll area of the scroll core: a child window with Facet's overlay bars whose
+  keyboard navigation is part of the view's window. Its content keeps its ids under the pane. A
+  collapsed pane is a hidden child window: the content is submitted but clipped away and takes no
+  input.
+- Compact width: a horizontal split shows its panes one above the other (the divider then moves on
+  y with Up and Down).
+- Remembered: the view keeps the last ratio the user set, the ratio before the last collapse and its
+  first ratio under its id in the Dear ImGui ini file. In a later run, the first `BeginSplitView`
+  writes the saved ratio to `*ratio` once, so the split survives a restart even when the caller
+  starts from a constant; later writes of the caller stand.
+- A null `ratio` shows the panes at 0.5 and writes nothing. Values outside 0 to 1 are shown clamped
+  (NaN as 0.5) and written only by an edit.
+- `SplitViewNext` starts the second pane; a view that never calls it gets an empty second pane.
+  `EndSplitView` is always called; the view is one group, the last item after it. Views nest in
+  their panes.
+
+Status: ready.
 
 ### BeginPanels, BeginPanel
 

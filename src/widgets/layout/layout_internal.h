@@ -10,6 +10,7 @@
 //     else if (input.steps != 0)    firstSize += input.steps * input.stepPixels;
 //     if (input.home) ...  if (input.end) ...  if (input.toggle) ...  if (input.reset) ...
 //     if (input.canceled) ...                                           // Escape during a drag
+//     DrawLayoutDivider(input.item, bandWhereItEndsUp, ImGuiAxis_X);
 //
 // The work rect narrowing that stacks, grids and flows use for their content, so items that fill
 // the available width stop at the container's edge:
@@ -72,12 +73,27 @@ struct LayoutDividerInput
 // Runs the divider `id` on `band` (screen pixels; the space is already laid out). `axis` is the
 // axis it moves along (ImGuiAxis_X for panes side by side), `split` the divider's current offset
 // from `origin` (the first pane's start on that axis). Shows the resize cursor while hovered or
-// dragged, draws the hairline across the band in the separator color with a grip in the middle
-// (scrollThumb, scrollThumbHover while hovered, dragged or focused) and the focus ring around the
-// band. While focused it owns the arrow keys of its axis, Home and End; while dragged it owns
-// Escape. `options` go to the item behaviour (forced states, disabled).
+// dragged. While focused it owns the arrow keys of its axis, Home and End; while dragged it owns
+// Escape. `options` go to the item behaviour (forced states, disabled). Draws nothing: the caller
+// applies the input and then draws the divider where it ends up with DrawLayoutDivider.
 LayoutDividerInput LayoutDivider(ImGuiID id, const ImRect& band, ImGuiAxis axis, float split, float origin,
                                  const ItemOptions& options = {});
+
+// Draws a divider on `band`: the hairline across it in the separator color, a grip in the middle
+// (scrollThumb at rest, scrollThumbHover while hovered, dragged or focused; labelTertiary while
+// disabled), and the focus ring of `item` around the band.
+void DrawLayoutDivider(const ItemState& item, const ImRect& band, ImGuiAxis axis);
+
+// ---- Split view -----------------------------------------------------------------------------------
+
+// The divider of the split view ended last (an empty record before any), for tests and probes.
+struct LayoutDividerRecord
+{
+    ImGuiID id = 0;
+    ImRect band;     // screen pixels, where it was drawn
+    bool vertical = false;  // the panes sit one above the other
+};
+const LayoutDividerRecord& LastSplitViewDivider();
 
 // ---- Settings row ---------------------------------------------------------------------------------
 
