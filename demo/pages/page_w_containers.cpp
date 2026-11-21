@@ -43,6 +43,9 @@ struct ContainersState
     bool shellOpen = false;
     ImRect shellRect;           // the shell window in the last frame it showed
     int shellPresses = 0;
+    // Title bar
+    const char* lastWindowButton = "none";
+    bool maximized = false;
     bool inspectorVisible = true;
     ImGuiSelectionBasicStorage selection;
 
@@ -162,9 +165,44 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
         facet::EndShell();
     }
     SectionHeader("Title bar");
-    Paragraph("A title row with an icon and window buttons, as the top of an app frame or a shell.");
-    facet::BeginTitleBar("Title", {.icon = facet::Icon("monitor"), .windowButtons = true});
+    Paragraph("A title row with an icon, a detail, the caller's items at the trailing end and the "
+              "window buttons, as the top of an app frame. On this page the buttons only report "
+              "their press; in an app frame the host minimizes, maximizes or closes its window.");
+    facet::BeginTitleBar("Window title", {.icon = facet::Icon("monitor"),
+                                          .detail = "Placeholder detail",
+                                          .windowButtons = true,
+                                          .maximized = s.maximized});
+    if (facet::Button("Title bar item"))
+        s.lastWindowButton = "item";
+    ctx.Probe("containers.titlebar.item");
     facet::EndTitleBar();
+    const ImRect bar(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    switch (facet::TitleBarButtonPressed())
+    {
+    case facet::WindowButton::Minimize: s.lastWindowButton = "minimize"; break;
+    case facet::WindowButton::Maximize:
+        s.lastWindowButton = "maximize";
+        s.maximized = !s.maximized;
+        break;
+    case facet::WindowButton::Close: s.lastWindowButton = "close"; break;
+    default: break;
+    }
+    {
+        // The window buttons, for the selftest: three squares of the control height at the end.
+        const float side = facet::ControlHeight(facet::ControlSize::Inherit);
+        const float gap = facet::Px(facet::T().spacing.xs);
+        const float inset = (bar.GetHeight() - side) * 0.5f;
+        const float top = std::floor(bar.GetCenter().y - side * 0.5f);
+        const char* const names[3] = {"containers.titlebar.minimize", "containers.titlebar.maximize",
+                                      "containers.titlebar.close"};
+        float x = bar.Max.x - inset - side * 3.0f - gap * 2.0f;
+        for (const char* name : names)
+        {
+            facet::demo::ProbeRect(ctx, name, 0, ImVec2(x, top), ImVec2(x + side, top + side));
+            x += side + gap;
+        }
+    }
+    Note("Last pressed: %s.", s.lastWindowButton);
     SectionHeader("App frame, overlay controller and mini window");
     Note("The app frame, the overlay controller and mini windows are root containers: the host "
          "calls them once per frame outside every window, and the app frame fills the whole "
@@ -509,6 +547,22 @@ FACET_DEMO_SELFTEST("containers")
     test.Wait(2);
     test.Click("containers.shell.close");
     test.Expect("the close button closes the shell", [] { return !State().shellOpen; });
+
+    // Title bar: the window buttons report their press, by mouse and keyboard; maximize shows restore.
+    test.Click("containers.titlebar.minimize");
+    test.ExpectText("the minimize button reports its press", [] { return std::string(State().lastWindowButton); },
+                    "minimize");
+    test.Click("containers.titlebar.maximize");
+    test.Expect("the maximize button reports its press", [] { return State().maximized; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Enter on the focused close button reports it", [] { return std::string(State().lastWindowButton); },
+                    "close");
+    test.Click("containers.titlebar.item");
+    test.ExpectText("the caller's item in the title bar works", [] { return std::string(State().lastWindowButton); },
+                    "item");
+    test.Do([] { State().maximized = false; });
 
     // Toolbar: clicks and Space or Enter activate; the arrows move along the row; the view buttons latch.
     test.Click("containers.toolbar.add");

@@ -385,6 +385,8 @@ void BeginToolbar(const char* id, const ToolbarOptions& options)
 
     ImGui::BeginGroup();
     ImGui::PushOverrideID(entry.id);
+    // EndGroup grows a group to the last item: an empty toolbar must not take the size of what came before.
+    GImGui->LastItemData.Rect = ImRect(window->DC.CursorPos, window->DC.CursorPos);
 }
 
 void EndToolbar()

@@ -93,8 +93,26 @@ WindowButton TitleBarButtonPressed();
 class TitleBarScope;
 ```
 
-A title row with icon, detail text, the caller's trailing items and optional window buttons; its free
-area is the drag region. Status: planned.
+A title row of `containers.titleBarHeight` (or `height`), filling the available width unless `width`
+is set.
+
+- **Leading.** The optional `icon`, the visible label part as the title in Headline and the optional
+  `detail` in Footnote and labelSecondary. Where the items begin the title ends in an ellipsis and
+  shows in full as a tooltip on hover; the detail gives way first.
+- **Trailing.** Items submitted between `BeginTitleBar` and `EndTitleBar` form a group that is
+  vertically centered on the bar and ends before the window buttons, placed with its width of the
+  last frame (kept under the id); use `ImGui::SameLine` between items as in any row. With
+  `windowButtons`, three square plain buttons follow: minimize, maximize (restore while `maximized`)
+  and close, named by `Strings::minimize`, `Strings::maximize`, `Strings::restore` and
+  `Strings::close` in their tooltips. The close button takes the destructive fill on hover and press,
+  because it closes the window. The buttons are Tab stops and activate with a click, Enter or Space;
+  `TitleBarButtonPressed` returns the one activated in the last `EndTitleBar` of the frame, or `None`.
+- **Caption.** The free area of the bar (everything but the items and the buttons) is what
+  `AppFrameHitTest` reports as `Caption`. The bar itself does not move a window.
+- **States.** Inside `ImGui::BeginDisabled` the title draws in labelTertiary and the buttons do
+  nothing.
+
+`EndTitleBar` is always called; after it the bar is one item of its whole size. Status: ready.
 
 ### BeginOverlay (overlay controller)
 

@@ -19,6 +19,9 @@ void ContainersEndFrame()
     ClearCardStack();
     ClearShellStack();
     ClearContainerBackdrops();
+    ClearTitleBarStack();
+    RotateTitleBarRegions();
+    ClearTitleBarPress();
 }
 
 } // namespace

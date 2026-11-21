@@ -62,12 +62,6 @@ void CallContainerStubs(Values& v)
     CHECK_BALANCED(facet::SaveAppFramePlacement("app", v.placement));
     CHECK_BALANCED(CHECK_FALSE(facet::LoadAppFramePlacement("app", &v.placement)));
     CHECK_BALANCED({
-        facet::BeginTitleBar("Title", {.windowButtons = true});
-        ImGui::TextUnformatted("child");
-        facet::EndTitleBar();
-    });
-    CHECK_BALANCED(CHECK(facet::TitleBarButtonPressed() == facet::WindowButton::None));
-    CHECK_BALANCED({
         const bool open = facet::BeginOverlay("Overlay", &v.visible);
         CHECK(open);
         if (open)

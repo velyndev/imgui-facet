@@ -15,6 +15,7 @@
 
 #include "internal/focus.h"
 #include "internal/popup_host.h"
+#include "widgets/containers/container_layout.h"
 #include "support/session.h"
 #include "support/structure_stub_check.h"
 
@@ -1202,5 +1203,145 @@ TEST_CASE("Shells leave every stack as they found it: open, closed, collapsed, n
     CHECK(facet::internal::OpenScopeCount() == 0);
     const int before = facet::internal::UsageErrorCount();
     CHECK_FALSE(facet::BeginShell("outside a frame", nullptr));
+    CHECK(facet::internal::UsageErrorCount() == before);
+}
+
+// ---- Title bar ----------------------------------------------------------------------------------
+
+TEST_CASE("A title bar puts the caller's items before its window buttons and reports a press")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::WindowButton pressed = facet::WindowButton::None;
+    int saves = 0;
+    ImRect bar;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginTitleBar("Editor", {.icon = facet::Icon("monitor"), .detail = "Placeholder detail", .windowButtons = true});
+        if (facet::Button("Save"))
+            ++saves;
+        session.Track("save");
+        facet::EndTitleBar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        pressed = facet::TitleBarButtonPressed();
+        if (pressed != facet::WindowButton::None)
+            session.Track("pressed");  // only to keep the frame of the press visible to the test
+    });
+    session.Frames(3);
+    CHECK(bar.GetHeight() == doctest::Approx(facet::Px(facet::T().containers.titleBarHeight)));
+    CHECK(bar.GetWidth() == doctest::Approx(ImGui::FindWindowByName("test")->ContentRegionRect.GetWidth()).epsilon(0.02));
+    const ImRect save = session.ItemRect("save");
+    const float h = facet::ControlHeight(facet::ControlSize::Regular);
+    const float gap = facet::Px(facet::T().spacing.xs);
+    const float inset = (bar.GetHeight() - h) * 0.5f;
+    // The three buttons end at the trailing edge; the items end before them.
+    const float buttonsLeft = bar.Max.x - inset - h * 3.0f - gap * 2.0f;
+    CHECK(save.Max.x <= buttonsLeft);
+    CHECK(save.Max.x >= buttonsLeft - facet::Px(facet::T().spacing.sm) - 1.0f);
+    CHECK(save.GetCenter().y == doctest::Approx(bar.GetCenter().y).epsilon(0.02));
+    session.Click(session.ItemCenter("save"));
+    CHECK(saves == 1);
+
+    // A press on each window button is reported on its frame, by mouse and keyboard.
+    const facet::WindowButton expected[3] = {facet::WindowButton::Minimize, facet::WindowButton::Maximize,
+                                             facet::WindowButton::Close};
+    for (int i = 0; i < 3; ++i)
+    {
+        facet::WindowButton seen = facet::WindowButton::None;
+        ImRect plain;
+        session.SetUi([&] {
+            facet::BeginTitleBar("Editor", {.windowButtons = true});
+            facet::EndTitleBar();
+            plain = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            if (facet::TitleBarButtonPressed() != facet::WindowButton::None)
+                seen = facet::TitleBarButtonPressed();
+        });
+        session.Frame();
+        const float left = plain.Max.x - inset - h * 3.0f - gap * 2.0f;
+        session.Click(ImVec2(left + h * 0.5f + (h + gap) * static_cast<float>(i), plain.GetCenter().y));
+        CHECK(seen == expected[i]);
+    }
+    facet::WindowButton seen = facet::WindowButton::None;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginTitleBar("Editor", {.windowButtons = true});
+        facet::EndTitleBar();
+        if (facet::TitleBarButtonPressed() != facet::WindowButton::None)
+            seen = facet::TitleBarButtonPressed();
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seen == facet::WindowButton::Minimize);
+}
+
+TEST_CASE("A title bar records its caption, items and buttons for the hit test")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        facet::BeginTitleBar("Editor", {.windowButtons = true});
+        ImGui::Button("item");
+        facet::EndTitleBar();
+    });
+    session.Frames(3);
+    const facet::internal::TitleBarRegions* regions = nullptr;
+    REQUIRE(facet::internal::PreviousTitleBarRegions(&regions) == 1);
+    CHECK(regions[0].bar.GetHeight() > 0.0f);
+    CHECK(regions[0].items.GetWidth() > 0.0f);
+    CHECK(regions[0].items.Max.x <= regions[0].buttons[0].Min.x);
+    CHECK(regions[0].buttons[2].Max.x <= regions[0].bar.Max.x);
+    CHECK(regions[0].rootWindow == ImGui::FindWindowByName("test")->ID);
+}
+
+TEST_CASE("A narrow title bar cuts its title and keeps every part inside")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImDrawList* drawList = nullptr;
+    int from = 0;
+    ImRect bar;
+    session.SetUi([&] {
+        drawList = ImGui::GetWindowDrawList();
+        from = drawList->VtxBuffer.Size;
+        facet::BeginTitleBar("A title much longer than the bar", {.windowButtons = true, .width = 140.0f});
+        facet::EndTitleBar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    });
+    session.Frames(2);
+    CHECK(bar.GetWidth() == doctest::Approx(facet::Px(140.0f)));
+    CHECK(VerticesInside(drawList, from, bar));
+}
+
+TEST_CASE("Title bars leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::TitleBarScope outer("Outer", {.windowButtons = true, .maximized = true});
+            ImGui::TextUnformatted("item");
+            facet::TitleBarScope inner("Inner", {.height = 28.0f});
+        });
+        CHECK_BALANCED({ facet::TitleBarScope narrow("Narrow", {.windowButtons = true, .width = 1.0f}); });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({ facet::TitleBarScope disabled("Disabled", {.windowButtons = true}); });
+        ImGui::EndDisabled();
+        const int before = facet::internal::UsageErrorCount();
+        facet::EndTitleBar();
+        CHECK(facet::internal::UsageErrorCount() == before + 1);
+    });
+    session.Frames(2);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    facet::BeginTitleBar("outside a frame");
+    facet::EndTitleBar();
+    CHECK(facet::TitleBarButtonPressed() == facet::WindowButton::None);
+    CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK(facet::internal::UsageErrorCount() == before);
 }

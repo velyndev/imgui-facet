@@ -150,6 +150,29 @@ float ContainerCollapseAmount(ImGuiID id, bool open);
 bool ContainerOpenState(ImGuiID id, bool defaultOpen, const NextItemData& next);
 void SetContainerOpenState(ImGuiID id, bool open);
 
+// ---- Title bar regions --------------------------------------------------------------------------
+
+// Where a title bar's parts were in a frame, for the app frame's hit test: its free area is the
+// caption, the caller's items and the window buttons are not.
+struct TitleBarRegions
+{
+    ImGuiID rootWindow = 0;     // the root window it was submitted to
+    ImRect bar;                 // the whole bar, pixels
+    ImRect items;               // the caller's items; empty when none
+    ImRect buttons[3];          // minimize, maximize or restore, close; empty without window buttons
+};
+
+inline constexpr int kTitleBarRegionCount = 8;
+
+// Records the regions of a title bar submitted this frame (the first kTitleBarRegionCount count).
+void RecordTitleBarRegions(const TitleBarRegions& regions);
+// The regions recorded in the last finished frame.
+int PreviousTitleBarRegions(const TitleBarRegions** regions);
+// facet::EndFrame: this frame's regions become the previous frame's.
+void RotateTitleBarRegions();
+// facet::EndFrame: forgets the window button activated in the frame that ends.
+void ClearTitleBarPress();
+
 // ---- Frame end ----------------------------------------------------------------------------------
 
 // facet::EndFrame (containers_frame.cpp): every widget of the family forgets the Begins whose End
@@ -159,5 +182,6 @@ void ClearGroupBoxStack();
 void ClearDisclosureStack();
 void ClearAccordionStack();
 void ClearShellStack();
+void ClearTitleBarStack();
 
 } // namespace facet::internal
