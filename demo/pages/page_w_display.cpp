@@ -481,6 +481,18 @@ void DataSection(facet::demo::PageCtx& ctx)
     if (facet::KeyValue("Key 1", "Placeholder value one, copied on activation"))
         ++ui.valueCopies;
     ctx.Probe("display.value");
+    {
+        // The start of the first value line, where KeyValue places it: after the key column of
+        // the labeled row layout, or under the key when the row stacks.
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const facet::LabeledRowLayout columns = facet::LayoutLabeledRow(max.x - min.x);
+        const float line = facet::MeasureText(facet::TextStyle::Body, "Ag").y;
+        const float top = min.y + (columns.stacked ? line + facet::Px(facet::T().spacing.xs) : 0.0f);
+        const float left = min.x + columns.controlOffset;
+        facet::demo::ProbeRect(ctx, "display.value.text", 0, ImVec2(left, top),
+                               ImVec2(left + facet::Px(facet::T().spacing.xxxl), top + line));
+    }
     if (facet::KeyValue("Key 2", "Placeholder value with a tone", {.tone = facet::Tone::Success}))
         ++ui.valueCopies;
     if (facet::KeyValue("A longer key that is cut", kWrappedText))
@@ -592,7 +604,8 @@ FACET_DEMO_SELFTEST("display")
     test.Expect("the cut line shows its whole text on hover", [] { return ui.truncatedTip; });
     test.Click("display.section");  // the heading itself: nothing happens
     test.Expect("a click on the heading does nothing", [] { return ui.sectionActions == 0; });
-    test.MouseMove(T::Item("display.section", 0.98f, 0.5f));
+    // The action ends the row; a few units in from the end land on it at every scale.
+    test.MouseMove(T::Item("display.section", 1.0f, 0.5f).Offset(-6.0f, 0.0f));
     test.MouseDown();
     test.MouseUp();
     test.Expect("a click on the action activates it", [] { return ui.sectionActions == 1; });
@@ -607,7 +620,7 @@ FACET_DEMO_SELFTEST("display")
     // close button dismisses; the page brings it back.
     test.Reveal("display.banner");
     test.WaitSeconds(0.4f);  // the smooth scroll settles
-    test.MouseMove(T::Item("display.section", 0.98f, 0.5f));
+    test.MouseMove(T::Item("display.section", 1.0f, 0.5f).Offset(-6.0f, 0.0f));
     test.MouseDown();
     test.MouseUp();
     test.KeyPress(ImGuiKey_Tab);
@@ -743,8 +756,9 @@ FACET_DEMO_SELFTEST("display")
     test.Reveal("display.value");
     test.WaitSeconds(0.4f);  // the smooth scroll settles
     test.SetClipboard("");
-    // The first line of the value: beside its key on a wide page, under it on a narrow one.
-    test.MouseMove(T::Item("display.value", 0.3f, 0.55f));
+    // The start of the first line of the value: beside its key on a wide page, under it on a
+    // narrow one.
+    test.MouseMove(T::Item("display.value.text"));
     test.MouseDown();
     test.MouseUp();
     test.ExpectClipboard("a click copies the value", "Placeholder value one, copied on activation");

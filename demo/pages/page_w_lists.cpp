@@ -675,6 +675,10 @@ FACET_DEMO_SELFTEST("lists")
     const auto boxRow = [](const char* probe, int row) {
         return T::Item(probe, 0.5f, 1.0f).Offset(0.0f, -(4.0f + 32.0f * (5.0f - static_cast<float>(row) - 0.5f)));
     };
+    // A run in the other theme may have left the list scrolled to its end: the wheel brings its
+    // top rows back, so the rows counted from the bottom are the first five.
+    test.Wheel(T::Item("lists.listbox"), 5.0f);
+    test.WaitSeconds(0.4f);  // the smooth scroll settles
     test.MouseMove(boxRow("lists.listbox", 1));
     test.MouseDown();
     test.MouseUp();
@@ -752,6 +756,10 @@ FACET_DEMO_SELFTEST("lists")
 
     // Combo: the caller's rows. Rows: Option 1 to Option 5, Option 4 disabled.
     test.Do([] { State().combo = 0; });
+    // The rows are reached with MouseMove, which does not scroll: the field is brought into the
+    // middle of the window first, so the open list is in view.
+    test.Reveal("lists.combo");
+    test.WaitSeconds(0.4f);  // the smooth scroll settles
     test.Click("lists.combo");
     test.MouseMove(popupRow("lists.combo.popup", 2));
     test.MouseDown();
