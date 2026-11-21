@@ -90,11 +90,10 @@ void CallSliderStubs(Values& v)
 {
     using namespace facet;
     FACET_CHECK_STUB(false, JoystickPad("Stick 1", &v.point, {.deadzone = 0.1f}));
-    FACET_CHECK_STUB(false, ArcRangeSlider("Arc 1", &v.low, &v.high, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 2;
+constexpr int kSliderStubCalls = 1;
 
 } // namespace
 
@@ -128,7 +127,7 @@ TEST_CASE("A sliders placeholder is one item under the label's id that cannot be
         expected = ImGui::GetID("Volume##value");
         facet::JoystickPad("Volume##value", &stick);
         session.Track("slider");
-        facet::ArcRangeSlider("Gain", &gain, &gainHigh, 0.0f, 1.0f);
+        facet::JoystickPad("Gain", &stick);
         session.Track("knob");
         ImGui::Button("after");
         session.Track("after");

@@ -133,10 +133,22 @@ struct SlidersUi
     float sharesNarrow[3] = {0.5f, 0.25f, 0.25f};
     int sharesCommits = 0;
 
-    // The planned widgets below.
-    ImVec2 stick = {0.0f, 0.0f};
+    // ArcRangeSlider
+    float bandLowArc = 25.0f;
+    float bandHighArc = 60.0f;
+    float hoursFrom = 22.0f;   // the band runs through 24 to 6
+    float hoursTo = 6.0f;
     float arcLow = 45.0f;
     float arcHigh = 135.0f;
+    float arcFixedLow = 20.0f, arcFixedHigh = 70.0f;
+    float arcOffLow = 30.0f, arcOffHigh = 80.0f;
+    float arcMixLow = 25.0f, arcMixHigh = 75.0f;
+    bool arcMixedSet = false;
+    float arcSmallLow = 0.2f, arcSmallHigh = 0.7f;
+    float arcLimitLow = 10.0f, arcLimitHigh = 90.0f;
+
+    // The planned widgets below.
+    ImVec2 stick = {0.0f, 0.0f};
 };
 
 SlidersUi ui;
@@ -542,7 +554,7 @@ void AllocationSection(facet::demo::PageCtx& ctx)
     ctx.Probe("allocation.split");
     ProbeHandles(ctx, "Split", "allocation.split", 2);
     if (ctx.capture && ctx.captureState == kShares)
-        ctx.RevealInCapture(0.3f);
+        ctx.RevealInCapture(0.05f);
     LabeledRow("Push, colors");
     // Data colors from the chart palette, two repeated over four segments.
     const ImU32 colors[] = {facet::ToU32(facet::T().colors.chart[2]), facet::ToU32(facet::T().colors.chart[5])};
@@ -576,6 +588,66 @@ void AllocationSection(facet::demo::PageCtx& ctx)
     Note("Split %.2f, %.2f, %.2f (total %.2f, %d finished edits). Parts %.2f, %.2f, %.2f, %.2f.", ui.shares[0],
          ui.shares[1], ui.shares[2], ui.shares[0] + ui.shares[1] + ui.shares[2], ui.sharesCommits, ui.parts[0], ui.parts[1],
          ui.parts[2], ui.parts[3]);
+    ImGui::PopID();
+}
+
+void ArcRangeSection(facet::demo::PageCtx& ctx)
+{
+    ImGui::PushID("arc");
+    SectionHeader("ArcRangeSlider");
+    Paragraph("A range on an arc. Each handle is a Tab stop that all four arrows step; drag a handle around the "
+              "arc, drag the band to turn both, or press elsewhere on the ring to move the nearer handle. On a full "
+              "circle with wrap the band may run through the end of the range, and the handles still never pass "
+              "each other.");
+    // Dials side by side, wrapping onto the next line in a narrow window.
+    const float dial = facet::ControlHeight(facet::ControlSize::Regular) * 4.0f;
+    float right = facet::demo::ContentRight();
+    const auto Next = [&] { facet::demo::SameLineIfFits(right, dial); };
+    LabeledRow("Arc and circles");
+    right = facet::demo::ContentRight();
+    if (ctx.capture && ctx.captureState == kShares)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 1);
+    facet::ArcRangeSlider("Band", &ui.bandLowArc, &ui.bandHighArc, 0.0f, 100.0f, {.format = "%.0f", .minGap = 10.0});
+    ctx.Probe("arc.band");
+    ProbeHandles(ctx, "Band", "arc.band", 2);
+    Next();
+    facet::ArcRangeSlider("Hours", &ui.hoursFrom, &ui.hoursTo, 0.0f, 24.0f,
+                          {.format = "%.0f", .step = 1.0, .minGap = 1.0, .wrap = true, .sweep = 360.0f});
+    ctx.Probe("arc.hours");
+    ProbeHandles(ctx, "Hours", "arc.hours", 2);
+    Next();
+    facet::ArcRangeSlider("Sector", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f,
+                          {.format = "%.0f", .step = 5.0, .minGap = 10.0, .collision = facet::HandleCollision::Push,
+                           .wrap = true, .sweep = 360.0f});
+    ctx.Probe("arc.sector");
+    ProbeHandles(ctx, "Sector", "arc.sector", 2);
+
+    LabeledRow("Sizes and states");
+    right = facet::demo::ContentRight();
+    facet::ArcRangeSlider("Small", &ui.arcSmallLow, &ui.arcSmallHigh, 0.0f, 1.0f,
+                          {.format = "%.1f", .size = facet::ControlSize::Small});
+    ctx.Probe("arc.small");
+    Next();
+    facet::ArcRangeSlider("Read-only", &ui.arcFixedLow, &ui.arcFixedHigh, 0.0f, 100.0f, {.format = "%.0f", .readOnly = true});
+    ctx.Probe("arc.readOnly");
+    Next();
+    ImGui::BeginDisabled();
+    facet::ArcRangeSlider("Disabled", &ui.arcOffLow, &ui.arcOffHigh, 0.0f, 100.0f, {.format = "%.0f"});
+    ImGui::EndDisabled();
+    ctx.Probe("arc.disabled");
+    Next();
+    if (facet::ArcRangeSlider("Mixed", &ui.arcMixLow, &ui.arcMixHigh, 0.0f, 100.0f, {.format = "%.0f", .mixed = !ui.arcMixedSet}))
+        ui.arcMixedSet = true;
+    ctx.Probe("arc.mixed");
+    ProbeHandles(ctx, "Mixed", "arc.mixed", 2);
+    LabeledRow("");
+    facet::ArcRangeSlider("Limit", &ui.arcLimitLow, &ui.arcLimitHigh, 0.0f, 100.0f,
+                          {.format = "%.0f", .error = ui.arcLimitHigh - ui.arcLimitLow > 60.0f ? "Keep the band at 60 or less" : nullptr,
+                           .helpText = "Narrow the band"});
+    ctx.Probe("arc.limit");
+    ProbeHandles(ctx, "Limit", "arc.limit", 2);
+    Note("Band %.0f to %.0f, hours %.0f to %.0f, sector %.0f to %.0f.", ui.bandLowArc, ui.bandHighArc, ui.hoursFrom,
+         ui.hoursTo, ui.arcLow, ui.arcHigh);
     ImGui::PopID();
 }
 
@@ -638,9 +710,7 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     AllocationSection(ctx);
 
-    SectionHeader("ArcRangeSlider");
-    LabeledRow("Arc range");
-    facet::ArcRangeSlider("##arc", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f});
+    ArcRangeSection(ctx);
 
     SectionHeader("JoystickPad");
     LabeledRow("Joystick");
@@ -1102,4 +1172,60 @@ FACET_DEMO_SELFTEST("sliders")
     test.MouseDown();
     test.MouseUp();
     test.Expect("a click left of the divider clears the error", [] { return ui.sharesLimit[0] <= 0.6f; });
+
+    // ArcRangeSlider: a press on a handle grabs and focuses it, all four arrows step, the gap holds,
+    // a wrapped band passes the end of the range, the band drags both handles.
+    // Fraction f of a `sweep` degree arc on a dial D units across lies at the angle
+    // 90 + (360 - sweep) / 2 + sweep * f degrees from the centre, D / 2 - 9 units out.
+    const auto ArcAt = [](const char* probe, float f, float sweep, float dial) {
+        const float pi = 3.14159265358979f;
+        const float sweepRad = sweep * pi / 180.0f;
+        const float angle = pi * 0.5f + (2.0f * pi - sweepRad) * 0.5f + sweepRad * f;
+        const float radius = dial * 0.5f - 9.0f;
+        return T::Item(probe, 0.0f, 0.0f).Offset(dial * 0.5f + std::cos(angle) * radius, dial * 0.5f + std::sin(angle) * radius);
+    };
+    test.Reveal("arc.band");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.bandLowArc = 25.0f; ui.bandHighArc = 60.0f; });
+    test.MouseMove(ArcAt("arc.band", 0.6f, 270.0f, 112.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectFocused("arc.band.h1");
+    test.ExpectNear("a press on a handle does not move it", [] { return ui.bandHighArc; }, 60.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right steps the high handle up", [] { return ui.bandHighArc; }, 61.0, 1e-4);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Left and Down step it down", [] { return ui.bandHighArc; }, 59.0, 1e-4);
+    test.KeyPress(ImGuiKey_Home);
+    test.ExpectNear("Home stops the high handle one gap after the low one", [] { return ui.bandHighArc; }, 35.0, 1e-4);
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("arc.band.h0");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down steps the low handle down", [] { return ui.bandLowArc; }, 24.0, 1e-4);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("arc.hours.h0");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("the start of the hours passes 24 and goes on from 0", [] { return ui.hoursFrom; }, 1.0, 1e-4);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("arc.hours.h1");
+    test.HoldKey(ImGuiKey_LeftArrow, 2.0f);
+    test.ExpectNear("the end of the hours stops one gap after the start", [] { return ui.hoursTo; }, 2.0, 1e-4);
+    test.Reveal("arc.band");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.bandLowArc = 25.0f; ui.bandHighArc = 60.0f; });
+    test.Drag({ArcAt("arc.band", 0.42f, 270.0f, 112.0f), ArcAt("arc.band", 0.52f, 270.0f, 112.0f)}, 0.3f);
+    test.Expect("a drag on the band turns both handles and keeps the band",
+                [] { return ui.bandLowArc > 30.0f && std::fabs(ui.bandHighArc - ui.bandLowArc - 35.0f) < 1e-3f; });
+    test.Drag({ArcAt("arc.readOnly", 0.7f, 270.0f, 112.0f), ArcAt("arc.readOnly", 0.9f, 270.0f, 112.0f)}, 0.2f);
+    test.ExpectNear("the read-only arc keeps its values", [] { return ui.arcFixedHigh; }, 70.0, 0.0);
+    test.Drag({ArcAt("arc.disabled", 0.8f, 270.0f, 112.0f), ArcAt("arc.disabled", 0.95f, 270.0f, 112.0f)}, 0.2f);
+    test.ExpectNear("the disabled arc keeps its values", [] { return ui.arcOffHigh; }, 80.0, 0.0);
+    test.Drag({ArcAt("arc.mixed", 0.75f, 270.0f, 112.0f), ArcAt("arc.mixed", 0.9f, 270.0f, 112.0f)}, 0.2f);
+    test.Expect("the first edit of a mixed arc sets it", [] { return ui.arcMixedSet; });
+    test.Drag({ArcAt("arc.limit", 0.9f, 270.0f, 112.0f), ArcAt("arc.limit", 0.6f, 270.0f, 112.0f)}, 0.3f);
+    test.Expect("narrowing the band clears the error", [] { return ui.arcLimitHigh - ui.arcLimitLow <= 60.0f; });
 }

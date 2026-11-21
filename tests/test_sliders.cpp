@@ -1610,6 +1610,198 @@ TEST_CASE("An allocation bar draws shares that do not add up normalized and writ
     CHECK(single[0] == 1.0f);
 }
 
+// ---- ArcRangeSlider ------------------------------------------------------------------------
+
+namespace
+{
+
+// The point at fraction f of the arc of a 200 unit arc range tracked as `name`, `sweep` degrees
+// starting at the bottom (open in the middle of the bottom for less than a full turn).
+ImVec2 ArcAt(const facet::test::Session& session, const char* name, double f, float sweep = 270.0f, float radiusShift = 0.0f)
+{
+    const ImRect r = session.ItemRect(name);
+    const float diameter = 200.0f;
+    const ImVec2 center(r.Min.x + diameter * 0.5f, r.Min.y + diameter * 0.5f);
+    const float radius = diameter * 0.5f - KnobSize() * 0.5f + radiusShift;
+    const float pi = 3.14159265358979f;
+    const float sweepRad = sweep * pi / 180.0f;
+    const float start = pi * 0.5f + (2.0f * pi - sweepRad) * 0.5f;
+    const float angle = start + sweepRad * static_cast<float>(f);
+    return ImVec2(center.x + std::cos(angle) * radius, center.y + std::sin(angle) * radius);
+}
+
+} // namespace
+
+TEST_CASE("An arc range has two Tab stops; all four arrows step, the gap holds and Push turns the other handle")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float low = 20.0f;
+    float high = 60.0f;
+    float pushLow = 20.0f;
+    float pushHigh = 60.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::ArcRangeSlider("Band", &low, &high, 0.0f, 100.0f, {.minGap = 10.0, .diameter = 200.0f});
+        session.Track("arc");
+        facet::ArcRangeSlider("Push", &pushLow, &pushHigh, 0.0f, 100.0f,
+                              {.minGap = 10.0, .collision = facet::HandleCollision::Push, .diameter = 200.0f});
+        session.Track("push");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    const ImGuiID widget = session.ItemId("arc");
+    const auto handleId = [&](ImGuiID w, int part) { return ImHashData(&part, sizeof(part), w); };
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == handleId(widget, 0));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(low == doctest::Approx(21.0f));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(low == doctest::Approx(22.0f));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(low == doctest::Approx(20.0f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(low == doctest::Approx(50.0f));
+    CHECK(ImGui::GetFocusID() == handleId(widget, 0));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == handleId(widget, 1));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(high == doctest::Approx(60.0f));
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == handleId(session.ItemId("push"), 0));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(pushLow == doctest::Approx(90.0f));
+    CHECK(pushHigh == doctest::Approx(100.0f));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("A wrapping arc range runs through max to min and its handles never pass each other")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float from = 300.0f;
+    float to = 60.0f;
+    float pushFrom = 50.0f;
+    float pushTo = 60.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::ArcRangeSlider("Sector", &from, &to, 0.0f, 360.0f,
+                              {.step = 5.0, .minGap = 10.0, .wrap = true, .sweep = 360.0f, .diameter = 200.0f});
+        session.Track("arc");
+        facet::ArcRangeSlider("Push", &pushFrom, &pushTo, 0.0f, 360.0f,
+                              {.minGap = 10.0, .collision = facet::HandleCollision::Push, .wrap = true, .sweep = 360.0f,
+                               .diameter = 200.0f});
+        session.Track("push");
+    });
+    session.Frame();
+    // A value out of order is drawn as the band through max: nothing is written.
+    session.Frames(2);
+    CHECK(from == 300.0f);
+    CHECK(to == 60.0f);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    // The high handle steps past max and on from min.
+    session.KeyPress(ImGuiKey_Tab);
+    for (int i = 0; i < 3; ++i)
+        session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(to == doctest::Approx(45.0f));
+    // Moving the high handle back toward the low one stops one gap after it, through min.
+    session.HoldKey(ImGuiKey_DownArrow, 3.0f);
+    CHECK(to == doctest::Approx(310.0f));
+    CHECK(from == 300.0f);
+    // Push: the low handle turning into the high one carries it along.
+    session.KeyPress(ImGuiKey_Tab);
+    for (int i = 0; i < 4; ++i)
+        session.KeyPress(ImGuiKey_RightArrow);
+    // Continuous keys move on the grid of hundredths of the track: 50.4, 54, 57.6, 61.2.
+    CHECK(pushFrom == doctest::Approx(61.2f));
+    CHECK(pushTo == doctest::Approx(pushFrom + 10.0f));
+}
+
+TEST_CASE("An arc range follows the pointer angle, the band turns both handles, Escape restores")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float low = 25.0f;
+    float high = 50.0f;
+    int commits = 0;
+    session.SetUi([&] {
+        facet::ArcRangeSlider("Band", &low, &high, 0.0f, 100.0f, {.diameter = 200.0f});
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("arc");
+    });
+    session.Frame();
+    // The high handle at half of the sweep (the top) to three quarters.
+    session.Drag({ArcAt(session, "arc", 0.5), ArcAt(session, "arc", 0.62), ArcAt(session, "arc", 0.75)});
+    CHECK(high == doctest::Approx(75.0f).epsilon(0.02));
+    CHECK(low == 25.0f);
+    CHECK(commits == 1);
+    // The band between them turns both by the same amount.
+    const float bandBefore = high - low;
+    session.Drag({ArcAt(session, "arc", 0.5), ArcAt(session, "arc", 0.6)});
+    CHECK(high - low == doctest::Approx(bandBefore));
+    CHECK(low == doctest::Approx(35.0f).epsilon(0.03));
+    // A press on the ring away from both handles moves the nearer one there.
+    session.Click(ArcAt(session, "arc", 0.1));
+    CHECK(low == doctest::Approx(10.0f).epsilon(0.05));
+    // Escape during a drag restores both values.
+    const float before = high;
+    const ImVec2 at = ArcAt(session, "arc", high / 100.0f);
+    session.MouseMove(at);
+    session.MouseDown();
+    session.MouseMove(ArcAt(session, "arc", 0.95));
+    CHECK(high != before);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(high == before);
+    session.MouseUp();
+}
+
+TEST_CASE("An arc range at a small size keeps its parts inside, and read-only, disabled or mixed write only where they may")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float low = 0.2f, high = 0.6f;
+    float fixedLow = 0.2f, fixedHigh = 0.6f;
+    float offLow = 0.2f, offHigh = 0.6f;
+    float mixLow = 0.2f, mixHigh = 0.6f;
+    bool mixedSet = false;
+    session.SetUi([&] {
+        facet::ArcRangeSlider("Tiny", &low, &high, 0.0f, 1.0f, {.format = "%.2f", .diameter = 24.0f});
+        session.Track("tiny");
+        facet::ArcRangeSlider("Fixed", &fixedLow, &fixedHigh, 0.0f, 1.0f, {.diameter = 200.0f, .readOnly = true});
+        session.Track("fixed");
+        ImGui::BeginDisabled();
+        facet::ArcRangeSlider("Off", &offLow, &offHigh, 0.0f, 1.0f, {.diameter = 200.0f});
+        ImGui::EndDisabled();
+        session.Track("off");
+        if (facet::ArcRangeSlider("Mixed", &mixLow, &mixHigh, 0.0f, 1.0f, {.diameter = 200.0f, .mixed = !mixedSet}))
+            mixedSet = true;
+        session.Track("mixed");
+    });
+    session.Frame();
+    // The tiny dial puts its values under it: the widget is taller than the dial and its label.
+    const ImRect tiny = session.ItemRect("tiny");
+    CHECK(tiny.GetWidth() >= 24.0f);
+    CHECK(tiny.GetHeight() > 24.0f + facet::T().spacing.xs);
+    session.Drag({ArcAt(session, "fixed", 0.6), ArcAt(session, "fixed", 0.9)});
+    session.Drag({ArcAt(session, "off", 0.6), ArcAt(session, "off", 0.9)});
+    CHECK(fixedHigh == 0.6f);
+    CHECK(offHigh == 0.6f);
+    session.Drag({ArcAt(session, "mixed", 0.6), ArcAt(session, "mixed", 0.8)});
+    CHECK(mixedSet);
+    CHECK(mixHigh > 0.7f);
+}
+
 // ---- RangeSliderHistogram ------------------------------------------------------------------
 
 TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")

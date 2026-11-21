@@ -347,7 +347,40 @@ bool ArcRangeSlider(const char* label, float* low, float* high, float min, float
                     const ArcRangeSliderOptions& options = {});
 ```
 
-A range slider bent into an arc, for angular sectors and cyclic bands. Status: planned.
+The two-handle range of RangeSlider on the dial of a Knob: a dial `diameter` units across (four
+control heights of `size` by default, at most the available width), the track arc along the sweep
+(`sweep` degrees, dialSweep by default, open at the bottom; 360 is a closed circle starting at the
+bottom), the band between the handles in the accent, both values inside the dial (low, a short bar,
+high, as RangeSlider's value column; under the dial when they do not fit in it) and the label under
+it in Footnote, cut with its full text on hover and keyboard focus. The handles are slider knobs
+on the arc, smaller on a dial too small for them; the arc runs half a knob inside the dial, so
+nothing leaves it. Handle 0 is `*low`, handle 1 `*high`, each its own item and Tab stop.
+
+- **Pointer:** a press on a handle grabs it without moving it, a press on the band grabs the band
+  (with `dragSpan`), a press elsewhere on the ring moves the nearer handle there first; a press in
+  the middle of the dial does nothing. Drags follow the pointer angle, with the grab offset kept;
+  on an open arc a pointer in the gap at the bottom goes to the nearer end. The band turns both
+  handles by the same amount (whole steps with `step`). The band thickens while a press would grab
+  it.
+- **Keys** on a focused handle: all four arrows step (Up and Right up, Down and Left down, as on a
+  knob), Shift finer, Ctrl coarser, Page Up and Down a tenth, Home and End as far as the rules let
+  the handle go; Escape during a drag or a key press restores both values. Ctrl+click or Enter
+  types the value of a handle in a number field over the dial.
+- **Rules:** without `wrap` as RangeSlider: order, `minGap`, `collision`, the band stops as a whole
+  at the ends. `wrap` needs `sweep` 360 and is ignored otherwise: the range is then a circle, the
+  band runs clockwise from `*low` to `*high` (through `max` to `min` when `*low` is the larger),
+  keys and drags pass the end of the range, and the handles never pass each other: both arcs
+  between them keep `minGap`, and Push turns the other handle along instead of stopping. Home and
+  End go to `min` and `max`, which are the same point there. `scale` Logarithmic needs `min > 0`
+  and no `wrap`.
+- **States:** as RangeSlider; `mixed` hides the band, the handles and the values until the first
+  edit (the handles stay Tab stops with their focus ring); `error` draws the track arc in the
+  destructive color and the message under the widget. Values passed in out of range, or closer
+  than the gap, are drawn repaired and written only for the handles an edit moves.
+- **Not done yet:** an int overload (the header declares the float one only), and tick marks
+  for the steps.
+
+Status: ready.
 
 ### BoxRangePad
 
