@@ -1096,6 +1096,41 @@ TEST_CASE("A circular knob follows the pointer angle, and a read-only knob write
     session.Drag({f.GetCenter(), ImVec2(f.GetCenter().x, f.GetCenter().y - 80.0f)});
     CHECK(fixed == 0.5f);
 }
+
+TEST_CASE("A focused knob steps with Left and Right like Down and Up and keeps the focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float value = 0.5f;
+    int commits = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Knob("Gain", &value, 0.0f, 1.0f);
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("knob");
+        facet::Knob("Next", &value, 0.0f, 1.0f);
+        session.Track("next");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("knob"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(value == doctest::Approx(0.51f));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(value == doctest::Approx(0.49f));
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    CHECK(value == doctest::Approx(0.5f));
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    CHECK(value == doctest::Approx(0.6f));
+    CHECK(commits == 5);
+    // The arrows never move the focus to the next knob.
+    CHECK(ImGui::GetFocusID() == session.ItemId("knob"));
+}
 // ---- RangeSliderHistogram ------------------------------------------------------------------
 
 TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")

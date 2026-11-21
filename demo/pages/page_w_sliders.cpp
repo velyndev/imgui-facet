@@ -244,8 +244,9 @@ void MultiSection(facet::demo::PageCtx& ctx)
 void KnobSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Knob");
-    Paragraph("Drag up to turn a knob up, or around it with circular drag. Up and Down step while it is focused, "
-              "the wheel turns it while it is focused or with Alt, a double click undoes the last click.");
+    Paragraph("Drag up to turn a knob up, or around it with circular drag. The arrows step while it is focused (Up "
+              "and Right up, Down and Left down), the wheel turns it while it is focused or with Alt, a double click "
+              "undoes the last click.");
     // Knobs side by side, wrapping onto the next line in a narrow window.
     const float knobWidth = facet::ControlHeight(facet::ControlSize::Large) * 2.0f;
     float right = facet::demo::ContentRight();
@@ -673,6 +674,11 @@ FACET_DEMO_SELFTEST("sliders")
     test.ExpectFocused("knob.dot");
     test.KeyPress(ImGuiKey_UpArrow);
     test.ExpectNear("Up turns the whole-number knob one step up", [] { return ui.knobDot; }, 4.0, 0.0);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right turns it one more step up", [] { return ui.knobDot; }, 5.0, 0.0);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("Left turns it one step down", [] { return ui.knobDot; }, 4.0, 0.0);
+    test.ExpectFocused("knob.dot");
     test.MouseMove(Row("multi.marks", 0.92f));
     test.MouseDown();
     test.MouseUp();

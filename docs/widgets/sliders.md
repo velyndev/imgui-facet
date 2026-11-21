@@ -281,11 +281,12 @@ the label under it in Footnote, cut with its full text on hover and keyboard foc
 - **Input:** every press grabs without moving the value; dragging up (and back down) moves it,
   one fader length of travel for the whole range, Shift ten times finer, and a drag that leaves the
   window comes back exactly. With `circularDrag` the value follows the pointer angle along the
-  sweep (inside the gap at the bottom it goes to the nearer end) and Escape restores it. Up and
-  Down step while focused (Left and Right keep moving the focus), Page Up and Down a tenth, Home
-  and End the ends; the wheel steps while focused or with Alt. Ctrl+click or Enter types a value
-  in a number field over the dial. A double click restores the value from the start of its first
-  click.
+  sweep (inside the gap at the bottom it goes to the nearer end) and Escape restores it. The
+  arrows step while focused, Up and Right toward the maximum, Down and Left toward the minimum
+  (a dial has no direction on screen, so all four turn it; Tab moves the focus), Page Up and
+  Down a tenth, Home and End the ends; the wheel steps while focused or with Alt. Ctrl+click or
+  Enter types a value in a number field over the dial. A double click restores the value from the
+  start of its first click.
 - **States:** as Slider: disabled, `readOnly`, `mixed` (no value mark and no text until the first
   edit), `error` (the track arc in the destructive color and the message under the knob).
 

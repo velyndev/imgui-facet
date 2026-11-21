@@ -3,10 +3,10 @@
 // under it.
 //
 // Input is the value drag core on a vertical track: dragging up increases, every press grabs
-// without moving the value, Shift is finer, the Up and Down arrows, Page Up and Down, Home and End
-// step while focused, and the wheel turns it while focused or with Alt. With circularDrag the value
-// follows the pointer's angle around the centre instead. A double click restores the value the
-// knob had when the first click of it began.
+// without moving the value, Shift is finer, the arrows (Up and Right increase, Down and Left
+// decrease), Page Up and Down, Home and End step while focused, and the wheel turns it while
+// focused or with Alt. With circularDrag the value follows the pointer's angle around the centre
+// instead. A double click restores the value the knob had when the first click of it began.
 
 #include "facet/widgets/sliders.h"
 
@@ -176,6 +176,8 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
             drag.orientation = Orientation::Vertical;
             drag.grabRadius = -1.0f;
             drag.readOnly = readOnly;
+            // A dial has no direction on screen: Left and Right turn it like Down and Up.
+            drag.crossArrows = true;
             internal::ItemState input = item;
             ImGuiContext& g = *GImGui;
             const bool circular = o.circularDrag && g.ActiveId == id && g.ActiveIdSource == ImGuiInputSource_Mouse &&
