@@ -123,8 +123,9 @@ struct ScrollAreaDesc
     bool fitHeight = false;            // the height follows the content (one frame behind), so it never scrolls vertically
     bool edgeFades = true;             // a fade of the surface where content continues past an edge
     // The surface under the area, the color its edge fades blend into. Alpha 0 (the default)
-    // takes the innermost PushScrollFadeSurface, else bgElevated inside a popup or tooltip and
-    // bg everywhere else.
+    // takes the innermost PushScrollFadeSurface pushed in the same root window (a popup does not
+    // take a surface the page pushed), else bgElevated inside a popup or tooltip and bg
+    // everywhere else.
     ImVec4 fadeSurface = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     // Pixels between the area's edge and its content on every side; < 0 takes FocusRingOutset()
     // (focus.h), so the focus ring of content flush with the padding shows whole.
@@ -158,7 +159,9 @@ bool ScrollAreaBarRects(ImGuiWindow* window, ImGuiAxis axis, ImRect* track, ImRe
 
 // The surface the edge fades of the scroll areas opened until the matching PopScrollFadeSurface
 // blend into: a container that draws its own surface (a card, a panel, a popover) pushes its
-// color around its content. Pushes nest up to kScrollFadeSurfaceDepth deep; deeper pushes are
+// color around its content. A push belongs to the root window it was made in: scroll areas of
+// other root windows opened inside it (popup levels) ignore it. Pushes nest up to
+// kScrollFadeSurfaceDepth deep; deeper pushes are
 // reported and ignored (their pops still balance), a pop without a push is reported, and
 // facet::EndFrame reports surfaces still pushed and clears them.
 inline constexpr int kScrollFadeSurfaceDepth = 8;

@@ -101,6 +101,7 @@ struct ScrollCore
     OpenArea open[kScrollAreaDepth];
     int openDepth = 0;
     ImVec4 surfaces[kScrollFadeSurfaceDepth];
+    ImGuiID surfaceRoots[kScrollFadeSurfaceDepth] = {};  // root window of the push; 0 outside a window
     int surfaceDepth = 0;
     int surfaceOverflow = 0;
     double clock = 0.0;
@@ -437,9 +438,14 @@ ImVec4 ResolveSurface(const ImVec4& requested, const ImGuiWindow* parent)
     if (requested.w > 0.0f)
         return requested;
     const ScrollCore& core = Core();
-    if (core.surfaceDepth > 0)
-        return core.surfaces[core.surfaceDepth - 1];
     const ImGuiWindow* root = parent->RootWindow != nullptr ? parent->RootWindow : parent;
+    // The innermost surface pushed in the same layer: a surface the page pushed around a control
+    // does not reach into a popup that control opened, which floats over another surface.
+    for (int i = core.surfaceDepth - 1; i >= 0; --i)
+    {
+        if (core.surfaceRoots[i] == 0 || core.surfaceRoots[i] == root->ID)
+            return core.surfaces[i];
+    }
     if ((root->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
         return T().colors.bgElevated;
     return T().colors.bg;
@@ -943,6 +949,9 @@ void PushScrollFadeSurface(const ImVec4& surface)
         ++core.surfaceOverflow;
         return;
     }
+    const ImGuiWindow* window = ImGui::GetCurrentContext() != nullptr ? GImGui->CurrentWindow : nullptr;
+    const ImGuiWindow* root = window != nullptr && window->RootWindow != nullptr ? window->RootWindow : window;
+    core.surfaceRoots[core.surfaceDepth] = root != nullptr ? root->ID : 0;
     core.surfaces[core.surfaceDepth++] = surface;
 }
 

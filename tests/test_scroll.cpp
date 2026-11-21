@@ -686,6 +686,61 @@ TEST_CASE("Scroll area: edge fades draw the surface color where content continue
     CHECK(fi::UsageErrorCount() == errors + 1);
 }
 
+TEST_CASE("Scroll area: a popup opened inside a pushed surface fades into the popup surface")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImVec4 page(0.25f, 0.5f, 0.75f, 1.0f);
+    const ImU32 pageColor = facet::ToU32(page);
+    const ImU32 elevated = facet::ToU32(facet::T().colors.bgElevated);
+    REQUIRE(pageColor != elevated);
+    int pageVertices = 0;
+    int elevatedVertices = 0;
+    int insideVertices = 0;
+    bool open = false;
+    session.SetUi([&] {
+        // The page pushes its surface around a control that opens a popup with a scrolling list.
+        fi::PushScrollFadeSurface(page);
+        if (!open)
+        {
+            ImGui::OpenPopup("list");
+            open = true;
+        }
+        if (ImGui::BeginPopup("list"))
+        {
+            if (fi::BeginScrollAreaCore("rows", {.size = ImVec2(200.0f, 120.0f)}))
+            {
+                ImGui::Dummy(ImVec2(180.0f, 900.0f));
+                ImGuiWindow* window = ImGui::GetCurrentWindow();
+                fi::EndScrollAreaCore();  // draws the fades
+                pageVertices = elevatedVertices = 0;
+                for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+                {
+                    pageVertices += vertex.col == pageColor ? 1 : 0;
+                    elevatedVertices += vertex.col == elevated ? 1 : 0;
+                }
+            }
+            ImGui::EndPopup();
+        }
+        // An area of the page itself still takes the pushed surface.
+        if (fi::BeginScrollAreaCore("page rows", {.size = ImVec2(200.0f, 120.0f)}))
+        {
+            ImGui::Dummy(ImVec2(180.0f, 900.0f));
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            fi::EndScrollAreaCore();
+            insideVertices = 0;
+            for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+                insideVertices += vertex.col == pageColor ? 1 : 0;
+        }
+        fi::PopScrollFadeSurface();
+    });
+    session.Frames(3);
+    CHECK(pageVertices == 0);
+    CHECK(elevatedVertices > 0);  // the bottom fade, where the rows continue
+    CHECK(insideVertices > 0);
+}
+
 TEST_CASE("Scroll area: an End without its Begin is reported")
 {
     MotionGuard guard;
