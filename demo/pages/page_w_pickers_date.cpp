@@ -1,10 +1,9 @@
 // Demo page: Other pickers. One section per widget of facet/widgets/pickers.h that is not a color
 // picker: date, date range and time pickers, the angle, icon and thumbnail pickers and the file
 // browser, with their important variants and states, capture states for the open and focused
-// looks, and a selftest that operates every ready widget by mouse and keyboard. A widget that is
-// still planned draws its placeholder. The color pickers have a page of their own
-// (page_w_pickers_color.cpp). Sample values are neutral: fixed dates and times, built-in icons,
-// "Option n" entries.
+// looks, and a selftest that operates every widget by mouse and keyboard. The color pickers have a
+// page of their own (page_w_pickers_color.cpp). Sample values are neutral: fixed dates and times,
+// built-in icons, "Option n" entries, and the root of drive C for the file browser.
 
 #include <cmath>
 #include <cstdio>
