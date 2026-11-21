@@ -682,6 +682,39 @@ TEST_CASE("A progress ring is one control height, eases its arc and shows its pe
     CHECK(arc >= early);
 }
 
+// ==== Spinner ====
+
+TEST_CASE("A spinner turns, and stands still in its resting shape while motion is reduced")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    std::vector<ImVec2> first;
+    std::vector<ImVec2> last;
+    std::vector<ImVec2>* sample = &first;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::Spinner("Loading", {.tone = facet::Tone::Accent});
+        sample->clear();
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+            if ((drawList->VtxBuffer[i].col & ~IM_COL32_A_MASK) == (facet::ToU32(facet::T().colors.focusRing) & ~IM_COL32_A_MASK))
+                sample->push_back(drawList->VtxBuffer[i].pos);
+    });
+    session.Frame();
+    sample = &last;
+    session.Seconds(facet::T().motion.spinnerPeriod * 0.25f);
+    REQUIRE_FALSE(first.empty());
+    CHECK((first.size() != last.size() || std::memcmp(first.data(), last.data(), first.size() * sizeof(ImVec2)) != 0));
+    DisplayGuard::ReduceMotion(true);
+    sample = &first;
+    session.Frame();
+    sample = &last;
+    session.Seconds(facet::T().motion.spinnerPeriod * 0.25f);
+    REQUIRE(first.size() == last.size());
+    CHECK(std::memcmp(first.data(), last.data(), first.size() * sizeof(ImVec2)) == 0);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

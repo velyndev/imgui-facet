@@ -128,7 +128,11 @@ colors. Status: ready.
 void Spinner(const char* label, const SpinnerOptions& options = {});
 ```
 
-Busy indicator on the shared spinner clock. Status: planned.
+A busy indicator as tall as the text of its size, centered on the capitals of the line, with the
+visible label part after it in `labelSecondary`. Neutral turns in `labelSecondary`, Accent in the 3:1
+accent (`focusRing`), the status tones in their colors. Every spinner reads one loading clock; with
+reduced motion it stands still as three quarters of a ring and fades in place. Not interactive;
+keeps nothing per id. Status: ready.
 
 ### Skeleton
 

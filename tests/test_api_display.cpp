@@ -233,14 +233,13 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
             CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
             ++checked;
         };
-        wide("Spinner", [] { Spinner("##spinner"); });
         wide("KeyCap", [] { KeyCap(ImGuiKey_A); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0, {.ring = true}); });
         wide("InlineCode", [] { InlineCode("a"); });
     });
     session.Frame();
-    CHECK(checked == 5);
+    CHECK(checked == 4);
 }
 
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")
