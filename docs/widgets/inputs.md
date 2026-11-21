@@ -331,7 +331,25 @@ bool PinCodeInput(const char* label, std::string* code, const PinCodeInputOption
 bool PinCodeInput(const char* label, char* buffer, std::size_t bufferSize, const PinCodeInputOptions& options = {});
 ```
 
-A one-time code as separate cells that fill as the user types or pastes. Status: planned.
+A code of `length` cells (1 to 16) with the label in front. One frameless text field on the text
+field core takes the keyboard for the whole code, so it is one Tab stop and typing, Backspace,
+paste, undo and IME are Dear ImGui's; the field draws no text and the cells are drawn from it. Each
+cell is a field frame one control height square with spacing.xs between cells and spacing.md after
+every `groupSize` cells; it shows its character centered, or a dot (statusDotSize) when `masked`.
+While the field has the keyboard the next empty cell (the last one when the code is full) has the
+active outline and a caret line. The caret stays at the end of the code, so typing fills the next
+cell and Backspace empties the last one; Ctrl+A then Backspace clears it. `numericOnly` keeps digits
+only (also from a paste); otherwise any visible character but a space is taken; a paste fills as
+many cells as there are characters. A click anywhere on the cells gives the field the keyboard.
+`masked` also turns copying off.
+
+Writes per keystroke and returns true when the code was written; the code is complete when its
+length equals `length`. `error` draws the error outline on every cell and the message under the
+cells, and shakes the cells sideways once (three swings over motion.durationSlow, spacing.xs wide)
+each time the error appears, unless motion is reduced. Default width: the label and the cells, at
+most the available width; in a narrower width the cells shrink down to the small control height and
+then wrap onto further rows. `readOnly`, disabled and the buffer form are as for TextField.
+Status: ready.
 
 ### DurationInput
 

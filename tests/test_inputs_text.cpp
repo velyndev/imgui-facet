@@ -1884,3 +1884,61 @@ TEST_CASE("MaskedInput takes escaped literals, letters and any character, and sh
     session.Type("any text");
     CHECK(plain == "any text");
 }
+// ---- PinCodeInput ------------------------------------------------------------------------------
+
+TEST_CASE("PinCodeInput fills its cells from typing and paste, keeps digits only and stops at its length")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string code;
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::PinCodeInput("Code", &code, {.length = 4}) ? 1 : 0;
+        session.Track("code");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("code"));
+    session.Type("1");
+    session.Type("a");
+    session.Type("2");
+    CHECK(code == "12");
+    CHECK(writes == 2);
+    session.Type("345");
+    CHECK(code == "1234");  // the length is reached
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(code == "123");
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.SetClipboard("98 76 54");
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(code == "9876");
+}
+
+TEST_CASE("PinCodeInput can take letters, hides a masked code from the clipboard and keeps a read-only one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string letters;
+    std::string secret = "1234";
+    std::string fixed = "55";
+    session.SetUi([&] {
+        facet::PinCodeInput("##letters", &letters, {.length = 3, .numericOnly = false});
+        session.Track("letters");
+        facet::PinCodeInput("##secret", &secret, {.length = 4, .masked = true});
+        session.Track("secret");
+        facet::PinCodeInput("##fixed", &fixed, {.length = 4, .readOnly = true});
+        session.Track("fixed");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("letters"));
+    session.Type("a b9");
+    CHECK(letters == "ab9");
+    session.Click(session.ItemCenter("secret"));
+    session.SetClipboard("unchanged");
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "unchanged");
+    session.Click(session.ItemCenter("fixed"));
+    session.Type("7");
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(fixed == "55");
+}

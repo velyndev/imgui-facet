@@ -50,15 +50,13 @@ void CallTextInputStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, PinCodeInput("Pin 1", &v.text, {.masked = true}));
-    FACET_CHECK_STUB(false, PinCodeInput("Pin 2", buffer, bufferSize, {.length = 4}));
     FACET_CHECK_STUB(false, PathField("Path 1", &v.text));
     FACET_CHECK_STUB(false, PathField("Path 2", buffer, bufferSize, {.browseButton = false}));
     CHECK_FALSE(PathFieldBrowsePressed());
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 4;
+constexpr int kTextInputStubCalls = 2;
 
 } // namespace
 
@@ -137,7 +135,7 @@ TEST_CASE("The buffer form of InlineRename reads no further than the buffer size
     CHECK(session.ItemRect("rename").GetWidth() == doctest::Approx(expected));
 }
 
-TEST_CASE("The pin code placeholder fits a short row and follows the width rules")
+TEST_CASE("PinCodeInput fits a short row and follows the width rules")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

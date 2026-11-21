@@ -40,7 +40,8 @@ enum CaptureState
     kOpen,
     kSuggestions,
     kFormatted,  // the TagInput and FilterField sections
-    kLater,      // InlineRename and the sections after it
+    kLater,      // InlineRename and MaskedInput
+    kCodes,      // PinCodeInput and the sections after it
 };
 
 constexpr const char* kSample = "Sample text";
@@ -133,6 +134,11 @@ struct TextInputsUi
     std::string maskedError;
     std::string maskedReadOnly = "12345678";
     std::string pin;
+    std::string pinMasked;
+    std::string pinLetters;
+    std::string pinError;
+    std::string pinReadOnly = "42";
+    std::string pinNarrow = "1234";
     std::string path;
 
     // CopyField
@@ -434,8 +440,6 @@ void PlannedSections(facet::demo::PageCtx&)
 
 
     SectionHeader("Formatted fields");
-    LabeledRow("Code");
-    facet::PinCodeInput("##pin", &ui.pin, {.groupSize = 3});
     LabeledRow("Path");
     facet::PathField("##path", &ui.path, {.placeholder = "Placeholder path"});
 
@@ -595,6 +599,42 @@ void MaskedInputSection(facet::demo::PageCtx& ctx)
     Note("Digits field: \"%s\". Literals field: \"%s\".", ui.masked.c_str(), ui.maskedLiterals.c_str());
 }
 
+void PinCodeSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("PinCodeInput");
+    Paragraph("A code in separate cells. Typing fills a cell and moves on, Backspace goes back, a paste fills every "
+              "cell. The whole code is one Tab stop.");
+
+    LabeledRow("Six digits");
+    if (ctx.capture && ctx.captureState == kCodes)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::PinCodeInput("##pin", &ui.pin, {.groupSize = 3, .helpText = "Placeholder: any six digits"});
+    ProbeFrame(ctx, "inputs.pin");
+    if (ctx.capture && ctx.captureState == kCodes)
+        ctx.RevealInCapture(0.2f);
+
+    LabeledRow("Masked");
+    facet::PinCodeInput("##pinMasked", &ui.pinMasked, {.length = 4, .masked = true});
+    ProbeFrame(ctx, "inputs.pin.masked");
+
+    LabeledRow("Letters");
+    facet::PinCodeInput("##pinLetters", &ui.pinLetters, {.length = 5, .numericOnly = false, .size = facet::ControlSize::Large});
+
+    LabeledRow("Error");
+    const bool wrong = ui.pinError.size() == 4 && ui.pinError != "1234";
+    facet::PinCodeInput("##pinError", &ui.pinError,
+                        {.length = 4, .error = wrong ? "Placeholder rule: only 1234 is accepted" : nullptr,
+                         .helpText = "Type four digits other than 1234 to see the error"});
+    ProbeFrame(ctx, "inputs.pin.error");
+
+    LabeledRow("Read-only");
+    facet::PinCodeInput("##pinReadOnly", &ui.pinReadOnly, {.length = 4, .readOnly = true});
+
+    LabeledRow("Narrow");
+    facet::PinCodeInput("##pinNarrow", &ui.pinNarrow, {.length = 8, .width = 120.0f});
+    Note("Code: \"%s\" (%s).", ui.pin.c_str(), ui.pin.size() == 6 ? "complete" : "incomplete");
+}
+
 void TagInputSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("TagInput");
@@ -702,7 +742,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions", "formatted", "later")
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions", "formatted", "later", "codes")
 {
     if (ctx.capture)
     {
@@ -726,6 +766,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     FilterFieldSection(ctx);
     InlineRenameSection(ctx);
     MaskedInputSection(ctx);
+    PinCodeSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -1079,4 +1120,25 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
     test.ExpectText("a paste fills the slots and keeps the literals", [] { return ui.maskedLiterals; }, "ab-123-z");
     test.KeyPress(ImGuiKey_Enter);
+
+    // PinCodeInput: typing fills the cells, a letter is refused, Backspace goes back, Tab moves on.
+    test.Click("inputs.pin");
+    test.Type("12");
+    test.Type("a");
+    test.Type("3456");
+    test.ExpectText("typing fills the six cells with digits only", [] { return ui.pin; }, "123456");
+    test.Type("7");
+    test.ExpectText("a full code takes nothing more", [] { return ui.pin; }, "123456");
+    test.KeyPress(ImGuiKey_Backspace);
+    test.ExpectText("Backspace empties the last cell", [] { return ui.pin; }, "12345");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.pin.masked");
+    test.SetClipboard("9 8 7 6");
+    test.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    test.ExpectText("a paste fills every masked cell", [] { return ui.pinMasked; }, "9876");
+    test.Click("inputs.pin.error");
+    test.Type("5555");
+    test.ExpectText("the error example takes the code", [] { return ui.pinError; }, "5555");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Do([] { ui.pinError.clear(); });
 }
