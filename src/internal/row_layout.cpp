@@ -138,7 +138,7 @@ const RowLayout& BeginRow(const char* label, const RowOptions& options)
     row.origin = window->DC.CursorPos;
     row.resetSize = options.resettable ? row.controlHeight : 0.0f;
     const float available = std::max(0.0f, ImGui::GetContentRegionAvail().x);
-    float resetSlot = options.resettable ? row.resetSize + row.gap : 0.0f;
+    float resetSlot = std::max(options.resettable ? row.resetSize + row.gap : 0.0f, std::max(0.0f, options.endReserve));
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
 
     ImGui::BeginGroup();

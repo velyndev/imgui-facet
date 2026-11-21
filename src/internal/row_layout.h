@@ -72,6 +72,10 @@ struct RowOptions
     bool resettable = false;            // a reset button at the end of the row while modified
     ControlSize size = ControlSize::Inherit;  // the control the label lines up with
     float labelColumn = 0.0f;           // units, gap included; 0: the group's column or the token
+    // Pixels kept free at the end of the row, gap included, at least: the room a reset slot takes
+    // in another row of the same column, so rows outside a group end their controls in one line and
+    // stack at the same width (SettingsRow). 0 for none.
+    float endReserve = 0.0f;
 };
 
 // The geometry of the row in progress, in screen pixels.
