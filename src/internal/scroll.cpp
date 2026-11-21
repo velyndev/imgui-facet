@@ -92,6 +92,9 @@ struct OpenArea
     bool hasBar[2] = {false, false};
     float expand[2] = {0.0f, 0.0f};  // 0 thin, 1 wide (pointer over the bar or dragging it)
     float active[2] = {0.0f, 0.0f};  // hovered or held, for the thumb color
+    float insetTop = 0.0f;           // pixels kept free above the vertical bar (BeginScrollAreaBars)
+    float insetLeft = 0.0f;          // pixels kept free left of the horizontal bar
+    bool barsOnly = false;           // opened by BeginScrollAreaBars: no clip rect, no child window
 };
 
 struct ScrollCore
@@ -458,13 +461,17 @@ struct BarGeometry
 };
 
 // The track and thumb of `axis` for a bar `thickness` pixels wide at scroll offset `scroll`.
-// `otherBar` leaves the corner free for the bar of the other axis.
-BarGeometry Bar(const ImGuiWindow* window, int axis, float thickness, bool otherBar, float scroll)
+// `otherBar` leaves the corner free for the bar of the other axis. The tracks start `open.insetTop`
+// below the top and `open.insetLeft` right of the left edge (a sticky header, frozen columns),
+// and the thumb measures the visible part less that inset.
+BarGeometry Bar(const ImGuiWindow* window, int axis, float thickness, bool otherBar, float scroll, const OpenArea& open)
 {
     const ScrollTokens& tokens = T().scroll;
     const float inset = Px(tokens.barInset);
     const float corner = otherBar ? inset + Px(tokens.barThicknessHover) : 0.0f;
-    const ImRect r = window->Rect();
+    ImRect r = window->Rect();
+    r.Min.x = std::min(r.Max.x, r.Min.x + open.insetLeft);
+    r.Min.y = std::min(r.Max.y, r.Min.y + open.insetTop);
     BarGeometry bar;
     if (axis == kAxisY)
         bar.track = ImRect(r.Max.x - inset - thickness, r.Min.y + inset, r.Max.x - inset, r.Max.y - inset - corner);
@@ -513,6 +520,10 @@ void DrawFades(ImDrawList* drawList, const ImGuiWindow* window, const ImRect& cl
     }
     drawList->PopClipRect();
 }
+
+// Defined after the scroll area functions below.
+void RunBars(ImGuiWindow* window, OpenArea& open, ScrollRecord& record, const ForcedItemRequest& forced);
+void DrawBars(ImDrawList* drawList, ImGuiWindow* window, const ImRect& clip, const OpenArea& open);
 
 } // namespace
 
@@ -768,9 +779,85 @@ bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc)
     open.clipPushed = true;
 
     // The bars take the mouse before the content, so a row under a bar does not take the drag.
+    RunBars(window, open, record, forced);
+    return true;
+}
+
+void BeginScrollAreaBars(const ScrollAreaBarsDesc& desc)
+{
+    ImGuiContext* context = ImGui::GetCurrentContext();
+    if (context == nullptr)
+        return;
+    ImGuiContext& g = *context;
+    ScrollCore& core = Core();
+    if (core.context != context)
+        ResetCore(context);
+    ImGuiWindow* window = g.CurrentWindow;
+    if (window == nullptr)
+        return;
+    if (core.openDepth >= kScrollAreaDepth)
+    {
+        ReportUsageError("BeginScrollAreaBars nested deeper than %d; no bars are shown", kScrollAreaDepth);
+        return;
+    }
+    const ForcedItemRequest forced = TakeForcedItemState();
+    ScrollRecord& record = Record(window);
+    record.area = true;
+    record.horizontal = desc.horizontal;
+    record.seenFrame = g.FrameCount;
+    if (window->Scroll.x != record.lastScroll.x || window->Scroll.y != record.lastScroll.y)
+        record.lastActivity = core.clock;
+    record.lastScroll = window->Scroll;
+
+    OpenArea& open = core.open[core.openDepth++];
+    open = OpenArea();
+    open.window = window->ID;
+    open.edgeFades = false;
+    open.horizontal = desc.horizontal;
+    open.insetTop = std::max(0.0f, desc.insetTop);
+    open.insetLeft = std::max(0.0f, desc.insetLeft);
+    open.barsOnly = true;
+    // The bars are items of the window; the clip rect of whatever the window is in the middle of
+    // (a table column) must not hide them from the pointer.
+    const ImRect rect = window->Rect();
+    ImGui::PushClipRect(rect.Min, rect.Max, false);
+    RunBars(window, open, record, forced);
+    ImGui::PopClipRect();
+}
+
+void EndScrollAreaBars()
+{
+    ImGuiContext* context = ImGui::GetCurrentContext();
+    if (context == nullptr)
+        return;
+    ScrollCore& core = Core();
+    if (core.openDepth == 0 || !core.open[core.openDepth - 1].barsOnly)
+    {
+        ReportUsageError("EndScrollAreaBars without BeginScrollAreaBars");
+        return;
+    }
+    const OpenArea open = core.open[--core.openDepth];
+    ImGuiWindow* window = ImGui::FindWindowByID(open.window);
+    if (window == nullptr || window->LastFrameActive != context->FrameCount)
+        return;
+    // On top of everything the window drew this frame (it may have ended already).
+    ImRect clip = window->Rect();
+    if (window->ParentWindow != nullptr)
+        clip.ClipWithFull(window->ParentWindow->ClipRect);
+    DrawBars(window->DrawList, window, clip, open);
+}
+
+namespace
+{
+
+// The bars of an open area take the mouse (before the content) and follow its drag and paging.
+void RunBars(ImGuiWindow* window, OpenArea& open, ScrollRecord& record, const ForcedItemRequest& forced)
+{
+    ImGuiContext& g = *GImGui;
+    ScrollCore& core = Core();
     const ScrollTokens& tokens = T().scroll;
     const ImGuiIO& io = g.IO;
-    const bool bars[2] = {desc.horizontal && window->ScrollMax.x > 0.0f, window->ScrollMax.y > 0.0f};
+    const bool bars[2] = {open.horizontal && window->ScrollMax.x > 0.0f, window->ScrollMax.y > 0.0f};
     bool anyActive = false;
     for (int axis = kAxisY; axis >= kAxisX; --axis)
     {
@@ -785,7 +872,7 @@ bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc)
             continue;
         }
         const bool other = bars[axis == kAxisY ? kAxisX : kAxisY];
-        const BarGeometry hit = Bar(window, axis, Px(tokens.barThicknessHover), other, window->Scroll[axis]);
+        const BarGeometry hit = Bar(window, axis, Px(tokens.barThicknessHover), other, window->Scroll[axis], open);
         ItemOptions options;
         options.press = PressMode::Click;
         options.repeat = true;
@@ -829,7 +916,7 @@ bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc)
             // Page toward the pointer until the thumb (where it is going) reaches it. A page is
             // the visible length less one edge fade, so the line at the old edge stays in view.
             const float goal = TargetOf(window, axis);
-            const BarGeometry atGoal = Bar(window, axis, Px(tokens.barThicknessHover), other, goal);
+            const BarGeometry atGoal = Bar(window, axis, Px(tokens.barThicknessHover), other, goal, open);
             const float page = std::max(0.0f, window->InnerRect.Max[axis] - window->InnerRect.Min[axis] -
                                                   Px(tokens.edgeFade));
             ImVec2 target(-1.0f, -1.0f);
@@ -860,8 +947,41 @@ bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc)
     const bool show = hovered || anyActive || recent || IsScrollAreaScrolling(window);
     const ImGuiID barId = window->GetID("##facet.vbar");
     open.alpha = Tween(barId, kBarAlphaSub, show ? 1.0f : 0.0f, T().motion.durationStandard);
-    return true;
 }
+
+void DrawBars(ImDrawList* drawList, ImGuiWindow* window, const ImRect& clip, const OpenArea& open)
+{
+    drawList->PushClipRect(clip.Min, clip.Max, false);
+    ScrollRecord& record = Record(window);
+    const Theme& theme = T();
+    const ScrollTokens& tokens = theme.scroll;
+    for (int axis = kAxisX; axis <= kAxisY; ++axis)
+    {
+        record.hasBar[axis] = open.hasBar[axis];
+        if (!open.hasBar[axis])
+            continue;
+        const float thickness =
+            Px(tokens.barThickness) + (Px(tokens.barThicknessHover) - Px(tokens.barThickness)) * open.expand[axis];
+        const bool other = open.hasBar[axis == kAxisY ? kAxisX : kAxisY];
+        const BarGeometry bar = Bar(window, axis, thickness, other, window->Scroll[axis], open);
+        record.track[axis] = bar.track;
+        record.thumb[axis] = bar.thumb;
+        if (open.alpha <= 0.0f)
+            continue;
+        const float radius = std::min(Px(theme.radii.element), thickness * 0.5f);
+        if (open.expand[axis] > 0.0f)
+        {
+            const ImVec4& track = theme.colors.fill[3];
+            FillRect(drawList, bar.track.Min, bar.track.Max,
+                     ToU32(WithAlpha(track, track.w * open.alpha * open.expand[axis])), radius);
+        }
+        const ImVec4 thumb = Mix(theme.colors.scrollThumb, theme.colors.scrollThumbHover, open.active[axis]);
+        FillRect(drawList, bar.thumb.Min, bar.thumb.Max, ToU32(WithAlpha(thumb, thumb.w * open.alpha)), radius);
+    }
+    drawList->PopClipRect();
+}
+
+} // namespace
 
 void EndScrollAreaCore()
 {
@@ -873,6 +993,11 @@ void EndScrollAreaCore()
     if (core.openDepth == 0)
     {
         ReportUsageError("EndScrollAreaCore without BeginScrollAreaCore");
+        return;
+    }
+    if (core.open[core.openDepth - 1].barsOnly)
+    {
+        ReportUsageError("EndScrollAreaCore called for BeginScrollAreaBars; use EndScrollAreaBars");
         return;
     }
     const OpenArea open = core.open[--core.openDepth];
@@ -890,35 +1015,7 @@ void EndScrollAreaCore()
         clip.ClipWithFull(window->ParentWindow->ClipRect);
     if (open.edgeFades)
         DrawFades(drawList, window, clip, open);
-    drawList->PushClipRect(clip.Min, clip.Max, false);
-
-    ScrollRecord& record = Record(window);
-    const Theme& theme = T();
-    const ScrollTokens& tokens = theme.scroll;
-    for (int axis = kAxisX; axis <= kAxisY; ++axis)
-    {
-        record.hasBar[axis] = open.hasBar[axis];
-        if (!open.hasBar[axis])
-            continue;
-        const float thickness =
-            Px(tokens.barThickness) + (Px(tokens.barThicknessHover) - Px(tokens.barThickness)) * open.expand[axis];
-        const bool other = open.hasBar[axis == kAxisY ? kAxisX : kAxisY];
-        const BarGeometry bar = Bar(window, axis, thickness, other, window->Scroll[axis]);
-        record.track[axis] = bar.track;
-        record.thumb[axis] = bar.thumb;
-        if (open.alpha <= 0.0f)
-            continue;
-        const float radius = std::min(Px(theme.radii.element), thickness * 0.5f);
-        if (open.expand[axis] > 0.0f)
-        {
-            const ImVec4& track = theme.colors.fill[3];
-            FillRect(drawList, bar.track.Min, bar.track.Max,
-                     ToU32(WithAlpha(track, track.w * open.alpha * open.expand[axis])), radius);
-        }
-        const ImVec4 thumb = Mix(theme.colors.scrollThumb, theme.colors.scrollThumbHover, open.active[axis]);
-        FillRect(drawList, bar.thumb.Min, bar.thumb.Max, ToU32(WithAlpha(thumb, thumb.w * open.alpha)), radius);
-    }
-    drawList->PopClipRect();
+    DrawBars(drawList, window, clip, open);
     if (open.clipPushed)
         ImGui::PopClipRect();
     ImGui::EndChild();

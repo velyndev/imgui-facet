@@ -152,6 +152,25 @@ inline constexpr int kScrollAreaDepth = 16;
 // closes the area.
 void EndScrollAreaCore();
 
+// The overlay bars and the wheel handling of a scroll area for a child window that another call
+// begins (a Dear ImGui table's inner window, which BeginTable creates itself). Ask for the window
+// without room for stock bars (ImGuiStyleVar_ScrollbarSize 0 while it begins; NoScrollbar would also
+// keep its content from being wider than the window) and without Dear ImGui's own wheel handling
+// (ImGui::SetNextWindowFlags with ImGuiWindowFlags_NoScrollWithMouse right before that call), then
+// call BeginScrollAreaBars while it is the current window, before its content, and
+// EndScrollAreaBars once its content is done; the window may have ended by then (EndTable), the
+// bars are drawn on top of what it drew. The bars, the wheel, their motion and the forced capture
+// states are those of BeginScrollAreaCore; there is no padding, no clip rect and no edge fade.
+// The pairs share the nesting of the scroll areas (kScrollAreaDepth).
+struct ScrollAreaBarsDesc
+{
+    bool horizontal = false;  // also the horizontal bar and the sideways wheel
+    float insetTop = 0.0f;    // pixels at the top the vertical bar leaves free (a header that stays in view)
+    float insetLeft = 0.0f;   // pixels at the left the horizontal bar leaves free (columns that stay in view)
+};
+void BeginScrollAreaBars(const ScrollAreaBarsDesc& desc = {});
+void EndScrollAreaBars();
+
 // The bar of `axis` of a scroll area as drawn in the latest frame: the track it runs in and its
 // thumb (screen pixels). False when the area has no bar on that axis (its content fits) or
 // `window` is not a scroll area. For probes in tests and selftests.
