@@ -759,6 +759,47 @@ TEST_CASE("Text field: Tab skips the clear button and reaches slot buttons that 
     CHECK(GImGui->NavId == afterId);
 }
 
+TEST_CASE("Text field: a slot button draws its glyph text, underlined when asked, instead of the icon")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    struct Slot
+    {
+        const char* glyph = nullptr;
+        bool underline = false;
+        ImRect rect;
+        int vertices = 0;
+    };
+    Slot plain{.glyph = "Aa"};
+    Slot underlined{.glyph = "Aa", .underline = true};
+    const auto run = [&](const char* label, Slot& slot) {
+        TextFieldParams params;
+        params.trailingWidth = facet::internal::TextFieldSlotButtonsWidth(1, facet::ControlSize::Regular);
+        params.trailingSlot = [](const facet::internal::TextFieldSlot& s, void* user) {
+            Slot& data = *static_cast<Slot*>(user);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const int first = drawList->VtxBuffer.Size;
+            const facet::internal::ItemState item = facet::internal::TextFieldSlotButton(
+                s, 0, ImGui::GetIDWithSeed("toggle", nullptr, s.fieldId), facet::Icon(),
+                {.tabStop = true, .name = "Toggle", .glyph = data.glyph, .glyphUnderline = data.underline});
+            data.rect = item.rect;
+            data.vertices = drawList->VtxBuffer.Size - first;
+        };
+        params.trailingUser = &slot;
+        TextFieldBehavior(label, &text, params);
+    };
+    session.SetUi([&] {
+        run("##plain", plain);
+        run("##underlined", underlined);
+    });
+    session.Frame();
+    // Two letters at least, and the underline adds a line on top of them.
+    CHECK(plain.vertices >= 8);
+    CHECK(underlined.vertices > plain.vertices);
+    CHECK(plain.rect.GetWidth() > 0.0f);
+}
+
 TEST_CASE("Text field: text never reaches under an adornment, at any width and scale")
 {
     TextFieldThemeGuard guard;

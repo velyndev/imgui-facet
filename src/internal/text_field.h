@@ -192,6 +192,9 @@ struct TextFieldSlotButtonOptions
     bool selected = false;      // the on look (a reveal toggle that is on)
     bool disabled = false;      // disabled in addition to the field (a stepper at its end of the range)
     const char* name = nullptr; // tooltip and accessible name; required (Strings member text)
+    // Members below were added for the filter field toggles.
+    const char* glyph = nullptr;  // short text ("Aa") drawn in the field's font instead of the icon; null draws the icon
+    bool glyphUnderline = false;  // a hairline under the glyph (the whole word toggle)
 };
 
 // A square icon button inside the slot: `index` 0 is the rightmost, 1 the one before it, and so

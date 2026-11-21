@@ -496,7 +496,8 @@ ImRect TextFieldSlotButtonRect(const ImRect& slot, ControlSize size, int index)
 }
 
 // The plain icon button look shared by the clear button and slot buttons.
-void DrawTextFieldButton(const ItemState& item, Icon icon, bool selected, float iconSize)
+void DrawTextFieldButton(const ItemState& item, Icon icon, bool selected, float iconSize, const char* glyph,
+                         bool glyphUnderline)
 {
     if (!item.visible)
         return;
@@ -515,9 +516,25 @@ void DrawTextFieldButton(const ItemState& item, Icon icon, bool selected, float 
     const ImVec4 color = item.disabled ? c.labelTertiary
                          : (selected || item.hovered || item.held) ? c.label
                                                                    : c.labelSecondary;
-    const float size = std::round(std::min(iconSize, item.rect.GetWidth()));
-    const ImVec2 at(std::round(item.rect.GetCenter().x - size * 0.5f), std::round(item.rect.GetCenter().y - size * 0.5f));
-    DrawIcon(drawList, icon, at, size, U32(color));
+    if (glyph != nullptr && glyph[0] != '\0')
+    {
+        const ImVec2 textSize = ImGui::CalcTextSize(glyph);
+        const ImVec2 at(std::round(item.rect.GetCenter().x - textSize.x * 0.5f),
+                        std::round(item.rect.GetCenter().y - textSize.y * 0.5f));
+        drawList->AddText(at, U32(color), glyph);
+        if (glyphUnderline)
+        {
+            const float y = std::round(at.y + textSize.y) + HairlineThickness() * 0.5f;
+            drawList->AddLine(ImVec2(at.x, y), ImVec2(at.x + textSize.x, y), U32(color), HairlineThickness());
+        }
+    }
+    else
+    {
+        const float size = std::round(std::min(iconSize, item.rect.GetWidth()));
+        const ImVec2 at(std::round(item.rect.GetCenter().x - size * 0.5f),
+                        std::round(item.rect.GetCenter().y - size * 0.5f));
+        DrawIcon(drawList, icon, at, size, U32(color));
+    }
     DrawItemFocusRing(item, radius);
 }
 
@@ -1054,7 +1071,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
         options.part = 0;
         const ImGuiID clearId = ImGui::GetIDWithSeed("clear", nullptr, id);
         const ItemState item = PartBehavior(clearId, clearRect, options);
-        DrawTextFieldButton(item, Icon("clear"), false, iconSize);
+        DrawTextFieldButton(item, Icon("clear"), false, iconSize, nullptr, false);
         ImGui::SetItemTooltip("%s", GetStrings().clear);
         result.clear = clearRect;
         if (item.pressed)
@@ -1239,7 +1256,8 @@ ItemState TextFieldSlotButton(const TextFieldSlot& slot, int index, ImGuiID id, 
     itemOptions.forced = slot.forced;
     itemOptions.part = std::max(0, index) + 1;
     item = PartBehavior(id, rect, itemOptions);
-    DrawTextFieldButton(item, icon, options.selected, std::round(ImGui::GetFontSize()));
+    DrawTextFieldButton(item, icon, options.selected, std::round(ImGui::GetFontSize()), options.glyph,
+                        options.glyphUnderline);
     if (options.name != nullptr && options.name[0] != 0)
         ImGui::SetItemTooltip("%s", options.name);
     return item;
