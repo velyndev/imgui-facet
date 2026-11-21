@@ -209,10 +209,11 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
         }
     }
     Note("Last pressed: %s.", s.lastWindowButton);
-    SectionHeader("App frame, overlay controller and mini window");
-    Note("The app frame, the overlay controller and mini windows are root containers: the host "
-         "calls them once per frame outside every window, and the app frame fills the whole "
-         "viewport. They cannot sit inside a page, so this page does not call them; "
+    SectionHeader("App frame and overlay controller");
+    Note("The app frame and the overlay controller are root containers: the host calls them once "
+         "per frame outside every window, and the app frame fills the whole viewport, so this page "
+         "does not call them. The app frame's hit test, size limits and placement are checked"
+         " by the unit tests in tests/test_containers.cpp, and "
          "docs/widgets/containers.md shows the host code for each.");
 }
 

@@ -79,10 +79,27 @@ void SaveAppFramePlacement(const char* id, const FramePlacement& placement);
 bool LoadAppFramePlacement(const char* id, FramePlacement* placement);
 ```
 
-The root surface of a borderless desktop app that fills the host viewport, with the hit test, size
-limits and placement storage the host window needs to stay resizable and snappable. The host calls
-it outside every window, so the widget gallery shows it only through the example below.
-Status: planned.
+The root surface of a borderless desktop app. The host calls it once per frame outside every window,
+so the widget gallery does not show it; the example below has the host code.
+
+- **Surface.** An undecorated Dear ImGui window that covers the main viewport, drawn in bg, without
+  padding (a title bar submitted first sits at the very top), and kept behind every other window: it
+  never comes to the front when it takes focus. `BeginAppFrame` returns false while the viewport has
+  no area (the host window is minimized); call `EndAppFrame` only after true.
+- **Hit test.** `AppFrameHitTest(point)` answers from the last finished frame, so the host can call
+  it from its window procedure between frames. A band of `resizeBorder` units (0:
+  `containers.resizeBorder`) along the edges reports the edges, and the corners reach twice the band
+  along each edge; with `hostMaximized` there is no band. Inside a title bar of the frame the window
+  buttons report `MinimizeButton`, `MaximizeButton` and `CloseButton`, the caller's items `Client`
+  and the free area `Caption`; everything else is `Client`, also outside the frame and before its
+  first frame.
+- **Size limits.** `AppFrameMinSize` and `AppFrameMaxSize` return `minSize` and `maxSize` of the last
+  frame in pixels at the current scale, {0, 0} where none was set.
+- **Placement.** `SaveAppFramePlacement` stores a `FramePlacement` under the id (hashed alone) in
+  Facet's part of the Dear ImGui ini file; `LoadAppFramePlacement` reads it back and returns false
+  when nothing was saved or the ini file was not read yet.
+
+Status: ready.
 
 ### BeginTitleBar
 

@@ -172,6 +172,8 @@ int PreviousTitleBarRegions(const TitleBarRegions** regions);
 void RotateTitleBarRegions();
 // facet::EndFrame: forgets the window button activated in the frame that ends.
 void ClearTitleBarPress();
+// facet::EndFrame: this frame's app frame record becomes the one AppFrameHitTest reads.
+void RotateAppFrameRecord();
 
 // ---- Frame end ----------------------------------------------------------------------------------
 

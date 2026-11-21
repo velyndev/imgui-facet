@@ -21,6 +21,7 @@ void ContainersEndFrame()
     ClearContainerBackdrops();
     ClearTitleBarStack();
     RotateTitleBarRegions();
+    RotateAppFrameRecord();
     ClearTitleBarPress();
 }
 

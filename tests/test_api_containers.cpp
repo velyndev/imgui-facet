@@ -48,20 +48,6 @@ void CallContainerStubs(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
     CHECK_BALANCED({
-        const bool open = facet::BeginAppFrame("App");
-        CHECK(open);
-        if (open)
-        {
-            ImGui::TextUnformatted("child");
-            facet::EndAppFrame();
-        }
-    });
-    CHECK_BALANCED(CHECK(facet::AppFrameHitTest(ImVec2(1.0f, 1.0f)) == facet::FrameHit::Client));
-    CHECK_BALANCED(CHECK(facet::AppFrameMinSize().x == 0.0f));
-    CHECK_BALANCED(CHECK(facet::AppFrameMaxSize().y == 0.0f));
-    CHECK_BALANCED(facet::SaveAppFramePlacement("app", v.placement));
-    CHECK_BALANCED(CHECK_FALSE(facet::LoadAppFramePlacement("app", &v.placement)));
-    CHECK_BALANCED({
         const bool open = facet::BeginOverlay("Overlay", &v.visible);
         CHECK(open);
         if (open)

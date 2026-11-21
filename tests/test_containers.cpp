@@ -1659,3 +1659,201 @@ TEST_CASE("The overflow fitter without a button reserves nothing for the hidden 
     CHECK(fit.hiddenCount == 0);
     CHECK(fit.usedWidth == doctest::Approx(320.0f));
 }
+// ---- App frame ----------------------------------------------------------------------------------
+
+namespace
+{
+
+// An app frame with a title bar (an item and the window buttons) and content, outside any window.
+struct AppFrameProbe
+{
+    facet::AppFrameOptions options{.minSize = {640.0f, 400.0f}, .maxSize = {1600.0f, 1000.0f}};
+    bool shown = false;
+    ImRect frame;
+    ImRect bar;
+    ImRect item;
+    int clicks = 0;
+    facet::WindowButton pressed = facet::WindowButton::None;
+
+    void Draw(facet::test::Session& session)
+    {
+        shown = facet::BeginAppFrame("app", options);
+        if (!shown)
+            return;
+        frame = ImGui::GetCurrentWindow()->Rect();
+        facet::BeginTitleBar("Editor", {.windowButtons = true, .maximized = options.hostMaximized});
+        if (ImGui::Button("item"))
+            ++clicks;
+        item = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        facet::EndTitleBar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        if (facet::TitleBarButtonPressed() != facet::WindowButton::None)
+            pressed = facet::TitleBarButtonPressed();
+        ImGui::Button("content");
+        session.Track("content");
+        facet::EndAppFrame();
+    }
+};
+
+} // namespace
+
+TEST_CASE("An app frame fills the viewport and answers the host's hit test")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    CHECK(facet::AppFrameHitTest(ImVec2(400.0f, 10.0f)) == facet::FrameHit::Client);  // before the first frame
+    AppFrameProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    CHECK(probe.frame.Min.x == 0.0f);
+    CHECK(probe.frame.Min.y == 0.0f);
+    CHECK(probe.frame.GetWidth() == 800.0f);
+    CHECK(probe.frame.GetHeight() == 600.0f);
+    CHECK(probe.bar.Min.y == 0.0f);  // no padding: the title bar sits at the very top
+
+    const float b = facet::Px(facet::T().containers.resizeBorder);
+    using facet::FrameHit;
+    CHECK(facet::AppFrameHitTest(ImVec2(1.0f, 300.0f)) == FrameHit::Left);
+    CHECK(facet::AppFrameHitTest(ImVec2(799.0f, 300.0f)) == FrameHit::Right);
+    CHECK(facet::AppFrameHitTest(ImVec2(300.0f, 599.0f)) == FrameHit::Bottom);
+    CHECK(facet::AppFrameHitTest(ImVec2(300.0f, 1.0f)) == FrameHit::Top);
+    CHECK(facet::AppFrameHitTest(ImVec2(1.0f, 1.0f)) == FrameHit::TopLeft);
+    CHECK(facet::AppFrameHitTest(ImVec2(799.0f, b * 1.5f)) == FrameHit::TopRight);
+    CHECK(facet::AppFrameHitTest(ImVec2(b * 1.5f, 599.0f)) == FrameHit::BottomLeft);
+    CHECK(facet::AppFrameHitTest(ImVec2(799.0f, 599.0f)) == FrameHit::BottomRight);
+    // The title bar: caption, the caller's item, the window buttons.
+    CHECK(facet::AppFrameHitTest(ImVec2(200.0f, probe.bar.GetCenter().y)) == FrameHit::Caption);
+    CHECK(facet::AppFrameHitTest(probe.item.GetCenter()) == FrameHit::Client);
+    const float h = facet::ControlHeight(facet::ControlSize::Regular);
+    const float gap = facet::Px(facet::T().spacing.xs);
+    const float inset = (probe.bar.GetHeight() - h) * 0.5f;
+    const float left = probe.bar.Max.x - inset - h * 3.0f - gap * 2.0f;
+    const float y = probe.bar.GetCenter().y;
+    CHECK(facet::AppFrameHitTest(ImVec2(left + h * 0.5f, y)) == FrameHit::MinimizeButton);
+    CHECK(facet::AppFrameHitTest(ImVec2(left + h * 1.5f + gap, y)) == FrameHit::MaximizeButton);
+    CHECK(facet::AppFrameHitTest(ImVec2(left + h * 2.5f + gap * 2.0f, y)) == FrameHit::CloseButton);
+    // The content.
+    CHECK(facet::AppFrameHitTest(session.ItemCenter("content")) == FrameHit::Client);
+    CHECK(facet::AppFrameHitTest(ImVec2(400.0f, 400.0f)) == FrameHit::Client);
+    CHECK(facet::AppFrameHitTest(ImVec2(900.0f, 400.0f)) == FrameHit::Client);  // outside
+
+    // The size limits in pixels at the current scale.
+    CHECK(facet::AppFrameMinSize().x == doctest::Approx(facet::Px(640.0f)));
+    CHECK(facet::AppFrameMaxSize().y == doctest::Approx(facet::Px(1000.0f)));
+
+    // Maximized: no resize band, so the top edge is caption and the sides are content.
+    probe.options.hostMaximized = true;
+    session.Frames(2);
+    CHECK(facet::AppFrameHitTest(ImVec2(300.0f, 1.0f)) == FrameHit::Caption);
+    CHECK(facet::AppFrameHitTest(ImVec2(1.0f, 300.0f)) == FrameHit::Client);
+
+    // The content and the window buttons take the mouse as usual.
+    session.Click(probe.item.GetCenter());
+    CHECK(probe.clicks == 1);
+    session.Click(ImVec2(left + h * 1.5f + gap, y));
+    CHECK(probe.pressed == facet::WindowButton::Maximize);
+}
+
+TEST_CASE("An app frame stays behind other windows and is skipped while the viewport has no area")
+{
+    {
+        facet::test::Session session({.window = false});
+        REQUIRE(session.Ready());
+        AppFrameProbe probe;
+        bool windowFront = false;
+        session.SetUi([&] {
+            probe.Draw(session);
+            ImGui::SetNextWindowPos(ImVec2(100.0f, 100.0f));
+            ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f));
+            ImGui::Begin("tool");
+            ImGui::End();
+            windowFront = GImGui->Windows.back() == ImGui::FindWindowByName("tool");
+        });
+        session.Frames(2);
+        session.Click(ImVec2(400.0f, 400.0f));  // on the frame
+        session.Frames(1);
+        CHECK(windowFront);
+    }
+    {
+        facet::test::Session session({.displaySize = ImVec2(0.0f, 0.0f), .window = false});
+        REQUIRE(session.Ready());
+        Values v;
+        bool shown = true;
+        session.SetUi([&] {
+            CHECK_BALANCED(shown = facet::BeginAppFrame("app"));
+            if (shown)
+                facet::EndAppFrame();
+        });
+        session.Frames(2);
+        CHECK_FALSE(shown);
+    }
+}
+
+TEST_CASE("An app frame placement is stored under its id and read back")
+{
+    std::string ini;
+    const facet::FramePlacement saved{.position = {-1200.0f, 80.0f}, .restoredSize = {900.0f, 640.0f}, .scale = 1.25f,
+                                      .maximized = true};
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        facet::FramePlacement placement;
+        CHECK_FALSE(facet::LoadAppFramePlacement("placement.test", &placement));
+        facet::SaveAppFramePlacement("placement.test", saved);
+        session.Frame();
+        ini = ImGui::SaveIniSettingsToMemory();
+        REQUIRE(facet::LoadAppFramePlacement("placement.test", &placement));
+        CHECK(placement.position.x == saved.position.x);
+    }
+    // The record holds the placement; change it in the text, so the next run reads the file.
+    const std::size_t record = ini.find("[AppFrame,");
+    REQUIRE(record != std::string::npos);
+    const std::size_t size = ini.find("size=", record);
+    REQUIRE(size != std::string::npos);
+    ini.replace(size, ini.find('\n', size) - size, "size=1000.00,700.00");
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        ImGui::LoadIniSettingsFromMemory(ini.c_str());
+        facet::FramePlacement placement;
+        REQUIRE(facet::LoadAppFramePlacement("placement.test", &placement));
+        CHECK(placement.position.x == doctest::Approx(-1200.0f));
+        CHECK(placement.position.y == doctest::Approx(80.0f));
+        CHECK(placement.restoredSize.x == doctest::Approx(1000.0f));
+        CHECK(placement.restoredSize.y == doctest::Approx(700.0f));
+        CHECK(placement.scale == doctest::Approx(1.25f));
+        CHECK(placement.maximized);
+        CHECK_FALSE(facet::LoadAppFramePlacement(nullptr, nullptr));
+    }
+}
+
+TEST_CASE("App frames leave every stack as they found it")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    int checks = 0;
+    session.SetUi([&] {
+        ImGui::Begin("host");
+        Values v;
+        CHECK_BALANCED({
+            facet::AppFrameScope frame("app", {.hostMaximized = true});
+            if (frame)
+            {
+                facet::CardScope card("Card");
+                ImGui::TextUnformatted("content");
+            }
+        });
+        const int before = facet::internal::UsageErrorCount();
+        facet::EndAppFrame();
+        CHECK(facet::internal::UsageErrorCount() == before + 1);
+        ImGui::End();
+        ++checks;
+    });
+    session.Frames(2);
+    CHECK(checks == 2);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    CHECK_FALSE(facet::BeginAppFrame("outside a frame"));
+    CHECK(facet::internal::UsageErrorCount() == before);
+}
