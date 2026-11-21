@@ -1,9 +1,9 @@
-// The declared API of the media family (facet/widgets/media.h) while its widgets are placeholders:
-// every options struct follows the conventions, and every function is called once inside a real
-// Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each call the id,
-// window, group and Facet scope stacks must be as before, a widget must have submitted one item of
-// non-zero size with the id of its label, the neutral result must come back and no value argument
-// may have changed.
+// The declared API of the media family (facet/widgets/media.h): every options struct follows the
+// conventions, and every function is called once inside a real Dear ImGui frame without input, in a
+// window and again inside ImGui::BeginDisabled. After each call the id, window, group and Facet scope
+// stacks must be as before, a widget must have submitted one item of non-zero size with the id of its
+// label, the neutral result must come back and no value argument may have changed. The behaviour of
+// each widget is tested in tests/test_media.cpp.
 
 #include <cmath>
 #include <string>
@@ -101,7 +101,7 @@ void MediaCalls()
 
 } // namespace
 
-TEST_CASE("The media stubs submit one item each, return the neutral result and keep every stack")
+TEST_CASE("The media widgets submit one item each, return the neutral result without input and keep every stack")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -115,48 +115,4 @@ TEST_CASE("The buffered band of a timeline scrubber defaults to NaN, outside eve
 {
     // -1 would be a valid time for a clock that includes it.
     CHECK(std::isnan(facet::TimelineScrubberOptions{}.buffered));
-}
-
-TEST_CASE("An image view stub follows kFill and widths relative to the available width")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        for (const float units : {kFill, -10.0f})
-        {
-            INFO("width " << units);
-            const float expected = ImGui::GetContentRegionAvail().x + (units == kFill ? 0.0f : Px(units));
-            ImageView("Image", ImageHandle{}, {.width = units});
-            CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
-            ++checked;
-        }
-    });
-    session.Frame();
-    CHECK(checked == 2);
-}
-
-TEST_CASE("Content-sized media stubs are wide enough to name the widget and say planned")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const auto wide = [&](const char* widget, auto&& call) {
-            INFO("widget: " << std::string(widget));
-            call();
-            char text[64];
-            ImFormatString(text, sizeof(text), "%s: planned", widget);
-            CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
-            ++checked;
-        };
-        static const AvatarItem avatars[] = {{"Name 1"}};
-        wide("ImageView", [] { ImageView("A", ImageHandle{}); });
-        wide("Avatar", [] { Avatar("A", ImageHandle{}); });
-        wide("AvatarGroup", [] { AvatarGroup("A", avatars); });
-    });
-    session.Frame();
-    CHECK(checked == 3);
 }

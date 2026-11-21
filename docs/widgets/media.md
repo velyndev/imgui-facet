@@ -35,7 +35,21 @@ bool ImageView(const char* label, ID3D11ShaderResourceView* texture, const Image
 bool ImageViewRetryPressed();
 ```
 
-An image as one item in design units, with loading and failed states, optional activation and retry. Status: planned.
+An image as one item in design units. `fit` places it in its box (Contain letterboxes, Cover
+crops around the center, Fill stretches), `corners` rounds it with a radius token, clamped to half
+the shorter side, and `tint` multiplies its colors. A width or height left at 0 follows the
+image's aspect ratio, and both at 0 take the texture size in pixels (an SVG handle is rasterized for
+the current scale, so it keeps its design size); `kFill` and widths relative to the available
+width resolve as for every widget. While the handle loads the box shows the skeleton, keeping the
+size the image had last or the large control height square while no size was ever known; a
+failed, released or invalid handle shows the failed marker with the alt text, also when the handle
+becomes invalid while it is shown. A ready image fades in over `motion.durationFast`. With
+`activatable` it is a Tab stop with hover and press washes and the focus ring, activated by a click,
+Enter or Space; otherwise it is not a Tab stop. `retryLabel` adds a small button at the bottom of a
+failed box (in its middle when the box has no room for the marker as well), reported by
+`ImageViewRetryPressed`. The alt text is the tooltip on hover and keyboard focus. `showStates` off
+draws nothing while the image is not ready. The texture overload reads the size of the view and
+shows the failed marker for a null view. Status: ready.
 
 ### Avatar
 
