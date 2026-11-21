@@ -59,15 +59,28 @@ Status: ready.
 
 ### ConfirmDialog
 
-Status: planned
-
 ```cpp
 DialogResult ConfirmDialog(const char* label, bool* open, const char* message,
                            const ConfirmDialogOptions& options = {});
 ```
 
-A compact yes or no modal that returns Confirmed or Canceled, with a destructive tone and an
-optional hold to confirm.
+A modal (`BeginModal`, without a close button) with the title, the message in Body and
+labelSecondary, and two buttons at the end of the last row: Cancel (Secondary, `cancelLabel` or
+`Strings::cancel`) and the confirm button (Primary, or Destructive with `destructive`; `confirmLabel`
+or `Strings::confirm`). Where the two do not fit side by side, they stack at full width.
+
+- **Result:** `Confirmed` or `Canceled` on the frame it is decided, with `*open = false` and the focus
+  back on the item that opened it; `None` on every other frame.
+- **Keys:** the focus starts on the confirm button, or on Cancel when the dialog is destructive.
+  Enter confirms from anywhere in the dialog unless it is destructive, must be held, or the focus is
+  on Cancel; while the focus ring is not shown yet (the dialog opened from a click), Enter in a
+  destructive dialog cancels. Escape and a click on the scrim cancel.
+- **Hold to confirm:** with `holdToConfirm`, the confirm button must stay held by the mouse, Space or
+  Enter for `motion.durationSlow`; a fill grows across it while it is held, and a shorter press does
+  nothing. `Strings::holdToConfirm` says so above the buttons.
+- Over a modal, call it inside the modal's content, so it stacks above it.
+
+Status: ready.
 
 ### BeginPopover
 

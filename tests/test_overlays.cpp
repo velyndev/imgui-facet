@@ -914,3 +914,145 @@ TEST_CASE("Modal content taller than the display scrolls inside a dialog that fi
     CHECK(Inside(dialog, DisplayMinusMargin()));
     CHECK(dialog.GetWidth() == doctest::Approx(facet::Px(facet::T().overlay.modalWidth)));
 }
+
+// ---- Confirm dialog ------------------------------------------------------------------------------
+
+TEST_CASE("A confirm dialog over a modal closes first on Escape, and each gives the focus back in turn")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool modal = false;
+    bool confirm = false;
+    facet::DialogResult last = facet::DialogResult::None;
+    session.SetUi([&] {
+        if (facet::Button("Open"))
+            modal = true;
+        session.Track("opener");
+        if (facet::BeginModal("Outer", &modal))
+        {
+            if (facet::Button("Delete"))
+                confirm = true;
+            session.Track("delete");
+            const facet::DialogResult result = facet::ConfirmDialog("Delete it?", &confirm, "It cannot be restored.");
+            if (result != facet::DialogResult::None)
+                last = result;
+            facet::EndModal();
+        }
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    session.Click(session.ItemCenter("delete"));
+    session.Seconds(0.3f);
+    REQUIRE(confirm);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(confirm);
+    CHECK(modal);
+    CHECK(last == facet::DialogResult::Canceled);
+    CHECK(ImGui::GetFocusID() == session.ItemId("delete"));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(modal);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+}
+
+TEST_CASE("Enter confirms a confirm dialog once and writes the flag; Escape cancels")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    int confirmed = 0;
+    int canceled = 0;
+    session.SetUi([&] {
+        if (facet::Button("Apply"))
+            open = true;
+        session.Track("opener");
+        const facet::DialogResult result = facet::ConfirmDialog("Apply?", &open, "Apply the changes.");
+        confirmed += result == facet::DialogResult::Confirmed ? 1 : 0;
+        canceled += result == facet::DialogResult::Canceled ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(confirmed == 1);
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(canceled == 1);
+    CHECK(confirmed == 1);
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("A destructive confirm dialog starts on Cancel, so Enter cancels; the scrim cancels too")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    facet::DialogResult last = facet::DialogResult::None;
+    session.SetUi([&] {
+        if (facet::Button("Delete"))
+            open = true;
+        session.Track("opener");
+        const facet::DialogResult result =
+            facet::ConfirmDialog("Delete?", &open, "It cannot be restored.", {.confirmLabel = "Delete", .destructive = true});
+        if (result != facet::DialogResult::None)
+            last = result;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(last == facet::DialogResult::Canceled);
+    CHECK_FALSE(open);
+    last = facet::DialogResult::None;
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    session.Click(ImVec2(5.0f, 500.0f));
+    session.Frames(2);
+    CHECK(last == facet::DialogResult::Canceled);
+}
+
+TEST_CASE("A hold to confirm dialog confirms only after the button was held long enough")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    int confirmed = 0;
+    session.SetUi([&] {
+        if (facet::Button("Reset"))
+            open = true;
+        session.Track("opener");
+        const facet::DialogResult result =
+            facet::ConfirmDialog("Reset?", &open, "Every setting returns to its default.", {.holdToConfirm = true});
+        confirmed += result == facet::DialogResult::Confirmed ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    // Enter does not bypass the hold.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(confirmed == 0);
+    CHECK(open);
+    // A short press does nothing.
+    session.KeyPress(ImGuiKey_Tab);  // shows the focus, which starts on the confirm button
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(confirmed == 0);
+    // Space held on the focused confirm button for longer than motion.durationSlow confirms.
+    session.HoldKey(ImGuiKey_Space, facet::T().motion.durationSlow + 0.2f);
+    session.Frames(2);
+    CHECK(confirmed == 1);
+    CHECK_FALSE(open);
+}
