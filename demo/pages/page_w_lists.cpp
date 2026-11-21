@@ -35,6 +35,10 @@ enum CaptureState
     kMultiOpen,
     kComboOpen,
     kReorderDrag,
+    kListFocused,
+    kTree,
+    kChecks,
+    kTransfer,
 };
 
 const facet::ChoiceItem kOptions[] = {
@@ -234,7 +238,7 @@ void ListBoxSection(facet::demo::PageCtx& ctx, ListsState& s)
     Paragraph("A framed list with one chosen row on the selection pill. It is one Tab stop: the arrows, Page Up and "
               "Down, Home and End move the choice, typing jumps to a matching label.");
     Columns columns;
-    if (ctx.capture && ctx.captureState == kFocused)
+    if (ctx.capture && ctx.captureState == kListFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused, 2);
     if (facet::ListBox("Icons and groups", &s.listBox, kOptions, {.visibleRows = 5, .width = columns.width / facet::Px(1.0f)}))
         ++s.writes;
@@ -264,12 +268,22 @@ void SelectableListSection(facet::demo::PageCtx& ctx, ListsState& s)
     Paragraph("A click selects, Ctrl+click toggles, Shift+click and Shift with the arrows extend, Ctrl+A selects all "
               "enabled rows, Escape clears, and a drag from empty space selects the rows it covers. Double click or "
               "Enter activates a row.");
+    if (ctx.capture && ctx.captureState == kListFocused && s.selection.Size == 0)
+    {
+        // The capture shows a selection of two rows and the hover on a third.
+        s.selection.SetItemSelected(0, true);
+        s.selection.SetItemSelected(2, true);
+    }
+    if (ctx.capture && ctx.captureState == kListFocused)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 4);
     if (facet::SelectableList("Rows", &s.selection, kOptions, {.visibleRows = 5, .width = 320.0f}))
         ++s.writes;
     ctx.Probe("lists.selectable");
     if (const int row = facet::SelectableListActivatedRow(); row >= 0)
         s.activated = row;
     Note("Selected rows: %d. Last activated: %s.", s.selection.Size, OptionName(s.activated));
+    if (ctx.capture && ctx.captureState == kListFocused)
+        ctx.RevealInCapture(0.85f);
 }
 
 int CountChecked(std::span<const bool> checked)
@@ -404,6 +418,8 @@ void TransferSection(facet::demo::PageCtx& ctx, ListsState& s)
                         {.searchable = false, .visibleRows = 2, .state = facet::DataState::Loading,
                          .width = columns.width / facet::Px(1.0f)});
     columns.End();
+    if (ctx.capture && ctx.captureState == kTransfer)
+        ctx.RevealInCapture(0.85f);
 }
 
 void ReorderSection(facet::demo::PageCtx& ctx, ListsState& s)
@@ -462,8 +478,16 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
     Paragraph("Nodes with icons, details and indent guides. The arrows move; Right opens a node or goes to its first "
               "child, Left closes it or goes to its parent; Enter or a double click opens a node or activates a leaf. "
               "Click, Ctrl+click and Shift+click select; a closed node keeps its selected children selected.");
-    if (ctx.capture && ctx.captureState == kFocused)
+    const bool treeCapture = ctx.capture && ctx.captureState == kTree;
+    if (treeCapture)
+    {
+        // The capture shows a selected node, the focus ring on another and the loading row.
+        if (s.treeSelection.Size == 0)
+            s.treeSelection.SetItemSelected(11, true);
+        s.lazyState = 1;
+        s.lazyStart = ImGui::GetTime();
         ctx.ForceNextItemState(ForcedItemState::Focused, 2);
+    }
     if (facet::BeginTreeView("tree", &s.treeSelection, {.width = 360.0f}))
     {
         if (facet::BeginTreeNode("Group 1", {.icon = facet::Icon("folder"), .detail = "3 entries", .defaultOpen = true,
@@ -485,6 +509,8 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
         }
         // Children that arrive later: the node shows the loading row for a second after it first
         // opens (a simulated delay standing in for a real fetch).
+        if (treeCapture)
+            ImGui::SetNextItemOpen(true);
         const bool open = facet::BeginTreeNode("Loaded on open", {.icon = facet::Icon("folder"), .id = 2,
                                                                   .loading = s.lazyState == 1});
         ctx.Probe("lists.tree.lazy");
@@ -515,6 +541,8 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
     LabeledRow("Loading");
     if (facet::BeginTreeView("loadingtree", nullptr, {.state = facet::DataState::Loading, .width = 240.0f}))
         facet::EndTreeView();
+    if (treeCapture)
+        ctx.RevealInCapture(0.8f);
 }
 
 const char* CheckName(facet::CheckState state)
@@ -553,12 +581,14 @@ void CheckboxTreeSection(facet::demo::PageCtx& ctx, ListsState& s)
     facet::CheckboxTree("checktreefailed", s.checkTree, kCheckTree,
                         {.state = facet::DataState::Error, .width = states.width / facet::Px(1.0f)});
     states.End();
+    if (ctx.capture && ctx.captureState == kChecks)
+        ctx.RevealInCapture(0.45f);
 }
 
 } // namespace
 
 FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dropdown-search", "focused",
-                 "multi-open", "combo-open", "reorder-drag")
+                 "multi-open", "combo-open", "reorder-drag", "list-focused", "tree", "checks", "transfer")
 {
     facet::demo::PageHeader("Lists",
                             "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
