@@ -1488,3 +1488,105 @@ TEST_CASE("A loading overlay keeps the region's size and blocks clicks and Tab w
     CHECK(presses == 1);
     CHECK(fi::OpenScopeCount() == 0);
 }
+
+// ---- Command palette -----------------------------------------------------------------------------
+
+namespace
+{
+
+const facet::ChoiceItem kPaletteCommands[] = {
+    {.label = "New file", .group = "File"},
+    {.label = "Open file", .group = "File"},
+    {.label = "Toggle sidebar", .group = "View"},
+    {.label = "Zoom in", .group = "View"},
+};
+
+} // namespace
+
+TEST_CASE("The command palette opens with its shortcut, filters as one types and Enter picks")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    const facet::ShortcutId shortcut = facet::RegisterShortcut("test.palette", ImGuiMod_Ctrl | ImGuiKey_K);
+    bool open = false;
+    int picked = -1;
+    int picks = 0;
+    session.SetUi([&] {
+        ImGui::Button("page");
+        session.Track("page");
+        if (facet::CommandPalette("Commands", &open, &picked, kPaletteCommands, {.openShortcut = shortcut}))
+            ++picks;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("page"));
+    session.KeyPress(ImGuiKey_K | ImGuiMod_Ctrl);
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    session.Type("zoom");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(picks == 1);
+    CHECK(picked == 3);
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("page"));
+    facet::UnregisterShortcut(shortcut);
+}
+
+TEST_CASE("The command palette moves with Down, closes on Escape without a pick and lists recent picks first")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    int picked = -1;
+    int picks = 0;
+    session.SetUi([&] {
+        if (facet::CommandPalette("##palette", &open, &picked, kPaletteCommands))
+            ++picks;
+    });
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(picks == 1);
+    CHECK(picked == 2);
+    // Opened again with an empty field, the recent pick is the first row: Enter picks it.
+    open = true;
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(picks == 2);
+    CHECK(picked == 2);
+    open = true;
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK_FALSE(open);
+    CHECK(picks == 2);
+}
+
+TEST_CASE("The shortcut palette triggers the picked shortcut")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    const facet::ShortcutId save = facet::RegisterShortcut("test.save", ImGuiMod_Ctrl | ImGuiKey_S, {.label = "Save the file"});
+    bool open = true;
+    facet::ShortcutId picked;
+    int fired = 0;
+    session.SetUi([&] {
+        fired += facet::ShortcutPressed(save) ? 1 : 0;
+        (void)facet::CommandPalette("Shortcuts", &open, &picked);
+    });
+    session.Seconds(0.3f);
+    session.Type("save");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(3);
+    CHECK(picked == save);
+    CHECK(fired == 1);
+    facet::UnregisterShortcut(save);
+}

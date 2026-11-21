@@ -264,8 +264,6 @@ Status: ready.
 
 ### CommandPalette
 
-Status: planned
-
 ```cpp
 bool CommandPalette(const char* label, bool* open, int* picked, std::span<const ChoiceItem> commands,
                     const CommandPaletteOptions& options = {});
@@ -274,8 +272,28 @@ bool CommandPalette(const char* label, bool* open, int* picked, std::span<const 
 bool CommandPalette(const char* label, bool* open, ShortcutId* picked, const CommandPaletteOptions& options = {});
 ```
 
-A floating launcher with fuzzy search over the app's commands or the registered shortcuts, recent
-picks first.
+A launcher centered `overlay.commandPaletteTop` below the top of the display,
+`overlay.commandPaletteWidth` wide (narrower on a narrow display): the visible label part as a small
+heading, a search field (`placeholder`, `Strings::search` by default) and the list of entries.
+
+- **Rows:** while the field is empty, the entries in their order with a header before each run of
+  equal `ChoiceItem::group`, and with `recentFirst` the recent picks first under `Strings::recent`;
+  while it has text, the fuzzy matches best first, their matched characters highlighted. A row shows
+  the icon, the label and `detail` at the end; in the shortcut form, the chord as key caps.
+  Disabled entries show and cannot be picked. The list is as tall as its rows, `maxVisibleRows`
+  (`list.popupRows` by default) at most and never past the display, and shows `emptyText`
+  (`Strings::noResults`) when nothing matches.
+- **Keys:** the field keeps the keyboard focus while the list takes Up, Down, Page Up and Page Down
+  (Home and End stay with the caret); Enter or Tab picks the active row; Escape closes. A click on a row
+  picks it; a click anywhere else in the palette gives the focus back to the field.
+- **Result:** on a pick it writes `*picked` and `*open = false`, returns true, and the focus goes back
+  to the item that had it; the shortcut form also calls `TriggerShortcut`. A null `picked` shows the
+  palette but picks nothing.
+- `openShortcut`, a registered shortcut, writes `*open = true` when it fires. Escape and a click
+  outside close it. Recent picks (5) are kept under the id in the ini file, by the label (or the
+  shortcut name), so they survive a change of the entries' order.
+
+Status: ready.
 
 ### WatermarkOverlay
 
