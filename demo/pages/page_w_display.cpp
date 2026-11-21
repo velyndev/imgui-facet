@@ -20,6 +20,7 @@
 namespace
 {
 
+using facet::demo::DemoWidth;
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
 using facet::demo::Note;
@@ -160,16 +161,16 @@ void TextSection(facet::demo::PageCtx& ctx)
     ctx.Probe("display.styled");
 
     LabeledRow("Truncated, end");
-    facet::TruncatedText(kLongText, {.width = 260.0f});
+    facet::TruncatedText(kLongText, {.width = DemoWidth(260.0f)});
     ctx.Probe("display.truncated");
     ui.truncatedId = ImGui::GetItemID();
     ui.truncatedTip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ui.truncatedId));
     LabeledRow("Truncated, middle");
-    facet::TruncatedText(kPathText, {.mode = facet::TruncateMode::Middle, .width = 220.0f});
+    facet::TruncatedText(kPathText, {.mode = facet::TruncateMode::Middle, .width = DemoWidth(220.0f)});
     LabeledRow("Truncated, start");
-    facet::TruncatedText(kPathText, {.mode = facet::TruncateMode::Start, .secondary = true, .width = 220.0f});
+    facet::TruncatedText(kPathText, {.mode = facet::TruncateMode::Start, .secondary = true, .width = DemoWidth(220.0f)});
     LabeledRow("Two lines, focusable");
-    facet::TruncatedText(kWrappedText, {.maxLines = 2, .focusable = true, .width = 260.0f});
+    facet::TruncatedText(kWrappedText, {.maxLines = 2, .focusable = true, .width = DemoWidth(260.0f)});
     ctx.Probe("display.truncatedFocus");
 
     LabeledRow("Section header");
@@ -318,9 +319,9 @@ void ProgressSection(facet::demo::PageCtx& ctx)
     facet::Skeleton({.shape = facet::SkeletonShape::Circle, .height = 40.0f});
     ImGui::SameLine();
     ImGui::BeginGroup();
-    facet::Skeleton({.lines = 2, .width = 260.0f});
+    facet::Skeleton({.lines = 2, .width = DemoWidth(260.0f)});
     ImGui::EndGroup();
-    facet::Skeleton({.shape = facet::SkeletonShape::Rect, .corners = facet::Radius::Card, .width = 320.0f, .height = 56.0f});
+    facet::Skeleton({.shape = facet::SkeletonShape::Rect, .corners = facet::Radius::Card, .width = DemoWidth(320.0f), .height = 56.0f});
     ImGui::EndGroup();
 }
 
@@ -383,7 +384,8 @@ void MarksSection(facet::demo::PageCtx& ctx)
     facet::StatusPill("Small##pill", {.tone = facet::Tone::Accent, .size = facet::ControlSize::Small});
     ImGui::SameLine();
     facet::StatusPill("Large##pill", {.size = facet::ControlSize::Large});
-    ImGui::SameLine();
+    // The pills share the text baseline of the line; the button goes under them, so its frame
+    // does not hang from the top of a line of marks.
     if (facet::Button("Change the state", {.size = facet::ControlSize::Small}))
         ui.pillWarning = !ui.pillWarning;
     ctx.Probe("display.pillToggle");
@@ -446,7 +448,7 @@ void CodeSection(facet::demo::PageCtx& ctx)
     LabeledRow("JSON and INI");
     ImGui::BeginGroup();
     facet::CodeView("json", kJsonSample, {.language = facet::CodeLanguage::Json, .lineNumbers = false, .copyButton = false});
-    facet::CodeView("ini", kIniSample, {.language = facet::CodeLanguage::Ini, .wrap = true, .copyButton = false, .width = 260.0f});
+    facet::CodeView("ini", kIniSample, {.language = facet::CodeLanguage::Ini, .wrap = true, .copyButton = false, .width = DemoWidth(260.0f)});
     ImGui::EndGroup();
     LabeledRow("Log view");
     ImGui::BeginGroup();
@@ -494,11 +496,11 @@ void DataSection(facet::demo::PageCtx& ctx)
     else if (Is(ctx, kError))
         tileState = facet::DataState::Error;
     facet::StatTile("Generated value", ui.statValue,
-                    {.delta = ui.statDelta, .trend = ui.trend, .state = tileState, .width = 260.0f});
+                    {.delta = ui.statDelta, .trend = ui.trend, .state = tileState, .width = DemoWidth(260.0f)});
     ctx.Probe("display.stat");
     ImGui::SameLine();
     facet::StatTile("Generated, lower is better", ui.statValue * 0.5,
-                    {.format = "%.1f", .delta = ui.statDelta, .invertDelta = true, .state = tileState, .width = 220.0f});
+                    {.format = "%.1f", .delta = ui.statDelta, .invertDelta = true, .state = tileState, .width = DemoWidth(220.0f)});
     if (facet::Button("Add 5", {.size = facet::ControlSize::Small}))
     {
         ui.statValue += 5.0;

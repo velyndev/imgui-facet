@@ -579,6 +579,10 @@ The dose caps in Direction apply. The choices behind each effect:
 - **Stock controls.** The gallery maps the theme tokens onto the stock Dear ImGui style with
   `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme and
   the scale.
+- **Mixed sizes on one line.** Controls of different sizes in one row are centered on the
+  tallest one, so their labels sit on one line instead of stepping down from a shared top.
+- **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
+  page holds at a large scale in a small window.
 - **Title strip.** The window background with a hairline below it; the title in the headline
   style, labels in labelSecondary in front of their controls.
 - **Navigation.** bgSecondary, group names in footnote labelSecondary, rows one control height

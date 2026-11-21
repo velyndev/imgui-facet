@@ -157,4 +157,27 @@ bool SameLineIfFits(float right, float nextWidth, float spacing = -1.0f);
 float ButtonWidth(const char* label);
 float CheckboxWidth(const char* label);
 
+// A width option of `units` design units, never more than the room left in the row (also in
+// units), so a demo control with a set width stays inside a narrow window or at a large scale.
+float DemoWidth(float units);
+
+// Places controls of different heights side by side, each centered on a line `lineHeight` pixels
+// tall (the tallest control of the line, such as ControlHeight(Large)), so their labels line up
+// instead of hanging from the top. In a compact window each control goes on a line of its own at
+// the column the row started in. Call Item with the control's height before each control.
+class MixedHeightRow
+{
+public:
+    explicit MixedHeightRow(float lineHeight, float spacing = -1.0f);
+    void Item(float height);
+
+private:
+    float top_ = 0.0f;
+    float column_ = 0.0f;
+    float lineHeight_ = 0.0f;
+    float spacing_ = -1.0f;
+    int count_ = 0;
+    bool stack_ = false;
+};
+
 } // namespace facet::demo

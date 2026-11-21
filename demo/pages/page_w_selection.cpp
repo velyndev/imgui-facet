@@ -17,8 +17,10 @@
 namespace
 {
 
+using facet::demo::DemoWidth;
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
+using facet::demo::MixedHeightRow;
 using facet::demo::Note;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
@@ -183,15 +185,13 @@ void ProbeEntries(facet::demo::PageCtx& ctx, const char* label, const char* prob
     }
 }
 
-// A width option of `units`, but never more than the room left in the row, so a demo control with
-// a set width stays inside a narrow window or at a large scale.
-float DemoWidth(float units)
+// Places controls side by side in a regular row, one under the other when the row is compact.
+// The gap between the controls of a row.
+float RowGap()
 {
-    const float room = ImGui::GetContentRegionAvail().x / facet::Px(1.0f);
-    return std::max(1.0f, std::min(units, room));
+    return facet::Px(facet::T().spacing.xl);
 }
 
-// Places controls side by side in a regular row, one under the other when the row is compact.
 struct ControlRow
 {
     bool stack = facet::AvailableWidthClass() == facet::WidthClass::Compact;
@@ -201,7 +201,7 @@ struct ControlRow
         if (stack)
             ImGui::SetCursorPosX(column);
         else
-            ImGui::SameLine(0.0f, facet::Px(facet::T().spacing.xl));
+            ImGui::SameLine(0.0f, RowGap());
     }
 };
 
@@ -226,12 +226,13 @@ void ToggleSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Sizes");
     {
-        const ControlRow row;
+        MixedHeightRow row(facet::ControlHeight(facet::ControlSize::Large), RowGap());
+        row.Item(facet::ControlHeight(facet::ControlSize::Small));
         facet::Toggle("Small", &ui.sizes[0], {.size = facet::ControlSize::Small});
         ctx.Probe("sel.toggle.small");
-        row.Next();
+        row.Item(facet::ControlHeight(facet::ControlSize::Regular));
         facet::Toggle("Regular", &ui.sizes[1]);
-        row.Next();
+        row.Item(facet::ControlHeight(facet::ControlSize::Large));
         facet::Toggle("Large", &ui.sizes[2], {.size = facet::ControlSize::Large});
     }
 
@@ -304,11 +305,12 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Tri-state");
     {
-        const ControlRow row;
+        MixedHeightRow row(facet::ControlHeight(facet::ControlSize::Regular), RowGap());
+        row.Item(facet::ControlHeight(facet::ControlSize::Regular));
         if (facet::Checkbox("Partly chosen", &ui.triState))
             ++ui.checkWrites;
         ctx.Probe("sel.check.tri");
-        row.Next();
+        row.Item(facet::ControlHeight(facet::ControlSize::Small));
         if (facet::Button("Set mixed again", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
             ui.triState = facet::CheckState::Mixed;
         ctx.Probe("sel.check.reset");
@@ -316,11 +318,12 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Sizes");
     {
-        const ControlRow row;
+        MixedHeightRow row(facet::ControlHeight(facet::ControlSize::Large), RowGap());
+        row.Item(facet::ControlHeight(facet::ControlSize::Small));
         facet::Checkbox("Small##check", &ui.checkSizes[0], {.size = facet::ControlSize::Small});
-        row.Next();
+        row.Item(facet::ControlHeight(facet::ControlSize::Regular));
         facet::Checkbox("Regular##check", &ui.checkSizes[1]);
-        row.Next();
+        row.Item(facet::ControlHeight(facet::ControlSize::Large));
         facet::Checkbox("Large##check", &ui.checkSizes[2], {.size = facet::ControlSize::Large});
     }
 
@@ -513,9 +516,9 @@ void SegmentedSection(facet::demo::PageCtx& ctx)
         const ControlRow row;
         // 150 units hold neither set of labels: icons replace them where every item has one,
         // and labels are cut where they do not.
-        count(facet::SegmentedControl("##narrowIcons", &ui.segmentNarrow, kChoices, {.width = 150.0f}));
+        count(facet::SegmentedControl("##narrowIcons", &ui.segmentNarrow, kChoices, {.width = DemoWidth(150.0f)}));
         row.Next();
-        count(facet::SegmentedControl("##narrowLabels", &ui.segmentNarrow, kOptions, {.width = 150.0f}));
+        count(facet::SegmentedControl("##narrowLabels", &ui.segmentNarrow, kOptions, {.width = DemoWidth(150.0f)}));
     }
     Note("Labels: %s. Writes on this section: %d.", kOptions[ui.segment], ui.segmentWrites);
 }
@@ -713,8 +716,12 @@ void ChipSection(facet::demo::PageCtx& ctx)
         {
             if (!ui.tags[i])
                 continue;
+            // The chip's width for the wrap: its label plus about one control height for the
+            // paddings and another for the remove button.
+            const float estimate = facet::MeasureText(facet::TextStyle::Body, kTags[i]).x +
+                                   facet::ControlHeight(facet::ControlSize::Regular) * 2.0f;
             if (!first)
-                facet::demo::SameLineIfFits(right, facet::Px(80.0f), facet::Px(facet::T().spacing.sm));
+                facet::demo::SameLineIfFits(right, estimate, facet::Px(facet::T().spacing.sm));
             first = false;
             ImGui::PushID(i);
             if (facet::Chip(kTags[i], {.removable = true}))

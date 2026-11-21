@@ -24,6 +24,7 @@
 namespace
 {
 
+using facet::demo::DemoWidth;
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
 using facet::demo::Note;
@@ -282,7 +283,7 @@ void TextFieldSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Narrow");
     // 160 units: the label takes at most half and ends in an ellipsis, the text scrolls inside.
-    facet::TextField("A label longer than its share##narrow", &ui.narrow, {.placeholder = "Placeholder", .width = 160.0f});
+    facet::TextField("A label longer than its share##narrow", &ui.narrow, {.placeholder = "Placeholder", .width = DemoWidth(160.0f)});
     ctx.Probe("inputs.text.narrow");
     if (ctx.capture && ctx.captureState == kFilled)
         ctx.RevealInCapture(0.6f);
@@ -495,7 +496,7 @@ void CopyFieldSection(facet::demo::PageCtx& ctx)
     facet::CopyField("##copyError", "Sample text to copy", {.error = "Placeholder error: the value is out of date"});
 
     LabeledRow("Narrow");
-    facet::CopyField("A label longer than its share##copyNarrow", kSampleLong, {.width = 160.0f});
+    facet::CopyField("A label longer than its share##copyNarrow", kSampleLong, {.width = DemoWidth(160.0f)});
     Note("Copies: %d.", ui.copies);
 }
 
@@ -560,7 +561,7 @@ void InlineRenameSection(facet::demo::PageCtx& ctx)
     if (facet::Button("Rename the file", {.size = facet::ControlSize::Small}))
         ui.renamingFile = true;
     LabeledRow("");
-    facet::InlineRename("renameFromButton", &ui.fileName2, &ui.renamingFile, {.selectStem = true, .width = 240.0f});
+    facet::InlineRename("renameFromButton", &ui.fileName2, &ui.renamingFile, {.selectStem = true, .width = DemoWidth(240.0f)});
     ctx.Probe("inputs.rename.button");
 
     LabeledRow("Error");
@@ -571,7 +572,7 @@ void InlineRenameSection(facet::demo::PageCtx& ctx)
     facet::InlineRename("renameReadOnly", &ui.nameReadOnly, nullptr, {.readOnly = true});
 
     LabeledRow("Narrow");
-    facet::InlineRename("renameNarrow", &ui.nameNarrow, nullptr, {.width = 120.0f});
+    facet::InlineRename("renameNarrow", &ui.nameNarrow, nullptr, {.width = DemoWidth(120.0f)});
     Note("Names written: %d. Current: \"%s\".", ui.renames, ui.name.c_str());
 }
 
@@ -637,7 +638,7 @@ void PinCodeSection(facet::demo::PageCtx& ctx)
     facet::PinCodeInput("##pinReadOnly", &ui.pinReadOnly, {.length = 4, .readOnly = true});
 
     LabeledRow("Narrow");
-    facet::PinCodeInput("##pinNarrow", &ui.pinNarrow, {.length = 8, .width = 120.0f});
+    facet::PinCodeInput("##pinNarrow", &ui.pinNarrow, {.length = 8, .width = DemoWidth(120.0f)});
     Note("Code: \"%s\" (%s).", ui.pin.c_str(), ui.pin.size() == 6 ? "complete" : "incomplete");
 }
 
@@ -662,7 +663,7 @@ void PathFieldSection(facet::demo::PageCtx& ctx)
     ProbeSlotButton(ctx, "inputs.path.browse", ImGui::GetIDWithSeed("browse", nullptr, pathId), 0);
 
     LabeledRow("Long path");
-    facet::PathField("##pathLong", &ui.pathLong, {.width = 280.0f});
+    facet::PathField("##pathLong", &ui.pathLong, {.width = DemoWidth(280.0f)});
     ctx.Probe("inputs.path.long");
 
     LabeledRow("Missing file");
@@ -697,7 +698,7 @@ void TagInputSection(facet::demo::PageCtx& ctx)
     ProbeFrame(ctx, "inputs.tags.limited");
 
     LabeledRow("Wrapping");
-    facet::TagInput("##tagsWrap", &ui.tagsWrap, {.width = 240.0f});
+    facet::TagInput("##tagsWrap", &ui.tagsWrap, {.width = DemoWidth(facet::T().metrics.cardWidth)});
 
     LabeledRow("Error");
     facet::TagInput("##tagsError", &ui.tagsError,
@@ -746,7 +747,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
     if (ctx.capture && ctx.captureState == kFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused, 0);
     const ImGuiID summaryId = ImGui::GetID("Errors in this window");
-    if (facet::ValidationSummary("Errors in this window", {.width = 420.0f}))
+    if (facet::ValidationSummary("Errors in this window", {.width = DemoWidth(420.0f)}))
         ++ui.summaryActivations;
     if (ImGui::GetItemID() == summaryId)
     {
@@ -760,7 +761,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
     ProbeFrame(ctx, "inputs.valid.name");
 
     LabeledRow("Stock field");
-    ImGui::SetNextItemWidth(facet::Px(200.0f));
+    ImGui::SetNextItemWidth(facet::Px(DemoWidth(facet::T().metrics.cardWidth)));
     ImGui::InputInt("##validPort", &ui.validPort);
     ctx.Probe("inputs.valid.port");
     if (ui.validPort < 1 || ui.validPort > 65535)

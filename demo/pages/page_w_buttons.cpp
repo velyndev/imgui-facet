@@ -17,6 +17,7 @@ namespace
 
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
+using facet::demo::MixedHeightRow;
 using facet::demo::Note;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
@@ -99,6 +100,11 @@ void Pressed(int* counter, const char* name)
 
 // Places buttons side by side in a regular row, one under the other in the control column when
 // the row is compact.
+float Height(facet::ControlSize size)
+{
+    return facet::ControlHeight(size);
+}
+
 struct ButtonRow
 {
     bool stack = facet::AvailableWidthClass() == facet::WidthClass::Compact;
@@ -148,15 +154,16 @@ void ButtonSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Sizes");
     {
-        const ButtonRow row;
+        MixedHeightRow row(Height(facet::ControlSize::Large));
+        row.Item(Height(facet::ControlSize::Small));
         if (facet::Button("Small", {.size = facet::ControlSize::Small}))
             Pressed(&ui.sized, "Small");
         ctx.Probe("button.small");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Regular));
         if (facet::Button("Regular"))
             Pressed(&ui.sized, "Regular");
         ctx.Probe("button.regular");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Large));
         if (facet::Button("Large", {.size = facet::ControlSize::Large}))
             Pressed(&ui.sized, "Large");
         ctx.Probe("button.large");
@@ -198,7 +205,7 @@ void ButtonSection(facet::demo::PageCtx& ctx)
     {
         const ButtonRow row;
         // 120 units cannot hold this label: it ends in an ellipsis and shows in full on hover and focus.
-        if (facet::Button("Export the selected layers", {.width = 120.0f}))
+        if (facet::Button("Export the selected layers", {.width = facet::demo::DemoWidth(120.0f)}))
             Pressed(&ui.narrow, "Export the selected layers");
         ui.narrowTip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
         ctx.Probe("button.narrow");
@@ -265,26 +272,28 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
     }
     LabeledRow("Sizes");
     {
-        const ButtonRow row;
+        MixedHeightRow row(Height(facet::ControlSize::Large));
+        row.Item(Height(facet::ControlSize::Small));
         facet::IconButton("Search##small", facet::Icon("search"),
                           {.variant = facet::ButtonVariant::Secondary, .size = facet::ControlSize::Small});
-        row.Next();
+        row.Item(Height(facet::ControlSize::Regular));
         facet::IconButton("Search##regular", facet::Icon("search"), {.variant = facet::ButtonVariant::Secondary});
-        row.Next();
+        row.Item(Height(facet::ControlSize::Large));
         facet::IconButton("Search##large", facet::Icon("search"),
                           {.variant = facet::ButtonVariant::Secondary, .size = facet::ControlSize::Large});
     }
     LabeledRow("States");
     {
-        const ButtonRow row;
+        MixedHeightRow row(Height(facet::ControlSize::Regular));
+        row.Item(Height(facet::ControlSize::Regular));
         ImGui::BeginDisabled();
         if (facet::IconButton("Edit (disabled)", facet::Icon("edit"), {.variant = facet::ButtonVariant::Secondary}))
             Pressed(&ui.iconPresses, "Edit (disabled)");
         ctx.Probe("button.icon.disabled");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Regular));
         facet::IconButton("Disabled and latched", facet::Icon("lock"), {.selected = true});
         ImGui::EndDisabled();
-        row.Next();
+        row.Item(Height(facet::ControlSize::Regular));
         const bool loading = ui.iconLoading || (ctx.capture && (ctx.captureState == kLoading || ctx.captureState == kToolsState));
         if (facet::IconButton("Refresh", facet::Icon("refresh"), {.variant = facet::ButtonVariant::Secondary, .loading = loading}))
         {
@@ -292,7 +301,7 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
             Pressed(&ui.iconPresses, "Refresh");
         }
         ctx.Probe("button.icon.refresh");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Small));
         if (facet::Button("Stop loading", {.variant = facet::ButtonVariant::Plain, .size = facet::ControlSize::Small}))
             ui.iconLoading = false;
         ctx.Probe("button.icon.stop");
@@ -320,16 +329,17 @@ void CopyButtonSection(facet::demo::PageCtx& ctx)
     }
     LabeledRow("With its label");
     {
-        const ButtonRow row;
+        MixedHeightRow row(Height(facet::ControlSize::Regular));
+        row.Item(Height(facet::ControlSize::Regular));
         if (facet::CopyButton("Copy##labelled", kSample, {.iconOnly = false}))
             Pressed(&ui.copies, "Copy");
         ctx.Probe("button.copy.label");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Regular));
         if (facet::CopyButton("Copy as one line", "Placeholder line",
                               {.variant = facet::ButtonVariant::Secondary, .iconOnly = false}))
             Pressed(&ui.copies, "Copy as one line");
         ctx.Probe("button.copy.secondary");
-        row.Next();
+        row.Item(Height(facet::ControlSize::Small));
         facet::CopyButton("Copy##small", kSample,
                           {.variant = facet::ButtonVariant::Secondary, .iconOnly = false, .size = facet::ControlSize::Small});
     }
@@ -378,7 +388,7 @@ void ToggleGroupSection(facet::demo::PageCtx& ctx)
     count(facet::ToggleButtonGroup("##text", &ui.textView, kToolNames));
     LabeledRow("Narrow");
     // 150 units hold one or two of the labels; the rest move into the "more" menu.
-    count(facet::ToggleButtonGroup("##narrow", &ui.narrowView, kToolNames, {.width = 150.0f}));
+    count(facet::ToggleButtonGroup("##narrow", &ui.narrowView, kToolNames, {.width = facet::demo::DemoWidth(150.0f)}));
     ctx.Probe("button.toggles.narrow");
     LabeledRow("States");
     {

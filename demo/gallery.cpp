@@ -622,6 +622,42 @@ float CheckboxWidth(const char* label)
     return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(label, nullptr, true).x;
 }
 
+float DemoWidth(float units)
+{
+    const float room = ImGui::GetContentRegionAvail().x / facet::Px(1.0f);
+    return std::max(1.0f, std::min(units, room));
+}
+
+MixedHeightRow::MixedHeightRow(float lineHeight, float spacing)
+    : top_(ImGui::GetCursorScreenPos().y),
+      column_(ImGui::GetCursorPosX()),
+      lineHeight_(lineHeight),
+      spacing_(spacing),
+      stack_(facet::AvailableWidthClass() == facet::WidthClass::Compact)
+{
+}
+
+void MixedHeightRow::Item(float height)
+{
+    if (count_++ > 0)
+    {
+        if (stack_)
+        {
+            ImGui::SetCursorPosX(column_);
+            return;  // a line of its own: nothing to center on
+        }
+        ImGui::SameLine(0.0f, spacing_);
+    }
+    else if (stack_)
+    {
+        return;
+    }
+    // The cursor of a continued line sits at the line's first item, which may itself be moved
+    // down; the offset is taken from the top of the row instead.
+    const float x = ImGui::GetCursorScreenPos().x;
+    ImGui::SetCursorScreenPos(ImVec2(x, top_ + std::max(0.0f, std::round((lineHeight_ - height) * 0.5f))));
+}
+
 void LabeledRow(const char* label)
 {
     const facet::Theme& theme = facet::T();

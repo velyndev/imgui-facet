@@ -377,7 +377,7 @@ void Cards(facet::demo::PageCtx& ctx, ContainersState& s)
     Note("A card without a title line.");
     facet::EndCard();
     ImGui::Spacing();
-    facet::BeginCard("A card title that is longer than its narrow card", {.width = 160.0f});
+    facet::BeginCard("A card title that is longer than its narrow card", {.width = facet::demo::DemoWidth(160.0f)});
     Note("Narrow card.");
     facet::EndCard();
 }

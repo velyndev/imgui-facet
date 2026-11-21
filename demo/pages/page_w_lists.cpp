@@ -19,6 +19,7 @@
 namespace
 {
 
+using facet::demo::DemoWidth;
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
 using facet::demo::Note;
@@ -155,21 +156,21 @@ void DropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
         ctx.ForceNextItemState(ForcedItemState::Open);
     else if (ctx.capture && ctx.captureState == kFocused)
         ctx.ForceNextItemState(ForcedItemState::Focused);
-    if (facet::Dropdown("Icons and groups", &s.dropdown, kOptions, {.width = 320.0f}))
+    if (facet::Dropdown("Icons and groups", &s.dropdown, kOptions, {.width = DemoWidth(320.0f)}))
         ++s.writes;
     ctx.Probe("lists.dropdown");
     ProbePopup(ctx, "lists.dropdown.popup");
     if (ctx.capture && ctx.captureState == kDropdownOpen)
         ctx.RevealInCapture(0.25f);
 
-    if (facet::Dropdown("Plain labels", &s.plain, kLabels, {.width = 320.0f}))
+    if (facet::Dropdown("Plain labels", &s.plain, kLabels, {.width = DemoWidth(320.0f)}))
         ++s.writes;
     ctx.Probe("lists.dropdown.plain");
 
     if (ctx.capture && ctx.captureState == kDropdownSearch)
         ctx.ForceNextItemState(ForcedItemState::Open);
     if (facet::Dropdown("Searchable", &s.searchable, kGeneratedCount, &NumberedOption, nullptr,
-                        {.searchable = true, .width = 320.0f, .helpText = "10000 generated entries, fuzzy filter"}))
+                        {.searchable = true, .width = DemoWidth(320.0f), .helpText = "10000 generated entries, fuzzy filter"}))
         ++s.writes;
     ctx.Probe("lists.dropdown.search");
     if (ctx.capture && ctx.captureState == kDropdownSearch)
@@ -184,26 +185,26 @@ void DropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
         {
             if (i > 0)
                 LabeledRow("");
-            facet::Dropdown(names[i], &s.sized[i], kLabels, {.size = sizes[i], .width = 200.0f});
+            facet::Dropdown(names[i], &s.sized[i], kLabels, {.size = sizes[i], .width = DemoWidth(200.0f)});
         }
     }
 
     LabeledRow("Disabled");
     ImGui::BeginDisabled();
-    facet::Dropdown("##disabled", &s.states[0], kLabels, {.width = 200.0f});
+    facet::Dropdown("##disabled", &s.states[0], kLabels, {.width = DemoWidth(200.0f)});
     ImGui::EndDisabled();
     ctx.Probe("lists.dropdown.disabled");
     LabeledRow("Read-only");
-    facet::Dropdown("##readonly", &s.states[1], kLabels, {.width = 200.0f, .readOnly = true});
+    facet::Dropdown("##readonly", &s.states[1], kLabels, {.width = DemoWidth(200.0f), .readOnly = true});
     LabeledRow("Error");
-    facet::Dropdown("##error", &s.states[2], kLabels, {.width = 200.0f, .error = "Choose an option"});
+    facet::Dropdown("##error", &s.states[2], kLabels, {.width = DemoWidth(200.0f), .error = "Choose an option"});
     LabeledRow("Items failed");
     facet::Dropdown("##failed", &s.states[3], kLabels,
-                    {.state = facet::DataState::Error, .width = 200.0f, .helpText = "The list shows the error"});
+                    {.state = facet::DataState::Error, .width = DemoWidth(200.0f), .helpText = "The list shows the error"});
     LabeledRow("Items loading");
-    facet::Dropdown("##loading", &s.states[3], kLabels, {.state = facet::DataState::Loading, .width = 200.0f});
+    facet::Dropdown("##loading", &s.states[3], kLabels, {.state = facet::DataState::Loading, .width = DemoWidth(200.0f)});
     LabeledRow("Narrow");
-    facet::Dropdown("##narrow", &s.narrow, kOptions, {.width = 96.0f});
+    facet::Dropdown("##narrow", &s.narrow, kOptions, {.width = DemoWidth(96.0f)});
 
     Note("Chosen: %s, %s, Option %d. Choices made on this page: %d.", OptionName(s.dropdown), kLabels[s.plain],
          s.searchable + 1, s.writes);
@@ -276,7 +277,7 @@ void SelectableListSection(facet::demo::PageCtx& ctx, ListsState& s)
     }
     if (ctx.capture && ctx.captureState == kListFocused)
         ctx.ForceNextItemState(ForcedItemState::Hovered, 4);
-    if (facet::SelectableList("Rows", &s.selection, kOptions, {.visibleRows = 5, .width = 320.0f}))
+    if (facet::SelectableList("Rows", &s.selection, kOptions, {.visibleRows = 5, .width = DemoWidth(320.0f)}))
         ++s.writes;
     ctx.Probe("lists.selectable");
     if (const int row = facet::SelectableListActivatedRow(); row >= 0)
@@ -299,20 +300,20 @@ void MultiDropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
               "them.");
     if (ctx.capture && ctx.captureState == kMultiOpen)
         ctx.ForceNextItemState(ForcedItemState::Open);
-    if (facet::MultiDropdown("With select all", s.multi, kOptions, {.selectAllRow = true, .width = 320.0f}))
+    if (facet::MultiDropdown("With select all", s.multi, kOptions, {.selectAllRow = true, .width = DemoWidth(320.0f)}))
         ++s.writes;
     ctx.Probe("lists.multi");
     ProbePopup(ctx, "lists.multi.popup");
     if (ctx.capture && ctx.captureState == kMultiOpen)
         ctx.RevealInCapture(0.25f);
     if (facet::MultiDropdown("Counted", s.multiCounted, kLabels,
-                             {.summary = facet::MultiDropdownSummary::Count, .searchable = true, .width = 320.0f}))
+                             {.summary = facet::MultiDropdownSummary::Count, .searchable = true, .width = DemoWidth(320.0f)}))
         ++s.writes;
     ctx.Probe("lists.multi.count");
     LabeledRow("Read-only");
-    facet::MultiDropdown("##multireadonly", s.multi, kOptions, {.width = 200.0f, .readOnly = true});
+    facet::MultiDropdown("##multireadonly", s.multi, kOptions, {.width = DemoWidth(200.0f), .readOnly = true});
     LabeledRow("Nothing checked");
-    facet::MultiDropdown("##multinone", s.multiNone, kLabels, {.width = 200.0f, .helpText = "Shows the placeholder"});
+    facet::MultiDropdown("##multinone", s.multiNone, kLabels, {.width = DemoWidth(200.0f), .helpText = "Shows the placeholder"});
     Note("Checked: %d of %d, %d of %d.", CountChecked(s.multi), static_cast<int>(std::size(kOptions)),
          CountChecked(s.multiCounted), static_cast<int>(std::size(kLabels)));
 }
@@ -324,7 +325,7 @@ void ComboSection(facet::demo::PageCtx& ctx, ListsState& s)
               "Enter or a click chooses, Escape closes. Rows wrapped in a disabled block are shown but refused.");
     if (ctx.capture && ctx.captureState == kComboOpen)
         ctx.ForceNextItemState(ForcedItemState::Open);
-    if (facet::BeginCombo("Custom rows", kOptions[s.combo].label, {.icon = kOptions[s.combo].icon, .width = 320.0f}))
+    if (facet::BeginCombo("Custom rows", kOptions[s.combo].label, {.icon = kOptions[s.combo].icon, .width = DemoWidth(320.0f)}))
     {
         for (int i = 0; i < static_cast<int>(std::size(kOptions)); ++i)
         {
@@ -347,11 +348,11 @@ void ComboSection(facet::demo::PageCtx& ctx, ListsState& s)
         ctx.RevealInCapture(0.25f);
     LabeledRow("Read-only");
     {
-        facet::ComboScope combo("##comboreadonly", kLabels[1], {.width = 200.0f, .readOnly = true});
+        facet::ComboScope combo("##comboreadonly", kLabels[1], {.width = DemoWidth(200.0f), .readOnly = true});
     }
     LabeledRow("Error");
     {
-        facet::ComboScope combo("##comboerror", nullptr, {.width = 200.0f, .error = "Choose an option"});
+        facet::ComboScope combo("##comboerror", nullptr, {.width = DemoWidth(200.0f), .error = "Choose an option"});
         if (combo)
             for (int i = 0; i < 4; ++i)
                 facet::ComboItem(kLabels[i], false);
@@ -376,7 +377,7 @@ void ChecklistSection(facet::demo::PageCtx& ctx, ListsState& s)
     columns.End();
     LabeledRow("Failed");
     facet::SearchableChecklist("##checklistfailed", s.checklistFirst, kOptions,
-                               {.visibleRows = 2, .state = facet::DataState::Error, .width = 320.0f,
+                               {.visibleRows = 2, .state = facet::DataState::Error, .width = DemoWidth(320.0f),
                                 .error = "Choose at least one entry"});
 }
 
@@ -412,7 +413,7 @@ void TransferSection(facet::demo::PageCtx& ctx, ListsState& s)
     Columns columns;
     facet::TransferList("transfernarrow", s.transfer, kOptions,
                         {.sourceTitle = "Available", .targetTitle = "Chosen", .searchable = false, .visibleRows = 2,
-                         .width = std::min(columns.width / facet::Px(1.0f), 300.0f)});
+                         .width = std::min(columns.width / facet::Px(1.0f), facet::T().metrics.cardWidth)});
     columns.Next();
     facet::TransferList("transferloading", s.transfer, kOptions,
                         {.searchable = false, .visibleRows = 2, .state = facet::DataState::Loading,
@@ -488,7 +489,7 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
         s.lazyStart = ImGui::GetTime();
         ctx.ForceNextItemState(ForcedItemState::Focused, 2);
     }
-    if (facet::BeginTreeView("tree", &s.treeSelection, {.width = 360.0f}))
+    if (facet::BeginTreeView("tree", &s.treeSelection, {.width = DemoWidth(360.0f)}))
     {
         if (facet::BeginTreeNode("Group 1", {.icon = facet::Icon("folder"), .detail = "3 entries", .defaultOpen = true,
                                              .id = 1}))
@@ -536,10 +537,10 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
 
     LabeledRow("Empty");
     if (facet::BeginTreeView("emptytree", nullptr, {.indentGuides = false, .emptyText = "No entries (placeholder)",
-                                                    .width = 240.0f}))
+                                                    .width = DemoWidth(240.0f)}))
         facet::EndTreeView();
     LabeledRow("Loading");
-    if (facet::BeginTreeView("loadingtree", nullptr, {.state = facet::DataState::Loading, .width = 240.0f}))
+    if (facet::BeginTreeView("loadingtree", nullptr, {.state = facet::DataState::Loading, .width = DemoWidth(240.0f)}))
         facet::EndTreeView();
     if (treeCapture)
         ctx.RevealInCapture(0.8f);
