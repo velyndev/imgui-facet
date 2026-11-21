@@ -1537,3 +1537,18 @@ TEST_CASE("A folder the system does not let the user read shows the error state"
     CHECK(view.state == 2);
     CHECK(path == "C:\\System Volume Information");
 }
+TEST_CASE("A narrow file browser keeps its parts inside its width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string path = "C:\\";
+    session.SetUi([&] {
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(120.0f), facet::Px(500.0f)));
+        facet::FileBrowser("Files", &path, {.fileTypes = kBrowserTypes});
+        session.Track("files");
+        ImGui::EndChild();
+    });
+    session.Frames(3);
+    const ImRect files = session.ItemRect("files");
+    CHECK(files.GetWidth() <= facet::Px(120.0f));
+}

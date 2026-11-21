@@ -368,9 +368,14 @@ bool FileBrowserImpl(const char* label, std::string* path, char* buffer, std::si
                                                                         : strings.open;
     {
         ControlTextScope text(m);
-        const float buttonWidth = std::ceil(ImGui::CalcTextSize(confirmText).x + m.paddingX * 2.0f);
+        float buttonWidth = std::ceil(ImGui::CalcTextSize(confirmText).x + m.paddingX * 2.0f);
         const int typeCount = std::min(static_cast<int>(options.fileTypes.size()), kFileBrowserTypeCapacity);
-        if (typeCount > 0 && options.mode != FileBrowserMode::Folder)
+        const bool types = typeCount > 0 && options.mode != FileBrowserMode::Folder;
+        // In a narrow browser the type dropdown takes a line of its own above the button, and a
+        // button wider than the browser is cut to its width (its label then ends in an ellipsis).
+        const bool stacked = types && width - buttonWidth - gap < m.height * 3.0f;
+        buttonWidth = std::min(buttonWidth, width);
+        if (types)
         {
             const char* labels[kFileBrowserTypeCapacity] = {};
             for (int i = 0; i < typeCount; ++i)
@@ -381,9 +386,11 @@ bool FileBrowserImpl(const char* label, std::string* path, char* buffer, std::si
             char typeLabel[96];
             std::snprintf(typeLabel, sizeof(typeLabel), "%s###type", strings.fileType);
             ImGui::SetCursorScreenPos(ImVec2(origin.x, y));
-            const float dropdownWidth = std::max(m.height, width - buttonWidth - gap);
+            const float dropdownWidth = stacked ? width : width - buttonWidth - gap;
             Dropdown(typeLabel, &state.fileType, std::span<const char* const>(labels, static_cast<std::size_t>(typeCount)),
                      {.width = dropdownWidth / Scale()});
+            if (stacked)
+                y += bar + gap;
         }
         // What the confirm button would write.
         const FileBrowserEntry* entry = chosenEntry();
@@ -410,7 +417,7 @@ bool FileBrowserImpl(const char* label, std::string* path, char* buffer, std::si
         std::snprintf(confirmLabel, sizeof(confirmLabel), "%s###confirm", confirmText);
         ImGui::SetCursorScreenPos(ImVec2(std::max(origin.x, origin.x + width - buttonWidth), y));
         ImGui::BeginDisabled(!canConfirm);
-        if (Button(confirmLabel, {.variant = ButtonVariant::Primary}))
+        if (Button(confirmLabel, {.variant = ButtonVariant::Primary, .width = buttonWidth / Scale()}))
             confirm = true;
         ImGui::EndDisabled();
 
