@@ -2,7 +2,7 @@
 
 // Looks shared by the display widgets (facet/widgets/display.h): the colors of a tone, the
 // placement of marks that sit on a line of text (badges, pills, key caps, inline code), key caps,
-// the "copied" feedback, the progress tone and the dismiss key of alerts. Every name carries the
+// placed on a line of text, the "copied" feedback, the progress tone and the dismiss key of alerts. Every name carries the
 // family, because every family links into the same library.
 //
 // Tone colors (DisplayToneLook) follow what the theme guarantees (theme.h, test_contrast.cpp):
@@ -98,10 +98,8 @@ void DrawDisplayDot(ImDrawList* drawList, ImVec2 center, float diameter, ImU32 c
 
 // ---- Key caps ---------------------------------------------------------------------------------
 
-// The caps of a chord: one per modifier (Ctrl, Shift, Alt, Win, in that order) and one for the
-// key; a modifier key alone folds into the modifiers. Returns how many were written (at most 5).
-inline constexpr int kDisplayMaxCaps = 5;
-int DisplayChordCaps(ImGuiKeyChord chord, const char* names[kDisplayMaxCaps]);
+// The cap names and colors are the shared ones of internal/key_caps.h (KeyCapNames, KeyCapLook);
+// the metrics below place them on a line of text.
 
 // The metrics of a mark of a size (Small, Regular, Large): badges, pills, key caps, inline code.
 struct DisplayMarkMetrics

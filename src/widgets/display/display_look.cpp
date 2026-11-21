@@ -12,6 +12,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "internal/control.h"
+#include "internal/key_caps.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
 
@@ -185,60 +186,6 @@ void DrawDisplayDot(ImDrawList* drawList, ImVec2 center, float diameter, ImU32 c
 
 // ---- Key caps ---------------------------------------------------------------------------------
 
-namespace
-{
-
-bool IsModifierKey(ImGuiKey key, ImGuiKeyChord* mod)
-{
-    switch (key)
-    {
-    case ImGuiKey_LeftCtrl:
-    case ImGuiKey_RightCtrl:
-        *mod = ImGuiMod_Ctrl;
-        return true;
-    case ImGuiKey_LeftShift:
-    case ImGuiKey_RightShift:
-        *mod = ImGuiMod_Shift;
-        return true;
-    case ImGuiKey_LeftAlt:
-    case ImGuiKey_RightAlt:
-        *mod = ImGuiMod_Alt;
-        return true;
-    case ImGuiKey_LeftSuper:
-    case ImGuiKey_RightSuper:
-        *mod = ImGuiMod_Super;
-        return true;
-    default:
-        return false;
-    }
-}
-
-} // namespace
-
-int DisplayChordCaps(ImGuiKeyChord chord, const char* names[kDisplayMaxCaps])
-{
-    ImGuiKeyChord mods = ChordMods(chord);
-    ImGuiKey key = ChordKey(chord);
-    ImGuiKeyChord folded = 0;
-    if (IsModifierKey(key, &folded))
-    {
-        mods |= folded;
-        key = ImGuiKey_None;
-    }
-    int count = 0;
-    for (const ImGuiKeyChord mod : {ImGuiKeyChord(ImGuiMod_Ctrl), ImGuiKeyChord(ImGuiMod_Shift),
-                                    ImGuiKeyChord(ImGuiMod_Alt), ImGuiKeyChord(ImGuiMod_Super)})
-        if ((mods & mod) != 0)
-            names[count++] = KeyNameText(static_cast<ImGuiKey>(mod));
-    if (key != ImGuiKey_None)
-    {
-        const char* name = KeyNameText(key);
-        if (name[0] != '\0')
-            names[count++] = name;
-    }
-    return count;
-}
-
 DisplayMarkMetrics DisplayMarkLook(ControlSize size)
 {
     const Theme& t = T();
@@ -295,8 +242,8 @@ float DisplayCapsWidth(ImGuiKeyChord chord, const DisplayMarkMetrics& m)
 {
     PushTextStyle(m.textStyle);
     float width = 0.0f;
-    const char* names[kDisplayMaxCaps] = {};
-    const int count = DisplayChordCaps(chord, names);
+    const char* names[kKeyCapMax] = {};
+    const int count = KeyCapNames(chord, names);
     if (count == 0)
     {
         width = ImGui::CalcTextSize(GetStrings().unbound).x;
@@ -314,22 +261,21 @@ float DisplayCapsWidth(ImGuiKeyChord chord, const DisplayMarkMetrics& m)
 void DrawDisplayCaps(ImDrawList* drawList, ImVec2 pos, float baseline, ImGuiKeyChord chord, const DisplayMarkMetrics& m,
                      bool pressed, bool disabled)
 {
-    const Colors& c = T().colors;
     PushTextStyle(m.textStyle);
     const float textTop = DisplayTextTop(baseline);
-    const char* names[kDisplayMaxCaps] = {};
-    const int count = DisplayChordCaps(chord, names);
+    const char* names[kKeyCapMax] = {};
+    const int count = KeyCapNames(chord, names);
     if (count == 0)
     {
         drawList->AddText(ImVec2(pos.x, textTop), ToU32(ControlSecondaryColor(disabled)), GetStrings().unbound);
         PopTextStyle();
         return;
     }
-    // A cap: the control fill with a boundary hairline (3:1, so the cap reads as a key), the held
-    // look one fill step stronger.
-    const ImU32 fill = ToU32(disabled ? c.fill[3] : (pressed ? c.fill[0] : c.fill[2]));
-    const ImU32 outline = ToU32(disabled ? c.separator : (pressed ? c.focusRing : ControlBoundaryColor(c)));
-    const ImU32 text = ToU32(ControlLabelColor(disabled));
+    // The cap colors every key cap shares (key_caps.h); the metrics are the mark's.
+    const KeyCapColors look = KeyCapLook(pressed, disabled);
+    const ImU32 fill = look.fill;
+    const ImU32 outline = look.outline;
+    const ImU32 text = look.text;
     float x = pos.x;
     for (int i = 0; i < count; ++i)
     {
