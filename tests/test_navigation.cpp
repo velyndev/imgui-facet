@@ -1075,3 +1075,86 @@ TEST_CASE("Wizard content slides in when the step changes and stands still with 
     CHECK(session.ItemRect("content").Min.x == doctest::Approx(rest));
 }
 
+// --- ShortcutSheet ------------------------------------------------------------------------------
+
+TEST_CASE("The shortcut sheet opens on its flag and closes by Escape and by its close button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId save =
+        facet::RegisterShortcut("test.sheet.save", ImGuiMod_Ctrl | ImGuiKey_S, {.label = "Save", .group = "File"});
+    bool open = true;
+    bool levelOpen = false;
+    ImGuiID sheet = 0;
+    session.SetUi([&] {
+        sheet = ImGui::GetID("Shortcuts");
+        facet::ShortcutSheet("Shortcuts", &open, {.searchable = false});
+        levelOpen = facet::internal::IsPopupLevelOpen(sheet);
+    });
+    session.Seconds(0.3f);
+    CHECK(levelOpen);
+    CHECK(NavigationPartRect(sheet, 0).GetWidth() > 0.0f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.3f);
+    CHECK_FALSE(open);
+    CHECK_FALSE(levelOpen);
+    open = true;
+    session.Seconds(0.3f);
+    session.Click(Center(NavigationPartRect(sheet, facet::internal::kNavigationPartClose)));
+    session.Frames(2);
+    CHECK_FALSE(open);
+    facet::UnregisterShortcut(save);
+}
+
+TEST_CASE("The shortcut sheet filters by the typed text and says when nothing matches")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId save =
+        facet::RegisterShortcut("test.sheet.save", ImGuiMod_Ctrl | ImGuiKey_S, {.label = "Save", .group = "File"});
+    const facet::ShortcutId find =
+        facet::RegisterShortcut("test.sheet.find", ImGuiMod_Ctrl | ImGuiKey_F, {.label = "Find", .group = "File"});
+    bool open = true;
+    ImGuiID sheet = 0;
+    session.SetUi([&] {
+        sheet = ImGui::GetID("Shortcuts");
+        facet::ShortcutSheet("Shortcuts", &open, {.group = "File"});
+    });
+    session.Seconds(0.3f);
+    CHECK(NavigationPartRect(sheet, 1).GetWidth() > 0.0f);
+    session.Type("fin");
+    session.Frames(2);
+    CHECK(NavigationPartRect(sheet, 0).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(sheet, 1).GetWidth() == 0.0f);
+    session.Type("zzz");
+    session.Frames(2);
+    CHECK(NavigationPartRect(sheet, facet::internal::kNavigationPartNoResults).GetWidth() > 0.0f);
+    // Escape clears the query first and the rows come back; the sheet closes only once the field
+    // has let go of Escape (rule 8: the edit first, then the layer).
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(open);
+    CHECK(NavigationPartRect(sheet, 1).GetWidth() > 0.0f);
+    for (int i = 0; i < 2 && open; ++i)
+    {
+        session.KeyPress(ImGuiKey_Escape);
+        session.Seconds(0.3f);
+    }
+    CHECK_FALSE(open);
+    facet::UnregisterShortcut(find);
+    facet::UnregisterShortcut(save);
+}
+
+TEST_CASE("A shortcut sheet for a group without shortcuts shows the empty state")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool open = true;
+    ImGuiID sheet = 0;
+    session.SetUi([&] {
+        sheet = ImGui::GetID("Shortcuts");
+        facet::ShortcutSheet("Shortcuts", &open, {.group = "test.sheet.none"});
+    });
+    session.Seconds(0.3f);
+    CHECK(NavigationPartRect(sheet, facet::internal::kNavigationPartEmpty).GetWidth() > 0.0f);
+}
