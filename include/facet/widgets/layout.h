@@ -89,7 +89,8 @@ struct GridOptions
 // Equal columns that reflow with the width: as many as fit minCellWidth, at least one. Start
 // each cell with GridNext; cells fill rows from the leading edge, and a row is as tall as its
 // tallest cell. EndGrid is always called. Arrow keys move between cells through Dear ImGui's
-// spatial navigation. Row heights of the last frame are kept under the id.
+// spatial navigation. Each row starts below the tallest cell of the row above, measured in the
+// same frame.
 void BeginGrid(const char* id, const GridOptions& options = {});
 
 struct GridCellOptions

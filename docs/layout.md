@@ -62,4 +62,4 @@ most 40 % of the width), the label on the baseline of the control's text, trunca
 ellipsis and the full label as a tooltip, a description line under the label, a help or error
 line under the control, and a marker and reset button for modified values. The demo page
 "Rows and width classes" shows it at every width. The public `SettingsRow` widget
-(`widgets/layout.h`) is planned for Phase 2 and will use the same block.
+(`widgets/layout.h`) is built on the same block.

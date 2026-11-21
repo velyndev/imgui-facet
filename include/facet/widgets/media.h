@@ -143,7 +143,7 @@ struct CarouselOptions
     bool loop = false;                     // the last slide wraps to the first
     bool captions = false;                 // the item label over the bottom of the slide
     float autoplay = 0.0f;                 // seconds per slide; 0 off. Pauses while hovered or
-                                           // focused, has a pause button, and is off with reduced motion
+                                           // with keyboard focus, has a pause button, and is off with reduced motion
     ImageFit fit = ImageFit::Cover;
     DataState state = DataState::Ready;    // Loading shows a skeleton slide, Error the error state
     const char* emptyText = nullptr;       // shown for 0 slides; null uses Strings::empty
