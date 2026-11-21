@@ -187,7 +187,12 @@ bool ContextMenuRequested(ContextRequestTarget target, ImVec2* at);
 // keeps the left mouse button until it is released, so the click that dismissed a level never
 // presses the control under it; a click on the anchor of an open level therefore closes it, and
 // the anchor sees nothing (the next click opens it again). A right click outside closes the levels
-// too and still asks for a context menu where it lands (ContextMenuRequested).
+// too and still asks for a context menu where it lands (ContextMenuRequested). A Popup level opened
+// without takeFocus is closed by the host itself, before the frame's items run, when a click lands
+// outside it and outside the levels above it, also on an item of another window (Dear ImGui would
+// leave it open, because that item takes the click); the button is held in the same way, except
+// for a click on the level's own anchor rect, which the anchor still receives (a text field placing
+// its caret; a dropdown field reads PopupLevelClosedReason and does not reopen).
 // Focus. A Popup level with takeFocus moves the keyboard focus to its first item (or the item
 // that called ImGui::SetItemDefaultFocus) when it opens; Dear ImGui's focus ring shows only after
 // keyboard input. When a level closes by Escape or by ClosePopupLevel, the focus returns to the

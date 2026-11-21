@@ -343,6 +343,61 @@ TEST_CASE("popup host: a level opens, shows its content and closes with a reason
     CHECK(G().OpenPopupStack.Size == 0);
 }
 
+TEST_CASE("popup host: a level without focus closes on a click on another item, which the click does not press")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool open = false;
+    int otherPresses = 0;
+    int anchorPresses = 0;
+    bool allowOpen = true;
+    ReasonLog reasons;
+    session.SetUi([&] {
+        if (ImGui::Button("other"))
+            ++otherPresses;
+        session.Track("other");
+        ImGui::Dummy(ImVec2(0.0f, 40.0f));
+        if (ImGui::Button("anchor"))
+        {
+            ++anchorPresses;
+            if (allowOpen)
+                fi::OpenPopupLevel(kLevel1, BelowItem(), {.takeFocus = false});
+        }
+        session.Track("anchor");
+        if (fi::BeginPopupLevel(kLevel1))
+        {
+            ImGui::Button("row");
+            session.Track("row");
+            fi::EndPopupLevel();
+        }
+        open = fi::IsPopupLevelOpen(kLevel1);
+        reasons.Note(kLevel1);
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("anchor"));
+    session.Frames(2);
+    REQUIRE(open);
+    // A click inside the level keeps it open.
+    session.Click(session.ItemCenter("row"));
+    CHECK(open);
+    session.Click(session.ItemCenter("other"));
+    CHECK_FALSE(open);
+    CHECK(otherPresses == 0);
+    CHECK(reasons.last == PopupCloseReason::ClickOutside);
+    session.Click(session.ItemCenter("other"));
+    CHECK(otherPresses == 1);
+    // A click on the anchor closes the level and still reaches the anchor.
+    session.Click(session.ItemCenter("anchor"));
+    session.Frames(2);
+    REQUIRE(open);
+    const int before = anchorPresses;
+    allowOpen = false;
+    session.Click(session.ItemCenter("anchor"));
+    CHECK_FALSE(open);
+    CHECK(anchorPresses == before + 1);
+}
+
 TEST_CASE("popup host: a click outside closes without pressing what is under it; a click on the anchor toggles")
 {
     MotionGuard guard;

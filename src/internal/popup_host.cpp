@@ -381,6 +381,49 @@ void CloseLevelsAboveClickedPopup()
     }
 }
 
+// Dear ImGui closes a popup on a click outside only while the keyboard focus is in it: an item of
+// another window that takes the click also takes the mouse button, and Dear ImGui then sees no
+// click on empty space. A Popup level that does not take the focus (a completion list, the list of
+// a dropdown driven from its field) would stay open under such a click, so the host closes it here,
+// before the frame's items run: a click outside the level and outside every level above it closes
+// it and those levels. The left button is then held until its release, so the click presses
+// nothing under it, except on the level's own anchor (a text field placing its caret); a widget
+// that must not react to that click there reads PopupLevelClosedReason.
+void CloseUnfocusedLevelsOnClickOutside()
+{
+    const ImGuiContext& g = *GImGui;
+    for (int button = 0; button < ImGuiMouseButton_COUNT; ++button)
+    {
+        if (!ImGui::IsMouseClicked(button, ImGuiInputFlags_None, ImGuiKeyOwner_Any))
+            continue;
+        const ImVec2 at = g.IO.MouseClickedPos[button];
+        for (int i = 0; i < g.OpenPopupStack.Size; ++i)
+        {
+            Level* level = FindLevel(g.OpenPopupStack[i].PopupId);
+            if (level == nullptr || level->phase != Phase::Open || level->options.kind != PopupKind::Popup ||
+                level->options.takeFocus)
+                continue;
+            bool inside = false;
+            for (int j = i; j < g.OpenPopupStack.Size && !inside; ++j)
+            {
+                const Level* above = FindLevel(g.OpenPopupStack[j].PopupId);
+                const ImGuiWindow* window = g.OpenPopupStack[j].Window;
+                if (above != nullptr && above->phase == Phase::Open)
+                    inside = above->rect.Contains(at);
+                else if (above == nullptr && window != nullptr)
+                    inside = window->Rect().Contains(at);
+            }
+            if (inside)
+                continue;
+            const bool onAnchor = level->anchor.rect.Contains(at);
+            CloseStackFrom(*level, PopupCloseReason::ClickOutside, false, true);
+            if (button == ImGuiMouseButton_Left && !onAnchor)
+                HoldDismissingClick();
+            return;
+        }
+    }
+}
+
 // ---- Placement and surface ------------------------------------------------------------------
 
 ImRect WorkBounds()
@@ -1026,6 +1069,7 @@ void PopupNewFrame()
 
     SyncWithImGuiStack(s.clickedLastFrame, s.leftClickedLastFrame);
     CloseLevelsAboveClickedPopup();
+    CloseUnfocusedLevelsOnClickOutside();
     ApplyEscape();
 
     // A click outside the topmost Modal lands on its scrim.
