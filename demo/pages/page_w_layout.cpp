@@ -605,7 +605,10 @@ void Tiles(facet::demo::PageCtx& ctx, LayoutState& s)
                     std::snprintf(probe, sizeof(probe), "layout.tiles.%d", i);
                     ctx.Probe(probe);
                 }
-                // The tile's content: its number, centered, in the label color.
+                // The tile's content: a hairline frame, so a tile at rest reads as one, and its
+                // number, centered, in the label color.
+                facet::StrokeRect(ImGui::GetWindowDrawList(), min, max, facet::ToU32(facet::T().colors.separator),
+                                  facet::Px(facet::T().radii.control), facet::HairlineThickness());
                 char number[16];
                 std::snprintf(number, sizeof(number), "%d", i + 1);
                 facet::PushTextStyle(facet::TextStyle::Body);
