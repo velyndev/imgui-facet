@@ -395,9 +395,38 @@ bool AllocationBar(const char* label, std::span<float> shares, std::span<const c
                    const AllocationBarOptions& options = {});
 ```
 
-One bar split into segments whose shares always add up to 1; a divider moves share between its two
-neighbours. The shares are 0 to 1; `format` and `formatter` both get them in percent.
-Status: planned.
+One bar split into segments whose shares always add up to 1: the slider track (label in front,
+the available width by default) with a stretch per segment in its data color, and a slider knob on
+each divider. Under the bar, a Caption line shows each segment's label and its share in percent,
+centred on the segment and cut to its width; when both do not fit the share is kept and the label
+left out, and the whole text shows on hover. At most 17 segments take part; of a `ChoiceItem` the
+label is used (icon, detail, group and disabled are not).
+
+- **Rules:** the dividers are the handles of the multi-handle model, each its own Tab stop, so
+  dragging divider `i` moves share only between segments `i` and `i + 1`, and the total never
+  changes. Every segment keeps at least `minGap` (clamped to an equal split, and rounded up to the
+  step), the first and the last included; `collision` Push lets a divider move the ones beyond it
+  until their segments are at the minimum. `step` snaps the dividers to multiples of the step, so
+  the shares are too.
+- **Pointer:** a press on a divider grabs it, a press elsewhere on the track moves the nearest
+  divider there. **Keys** on a focused divider: as Slider (a hundredth, or one step; Shift finer,
+  Ctrl coarser; Page Up and Down a tenth; Home and End as far as the rules let it); Escape restores
+  every divider from where the edit began.
+- **Typed shares:** Enter or Ctrl+click on a divider types the share of the segment before it, and
+  a click on a segment's caption types that segment's share, in percent in a number field over the
+  bar. The divider after the segment moves (the one before it, for the last segment), within the
+  same rules. Enter or Escape returns the focus to the divider.
+- **Colors:** `segmentColors` repeats over the segments; an empty list or a 0 entry takes the
+  chart palette color of the segment index, as charts do. Disabled draws every segment in fill[3].
+- **Values:** negative and NaN shares count as 0, and shares that do not add up to 1 are drawn
+  normalized (all 0: equal) and written only by an edit, which writes every share, the last one
+  closing the total at 1.
+- **States:** disabled and `readOnly` as Slider (the segments keep their data colors when
+  read-only); `mixed` draws equal segments without dividers and without percentages until the
+  first edit writes every share (the dividers stay Tab stops with their focus ring); `error` adds
+  the message under the bar. Fewer than two segments show the bar read-only.
+
+Status: ready.
 
 ## Usage
 

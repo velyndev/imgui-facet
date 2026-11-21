@@ -122,11 +122,21 @@ struct SlidersUi
     bool boxMixedSet = false;
     ImVec2 boxSmallLow = {0.1f, 0.1f}, boxSmallHigh = {0.9f, 0.9f};
 
+    // AllocationBar
+    float shares[3] = {0.5f, 0.3f, 0.2f};
+    float parts[4] = {0.25f, 0.25f, 0.25f, 0.25f};
+    float sharesFixed[3] = {0.2f, 0.5f, 0.3f};
+    float sharesOff[3] = {0.4f, 0.4f, 0.2f};
+    float sharesMixed[3] = {0.6f, 0.2f, 0.2f};
+    bool sharesMixedSet = false;
+    float sharesLimit[2] = {0.7f, 0.3f};
+    float sharesNarrow[3] = {0.5f, 0.25f, 0.25f};
+    int sharesCommits = 0;
+
     // The planned widgets below.
     ImVec2 stick = {0.0f, 0.0f};
     float arcLow = 45.0f;
     float arcHigh = 135.0f;
-    float shares[3] = {0.5f, 0.3f, 0.2f};
 };
 
 SlidersUi ui;
@@ -139,6 +149,7 @@ enum CaptureState
     kFocused,
     kDragging,
     kPads,       // the two-dimensional widgets in use: a pad dragged, a box handle focused
+    kShares,     // the allocation bar with a divider dragged, the arc range with a handle focused
 };
 
 const float kZoomStops[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
@@ -147,6 +158,7 @@ const float kOpacityStops[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
 // Placeholder distribution for the histogram: an even ramp, not measured data.
 const float kBins[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
 const char* const kSegments[] = {"Option 1", "Option 2", "Option 3"};
+const facet::ChoiceItem kParts[] = {{"Part 1"}, {"Part 2"}, {"Part 3"}, {"Part 4"}};
 // Segment colors of the fixed splits: 0 takes the chart palette color of each segment.
 const ImU32 kSegmentColors[] = {0, 0, 0, 0};
 
@@ -512,9 +524,64 @@ void BoxRangeSection(facet::demo::PageCtx& ctx)
     ImGui::PopID();
 }
 
+void AllocationSection(facet::demo::PageCtx& ctx)
+{
+    ImGui::PushID("allocation");
+    SectionHeader("AllocationBar");
+    Paragraph("Shares of one total. A divider moves share between the two segments beside it only, so the total "
+              "stays whole; each divider is a Tab stop moved by the arrows. Enter on a divider, or a click on a "
+              "segment's percentage, types that share.");
+    LabeledRow("Steps of 1 %");
+    if (ctx.capture && ctx.captureState == kShares)
+    {
+        ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Dragging, 0);
+    }
+    facet::AllocationBar("Split", std::span<float>(ui.shares), kSegments, {.step = 0.01, .minGap = 0.05});
+    if (facet::IsItemEditCommitted())
+        ++ui.sharesCommits;
+    ctx.Probe("allocation.split");
+    ProbeHandles(ctx, "Split", "allocation.split", 2);
+    if (ctx.capture && ctx.captureState == kShares)
+        ctx.RevealInCapture(0.3f);
+    LabeledRow("Push, colors");
+    // Data colors from the chart palette, two repeated over four segments.
+    const ImU32 colors[] = {facet::ToU32(facet::T().colors.chart[2]), facet::ToU32(facet::T().colors.chart[5])};
+    facet::AllocationBar("Parts", std::span<float>(ui.parts), kParts,
+                         {.minGap = 0.1, .collision = facet::HandleCollision::Push, .segmentColors = colors});
+    ctx.Probe("allocation.parts");
+    ProbeHandles(ctx, "Parts", "allocation.parts", 3);
+    LabeledRow("Narrow");
+    facet::AllocationBar("Narrow", std::span<float>(ui.sharesNarrow), kSegments,
+                         {.width = facet::demo::DemoWidth(200.0f)});
+    ctx.Probe("allocation.narrow");
+
+    LabeledRow("States");
+    facet::AllocationBar("Read-only", std::span<float>(ui.sharesFixed), kSegments, {.readOnly = true});
+    ctx.Probe("allocation.readOnly");
+    LabeledRow("");
+    ImGui::BeginDisabled();
+    facet::AllocationBar("Disabled", std::span<float>(ui.sharesOff), kSegments);
+    ImGui::EndDisabled();
+    ctx.Probe("allocation.disabled");
+    LabeledRow("");
+    if (facet::AllocationBar("Mixed", std::span<float>(ui.sharesMixed), kSegments, {.mixed = !ui.sharesMixedSet}))
+        ui.sharesMixedSet = true;
+    ctx.Probe("allocation.mixed");
+    ProbeHandles(ctx, "Mixed", "allocation.mixed", 2);
+    LabeledRow("");
+    facet::AllocationBar("Limit", std::span<float>(ui.sharesLimit), kSegments,
+                         {.error = ui.sharesLimit[0] > 0.6f ? "Keep option 1 at 60 % or less" : nullptr,
+                          .helpText = "Move the divider to the left"});
+    ctx.Probe("allocation.limit");
+    Note("Split %.2f, %.2f, %.2f (total %.2f, %d finished edits). Parts %.2f, %.2f, %.2f, %.2f.", ui.shares[0],
+         ui.shares[1], ui.shares[2], ui.shares[0] + ui.shares[1] + ui.shares[2], ui.sharesCommits, ui.parts[0], ui.parts[1],
+         ui.parts[2], ui.parts[3]);
+    ImGui::PopID();
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging", "pads")
+FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging", "pads", "ranges")
 {
     facet::demo::PageHeader("Sliders",
                             "Sliders, range sliders, multi-handle sliders, knobs and two-dimensional pads.");
@@ -569,9 +636,7 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     BoxRangeSection(ctx);
 
-    SectionHeader("AllocationBar");
-    LabeledRow("Shares");
-    facet::AllocationBar("##shares", std::span<float>(ui.shares), kSegments, {.minGap = 0.05});
+    AllocationSection(ctx);
 
     SectionHeader("ArcRangeSlider");
     LabeledRow("Arc range");
@@ -982,4 +1047,59 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("dragging the corner inward clears the error", [] {
         return (ui.boxSmallHigh.x - ui.boxSmallLow.x) * (ui.boxSmallHigh.y - ui.boxSmallLow.y) <= 0.5f;
     });
+
+    // AllocationBar: a click on the track moves the nearest divider, the keys move the focused one,
+    // Enter types a share, the total stays 1 and every segment keeps its minimum.
+    const auto Total = [](const float* shares, int n) {
+        double sum = 0.0;
+        for (int i = 0; i < n; ++i)
+            sum += shares[i];
+        return sum;
+    };
+    test.Reveal("allocation.split");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.shares[0] = 0.5f; ui.shares[1] = 0.3f; ui.shares[2] = 0.2f; ui.sharesCommits = 0; });
+    test.MouseMove(Row("allocation.split", 0.97f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click near the end moves the second divider there", [] { return ui.shares[2] < 0.15f; });
+    test.Expect("the click was one finished edit", [] { return ui.sharesCommits == 1; });
+    test.ExpectFocused("allocation.split.h1");
+    test.KeyPress(ImGuiKey_Home);
+    test.ExpectNear("Home stops the divider one minimum after the first", [] { return ui.shares[1]; }, 0.05, 1e-4);
+    test.ExpectNear("the shares still add up to 1", [Total] { return Total(ui.shares, 3); }, 1.0, 1e-6);
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("allocation.split.h0");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("Left takes one percent from the first segment", [] { return ui.shares[0]; }, 0.49, 1e-4);
+    test.ExpectNear("and gives it to the second", [] { return ui.shares[1]; }, 0.06, 1e-4);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.Type("30");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.ExpectNear("a typed share is written on Enter", [] { return ui.shares[0]; }, 0.3, 1e-4);
+    test.ExpectNear("the second segment takes the rest", [] { return ui.shares[1]; }, 0.25, 1e-4);
+    test.ExpectFocused("allocation.split.h0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("allocation.parts.h0");
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End pushes the other dividers along, each segment keeping a tenth", [Total] {
+        return std::fabs(ui.parts[0] - 0.7f) < 1e-4f && std::fabs(ui.parts[3] - 0.1f) < 1e-4f &&
+               std::fabs(Total(ui.parts, 4) - 1.0) < 1e-6;
+    });
+    test.Drag({Row("allocation.readOnly", 0.7f), Row("allocation.readOnly", 0.95f)}, 0.2f);
+    test.ExpectNear("the read-only bar keeps its shares", [] { return ui.sharesFixed[0]; }, 0.2, 1e-6);
+    test.Drag({Row("allocation.disabled", 0.7f), Row("allocation.disabled", 0.95f)}, 0.2f);
+    test.ExpectNear("the disabled bar keeps its shares", [] { return ui.sharesOff[0]; }, 0.4, 1e-6);
+    test.MouseMove(Row("allocation.mixed", 0.95f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("the first edit of a mixed bar writes every share",
+                [Total] { return ui.sharesMixedSet && std::fabs(Total(ui.sharesMixed, 3) - 1.0) < 1e-6; });
+    test.MouseMove(Row("allocation.limit", 0.55f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click left of the divider clears the error", [] { return ui.sharesLimit[0] <= 0.6f; });
 }

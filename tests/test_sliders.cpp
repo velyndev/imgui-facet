@@ -1456,6 +1456,160 @@ TEST_CASE("A box range pad read-only, disabled or mixed: written only where it m
     CHECK(outLow.y == 0.2f);
 }
 
+// ---- AllocationBar -------------------------------------------------------------------------
+
+namespace
+{
+
+// A point on the track row of an allocation bar without a visible label, at share fraction f.
+ImVec2 BarAt(const facet::test::Session& session, const char* name, double f)
+{
+    const ImRect r = session.ItemRect(name);
+    const float half = KnobSize() * 0.5f;
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    return ImVec2(r.Min.x + half + static_cast<float>(f) * (r.GetWidth() - KnobSize()), r.Min.y + row * 0.5f);
+}
+
+float ShareSum(const float* shares, int n)
+{
+    double sum = 0.0;
+    for (int i = 0; i < n; ++i)
+        sum += shares[i];
+    return static_cast<float>(sum);
+}
+
+} // namespace
+
+TEST_CASE("An allocation bar divider moves share between its neighbours only and keeps the total and the minimum")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float shares[3] = {0.5f, 0.3f, 0.2f};
+    static const char* const kParts[] = {"A", "B", "C"};
+    int commits = 0;
+    session.SetUi([&] {
+        facet::AllocationBar("##bar", shares, kParts, {.minGap = 0.1, .width = 400.0f});
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("bar");
+    });
+    session.Frame();
+    session.Drag({BarAt(session, "bar", 0.5), BarAt(session, "bar", 1.0)});
+    CHECK(shares[0] == doctest::Approx(0.7f));
+    CHECK(shares[1] == doctest::Approx(0.1f));
+    CHECK(shares[2] == doctest::Approx(0.2f));
+    CHECK(ShareSum(shares, 3) == 1.0f);
+    CHECK(commits == 1);
+    // The second divider toward the end stops one minimum short of it.
+    session.Drag({BarAt(session, "bar", 0.8), BarAt(session, "bar", 1.2)});
+    CHECK(shares[0] == doctest::Approx(0.7f));
+    CHECK(shares[1] == doctest::Approx(0.2f));
+    CHECK(shares[2] == doctest::Approx(0.1f));
+    CHECK(ShareSum(shares, 3) == 1.0f);
+}
+
+TEST_CASE("An allocation bar steps the focused divider with the keys and Push moves the dividers beyond it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float shares[3] = {0.5f, 0.3f, 0.2f};
+    static const char* const kParts[] = {"A", "B", "C"};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::AllocationBar("##bar", shares, kParts,
+                             {.step = 0.01, .minGap = 0.1, .collision = facet::HandleCollision::Push, .width = 400.0f});
+        session.Track("bar");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(shares[0] == doctest::Approx(0.51f));
+    CHECK(shares[1] == doctest::Approx(0.29f));
+    CHECK(shares[2] == doctest::Approx(0.2f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(shares[0] == doctest::Approx(0.8f));
+    CHECK(shares[1] == doctest::Approx(0.1f));
+    CHECK(shares[2] == doctest::Approx(0.1f));
+    CHECK(ShareSum(shares, 3) == 1.0f);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(shares[0] == doctest::Approx(0.1f));
+    CHECK(shares[1] == doctest::Approx(0.8f));
+    // The second divider is the next Tab stop.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(shares[1] == doctest::Approx(0.79f));
+    CHECK(shares[2] == doctest::Approx(0.11f));
+}
+
+TEST_CASE("An allocation bar types the share of a segment from a divider or a click on its caption")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float shares[3] = {0.5f, 0.3f, 0.2f};
+    static const char* const kParts[] = {"A", "B", "C"};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::AllocationBar("##bar", shares, kParts, {.minGap = 0.05, .width = 400.0f});
+        session.Track("bar");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    session.Type("40");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(shares[0] == doctest::Approx(0.4f));
+    CHECK(shares[1] == doctest::Approx(0.4f));
+    CHECK(shares[2] == doctest::Approx(0.2f));
+    // A click on the caption of the last segment types its share; the divider before it moves.
+    const ImRect r = session.ItemRect("bar");
+    session.Click(ImVec2(BarAt(session, "bar", 0.9).x, r.Max.y - 4.0f));
+    session.Frames(2);
+    session.Type("50");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(shares[2] == doctest::Approx(0.5f));
+    CHECK(shares[1] == doctest::Approx(0.1f));
+    CHECK(ShareSum(shares, 3) == 1.0f);
+}
+
+TEST_CASE("An allocation bar draws shares that do not add up normalized and writes them only on an edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float shares[3] = {2.0f, 1.0f, 1.0f};
+    float fixed[2] = {0.25f, 0.75f};
+    float single[1] = {1.0f};
+    static const char* const kParts[] = {"A", "B", "C"};
+    session.SetUi([&] {
+        facet::AllocationBar("##bar", shares, kParts, {.width = 400.0f});
+        session.Track("bar");
+        facet::AllocationBar("##fixed", fixed, kParts, {.width = 400.0f, .readOnly = true});
+        session.Track("fixed");
+        facet::AllocationBar("##single", single, kParts, {.width = 400.0f});
+        session.Track("single");
+    });
+    session.Frames(3);
+    CHECK(shares[0] == 2.0f);
+    // The first divider sits at 0.5 of the normalized total; a drag from there writes all shares.
+    session.Drag({BarAt(session, "bar", 0.5), BarAt(session, "bar", 0.6)});
+    CHECK(shares[0] == doctest::Approx(0.6f).epsilon(0.02));
+    CHECK(shares[1] == doctest::Approx(0.15f).epsilon(0.05));
+    CHECK(shares[2] == doctest::Approx(0.25f));
+    CHECK(ShareSum(shares, 3) == 1.0f);
+    session.Drag({BarAt(session, "fixed", 0.25), BarAt(session, "fixed", 0.6)});
+    CHECK(fixed[0] == 0.25f);
+    session.Drag({BarAt(session, "single", 0.5), BarAt(session, "single", 0.9)});
+    CHECK(single[0] == 1.0f);
+}
+
 // ---- RangeSliderHistogram ------------------------------------------------------------------
 
 TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")
