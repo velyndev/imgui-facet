@@ -42,6 +42,36 @@ float TooltipWait()
 
 const ImVec2 kAway(4.0f, 590.0f);
 
+// Motion that does not follow the system setting, restored afterwards; `reduce` turns it off.
+struct OverlayMotionGuard
+{
+    explicit OverlayMotionGuard(bool reduce = false)
+    {
+        facet::SetFollowSystemMotion(false);
+        facet::Theme theme = facet::Theme::Light();
+        theme.motion.reduceMotion = reduce;
+        facet::SetTheme(theme, false);
+    }
+    ~OverlayMotionGuard()
+    {
+        facet::SetFollowSystemMotion(true);
+        facet::SetTheme(facet::Theme::Light(), false);
+    }
+};
+
+bool Inside(const ImRect& inner, const ImRect& outer)
+{
+    return inner.Min.x >= outer.Min.x - 0.5f && inner.Min.y >= outer.Min.y - 0.5f && inner.Max.x <= outer.Max.x + 0.5f &&
+           inner.Max.y <= outer.Max.y + 0.5f;
+}
+
+ImRect DisplayMinusMargin()
+{
+    const float margin = facet::Px(facet::T().overlay.viewportMargin);
+    const ImVec2 size = ImGui::GetIO().DisplaySize;
+    return ImRect(margin, margin, size.x - margin, size.y - margin);
+}
+
 } // namespace
 
 // ---- Popup host additions ----------------------------------------------------------------------
@@ -428,4 +458,238 @@ TEST_CASE("A forced capture state shows a tooltip below its item without input")
     for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
         visibleTooltips += window->Active && !window->Hidden && (window->Flags & ImGuiWindowFlags_Tooltip) != 0 ? 1 : 0;
     CHECK(visibleTooltips == 1);
+}
+// ---- Popover -------------------------------------------------------------------------------------
+
+TEST_CASE("A popover opens below its anchor, takes the focus, and Escape closes it and gives the focus back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    ImRect card;
+    ImRect anchor;
+    session.SetUi([&] {
+        if (facet::Button("Filters"))
+            open = !open;
+        session.Track("anchor");
+        anchor = session.ItemRect("anchor");
+        if (facet::BeginPopover("filters", &open, {.placement = facet::PopoverPlacement::Below}))
+        {
+            facet::Button("Inside");
+            session.Track("inside");
+            facet::EndPopover();
+        }
+        card = fi::PopupLevelRect(ImGui::GetID("filters"));
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("anchor"));
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    CHECK(card.Min.y >= anchor.Max.y);
+    CHECK(card.GetWidth() > 0.0f);
+    const ImGuiContext& g = *ImGui::GetCurrentContext();
+    CHECK(g.NavId == session.ItemId("inside"));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(open);
+    CHECK(g.NavId == session.ItemId("anchor"));
+}
+
+TEST_CASE("A click outside a popover closes it and still presses the item there; the anchor toggles it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    int otherPresses = 0;
+    session.SetUi([&] {
+        if (facet::Button("Anchor"))
+            open = !open;
+        session.Track("anchor");
+        if (facet::BeginPopover("pop", &open))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndPopover();
+        }
+        ImGui::SetCursorPos(ImVec2(500.0f, 500.0f));
+        if (facet::Button("Other"))
+            ++otherPresses;
+        session.Track("other");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("anchor"));
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    // The page under a popover keeps taking input: the press closes the popover and reaches the button.
+    session.Click(session.ItemCenter("other"));
+    CHECK_FALSE(open);
+    CHECK(otherPresses == 1);
+    // A second click on the anchor closes the popover instead of opening it again.
+    session.Click(session.ItemCenter("anchor"));
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    session.Click(session.ItemCenter("anchor"));
+    session.Frame();
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("A popover stays inside the display and off its anchor at every edge and corner, at scale 0.75 and 2")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    const ImVec2 corners[] = {{0.0f, 0.0f},   {380.0f, 0.0f},   {740.0f, 0.0f},  {0.0f, 280.0f},  {740.0f, 280.0f},
+                              {0.0f, 560.0f}, {380.0f, 560.0f}, {740.0f, 560.0f}};
+    const float scales[] = {0.75f, 2.0f};
+    const facet::PopoverPlacement placements[] = {facet::PopoverPlacement::Auto, facet::PopoverPlacement::Below,
+                                                  facet::PopoverPlacement::End};
+    for (const float scale : scales)
+    {
+        facet::SetUiScale(scale);
+        for (const facet::PopoverPlacement placement : placements)
+        {
+            for (const ImVec2 at : corners)
+            {
+                bool open = true;
+                ImRect card;
+                ImRect anchor;
+                session.SetUi([&] {
+                    ImGui::SetCursorScreenPos(at);
+                    ImGui::Button("A", ImVec2(40.0f, 24.0f));
+                    anchor = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+                    if (facet::BeginPopover("edge", &open, {.placement = placement, .width = 160.0f}))
+                    {
+                        ImGui::Dummy(ImVec2(facet::Px(140.0f), facet::Px(80.0f)));
+                        facet::EndPopover();
+                    }
+                    card = fi::PopupLevelRect(ImGui::GetID("edge"));
+                });
+                session.Seconds(0.3f);
+                INFO("scale " << scale << " anchor at " << at.x << ", " << at.y);
+                CHECK(Inside(card, DisplayMinusMargin()));
+                CHECK_FALSE(card.Overlaps(anchor));
+                open = false;
+                session.Frames(2);
+            }
+        }
+    }
+    facet::SetUiScale(1.0f);
+}
+
+TEST_CASE("A popover follows its anchor when the window scrolls and when the anchor moves")
+
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    float scroll = 0.0f;
+    float x = 300.0f;
+    ImRect card;
+    ImRect anchor;
+    session.SetUi([&] {
+        ImGui::SetScrollY(scroll);
+        ImGui::SetCursorPos(ImVec2(x, 200.0f));
+        ImGui::Button("anchor");
+        anchor = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        if (facet::BeginPopover("follow", &open, {.placement = facet::PopoverPlacement::Below}))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndPopover();
+        }
+        card = fi::PopupLevelRect(ImGui::GetID("follow"));
+        ImGui::Dummy(ImVec2(10.0f, 1200.0f));
+    });
+    session.Seconds(0.3f);
+    const float gapBefore = card.Min.y - anchor.Max.y;
+    scroll = 80.0f;
+    session.Frames(3);
+    REQUIRE(open);
+    CHECK(card.Min.y - anchor.Max.y == doctest::Approx(gapBefore).epsilon(0.01));
+    // An anchor that moves next to the display edge (a window resized under it) takes the card along,
+    // and the card stays inside the display.
+    x = 760.0f;
+    session.Frames(3);
+    CHECK(card.Max.x <= 800.0f - facet::Px(facet::T().overlay.viewportMargin) + 0.5f);
+    CHECK(card.Min.y > anchor.Max.y);
+}
+
+TEST_CASE("A popover that is not dismissible stays on Escape and on a click outside")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    session.SetUi([&] {
+        ImGui::Button("anchor");
+        if (facet::BeginPopover("stay", &open, {.dismissible = false}))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndPopover();
+        }
+        ImGui::SetCursorPos(ImVec2(500.0f, 500.0f));
+        ImGui::Button("away");
+        session.Track("away");
+    });
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(open);
+    session.Click(session.ItemCenter("away"));
+    CHECK(open);
+}
+
+TEST_CASE("A popover with openOnHover opens after the delay and closes when the pointer leaves both")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    ImRect card;
+    session.SetUi([&] {
+        ImGui::SetCursorPos(ImVec2(100.0f, 100.0f));
+        ImGui::Button("hover me");
+        session.Track("anchor");
+        if (facet::BeginPopover("hover", &open, {.placement = facet::PopoverPlacement::Below, .openOnHover = true}))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndPopover();
+        }
+        card = fi::PopupLevelRect(ImGui::GetID("hover"));
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("anchor"));
+    session.Frame();
+    CHECK_FALSE(open);
+    session.Seconds(facet::T().overlay.submenuDelay + 0.2f);
+    CHECK(open);
+    // Into the card and back: it stays.
+    session.MouseMove(card.GetCenter());
+    session.Frames(2);
+    CHECK(open);
+    session.MouseMove(kAway);
+    session.Frames(2);
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("Popover content taller than the display scrolls inside the card")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    ImRect card;
+    session.SetUi([&] {
+        ImGui::Button("anchor");
+        if (facet::BeginPopover("tall", &open))
+        {
+            for (int i = 0; i < 80; ++i)
+                ImGui::Text("Row %d", i);
+            facet::EndPopover();
+        }
+        card = fi::PopupLevelRect(ImGui::GetID("tall"));
+    });
+    session.Seconds(0.3f);
+    CHECK(Inside(card, DisplayMinusMargin()));
+    CHECK(card.GetHeight() > facet::Px(facet::T().metrics.controlHeight));
 }

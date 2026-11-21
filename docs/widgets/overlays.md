@@ -51,16 +51,34 @@ optional hold to confirm.
 
 ### BeginPopover
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginPopover(const char* id, bool* open, const PopoverOptions& options = {});
 void EndPopover();
 class PopoverScope;
 ```
 
-A floating card anchored to the last item or the pointer that flips and clamps to the display, with
-light dismiss and an optional open on hover.
+A card next to the last item (or where the pointer was when it opened, with `PopoverAnchor::Mouse`),
+on the blurred surface (the opaque tint where blur is not available), with the popover radius and
+`spacing.md` of padding.
+
+- **Placement:** the side of `placement`; `Auto` takes below or above, whichever has more room (beside
+  the anchor only when neither holds two control heights). It flips to the opposite side where it
+  does not fit, moves into the display, and follows its anchor while the anchor scrolls or moves.
+  The arrow (`arrow`) points at the anchor's center from the facing edge, `overlay.arrowSize` long.
+- **Size:** `width` in units, or the width of its content; as tall as its content, which scrolls with
+  Facet's overlay bars once it outgrows the room on its side.
+- **Input:** the page around it stays usable: it takes hover, the wheel and clicks. With
+  `dismissible`, a press outside the card and its anchor closes it and still reaches what was
+  pressed, and Escape closes it (after a list opened from its content, before the layers below it).
+  A press on the anchor is the anchor's own, so a button that toggles the flag (`open = !open`)
+  closes the popover on its second click. Without `dismissible`, only the caller closes it.
+- **Focus:** the keyboard focus moves into it when it opens and goes back to the anchor when it
+  closes by Escape or by the flag.
+- **Open on hover:** with `openOnHover`, resting on the anchor for `overlay.submenuDelay` opens it
+  without taking the focus, and leaving both the anchor and the card closes it again.
+- Content ids are under the card. Motion: it grows from the side that faces the anchor.
+
+Status: ready.
 
 ### BeginContextMenu
 

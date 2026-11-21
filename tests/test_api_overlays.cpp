@@ -1,7 +1,7 @@
 // The frozen API of the overlays family (facet/widgets/overlays.h): every options struct follows
-// the conventions, and every widget that is still planned is safe to call inside a real frame
-// (stacks balanced, no value written, the neutral result). The placeholder helpers themselves are
-// tested in tests/test_api_structure.cpp.
+// the conventions, and every widget called closed (a false or null open flag, no change, no
+// hover) inside a real frame keeps the stacks balanced, writes nothing and returns the neutral
+// result. The behaviour of each widget is tested in tests/test_overlays.cpp.
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -31,33 +31,43 @@ static_assert(OptionsFollowConventions<facet::CommandPaletteOptions>());
 static_assert(OptionsFollowConventions<facet::WatermarkOptions>());
 static_assert(OptionsFollowConventions<facet::UnsavedChangesBarOptions>());
 
-// Calls every function of overlays.h once, checking balance and the neutral result.
-void CallOverlayStubs(Values& v)
+// Calls every function of overlays.h once with its layer closed, checking balance and the neutral
+// result. `v.closed` is false; null open flags show nothing.
+void CallClosedOverlays(Values& v)
 {
-    CHECK_BALANCED(if (facet::BeginModal("Modal", &v.open)) {
+    CHECK_BALANCED(if (facet::BeginModal("Modal", &v.closed)) {
         FAIL("BeginModal opened");
         facet::EndModal();
     });
-    CHECK_BALANCED(CHECK(facet::ConfirmDialog("Confirm", &v.open, "Message") == facet::DialogResult::None));
-    CHECK_BALANCED(if (facet::BeginPopover("Popover", &v.open)) {
+    CHECK_BALANCED(if (facet::BeginModal("Modal null", nullptr)) {
+        FAIL("BeginModal opened without a flag");
+        facet::EndModal();
+    });
+    CHECK_BALANCED(CHECK(facet::ConfirmDialog("Confirm", &v.closed, "Message") == facet::DialogResult::None));
+    CHECK_BALANCED(CHECK(facet::ConfirmDialog("Confirm null", nullptr, "Message") == facet::DialogResult::None));
+    CHECK_BALANCED(if (facet::BeginPopover("Popover", &v.closed)) {
         FAIL("BeginPopover opened");
         facet::EndPopover();
     });
+    CHECK_BALANCED(if (facet::BeginPopover("Popover null", nullptr)) {
+        FAIL("BeginPopover opened without a flag");
+        facet::EndPopover();
+    });
     CHECK_BALANCED(if (facet::BeginContextMenu("Context")) {
-        FAIL("BeginContextMenu opened");
+        FAIL("BeginContextMenu opened without a request");
         facet::EndContextMenu();
     });
-    CHECK_BALANCED({
-        const facet::ToastId toast = facet::ShowToast("Toast");
-        CHECK_FALSE(toast.IsValid());
-        facet::UpdateToast(toast, "Toast");
-        CHECK_FALSE(facet::ToastActionPressed(toast));
-        CHECK_FALSE(facet::IsToastVisible(toast));
-        facet::DismissToast(toast);
-        facet::SetToastCorner(facet::ScreenCorner::TopLeft);
+    CHECK_BALANCED(facet::ItemTooltip("Tooltip %d", 1));
+    CHECK_BALANCED(if (facet::BeginRichTooltip()) {
+        FAIL("BeginRichTooltip opened without hover");
+        facet::EndRichTooltip();
     });
-    CHECK_BALANCED(if (facet::BeginDrawer("Drawer", &v.open)) {
+    CHECK_BALANCED(if (facet::BeginDrawer("Drawer", &v.closed)) {
         FAIL("BeginDrawer opened");
+        facet::EndDrawer();
+    });
+    CHECK_BALANCED(if (facet::BeginDrawer("Drawer null", nullptr)) {
+        FAIL("BeginDrawer opened without a flag");
         facet::EndDrawer();
     });
     CHECK_BALANCED({
@@ -65,25 +75,26 @@ void CallOverlayStubs(Values& v)
         ImGui::TextUnformatted("child");
         facet::EndLoadingOverlay();
     });
-    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Commands", &v.open, &v.picked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Command labels", &v.open, &v.picked, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Shortcuts palette", &v.open, &v.pickedShortcut)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Commands", &v.closed, &v.picked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Command labels", &v.closed, &v.picked, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Shortcuts palette", &v.closed, &v.pickedShortcut)));
+    CHECK_BALANCED(CHECK_FALSE(facet::CommandPalette("Palette null", nullptr, &v.picked, kItems)));
     CHECK_BALANCED(facet::WatermarkOverlay("Watermark", kFields));
-    CHECK_BALANCED(CHECK(facet::UnsavedChangesBar("Changes", 2) == facet::UnsavedChangesAction::None));
+    CHECK_BALANCED(CHECK(facet::UnsavedChangesBar("No changes", 0) == facet::UnsavedChangesAction::None));
 }
 
 } // namespace
 
-TEST_CASE("Every overlay widget stub is safe to call, also disabled, and returns the neutral result")
+TEST_CASE("Every overlay widget called closed is balanced, writes nothing and returns the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     const int errorsBefore = facet::internal::UsageErrorCount();
     Values v;
     session.SetUi([&] {
-        CallOverlayStubs(v);
+        CallClosedOverlays(v);
         ImGui::BeginDisabled();
-        CallOverlayStubs(v);
+        CallClosedOverlays(v);
         ImGui::EndDisabled();
     });
     session.Frames(2);
@@ -93,6 +104,19 @@ TEST_CASE("Every overlay widget stub is safe to call, also disabled, and returns
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
+TEST_CASE("Toast calls outside a frame return an invalid id and change nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ToastId toast = facet::ShowToast("Toast");
+    CHECK_FALSE(toast.IsValid());
+    facet::UpdateToast(toast, "Toast");
+    CHECK_FALSE(facet::ToastActionPressed(toast));
+    CHECK_FALSE(facet::IsToastVisible(toast));
+    facet::DismissToast(toast);
+    facet::SetToastCorner(facet::ScreenCorner::BottomRight);
+}
+
 TEST_CASE("Overlay scope classes end only what began")
 {
     facet::test::Session session;
@@ -100,9 +124,19 @@ TEST_CASE("Overlay scope classes end only what began")
     Values v;
     session.SetUi([&] {
         CHECK_BALANCED({
-            facet::ModalScope modal("modal", &v.open);
+            facet::ModalScope modal("modal", &v.closed);
             CHECK_FALSE(static_cast<bool>(modal));
         });
+        CHECK_BALANCED({
+            facet::PopoverScope popover("popover", &v.closed);
+            CHECK_FALSE(static_cast<bool>(popover));
+        });
+        CHECK_BALANCED({
+            facet::DrawerScope drawer("drawer", &v.closed);
+            CHECK_FALSE(static_cast<bool>(drawer));
+        });
+        CHECK_BALANCED({ facet::ContextMenuScope menu("menu"); });
+        CHECK_BALANCED({ facet::RichTooltipScope tip; });
         CHECK_BALANCED({ facet::LoadingOverlayScope loading("loading"); });
     });
     session.Frame();
@@ -118,11 +152,16 @@ TEST_CASE("An overlay End without its Begin is reported and changes no stack")
         const int before = facet::internal::UsageErrorCount();
         const Snapshot start = Snapshot::Take(v);
         facet::EndModal();
+        facet::EndPopover();
+        facet::EndDrawer();
+        facet::EndContextMenu();
+        facet::EndRichTooltip();
+        facet::EndLoadingOverlay();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;
         end.errors = start.errors;
         CHECK(end == start);
     });
     session.Frame();
-    CHECK(reported == 1);
+    CHECK(reported == 6);
 }
