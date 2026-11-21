@@ -1088,3 +1088,184 @@ TEST_CASE("A read-only icon picker does not open")
     CHECK_FALSE(popup.open);
     CHECK(icon == facet::Icon("sun"));
 }
+// ---- ThumbnailPicker ----------------------------------------------------------------------------
+
+namespace
+{
+
+const facet::ThumbnailItem kTiles[] = {
+    {"Option 1", {}, facet::Icon("image")},
+    {"Option 2", {}, facet::Icon("image")},
+    {"Option 3", {}, facet::Icon("image"), true},
+    {"Option 4", {}, facet::Icon("image"), false, true},
+    {"Option 5", {}, facet::Icon("image")},
+    {"Option 6", {}, facet::Icon("image")},
+    {"Option 7", {}, facet::Icon("image")},
+};
+
+// The tiles of a ThumbnailPicker, read inside the ui code.
+struct TileProbe
+{
+    ImGuiID grid = 0;
+    ImRect rects[8];
+
+    void Record(const char* label)
+    {
+        grid = ImHashStr("##tiles", 0, ImGui::GetID(label));
+        for (int i = 0; i < 8; ++i)
+            rects[i] = fi::PickerGridTileRect(grid, i);
+    }
+    ImGuiID Tile(int index) const
+    {
+        const ImGuiID key = static_cast<ImGuiID>(index);
+        return ImHashData(&key, sizeof(key), ImHashStr("##tile", 0, grid));
+    }
+};
+
+} // namespace
+
+TEST_CASE("A thumbnail picker picks by click and moves in two dimensions past locked and disabled tiles")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 0;
+    int writes = 0;
+    TileProbe tiles;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::ThumbnailPicker("Pictures", &index, kTiles, {.thumbnailSize = {64.0f, 48.0f}, .columns = 3}))
+            ++writes;
+        session.Track("pictures");
+        tiles.Record("Pictures");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    session.Click(tiles.rects[1].GetCenter());
+    CHECK(index == 1);
+    CHECK(writes == 1);
+    // A locked tile takes the focus but is not picked; a disabled one ignores the click.
+    session.Click(tiles.rects[2].GetCenter());
+    session.Click(tiles.rects[3].GetCenter());
+    CHECK(index == 1);
+    CHECK(writes == 1);
+
+    // One Tab stop: Tab from the button lands on the tile focused last (the locked one the click
+    // focused), the arrows move from there, and the next Tab leaves the grid.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(2));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(index == 1);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(4));  // the disabled tile 3 is passed over
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(6));  // the last line holds only tile 6
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(2));  // tile 3 above 6 is disabled: the scan goes on back
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(0));
+    session.KeyPress(ImGuiKey_End);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(index == 6);
+    CHECK(writes == 2);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("The multi thumbnail picker flips one flag per tile and makes each tile a Tab stop")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool checked[7] = {false, true, false, false, false, false, false};
+    TileProbe tiles;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::ThumbnailPicker("Pictures", std::span<bool>(checked), kTiles, {.thumbnailSize = {64.0f, 48.0f}, .columns = 3});
+        tiles.Record("Pictures");
+    });
+    session.Frames(2);
+    session.Click(tiles.rects[0].GetCenter());
+    CHECK(checked[0]);
+    session.Click(tiles.rects[1].GetCenter());
+    CHECK_FALSE(checked[1]);
+    session.Click(tiles.rects[2].GetCenter());
+    CHECK_FALSE(checked[2]);  // locked
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(0));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == tiles.Tile(1));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(checked[1]);
+}
+
+TEST_CASE("A thumbnail picker shows its loading, error and empty states and writes nothing in them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 0;
+    facet::DataState state = facet::DataState::Loading;
+    std::span<const facet::ThumbnailItem> items(kTiles);
+    session.SetUi([&] {
+        if (facet::ThumbnailPicker("Pictures", &index, items, {.thumbnailSize = {64.0f, 48.0f}, .columns = 3, .state = state}))
+            index = 99;
+        session.Track("pictures");
+    });
+    session.Frames(2);
+    const float loadingHeight = session.ItemRect("pictures").GetHeight();
+    CHECK(loadingHeight > facet::Px(48.0f) * 2.0f);  // three lines of skeleton tiles
+    session.Click(session.ItemCenter("pictures"));
+    CHECK(index == 0);
+    state = facet::DataState::Error;
+    session.Frames(2);
+    CHECK(session.ItemRect("pictures").GetHeight() < loadingHeight);
+    session.Click(session.ItemCenter("pictures"));
+    CHECK(index == 0);
+    state = facet::DataState::Ready;
+    items = {};
+    session.Frames(2);
+    session.Click(session.ItemCenter("pictures"));
+    CHECK(index == 0);
+}
+
+TEST_CASE("A thumbnail grid of fifty thousand tiles submits only the lines in view")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static constexpr int kCount = 50000;
+    static facet::ThumbnailItem many[kCount];
+    for (int i = 0; i < kCount; ++i)
+        many[i] = facet::ThumbnailItem{"Option", {}, facet::Icon("image")};
+    int index = 0;
+    ImRect first;
+    ImRect last;
+    int laidOut = 0;
+    session.SetUi([&] {
+        ImGui::BeginChild("area", ImVec2(facet::Px(400.0f), facet::Px(300.0f)));
+        facet::ThumbnailPicker("Pictures", &index, std::span<const facet::ThumbnailItem>(many, kCount),
+                               {.thumbnailSize = {64.0f, 48.0f}});
+        const ImGuiID grid = ImHashStr("##tiles", 0, ImGui::GetID("Pictures"));
+        first = fi::PickerGridTileRect(grid, 0);
+        last = fi::PickerGridTileRect(grid, kCount - 1);
+        laidOut = 0;
+        for (int i = 0; i < 400; ++i)
+            laidOut += fi::PickerGridTileRect(grid, i).GetWidth() > 0.0f ? 1 : 0;
+        ImGui::EndChild();
+    });
+    session.Frames(2);
+    CHECK(first.GetWidth() > 0.0f);
+    CHECK(last.GetWidth() == 0.0f);
+    CHECK(laidOut < 100);
+    session.Click(first.GetCenter());
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(4);
+    CHECK(last.GetWidth() > 0.0f);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(index == kCount - 1);
+}

@@ -43,15 +43,12 @@ void CallDatePickerStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 1", &v.index, kThumbnails));
-    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 2", std::span<bool>(v.thumbnailFlags), kThumbnails,
-                                            {.state = DataState::Loading}));
     FACET_CHECK_STUB(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
     FACET_CHECK_STUB(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallDatePickerStubs.
-constexpr int kDatePickerStubCalls = 4;
+constexpr int kDatePickerStubCalls = 2;
 
 } // namespace
 

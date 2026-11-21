@@ -368,8 +368,29 @@ bool ThumbnailPicker(const char* label, std::span<bool> checked, std::span<const
                      const ThumbnailPickerOptions& options = {});
 ```
 
-A grid of captioned pictures with a selection ring and lock badges, with empty, loading and error
-states. Status: planned.
+A grid of captioned tiles in the available width (`width` otherwise): each tile is
+`thumbnailSize` units (`metrics.thumbnailSize` square by default, narrowed to the width), with its
+caption in Footnote under the picture, cut with an ellipsis and shown whole as a tooltip. A tile
+shows its image (with the image's own loading and failed looks), or its icon on a quiet fill when it
+has none. `columns` sets the columns; 0 fits as many as the width allows. The visible label part is
+not drawn; it is the panel's tooltip on hover and keyboard focus. Only the lines in view are
+submitted (through the row ranges of the list core in the surrounding window), so a grid of any
+size costs the same per frame.
+
+The single form shows the picked tile with the row selection fill and a ring in the accent text
+color. It is one Tab stop: the tile focused last, else the picked one, else the first. The arrows
+move in two dimensions (Up and Down keep the column), Home and End go to the first and last tile,
+Page Up and Down by the lines in view; Enter, Space or a click writes *index. The multi form keeps
+one flag per tile in `checked`: every tile is a Tab stop, Dear ImGui's navigation moves between
+them, and a click or Space flips the flag; a checked tile shows the ring and a check badge. A
+`locked` tile shows a lock badge and takes the focus but is never picked or flipped; a `disabled`
+tile is dimmed, cannot be focused and is passed over by the arrows.
+
+`state` Loading shows skeleton tiles in place of the tiles (one line while there are none), Error
+shows `errorText` (or `Strings::loadFailed`) and a Ready grid without tiles `emptyText` (or
+`Strings::empty`), in the room of one line; none of them takes input. `readOnly` (or a null index)
+lets the tiles focus but writes nothing. Captures: a forced state for part -1 or 0 goes to the
+tile Tab lands on. Status: ready.
 
 ### FileBrowser
 

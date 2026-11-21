@@ -18,6 +18,7 @@
 #include "internal/popup_host.h"
 #include "pages/pages.h"
 #include "widgets/pickers/date_picker_parts.h"
+#include "widgets/pickers/icon_picker_parts.h"
 
 namespace
 {
@@ -39,6 +40,7 @@ enum CaptureState
     kTimeOpen,
     kAngleFocused,
     kIconOpen,
+    kThumbnailsFocused,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -72,6 +74,8 @@ struct OtherPickersUi
     facet::Icon iconSection = facet::Icon("sun");
     facet::Icon iconEmpty;
     int thumbnail = 0;
+    bool thumbnailChecks[6] = {true, false, false, false, false, false};
+    int thumbnailState = 0;  // 0 Ready, 1 Loading, 2 Error, 3 Empty
     std::string path;
 };
 
@@ -84,10 +88,14 @@ const facet::ChoiceItem kIcons[] = {
     {"Sun", facet::Icon("sun"), nullptr, "Theme"},
     {"Moon", facet::Icon("moon"), nullptr, "Theme"},
 };
+// Placeholder tiles without pictures: the icon stands in for an image.
 const facet::ThumbnailItem kThumbnails[] = {
     {"Option 1", {}, facet::Icon("image")},
-    {"Option 2", {}, facet::Icon("image")},
-    {"Option 3", {}, facet::Icon("image"), true},
+    {"Option 2", {}, facet::Icon("layers")},
+    {"Option 3 (locked)", {}, facet::Icon("image"), true},
+    {"Option 4 (unavailable)", {}, facet::Icon("image"), false, true},
+    {"Option 5", {}, facet::Icon("grid")},
+    {"Option 6 with a long caption that is cut", {}, facet::Icon("image")},
 };
 const facet::FileType kFileTypes[] = {
     {"Images", "*.png;*.jpg"},
@@ -338,10 +346,53 @@ void IconSection(facet::demo::PageCtx& ctx)
     Note("Picked: %s.", name != nullptr ? name : "none");
 }
 
+// Records tile `index` of the ThumbnailPicker `label` as probe `name`.
+void ProbeTile(facet::demo::PageCtx& ctx, const char* label, int index, const char* name)
+{
+    const ImGuiID grid = ImHashStr("##tiles", 0, ImGui::GetID(label));
+    const ImRect rect = facet::internal::PickerGridTileRect(grid, index);
+    // The tile id as the grid makes it for an item without an id of its own (the index).
+    const ImGuiID key = static_cast<ImGuiID>(index);
+    const ImGuiID id = ImHashData(&key, sizeof(key), ImHashStr("##tile", 0, grid));
+    if (rect.GetWidth() > 0.0f)
+        facet::demo::ProbeRect(ctx, name, id, rect.Min, rect.Max);
+}
+
+void ThumbnailSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("ThumbnailPicker");
+    Paragraph("A grid of captioned pictures. The single form is one Tab stop: the arrows move in two dimensions and "
+              "Enter or Space picks. The multi form flips one flag per tile, and each tile is a Tab stop. Locked "
+              "tiles focus but cannot be picked; the tiles here are placeholders without images.");
+    if (ctx.capture && ctx.captureState == kThumbnailsFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::ThumbnailPicker("Pick one", &ui.thumbnail, kThumbnails, {.thumbnailSize = {96.0f, 72.0f}});
+    ProbeTile(ctx, "Pick one", 0, "pickers.thumbs.0");
+    ProbeTile(ctx, "Pick one", 1, "pickers.thumbs.1");
+    ProbeTile(ctx, "Pick one", 2, "pickers.thumbs.2");
+    if (ctx.capture && ctx.captureState == kThumbnailsFocused)
+        ctx.RevealInCapture(0.4f);
+    Note("Picked: %s.", kThumbnails[ui.thumbnail].label);
+    facet::ThumbnailPicker("Pick several", std::span<bool>(ui.thumbnailChecks), kThumbnails,
+                           {.thumbnailSize = {72.0f, 54.0f}});
+    ProbeTile(ctx, "Pick several", 1, "pickers.thumbs.multi.1");
+    LabeledRow("Data state");
+    const char* const states[] = {"Ready", "Loading", "Error", "Empty"};
+    facet::SegmentedControl("##thumbstate", &ui.thumbnailState, states);
+    ctx.Probe("pickers.thumbs.state");
+    const facet::DataState data = ui.thumbnailState == 1 ? facet::DataState::Loading
+                                  : ui.thumbnailState == 2 ? facet::DataState::Error
+                                                           : facet::DataState::Ready;
+    int fixed = 0;
+    facet::ThumbnailPicker("States", &fixed,
+                           ui.thumbnailState == 3 ? std::span<const facet::ThumbnailItem>() : std::span(kThumbnails),
+                           {.thumbnailSize = {72.0f, 54.0f}, .state = data, .errorText = "The pictures could not be read"});
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
-                "time-open", "angle-focused", "icon-open")
+                "time-open", "angle-focused", "icon-open", "thumbnails-focused")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
@@ -356,9 +407,7 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
 
     IconSection(ctx);
 
-    SectionHeader("Other pickers");
-    LabeledRow("Thumbnails");
-    facet::ThumbnailPicker("##thumbnails", &ui.thumbnail, kThumbnails);
+    ThumbnailSection(ctx);
 
     SectionHeader("Files");
     Paragraph("A browser drawn inside the app, for hosts that cannot show a system dialog.");
@@ -532,6 +581,28 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.KeyPress(ImGuiKey_LeftArrow);
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Up past the section header and Left reach Grid", [] { return ui.iconSection == facet::Icon("grid"); });
+
+    // ThumbnailPicker: a click picks, a locked tile does not, the arrows and Enter pick by keyboard.
+    test.Reveal("pickers.thumbs.1");
+    test.WaitSeconds(0.4f);
+    test.Click("pickers.thumbs.1");
+    test.ExpectNear("a click picks the second tile", [] { return ui.thumbnail; }, 1.0, 0.0);
+    test.Click("pickers.thumbs.2");
+    test.ExpectNear("a click on the locked tile picks nothing", [] { return ui.thumbnail; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("Left twice and Enter pick the first tile", [] { return ui.thumbnail; }, 0.0, 0.0);
+    test.Click("pickers.thumbs.multi.1");
+    test.Expect("a click flips the flag of a tile of the multi form", [] { return ui.thumbnailChecks[1]; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus where it is
+    test.ExpectFocused("pickers.thumbs.multi.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space flips it back", [] { return !ui.thumbnailChecks[1]; });
+    test.MouseMove(facet::demo::Target::Item("pickers.thumbs.state", 0.35f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the data state control shows the loading tiles", [] { return ui.thumbnailState; }, 1.0, 0.0);
 
     // The planned pickers are placeholders: clicks and keys write nothing.
 
