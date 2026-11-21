@@ -923,6 +923,60 @@ TEST_CASE("An empty state's action is its only Tab stop and returns true when ac
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
 
+// ==== DataStateView ====
+
+TEST_CASE("A data state view keeps the height of its last Ready frame and reports its retry button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::DataState state = facet::DataState::Ready;
+    int count = 3;
+    bool retried = false;
+    int retries = 0;
+    ImGuiID viewId = 0;
+    session.SetUi([&] {
+        viewId = ImGui::GetID("files");
+        if (facet::BeginDataStateView("files", state, count, {.retryLabel = "Try again"}))
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                ImGui::PushID(i);
+                facet::StyledText("Row");
+                ImGui::Dummy(ImVec2(10.0f, 20.0f));
+                ImGui::PopID();
+            }
+            facet::EndDataStateView();
+        }
+        session.Track("view");
+        retried = facet::DataStateViewRetryPressed();
+        retries += retried ? 1 : 0;
+    });
+    session.Frame();
+    const float ready = session.ItemRect("view").GetHeight();
+    CHECK(ready > 0.0f);
+    state = facet::DataState::Loading;
+    session.Frame();
+    CHECK(session.ItemRect("view").GetHeight() == doctest::Approx(ready));
+    CHECK(session.ItemId("view") == viewId);
+    state = facet::DataState::Error;
+    session.Frames(2);
+    CHECK(session.ItemRect("view").GetHeight() == doctest::Approx(ready));
+    // The retry button: activating it reports DataStateViewRetryPressed.
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::BeginDataStateView("files", state, count, {.retryLabel = "Try again"}))
+            facet::EndDataStateView();
+        retries += facet::DataStateViewRetryPressed() ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(retries == 1);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

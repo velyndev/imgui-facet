@@ -110,7 +110,16 @@ bool DataStateViewRetryPressed();
 class DataStateViewScope;
 ```
 
-Switches a data view between skeleton rows, error with retry, empty state and content. Status: planned.
+Draws the state of a data view itself and opens a group for the content only when there is some:
+Loading draws `skeletonRows` skeleton bars in the list row height; Error draws the error state (error
+icon, `errorText` or `Strings::loadFailed`, and the `retryLabel` button); Ready with a count of 0
+draws the empty state (`emptyText` or `Strings::empty`). Its height is `height` when set, otherwise
+the height of the last Ready frame with content (kept under the id), so switching states does not
+move what follows; before any Ready frame a state takes the room it needs. A state too low for the
+full empty state draws the compact one-line form. A state that appears fades in over
+`motion.durationFast` (at once with reduced motion); the caller's content is shown as it is.
+`DataStateViewRetryPressed` is true on the frame the retry button of the last call was activated.
+`EndDataStateView` without its Begin is reported and does nothing. Status: ready.
 
 ### ProgressBar
 
