@@ -23,6 +23,7 @@
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/scope_stack.h"
+#include "internal/scroll.h"
 #include "support/session.h"
 #include "widgets/lists/list_parts.h"
 
@@ -1195,4 +1196,184 @@ TEST_CASE("Tab enters a tree view with a selection at its first node and leaves 
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
     CHECK(ui.selection.Size == 0);
+}
+
+// ---- ReorderableList ------------------------------------------------------------------------------
+
+namespace
+{
+
+// A reorderable list over five items with stable ids that applies every move it reports.
+struct ReorderUi
+{
+    std::array<facet::ChoiceItem, 5> items = {{{.label = "Item 1", .id = 1},
+                                               {.label = "Item 2", .id = 2},
+                                               {.label = "Item 3", .id = 3},
+                                               {.label = "Item 4", .id = 4},
+                                               {.label = "Item 5", .id = 5}}};
+    facet::ReorderableListOptions options;
+    facet::ReorderMove last;
+    int moves = 0;
+
+    void Ui(facet::test::Session& session)
+    {
+        facet::ReorderMove move;
+        if (facet::ReorderableList("reorder", &move, items, options))
+        {
+            last = move;
+            ++moves;
+            facet::ApplyReorderMove(items, move);
+        }
+        session.Track("reorder");
+    }
+
+    // The ids in their current order.
+    std::array<ImGuiID, 5> Order() const
+    {
+        std::array<ImGuiID, 5> order{};
+        for (std::size_t i = 0; i < items.size(); ++i)
+            order[i] = items[i].id;
+        return order;
+    }
+
+    static ImVec2 Row(const facet::test::Session& session, int index, float fraction = 0.5f)
+    {
+        const ImRect rect = session.ItemRect("reorder");
+        const float height = fi::ListRowHeight(facet::ControlSize::Regular);
+        return ImVec2(rect.GetCenter().x, rect.Min.y + height * (static_cast<float>(index) + fraction));
+    }
+};
+
+} // namespace
+
+TEST_CASE("Dragging a row reports the move in both directions")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    // Item 1 dropped in the lower half of row 2 lands after Item 3: from 0 to 2.
+    session.Drag({ReorderUi::Row(session, 0), ReorderUi::Row(session, 1), ReorderUi::Row(session, 2, 0.8f)}, 6);
+    session.Frames(2);
+    CHECK(ui.moves == 1);
+    CHECK(ui.last.from == 0);
+    CHECK(ui.last.to == 2);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{2, 3, 1, 4, 5});
+    // Item 5 dropped on the upper half of row 0 lands first: from 4 to 0.
+    session.Drag({ReorderUi::Row(session, 4), ReorderUi::Row(session, 2), ReorderUi::Row(session, 0, 0.2f)}, 6);
+    session.Frames(2);
+    CHECK(ui.moves == 2);
+    CHECK(ui.last.from == 4);
+    CHECK(ui.last.to == 0);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{5, 2, 3, 1, 4});
+}
+
+TEST_CASE("A drag canceled with Escape or dropped on its own place moves nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.MouseMove(ReorderUi::Row(session, 1));
+    session.MouseDown();
+    session.MouseMove(ReorderUi::Row(session, 2));
+    session.MouseMove(ReorderUi::Row(session, 3, 0.8f));
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    session.Frames(2);
+    CHECK(ui.moves == 0);
+    session.Drag({ReorderUi::Row(session, 2), ReorderUi::Row(session, 2, 0.9f), ReorderUi::Row(session, 2, 0.6f)}, 6);
+    session.Frames(2);
+    CHECK(ui.moves == 0);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{1, 2, 3, 4, 5});
+}
+
+TEST_CASE("Alt+Up and Alt+Down move the focused row and the focus stays on it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(ReorderUi::Row(session, 1));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Alt);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{1, 3, 2, 4, 5});
+    CHECK(ui.last.from == 1);
+    CHECK(ui.last.to == 2);
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Alt);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{1, 3, 4, 2, 5});
+    session.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Alt);
+    session.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Alt);
+    session.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Alt);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{2, 1, 3, 4, 5});
+    // At the top Alt+Up does nothing.
+    session.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Alt);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{2, 1, 3, 4, 5});
+    CHECK(ui.moves == 5);
+}
+
+TEST_CASE("Space picks a row up, the arrows move it, Space drops it and Escape puts it back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(ReorderUi::Row(session, 0));
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(ui.moves == 0);
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(ui.moves == 1);
+    CHECK(ui.last.from == 0);
+    CHECK(ui.last.to == 2);
+    CHECK(ui.Order() == std::array<ImGuiID, 5>{2, 3, 1, 4, 5});
+}
+
+TEST_CASE("A read-only reorderable list moves nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    ui.options.readOnly = true;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Drag({ReorderUi::Row(session, 0), ReorderUi::Row(session, 3, 0.8f)}, 6);
+    session.Click(ReorderUi::Row(session, 1));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Alt);
+    session.Frames(2);
+    CHECK(ui.moves == 0);
+}
+
+TEST_CASE("A drag resting at the edge of a scroll area around a reorderable list scrolls it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ReorderUi ui;
+    float scroll = 0.0f;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("area", {.size = ImVec2(300.0f, 90.0f)}))
+        {
+            ui.Ui(session);
+            scroll = ImGui::GetScrollY();
+            fi::EndScrollAreaCore();
+        }
+        session.Track("area");
+    });
+    session.Frames(2);
+    const ImRect area = session.ItemRect("area");
+    const ImVec2 edge(area.GetCenter().x, area.Max.y - 4.0f);
+    session.DragAndHold({ReorderUi::Row(session, 0), edge}, 6, 30);
+    session.Frames(2);
+    CHECK(scroll > 0.0f);
 }

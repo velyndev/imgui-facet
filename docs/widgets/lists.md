@@ -207,8 +207,6 @@ Status: ready.
 
 ### ReorderableList
 
-Status: planned
-
 ```cpp
 struct ReorderMove { int from = -1; int to = -1; constexpr bool IsValid() const; };
 template <class Range>
@@ -220,10 +218,30 @@ bool ReorderableList(const char* id, ReorderMove* move, std::span<const char* co
                      const ReorderableListOptions& options = {});
 ```
 
-Rows dragged by a grip (or moved with Alt+Up and Alt+Down) to a new place; the move comes back as a
-result that the caller applies to its own data. `from` is the row's index before the move and `to`
-its index after it. `ApplyReorderMove` is implemented and tested; it takes a `std::vector`, a
-`std::array`, a C array or a `std::span` as it is.
+Rows that move to a new place; the move comes back as a result that the caller applies to its own
+data. `from` is the row's index before the move and `to` its index after it, in both directions.
+`ApplyReorderMove` takes a `std::vector`, a `std::array`, a C array or a `std::span` as it is.
+
+- **Rows:** one per item at the list row height, the full width (the available width by default):
+  the grip, the icon, the label (cut with an ellipsis and a tooltip) and the detail at the end.
+- **Pointer:** a press on a row (on its grip alone with `handleOnly`) becomes a drag after
+  `drag.startThreshold`. The ghost follows the pointer, the other rows spring aside to open the gap
+  where the row would land, and that place shows a fill[2] slot. Releasing over the list reports the
+  move; releasing outside it, Escape or a right click cancels and the rows spring back. A drag that
+  rests at the edge of a scroll area around the list scrolls it.
+- **Keyboard:** each row is a Tab stop. Alt+Up and Alt+Down move the focused row at once. Space
+  picks the focused row up, the arrows move it between the places it can land, Space or Enter drops
+  it and Escape puts it back. The focus stays on the moved row.
+- **Ids:** rows are keyed by `ChoiceItem::id`, so a row keeps its animation and its focus when the
+  caller moves its data; give items stable ids. Rows of the label overload are keyed by their index:
+  their positions do not animate after a move, and the focus follows the moved row by its new index.
+- **States:** read-only (`readOnly`, or a null `move`): no grips, nothing moves; disabled items and
+  rows inside `ImGui::BeginDisabled` are shown in labelTertiary and do not move. While `state` is
+  Loading or Error, or with no items, one row shows the loading row, `errorText` or `emptyText`.
+- **Result:** true on the frame a row lands on a new place; `*move` is written only then.
+- **Limits:** at most 512 rows are laid out (a longer list is reported); rows are not virtualized.
+
+Status: ready.
 
 ### BeginTreeView, BeginTreeNode, TreeLeaf
 

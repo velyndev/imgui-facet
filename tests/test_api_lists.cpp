@@ -15,6 +15,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/list_view.h"
 #include "support/options_check.h"
 #include "support/session.h"
 #include "support/structure_stub_check.h"
@@ -59,8 +60,6 @@ void CallListStubs(Values& v)
     const std::span<bool> checked(v.checked);
     const std::span<facet::CheckState> states(v.states);
 
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
@@ -104,7 +103,7 @@ TEST_CASE("Lists placeholders outside a frame draw nothing and return the neutra
     CHECK(facet::internal::UsageErrorCount() == before);
 }
 
-TEST_CASE("A reorderable list placeholder takes one row per item or one row for its state")
+TEST_CASE("A reorderable list takes one row per item or one row for its state")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -120,7 +119,7 @@ TEST_CASE("A reorderable list placeholder takes one row per item or one row for 
         session.Track("empty");
     });
     session.Frame();
-    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    const float row = facet::internal::ListRowHeight(facet::ControlSize::Regular);
     CHECK(session.ItemRect("ready").GetHeight() == doctest::Approx(row * static_cast<float>(std::size(kItems))));
     CHECK(session.ItemRect("loading").GetHeight() == doctest::Approx(row));
     CHECK(session.ItemRect("error").GetHeight() == doctest::Approx(row));

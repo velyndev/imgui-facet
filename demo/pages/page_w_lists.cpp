@@ -34,6 +34,7 @@ enum CaptureState
     kFocused,
     kMultiOpen,
     kComboOpen,
+    kReorderDrag,
 };
 
 const facet::ChoiceItem kOptions[] = {
@@ -94,9 +95,15 @@ struct ListsState
     bool transfer[5] = {false, true, false, false, false};
     facet::CheckState checkTree[5] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
                                       facet::CheckState::Off, facet::CheckState::Off};
-    facet::ChoiceItem reorder[4] = {{.label = "Option 1", .id = 1}, {.label = "Option 2", .id = 2},
-                                    {.label = "Option 3", .id = 3}, {.label = "Option 4", .id = 4}};
     ImGuiSelectionBasicStorage selection;
+
+    // ReorderableList
+    facet::ChoiceItem reorder[4] = {{.label = "Option 1", .icon = facet::Icon("file"), .id = 1},
+                                    {.label = "Option 2", .icon = facet::Icon("image"), .id = 2},
+                                    {.label = "Option 3", .icon = facet::Icon("layers"), .id = 3},
+                                    {.label = "Option 4", .icon = facet::Icon("grid"), .id = 4}};
+    const char* reorderLabels[4] = {"Option A", "Option B", "Option C", "Option D"};
+    facet::ReorderMove lastMove;
 
     // TreeView
     ImGuiSelectionBasicStorage treeSelection;
@@ -344,12 +351,44 @@ void ChooseSeveral(ListsState& s)
                         {.sourceTitle = "Available", .targetTitle = "Chosen", .visibleRows = 4});
 }
 
-void SelectAndReorder(ListsState& s)
+void ReorderSection(facet::demo::PageCtx& ctx, ListsState& s)
 {
-    SectionHeader("Reorder");
+    SectionHeader("Reorderable list");
+    Paragraph("Drag a row by its grip or anywhere on it; the other rows move aside to show where it lands, and the "
+              "list scrolls when the drag rests at its edge. With the keyboard, Alt+Up and Alt+Down move the focused "
+              "row, or Space picks it up, the arrows move it, Space drops it and Escape puts it back.");
+    Columns columns;
+    if (ctx.capture && ctx.captureState == kReorderDrag)
+        ctx.ForceNextItemState(ForcedItemState::Dragging, 1);
     facet::ReorderMove move;
-    if (facet::ReorderableList("reorder", &move, s.reorder))
+    if (facet::ReorderableList("reorder", &move, s.reorder, {.width = columns.width / facet::Px(1.0f)}))
+    {
         facet::ApplyReorderMove(s.reorder, move);
+        s.lastMove = move;
+        ++s.writes;
+    }
+    ctx.Probe("lists.reorder");
+    if (ctx.capture && ctx.captureState == kReorderDrag)
+        ctx.RevealInCapture(0.5f);
+    columns.Next();
+    // Plain labels are keyed by their index; only the grip starts a drag.
+    if (facet::ReorderableList("reorderlabels", &move, s.reorderLabels,
+                               {.handleOnly = true, .width = columns.width / facet::Px(1.0f)}))
+        facet::ApplyReorderMove(s.reorderLabels, move);
+    ctx.Probe("lists.reorder.labels");
+    columns.End();
+    Columns states;
+    facet::ReorderableList("reorderreadonly", &move, s.reorder,
+                           {.width = states.width / facet::Px(1.0f), .readOnly = true});
+    states.Next();
+    facet::ReorderableList("reorderloading", &move, s.reorder,
+                           {.state = facet::DataState::Loading, .width = states.width / facet::Px(1.0f)});
+    states.End();
+    if (s.lastMove.IsValid())
+        Note("Last move: row %d to %d. Order: %s, %s, %s, %s.", s.lastMove.from + 1, s.lastMove.to + 1,
+             s.reorder[0].label, s.reorder[1].label, s.reorder[2].label, s.reorder[3].label);
+    else
+        Note("No row moved yet. Below: a read-only list without grips, and a list whose rows are loading.");
 }
 
 // A leaf of the sample tree with its probe "lists.tree.<label>"; counts an activation.
@@ -432,7 +471,7 @@ void Hierarchies(ListsState& s)
 } // namespace
 
 FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dropdown-search", "focused",
-                 "multi-open", "combo-open")
+                 "multi-open", "combo-open", "reorder-drag")
 {
     facet::demo::PageHeader("Lists",
                             "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
@@ -445,8 +484,8 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     MultiDropdownSection(ctx, s);
     ComboSection(ctx, s);
     TreeViewSection(ctx, s);
+    ReorderSection(ctx, s);
     ChooseSeveral(s);
-    SelectAndReorder(s);
     Hierarchies(s);
 }
 
@@ -651,4 +690,52 @@ FACET_DEMO_SELFTEST("lists")
     test.ExpectNear("the children arrive", [] { return State().lazyState; }, 2.0, 0.0);
     test.Reveal("lists.tree.Option 4");
     test.ExpectVisible("lists.tree.Option 4");
+
+    // ReorderableList: four rows, each a quarter of the list.
+    test.Do([] {
+        ListsState& s = State();
+        const char* labels[] = {"Option 1", "Option 2", "Option 3", "Option 4"};
+        for (int i = 0; i < 4; ++i)
+        {
+            s.reorder[i].label = labels[i];
+            s.reorder[i].id = static_cast<ImGuiID>(i + 1);
+        }
+        s.lastMove = {};
+    });
+    test.Reveal("lists.reorder");
+    test.Drag({T::Item("lists.reorder", 0.5f, 0.125f), T::Item("lists.reorder", 0.5f, 0.4f),
+               T::Item("lists.reorder", 0.5f, 0.7f)},
+              0.5f);
+    test.Wait(2);
+    test.ExpectText("dragging the first row into the lower half of the third moves it there",
+                    [] { return std::string(State().reorder[2].label); }, "Option 1");
+    test.ExpectNear("the reported move ends at index 2", [] { return State().lastMove.to; }, 2.0, 0.0);
+    test.Drag({T::Item("lists.reorder", 0.5f, 0.875f), T::Item("lists.reorder", 0.5f, 0.5f),
+               T::Item("lists.reorder", 0.5f, 0.05f)},
+              0.5f);
+    test.Wait(2);
+    test.ExpectText("dragging the last row to the top moves it up", [] { return std::string(State().reorder[0].label); },
+                    "Option 4");
+    test.ExpectNear("the reported move starts at index 3", [] { return State().lastMove.from; }, 3.0, 0.0);
+    // Keyboard: Alt+Down moves the focused row; Space picks a row up, Down moves it, Space drops it.
+    test.Click("lists.reorder");
+    test.KeyPress(ImGuiKey_Escape);
+    test.MouseMove(T::Item("lists.reorder", 0.5f, 0.125f));
+    test.MouseDown();
+    test.MouseUp();
+    test.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Alt);
+    test.ExpectText("Alt+Down moves the focused row down", [] { return std::string(State().reorder[1].label); },
+                    "Option 4");
+    test.KeyPress(ImGuiKey_Space);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.Wait(2);
+    test.ExpectText("Space, Down and Space move it one more place", [] { return std::string(State().reorder[2].label); },
+                    "Option 4");
+    test.KeyPress(ImGuiKey_Space);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_Escape);
+    test.Wait(2);
+    test.ExpectText("Escape puts a picked-up row back", [] { return std::string(State().reorder[2].label); },
+                    "Option 4");
 }
