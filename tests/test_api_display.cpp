@@ -196,28 +196,6 @@ TEST_CASE("Display widgets without a label submit an item whose id is not the wi
     CHECK(checked == 5);
 }
 
-TEST_CASE("Display placeholders are at least as tall as a small control")
-{
-    // The placeholder text is Footnote; a box of one line of Body or less cuts its descenders.
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const float minimum = ControlHeight(ControlSize::Small);
-        const auto tall = [&](const char* widget, auto&& call) {
-            INFO("widget: " << std::string(widget));
-            call();
-            CHECK(ImGui::GetItemRectSize().y >= minimum);
-            ++checked;
-        };
-        tall("Skeleton, one line", [] { Skeleton({.lines = 1}); });
-        tall("Skeleton, low", [] { Skeleton({.shape = SkeletonShape::Rect, .height = 4.0f}); });
-    });
-    session.Frame();
-    CHECK(checked == 2);
-}
-
 TEST_CASE("Content-sized display placeholders are wide enough to name the widget and say planned")
 {
     facet::test::Session session;

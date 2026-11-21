@@ -715,6 +715,37 @@ TEST_CASE("A spinner turns, and stands still in its resting shape while motion i
     CHECK(std::memcmp(first.data(), last.data(), first.size() * sizeof(ImVec2)) == 0);
 }
 
+// ==== Skeleton ====
+
+TEST_CASE("A skeleton takes the size of the content it stands for")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float available = 0.0f;
+    float lineHeight = 0.0f;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        lineHeight = std::round(facet::MeasureText(facet::TextStyle::Body, "").y);
+        facet::Skeleton({.lines = 3});
+        session.Track("text");
+        facet::Skeleton({.shape = facet::SkeletonShape::Rect, .width = 120.0f, .height = 40.0f});
+        session.Track("rect");
+        facet::Skeleton({.shape = facet::SkeletonShape::Circle});
+        session.Track("circle");
+        facet::Skeleton({.shape = facet::SkeletonShape::Circle, .height = 48.0f});
+        session.Track("avatar");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("text").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("text").GetHeight() == doctest::Approx(lineHeight * 3.0f));
+    CHECK(session.ItemRect("rect").GetWidth() == doctest::Approx(std::round(facet::Px(120.0f))));
+    CHECK(session.ItemRect("rect").GetHeight() == doctest::Approx(std::round(facet::Px(40.0f))));
+    const float control = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("circle").GetWidth() == doctest::Approx(control));
+    CHECK(session.ItemRect("circle").GetHeight() == doctest::Approx(control));
+    CHECK(session.ItemRect("avatar").GetWidth() == doctest::Approx(std::round(facet::Px(48.0f))));
+}
+
 // ==== Skeleton circle ====
 
 TEST_CASE("A skeleton with circular corners is a true circle")

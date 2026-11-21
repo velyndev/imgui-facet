@@ -140,7 +140,11 @@ keeps nothing per id. Status: ready.
 void Skeleton(const SkeletonOptions& options = {});
 ```
 
-Loading placeholder lines, blocks or circles with the shared shimmer. Status: planned.
+A loading placeholder with the shared shimmer sweep, flat with reduced motion: Text draws `lines`
+bars, each centered in a Body line (or `height`), the last of several ending early; Rect one block of
+`width` by `height` (the control height by default) with the `corners` radius; Circle a true circle of
+`height` (an avatar placeholder). Width: the available width (Circle: its height). Not interactive;
+keeps no state. Status: ready.
 
 ### Badge
 
