@@ -77,6 +77,8 @@ struct Level
     float closeTime = 0.0f;      // seconds into the close motion
     std::uint64_t fadeStartFrame = 0;
     float wrapWidth = 0.0f;      // tooltips: text wrap width in pixels
+    ImGuiID restoreWindow = 0;   // panels: the window that had the keyboard focus when it opened
+    ImGuiID ownerWindow = 0;     // panels: the root window it was opened from, which it stays in front of
 
     // This frame's submission.
     ImGuiWindow* window = nullptr;
@@ -241,7 +243,28 @@ int ImGuiPopupIndex(ImGuiID id)
 
 bool IsStackLevel(const Level& level)
 {
-    return level.options.kind != PopupKind::Tooltip;
+    return level.options.kind != PopupKind::Tooltip && level.options.kind != PopupKind::Panel;
+}
+
+// A level drawn in a plain window of its record's slot instead of a Dear ImGui popup.
+bool IsPlainKind(PopupKind kind)
+{
+    return kind == PopupKind::Tooltip || kind == PopupKind::Panel;
+}
+
+// A Panel that closes while the keyboard focus is inside it gives the focus back to the window
+// that had it when it opened; Dear ImGui then restores that window's last focused item.
+void RestorePanelFocus(const Level& level)
+{
+    ImGuiContext& g = *GImGui;
+    if (level.options.kind != PopupKind::Panel || level.window == nullptr || g.NavWindow == nullptr ||
+        g.NavWindow->RootWindow != level.window)
+        return;
+    ImGuiWindow* back = level.restoreWindow != 0 ? ImGui::FindWindowByID(level.restoreWindow) : nullptr;
+    if (back != nullptr && back->WasActive && back != level.window)
+        ImGui::FocusWindow(back, ImGuiFocusRequestFlags_RestoreFocusedChild);
+    else
+        ImGui::FocusWindow(nullptr);
 }
 
 float MotionScale()
@@ -445,14 +468,17 @@ ImVec4 ViewportClip()
     return ImVec4(viewport->Pos.x, viewport->Pos.y, viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y);
 }
 
-ImVec2 LevelPadding(PopupKind kind)
+ImVec2 LevelPadding(const PopupOptions& options)
 {
+    if (options.padding.x >= 0.0f && options.padding.y >= 0.0f)
+        return options.padding;
     const Spacing& spacing = T().spacing;
-    switch (kind)
+    switch (options.kind)
     {
     case PopupKind::Popup:
         return Px(ImVec2(spacing.xs, spacing.xs));
     case PopupKind::Modal:
+    case PopupKind::Panel:
         return Px(ImVec2(spacing.xl, spacing.xl));
     case PopupKind::Tooltip:
         return Px(ImVec2(spacing.sm, spacing.xs));
@@ -460,11 +486,14 @@ ImVec2 LevelPadding(PopupKind kind)
     return ImVec2(0.0f, 0.0f);
 }
 
-int LevelElevation(PopupKind kind)
+int LevelElevation(const PopupOptions& options)
 {
-    switch (kind)
+    if (options.elevation > 0)
+        return std::min(options.elevation, 3);
+    switch (options.kind)
     {
     case PopupKind::Popup:
+    case PopupKind::Panel:
         return 2;
     case PopupKind::Modal:
         return 3;
@@ -474,12 +503,15 @@ int LevelElevation(PopupKind kind)
     return 2;
 }
 
-float LevelRadius(PopupKind kind)
+float LevelRadius(const PopupOptions& options)
 {
+    if (options.radius >= 0.0f)
+        return options.radius;
     const Radii& radii = T().radii;
-    switch (kind)
+    switch (options.kind)
     {
     case PopupKind::Popup:
+    case PopupKind::Panel:
         return Px(radii.popover);
     case PopupKind::Modal:
         return Px(radii.window);
@@ -500,7 +532,7 @@ bool AnchorIsEmpty(const PopupAnchor& anchor)
 ImRect AnchorRegion(const PopupOptions& options)
 {
     const ImGuiWindow* window = GImGui->CurrentWindow;
-    if (options.kind != PopupKind::Popup || window == nullptr)
+    if ((options.kind != PopupKind::Popup && options.kind != PopupKind::Panel) || window == nullptr)
         return ImRect();
     const ImGuiWindow* root = window->RootWindow != nullptr ? window->RootWindow : window;
     if ((root->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
@@ -511,6 +543,16 @@ ImRect AnchorRegion(const PopupOptions& options)
 void PlaceLevel(Level& level, ImVec2 wanted)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
+    // A level with a fixed rect (a drawer at a display edge) sits exactly there.
+    if (level.options.placeRect.GetWidth() > 0.0f && level.options.placeRect.GetHeight() > 0.0f)
+    {
+        level.rect = level.options.placeRect;
+        level.side = level.anchor.side;
+        level.hasSide = true;
+        level.coversAnchor = true;
+        level.placedAnchor = level.anchor.rect;
+        return;
+    }
     PopupPlaceInput in;
     in.anchor = level.anchor.rect;
     in.region = level.anchorRegion;
@@ -582,8 +624,9 @@ SurfaceCommands DrawSurface(ImDrawList* drawList, Level& level, const ImRect& re
         level.scrimVertexEnd = drawList->VtxBuffer.Size;
     }
     commands.scrimEnd = drawList->CmdBuffer.Size - 1;
-    const float radius = LevelRadius(kind);
-    const int elevation = LevelElevation(kind);
+    const float radius = LevelRadius(level.options);
+    const int elevation = LevelElevation(level.options);
+    const ImDrawFlags corners = level.options.corners;
     drawList->PushClipRect(ImVec2(clip.x, clip.y), ImVec2(clip.z, clip.w), false);
     if (level.options.glass)
     {
@@ -594,8 +637,8 @@ SurfaceCommands DrawSurface(ImDrawList* drawList, Level& level, const ImRect& re
     else
     {
         DrawElevation(drawList, rect.Min, rect.Max, radius, elevation);
-        FillRect(drawList, rect.Min, rect.Max, ToU32(theme.colors.ElevatedSurface(elevation)), radius);
-        StrokeRect(drawList, rect.Min, rect.Max, ToU32(theme.colors.separator), radius, HairlineThickness());
+        FillRect(drawList, rect.Min, rect.Max, ToU32(theme.colors.ElevatedSurface(elevation)), radius, corners);
+        StrokeRect(drawList, rect.Min, rect.Max, ToU32(theme.colors.separator), radius, HairlineThickness(), corners);
     }
     drawList->PopClipRect();
     BreakCommand(drawList);
@@ -629,8 +672,31 @@ Motion MotionAt(const Level& level, float amount)
     Motion m;
     amount = std::clamp(amount, 0.0f, 1.0f);
     m.alpha = amount;
-    m.scale = T().motion.popupScaleFrom + (1.0f - T().motion.popupScaleFrom) * amount;
     const ImRect& r = level.rect;
+    if (level.options.slideIn)
+    {
+        // The whole level moves in from its display edge, at full size.
+        m.scale = 1.0f;
+        m.pivot = r.GetCenter();
+        const float rest = 1.0f - amount;
+        switch (level.options.slideEdge)
+        {
+        case PopupSide::Below:
+            m.translate = ImVec2(0.0f, r.GetHeight() * rest);
+            break;
+        case PopupSide::Above:
+            m.translate = ImVec2(0.0f, -r.GetHeight() * rest);
+            break;
+        case PopupSide::After:
+            m.translate = ImVec2(r.GetWidth() * rest, 0.0f);
+            break;
+        case PopupSide::Before:
+            m.translate = ImVec2(-r.GetWidth() * rest, 0.0f);
+            break;
+        }
+        return m;
+    }
+    m.scale = T().motion.popupScaleFrom + (1.0f - T().motion.popupScaleFrom) * amount;
     const ImVec2 anchorCenter = level.anchor.rect.GetCenter();
     const float slide = Px(T().overlay.anchorGap) * (1.0f - amount);
     const bool centered =
@@ -792,7 +858,10 @@ void TooltipNewFrame()
 }
 
 // Applies the tooltip rules of popup_host.h for one item; fills *anchor when it should show.
-bool TooltipWanted(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible, PopupAnchor* anchor)
+// `insideTip`: the pointer is over the item's interactive tooltip or on its way there, which counts
+// as hovering the item, and a press there does not hide the tooltip.
+bool TooltipWanted(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible, PopupAnchor* anchor,
+                   bool insideTip = false)
 {
     HostState& s = State();
     TooltipState& t = s.tooltip;
@@ -802,7 +871,14 @@ bool TooltipWanted(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool fo
     const double grace = static_cast<double>(theme.overlay.tooltipGrace * MotionScale());
     bool want = false;
     bool atPointer = false;
-    if (hovered)
+    if (insideTip)
+    {
+        // Working in the tooltip keeps it: no press or key hides it there.
+        if (t.pressSuppressed == itemId)
+            t.pressSuppressed = 0;
+        t.keySuppressed = false;
+    }
+    if (hovered || insideTip)
     {
         if (t.hoverItem != itemId)
         {
@@ -813,7 +889,7 @@ bool TooltipWanted(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool fo
                 t.pressSuppressed = 0;
         }
         t.hoverSeenFrame = s.frame;
-        if (ImGui::IsAnyMouseDown())
+        if (ImGui::IsAnyMouseDown() && !insideTip)
             t.pressSuppressed = itemId;
         if (t.pressSuppressed != itemId && !t.keySuppressed && (t.hoverImmediate || now - t.hoverStart >= delay))
         {
@@ -1215,7 +1291,7 @@ void OpenPopupLevel(ImGuiID id, const PopupAnchor& anchor, const PopupOptions& o
     if (level == nullptr)
         return;
     level->lastUseFrame = s.frame;
-    if (options.kind == PopupKind::Tooltip)
+    if (IsPlainKind(options.kind))
     {
         if (level->phase != Phase::Open)
         {
@@ -1225,9 +1301,15 @@ void OpenPopupLevel(ImGuiID id, const PopupAnchor& anchor, const PopupOptions& o
             level->openTime = 0.0f;
             level->hasSide = false;
             level->closeReason = PopupCloseReason::None;
+            const ImGuiWindow* nav = GImGui->NavWindow;
+            level->restoreWindow = nav != nullptr ? nav->RootWindow->ID : 0;
+            const ImGuiWindow* current = GImGui->CurrentWindow;
+            level->ownerWindow = current != nullptr ? current->RootWindow->ID : 0;
+            level->parent = CurrentPopupLevel();
         }
         level->anchor = anchor;
         level->options = options;
+        level->anchorRegion = AnchorRegion(options);
         return;
     }
     if (level->phase == Phase::Open && ImGuiPopupIndex(id) >= 0)
@@ -1269,9 +1351,14 @@ void ClosePopupLevel(ImGuiID id)
     if (level == nullptr || level->phase != Phase::Open)
         return;
     if (IsStackLevel(*level))
+    {
         CloseStackFrom(*level, PopupCloseReason::Closed, true, true);
+    }
     else
+    {
+        RestorePanelFocus(*level);
         BeginClose(*level, PopupCloseReason::Closed, true);
+    }
 }
 
 void ClosePopupLevelChain(ImGuiID id)
@@ -1337,7 +1424,7 @@ bool BeginPopupLevel(ImGuiID id)
             return false;
     }
     const PopupKind kind = level->options.kind;
-    const bool plain = forced || kind == PopupKind::Tooltip;
+    const bool plain = forced || IsPlainKind(kind);
 
     // A plain level (a tooltip or a forced level) draws in the window of its record's slot, not
     // in a window per id: Dear ImGui never destroys windows, so a window per hovered item would
@@ -1361,7 +1448,7 @@ bool BeginPopupLevel(ImGuiID id)
         std::snprintf(name, sizeof(name), "##Popup_%08x", id);
         existing = ImGui::FindWindowByName(name);
     }
-    const ImVec2 padding = LevelPadding(kind);
+    const ImVec2 padding = LevelPadding(level->options);
     ImVec2 wanted(0.0f, 0.0f);
     if (existing != nullptr)
     {
@@ -1378,7 +1465,8 @@ bool BeginPopupLevel(ImGuiID id)
     PlaceLevel(*level, wanted);
 
     ImGui::SetNextWindowPos(level->rect.Min);
-    if (existing != nullptr)
+    const bool fixedRect = level->options.placeRect.GetWidth() > 0.0f && level->options.placeRect.GetHeight() > 0.0f;
+    if (existing != nullptr || fixedRect)
         ImGui::SetNextWindowSize(level->rect.GetSize());
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 0.0f);
@@ -1390,9 +1478,23 @@ bool BeginPopupLevel(ImGuiID id)
     bool shown = false;
     if (plain)
     {
-        flags |= ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing;
-        if (kind == PopupKind::Tooltip)
-            flags |= ImGuiWindowFlags_Tooltip;
+        if (kind == PopupKind::Panel && !forced)
+        {
+            // A panel is a window the user works in: it takes input and the keyboard.
+            if (!level->options.takeFocus)
+                flags |= ImGuiWindowFlags_NoFocusOnAppearing;
+        }
+        else if (kind == PopupKind::Tooltip && level->options.interactive && !forced)
+        {
+            // An interactive tooltip takes the mouse but never the keyboard.
+            flags |= ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing;
+        }
+        else
+        {
+            flags |= ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing;
+            if (kind == PopupKind::Tooltip)
+                flags |= ImGuiWindowFlags_Tooltip;
+        }
         std::snprintf(name, sizeof(name), "##FacetPopupPlain%02d", static_cast<int>(level - s.levels));
         shown = ImGui::Begin(name, nullptr, flags);
         if (!shown)
@@ -1412,8 +1514,23 @@ bool BeginPopupLevel(ImGuiID id)
         return false;
 
     ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (plain && window->Appearing && kind != PopupKind::Tooltip)
+    if (plain && window->Appearing && (kind != PopupKind::Tooltip || level->options.interactive))
         ImGui::BringWindowToDisplayFront(window);
+    if (kind == PopupKind::Panel && !forced && !window->Appearing)
+    {
+        // A click on the page brings the page window to the front; the panel goes back in front of
+        // it, and the open popups go back in front of the panel.
+        ImGuiWindow* owner = level->ownerWindow != 0 ? ImGui::FindWindowByID(level->ownerWindow) : nullptr;
+        if (owner != nullptr && owner != window && ImGui::IsWindowAbove(owner, window))
+        {
+            ImGui::BringWindowToDisplayFront(window);
+            for (const ImGuiPopupData& data : GImGui->OpenPopupStack)
+            {
+                if (data.Window != nullptr && data.Window->WasActive)
+                    ImGui::BringWindowToDisplayFront(data.Window);
+            }
+        }
+    }
     level->window = window;
     level->plainWindow = plain;
     level->submittedFrame = s.frame;
@@ -1659,11 +1776,37 @@ ImGuiID PopupTooltipLevel(ImGuiID itemId)
 
 bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible, float maxWidth)
 {
+    PopupTooltipDesc desc;
+    desc.maxWidth = maxWidth;
+    return BeginPopupTooltip(itemId, itemRect, hovered, focusVisible, desc);
+}
+
+bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible,
+                       const PopupTooltipDesc& desc)
+{
     if (!InFrame() || itemId == 0)
         return false;
     const ImGuiID tipId = PopupTooltipLevel(itemId);
+    // An interactive tooltip shown in the last frame stays while the pointer is over it, or moves
+    // from the item toward it.
+    bool insideTip = false;
+    if (desc.interactive)
+    {
+        const Level* tip = FindLevel(tipId);
+        if (tip != nullptr && tip->phase == Phase::Open && tip->submittedFrame + 1 >= State().frame)
+        {
+            // The way there: the box from where the pointer was when the tooltip showed to the
+            // tooltip itself (it opens below and after the pointer).
+            const TooltipState& t = State().tooltip;
+            ImRect way = tip->rect;
+            if (t.anchorItem == itemId && t.anchorAtPointer)
+                way.Add(t.anchorPoint);
+            const ImVec2 pointer = ImGui::GetIO().MousePos;
+            insideTip = way.Contains(pointer) || (!hovered && PopupPointerAimsAt(tip->rect));
+        }
+    }
     PopupAnchor anchor;
-    if (!TooltipWanted(itemId, itemRect, hovered, focusVisible, &anchor))
+    if (!TooltipWanted(itemId, itemRect, hovered, focusVisible, &anchor, insideTip))
     {
         if (IsPopupLevelOpen(tipId))
             ClosePopupLevel(tipId);
@@ -1672,12 +1815,16 @@ bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, boo
     PopupOptions options;
     options.kind = PopupKind::Tooltip;
     options.takeFocus = false;
+    options.interactive = desc.interactive;
     if (!IsPopupLevelOpen(tipId))
         OpenPopupLevel(tipId, anchor, options);
     else
         SetPopupLevelAnchor(tipId, anchor);
     if (Level* level = FindLevel(tipId))
-        level->wrapWidth = maxWidth;
+    {
+        level->wrapWidth = desc.maxWidth;
+        level->options.interactive = desc.interactive;
+    }
     return BeginPopupLevel(tipId);
 }
 

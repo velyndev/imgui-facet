@@ -38,7 +38,8 @@
 //   4. the topmost shell that set closeOnEscape (EscapeLayer::Shell through ClaimEscape).
 // Levels opened through this header take part on their own; layers that are not levels (a
 // shell) claim Escape with ClaimEscape. Facet reads Escape through key ownership, so this works
-// without ImGuiConfigFlags_NavEnableKeyboard. Tooltip levels are not part of the order.
+// without ImGuiConfigFlags_NavEnableKeyboard. Tooltip levels are not part of the order; a Panel
+// level takes part only through the ClaimEscape of its widget (EscapeLayer::Shell).
 //
 // The context menu keys: a right click on the target, the Menu key or Shift+F10 while the target
 // has keyboard focus ask for its context menu (ContextMenuRequested). The keys are read through
@@ -89,19 +90,37 @@ enum class PopupKind
     Modal,    // dialogs and drawers: drawn over a scrim, keeps the keyboard focus inside; a click
               // outside does not close it (the widget decides what a click on the scrim does)
     Tooltip,  // tooltips: no focus, no input, never part of the Escape order
+    // Panels: a floating layer outside Dear ImGui's popup stack that takes input and focus like a
+    // window, and that neither a click outside nor Escape closes (non-modal drawers, popovers that
+    // are not dismissible). The widget closes it; Escape reaches it through ClaimEscape. When it
+    // closes while the keyboard focus is inside it, the focus goes back to the window (and its
+    // item) that had it when the panel opened. It stays in front of the window it was opened from,
+    // also after a click there, and behind the popups that are open.
+    Panel,
 };
 
 struct PopupOptions
 {
     PopupKind kind = PopupKind::Popup;
-    bool takeFocus = true;             // Popup: the keyboard focus moves into the level when it opens; a
-                                       // completion list passes false so typing stays in the field
+    bool takeFocus = true;             // Popup and Panel: the keyboard focus moves into the level when it
+                                       // opens; a completion list passes false so typing stays in the field
     bool glass = false;                // backdrop blur behind the level (popovers; DESIGN.md dose caps)
     ImVec2 size = {0.0f, 0.0f};        // pixels per axis; 0 fits the content
     float minWidth = 0.0f;             // pixels; 0 for none (menus pass overlay.menuMinWidth through Px)
     bool closeOnEscape = true;         // Popup and Modal: Escape closes it; false: the press stops
                                        // at the level and closes nothing (a modal that must be
                                        // answered)
+    // Members below were added by the overlays family.
+    ImVec2 padding = {-1.0f, -1.0f};   // pixels between the surface and the content; < 0 for the kind's default
+    ImRect placeRect;                  // screen pixels: the level sits exactly here (no flip or clamp), for
+                                       // drawers at a display edge; empty (the default) places it at the anchor
+    bool slideIn = false;              // the open and close motion slides the whole level in from `slideEdge`
+                                       // instead of growing from the anchor side (drawers)
+    PopupSide slideEdge = PopupSide::After;  // the display edge a sliding level comes from
+    ImDrawFlags corners = 0;           // which surface corners are rounded (ImDrawFlags_RoundCorners*); 0 for all
+    bool interactive = false;          // Tooltip: takes the mouse, so its content can be clicked (no focus, no keys)
+    float radius = -1.0f;              // pixels of the surface corners; < 0 for the kind's default
+    int elevation = 0;                 // shadow and surface level 1 to 3; 0 for the kind's default
 };
 
 // Opens level `id` at `anchor`. Opened while another Popup level is being submitted, it becomes
@@ -285,6 +304,19 @@ bool PopupPointerAimsAt(const ImRect& target);
 [[nodiscard]] bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible,
                                      float maxWidth = 0.0f);
 void EndPopupTooltip();  // only after BeginPopupTooltip returned true
+
+// The same with more choices (added by the overlays family).
+struct PopupTooltipDesc
+{
+    float maxWidth = 0.0f;     // pixels where the text wraps; 0 for overlay.tooltipMaxWidth
+    // The tooltip takes the mouse and stays while the pointer is over it or on its way there from
+    // the item (inside the box from where the pointer was when it showed to the tooltip, or aiming
+    // at it with PopupPointerAimsAt), so its content can be hovered and clicked. A press inside it
+    // does not hide it. It still never takes the keyboard focus.
+    bool interactive = false;
+};
+[[nodiscard]] bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible,
+                                     const PopupTooltipDesc& desc);
 
 // The level id of the tooltip of item `itemId` (for IsPopupLevelOpen and tests).
 ImGuiID PopupTooltipLevel(ImGuiID itemId);
