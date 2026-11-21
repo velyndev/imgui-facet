@@ -530,6 +530,27 @@ TEST_CASE("List view: the focused row stays alive when scrolled out, and it is t
     CHECK(session.ItemVisible("row4"));
 }
 
+TEST_CASE("List view: a double click on a driven list activates once per click")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int active = -1;
+    int activations = 0;
+    ListUi ui;
+    ui.desc.rowCount = 6;
+    ui.desc.highlight = &active;
+    session.SetUi([&] {
+        ui.Ui(session);
+        if (ui.result.activated == 2)
+            ++activations;
+    });
+    session.Frames(2);
+    session.DoubleClick(Row(session, 2));
+    CHECK(activations == 2);
+    CHECK(active == 2);
+}
+
 TEST_CASE("List view: Tab and Shift+Tab enter a selection list at its tab stop and leave it")
 {
     MotionGuard guard;

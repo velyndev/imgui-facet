@@ -1078,8 +1078,9 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
             *desc.highlight = index;
         if (row.item.pressed && !row.item.keyboardPressed)
             ActivateHighlight(frame, index);
-        if (frame.activated == index)
-            row.activated = true;
+        // A click already activates a row of a driven list, so a double click is two activations
+        // (one per click), not a third one on its second press.
+        row.activated = frame.activated == index;
     }
     if (row.activated)
         frame.activated = index;
