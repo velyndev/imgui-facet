@@ -328,6 +328,33 @@ TEST_CASE("Keyboard steps: stepped and integer values move by whole steps")
     CHECK(KeyboardStep(integer, kNaN, 1, StepSize::Normal) == 1.0);
 }
 
+TEST_CASE("Keyboard steps: a value kept in a float steps from the grid point it rounds to")
+{
+    // 0.8f is 0.800000011920929 as a double, a hair above the grid point 0.8: a step down that
+    // treated it as off the grid would land on 0.8, which is the same float again.
+    const double held = static_cast<double>(0.8f);
+    REQUIRE(held > 0.8);
+    const ValueMapping stepped{.min = 0.0, .max = 1.0, .step = 0.1};
+    CHECK(static_cast<float>(KeyboardStep(stepped, held, -1, StepSize::Normal)) == 0.7f);
+    CHECK(static_cast<float>(KeyboardStep(stepped, held, 1, StepSize::Normal)) == 0.9f);
+    // 0.7f is a hair below 0.7: a step up goes to 0.8, not to 0.7.
+    REQUIRE(static_cast<double>(0.7f) < 0.7);
+    CHECK(static_cast<float>(KeyboardStep(stepped, static_cast<double>(0.7f), 1, StepSize::Normal)) == 0.8f);
+    // The same on the keyboard grid of a continuous track, also logarithmic.
+    const ValueMapping continuous{.min = 0.0, .max = 1.0};
+    CHECK(static_cast<float>(KeyboardStep(continuous, static_cast<double>(0.29f), -1, StepSize::Normal)) == 0.28f);
+    CHECK(static_cast<float>(KeyboardStep(continuous, static_cast<double>(0.29f), 1, StepSize::Normal)) == 0.30f);
+    const ValueMapping log{.min = 1.0, .max = 1000.0, .scale = facet::ValueScale::Logarithmic};
+    const float tenth = static_cast<float>(std::pow(1000.0, 0.1));
+    CHECK(static_cast<float>(KeyboardStep(log, static_cast<double>(tenth), -1, StepSize::Coarse)) == 1.0f);
+    // A value really between grid points still moves to the next one first.
+    CHECK(KeyboardStep(stepped, 0.75, -1, StepSize::Normal) == doctest::Approx(0.7));
+    // A large value on a fine grid never skips a grid point.
+    const ValueMapping fine{.min = 0.0, .max = 2.0e6, .step = 0.1};
+    CHECK(KeyboardStep(fine, 1.0e6, 1, StepSize::Normal) == doctest::Approx(1.0e6 + 0.1));
+    CHECK(KeyboardStep(fine, 1.0e6, -1, StepSize::Normal) == doctest::Approx(1.0e6 - 0.1));
+}
+
 TEST_CASE("Drag tracker: travel turns into a fraction without rounding")
 {
     DragTracker tracker;

@@ -4,6 +4,7 @@
 #include "internal/value_drag.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <utility>
 
@@ -85,11 +86,32 @@ double GridValue(const ValueMapping& m, double index)
     return value;
 }
 
+// How far from a grid point, in value units, a value still counts as on it: the rounding of a
+// float that holds the value (a float 0.8 is 0.800000011920929 as a double). Callers keep most
+// values in floats, and a value one float rounding off a grid point must step from that point,
+// or the step lands on a value that rounds back to the same float and the key does nothing.
+double FloatTolerance(double value)
+{
+    return std::isfinite(value) ? std::fabs(value) * static_cast<double>(FLT_EPSILON) : 0.0;
+}
+
+// The tolerance in grid units: at least kGridEpsilon, and never more than a tenth of a grid step,
+// so a large value on a fine grid (where a float cannot tell neighbouring points apart anyway)
+// never skips a point.
+constexpr double kMaxGridTolerance = 0.1;
+
+double GridTolerance(double floatSpread)
+{
+    return std::clamp(floatSpread, kGridEpsilon, kMaxGridTolerance);
+}
+
 // Moves `count` grid steps of `perStep` grid units in `direction` from `value`. A value between
-// grid points goes to the next point in the direction first. Above the last whole step, max
-// counts as one more grid point.
+// grid points goes to the next point in the direction first; one within a float rounding of a
+// point (FloatTolerance) counts as on it. Above the last whole step, max counts as one more grid
+// point.
 double StepOnGrid(const ValueMapping& m, double value, int direction, double perStep, int count)
 {
+    const double epsilon = GridTolerance(FloatTolerance(value) / m.step);
     const double range = m.max - m.min;
     const double lastIndex = std::floor(range / m.step + kGridEpsilon);
     const bool maxOffGrid = range - lastIndex * m.step > m.step * kGridEpsilon;
@@ -100,9 +122,9 @@ double StepOnGrid(const ValueMapping& m, double value, int direction, double per
         index = lastIndex + (index - lastIndex) / ((range - lastIndex * m.step) / m.step);
     double target = 0.0;
     if (direction > 0)
-        target = std::floor(index + kGridEpsilon) + perStep * count;
+        target = std::floor(index + epsilon) + perStep * count;
     else
-        target = std::ceil(index - kGridEpsilon) - perStep * count;
+        target = std::ceil(index - epsilon) - perStep * count;
     target = m.wrap ? WrapIndex(target, maxIndex) : std::clamp(target, 0.0, maxIndex);
     if (target >= maxIndex)
         return m.max;
@@ -308,7 +330,11 @@ double KeyboardStep(const ValueMapping& mapping, double value, int direction, St
                         : size == StepSize::Coarse ? kKeyboardGridCoarse
                                                    : kKeyboardGrid;
     const double index = ValueToFraction(m, value) * grid;
-    double target = direction > 0 ? std::floor(index + kGridEpsilon) + count : std::ceil(index - kGridEpsilon) - count;
+    // The float rounding of the value, as grid units of this track (StepOnGrid).
+    const double tolerance = FloatTolerance(value);
+    const double spread = (ValueToFraction(m, value + tolerance) - ValueToFraction(m, value - tolerance)) * 0.5 * grid;
+    const double epsilon = GridTolerance(spread);
+    double target = direction > 0 ? std::floor(index + epsilon) + count : std::ceil(index - epsilon) - count;
     target = m.wrap ? WrapIndex(target, grid) : std::clamp(target, 0.0, grid);
     return FractionToValue(m, target / grid);
 }

@@ -138,7 +138,9 @@ inline constexpr double kKeyboardGridCoarse = 10.0;
 // step, it moves by whole steps from the grid point at or next to `value`. Without one, it moves
 // on a grid of 1/kKeyboardGrid of the track (1/kKeyboardGridFine fine, 1/kKeyboardGridCoarse
 // coarse) in fraction space, so logarithmic tracks step evenly too. A value between grid points
-// first moves to the next grid point in the direction of travel. Clamped to the range.
+// first moves to the next grid point in the direction of travel. A value within the rounding of a
+// float of a grid point (0.8f is 0.800000011920929 as a double) counts as on that point, so a
+// caller that keeps its value in a float can pass it as it is. Clamped to the range.
 double KeyboardStep(const ValueMapping& mapping, double value, int direction, StepSize size, int count = 1);
 
 // The value after `count` Page Up (direction +1) or Page Down (-1) presses: a tenth of the
