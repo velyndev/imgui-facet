@@ -203,6 +203,10 @@ struct ValueDragOptions
     // writes nothing and its session ends without an edit. The defaults do not limit.
     double clampLow = -std::numeric_limits<double>::infinity();
     double clampHigh = std::numeric_limits<double>::infinity();
+    // The arrows across the track step too, Right and Up toward max, Left and Down toward min,
+    // and are taken from keyboard navigation while focused: for a control with no direction of
+    // its own on screen, such as a knob. Off: those arrows keep moving the focus.
+    bool crossArrows = false;
 };
 
 // Speed factor of a delta mode drag or step with Ctrl held (coarser), and of Page Up and Down.
@@ -229,14 +233,103 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
 float FractionToTrack(const ImRect& track, Orientation orientation, double fraction);
 double TrackToFraction(const ImRect& track, Orientation orientation, ImVec2 point);
 
+// ---- Two axes ------------------------------------------------------------------------------
+//
+// ValueDrag2DBehavior: the same input for a point on a plane, for the pads (XYPad, JoystickPad)
+// and the edges and corners of a box (BoxRangePad). x runs along the width of `area`, y along
+// its height, each with a mapping of its own:
+//
+//     ItemState item = ItemBehavior(id, size, {.press = PressMode::Click});
+//     double x = value->x, y = value->y;
+//     const ValueDrag2DResult edit = ValueDrag2DBehavior(item, &x, &y, area,
+//                                                        {.mappingX = mx, .mappingY = my});
+//     if (edit.changed) *value = ImVec2(static_cast<float>(x), static_cast<float>(y));
+//     ... draw the point at PadPoint(area, mx, my, false, x, y) ...
+//
+// Mouse: as ValueDragBehavior on both axes at once. A press within grabRadius of the point grabs
+// it without moving it, a press further away first moves the point under the pointer. The
+// pointer travel since the press maps onto fractions of the area, so a drag out of the window and
+// back returns exactly to the values it passed. Shift during a drag keeps only the axis with the
+// larger travel since the press (the other one goes back to its value at the press), Ctrl snaps
+// both axes to the coarse grid. There is no fine drag: Shift is the axis lock.
+// Keyboard, while the item has keyboard focus, in PadKeys::Step: Left and Right step x, Up and
+// Down move the point up and down on screen (toward max.y, or toward min.y with yDown), by the
+// steps of KeyboardStep with Shift finer and Ctrl coarser; Page Up and Page Down move it up and
+// down by a tenth of the y range; Home and End send x to min and max (y, for an item that moves
+// y only). In PadKeys::Hold the arrows hold the point at the edge of the range in their direction
+// while they are down (two arrows: the diagonal; Shift: half way), for a stick that springs back.
+// The arrows of an axis the item moves are taken from keyboard navigation; the others, Tab and
+// the axes the item does not move keep moving the focus. The wheel is left to the window.
+// Escape during a drag or a key session restores both values from its start.
+// Edit sessions: as ValueDragBehavior, one per drag and per key press with its repeats (in Hold,
+// while any arrow is down), so the item queries and facet::IsItemEditCommitted report each once.
+
+// What the arrow keys do on a two-axis item.
+enum class PadKeys
+{
+    Step,  // step the point like a slider's arrows
+    Hold,  // hold the point at the edge while down (a stick); the caller decides what release does
+};
+
+struct ValueDrag2DOptions
+{
+    ValueMapping mappingX;
+    ValueMapping mappingY;
+    bool yDown = false;      // fraction 0 of y at the top of the area; by default at the bottom
+    // Pixels from the point within which a press grabs it; a press further away first moves the
+    // point under the pointer. Negative: every press grabs (a box body).
+    float grabRadius = 0.0f;
+    bool moveX = true;       // the axes the input moves; the other keeps its value
+    bool moveY = true;
+    // The point stays inside the ellipse inscribed in the two ranges: a drag or key that would
+    // leave it ends on its edge in the same direction from the middle (a round stick).
+    bool disc = false;
+    bool axisLock = true;    // Shift during a drag keeps one axis (see above)
+    bool keyboard = true;
+    PadKeys keys = PadKeys::Step;
+    bool readOnly = false;   // shown and focusable, never written (also ImGuiItemFlags_ReadOnly)
+    // Limits inside the ranges that an edit never passes, per axis, as ValueDragOptions has.
+    double clampLowX = -std::numeric_limits<double>::infinity();
+    double clampHighX = std::numeric_limits<double>::infinity();
+    double clampLowY = -std::numeric_limits<double>::infinity();
+    double clampHighY = std::numeric_limits<double>::infinity();
+};
+
+struct ValueDrag2DResult
+{
+    bool changed = false;   // *x or *y was written this frame
+    bool canceled = false;  // Escape ended the edit; changed too when the point had moved and was restored
+    bool dragging = false;  // a mouse drag is under way
+    bool keyboard = false;  // a key session is under way
+    bool ended = false;     // a drag or key session of this item ended this frame (release, keys up, Escape, focus loss)
+};
+
+// Runs the drag and keyboard input of `item` (from ItemBehavior or PartBehavior this frame) on
+// the point (*x, *y). `area` is the rectangle the point travels in: fraction 0 of x at its left
+// edge, fraction 0 of y at its bottom edge (top with yDown). A disabled or read-only item never
+// writes and leaves every arrow to keyboard navigation; an item showing a forced state takes no
+// input. A value outside its range is left as it is until an edit writes a new one.
+ValueDrag2DResult ValueDrag2DBehavior(const ItemState& item, double* x, double* y, const ImRect& area,
+                                      const ValueDrag2DOptions& options);
+
+// The screen position in `area` of the point (x, y), clamped into the area.
+ImVec2 PadPoint(const ImRect& area, const ValueMapping& mappingX, const ValueMapping& mappingY, bool yDown, double x,
+                double y);
+// The fractions of a screen position in `area`, not clamped (a pointer can be outside).
+void PadFractions(const ImRect& area, bool yDown, ImVec2 point, double* fx, double* fy);
+// Moves fractions (fx, fy) that lie outside the ellipse inscribed in the unit square onto its
+// edge, toward the middle (0.5, 0.5); fractions inside stay.
+void ClampToDisc(double* fx, double* fy);
+
 // Ends an edit session of `id` by Escape on this frame: the query facet::IsItemEditCanceled
 // reports it for that item. Used by ValueDragBehavior and by other blocks that revert edits.
 void MarkEditCanceled(ImGuiID id);
 // True when Escape ended the edit session of `id` on this frame.
 bool WasEditCanceled(ImGuiID id);
 
-// Forgets the edit session in progress and the last canceled edit (facet::Init and Shutdown,
-// through the focus subsystem), so nothing carries over to another Dear ImGui context.
+// Forgets the edit sessions in progress (one and two axes) and the last canceled edit
+// (facet::Init and Shutdown, through the focus subsystem), so nothing carries over to another
+// Dear ImGui context.
 void ResetValueDragState();
 
 } // namespace facet::internal

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <iterator>
+#include <span>
 #include <utility>
 
 #include "facet/core/scale.h"
@@ -146,6 +148,28 @@ struct Session
 Session& CurrentSession()
 {
     static Session session;
+    return session;
+}
+
+// The edit session of a two-axis item (ValueDrag2DBehavior).
+struct Session2D
+{
+    ImGuiID id = 0;
+    bool mouse = false;
+    bool keyboard = false;
+    double startX = 0.0;   // the values at the start of the session, for Escape
+    double startY = 0.0;
+    double anchorX = 0.0;  // the values at the drag's start fractions (after a jump)
+    double anchorY = 0.0;
+    DragTracker trackerX;
+    DragTracker trackerY;
+    ImVec2 lastMouse;
+    bool pointerLost = false;
+};
+
+Session2D& CurrentSession2D()
+{
+    static Session2D session;
     return session;
 }
 
@@ -415,6 +439,7 @@ void MarkEditCanceled(ImGuiID id)
 void ResetValueDragState()
 {
     CurrentSession() = {};
+    CurrentSession2D() = {};
     CurrentWheelRest() = {};
     Canceled() = {};
 }
@@ -608,8 +633,15 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     const ImGuiKey incKey = vertical ? ImGuiKey_UpArrow : ImGuiKey_RightArrow;
     const ImGuiKey decPad = vertical ? ImGuiKey_GamepadDpadDown : ImGuiKey_GamepadDpadLeft;
     const ImGuiKey incPad = vertical ? ImGuiKey_GamepadDpadUp : ImGuiKey_GamepadDpadRight;
-    const ImGuiKey stepKeys[] = {decKey, incKey, decPad, incPad, ImGuiKey_PageUp, ImGuiKey_PageDown,
-                                 ImGuiKey_Home, ImGuiKey_End};
+    // With crossArrows, the arrows across the track as well: Right and Up increase.
+    const ImGuiKey crossDecKey = vertical ? ImGuiKey_LeftArrow : ImGuiKey_DownArrow;
+    const ImGuiKey crossIncKey = vertical ? ImGuiKey_RightArrow : ImGuiKey_UpArrow;
+    const ImGuiKey crossDecPad = vertical ? ImGuiKey_GamepadDpadLeft : ImGuiKey_GamepadDpadDown;
+    const ImGuiKey crossIncPad = vertical ? ImGuiKey_GamepadDpadRight : ImGuiKey_GamepadDpadUp;
+    const ImGuiKey allStepKeys[] = {decKey, incKey, decPad, incPad, ImGuiKey_PageUp, ImGuiKey_PageDown,
+                                    ImGuiKey_Home, ImGuiKey_End, crossDecKey, crossIncKey, crossDecPad, crossIncPad};
+    constexpr size_t kTrackStepKeys = 8;
+    const std::span<const ImGuiKey> stepKeys(allStepKeys, options.crossArrows ? std::size(allStepKeys) : kTrackStepKeys);
 
     // A key session lasts while one of its keys is held.
     if (session.id == id && session.keyboard)
@@ -631,8 +663,13 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         for (const ImGuiKey key : stepKeys)
             ImGui::SetKeyOwner(key, id);
         const StepSize size = io.KeyCtrl ? StepSize::Coarse : (io.KeyShift ? StepSize::Fine : StepSize::Normal);
-        const int inc = PressCount(incKey, id) + PressCount(incPad, id);
-        const int dec = PressCount(decKey, id) + PressCount(decPad, id);
+        int inc = PressCount(incKey, id) + PressCount(incPad, id);
+        int dec = PressCount(decKey, id) + PressCount(decPad, id);
+        if (options.crossArrows)
+        {
+            inc += PressCount(crossIncKey, id) + PressCount(crossIncPad, id);
+            dec += PressCount(crossDecKey, id) + PressCount(crossDecPad, id);
+        }
         const int pageUp = PressCount(ImGuiKey_PageUp, id);
         const int pageDown = PressCount(ImGuiKey_PageDown, id);
         if (inc > 0)
@@ -705,6 +742,405 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
             session.startValue = *value;
         }
         write(next);
+        result.keyboard = true;
+    }
+
+    if (session.id == id && session.keyboard)
+    {
+        result.keyboard = true;
+        ImGui::SetKeyOwner(ImGuiKey_Escape, id);
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, id))
+        {
+            cancel();
+            result.keyboard = false;
+        }
+    }
+    return result;
+}
+
+// ---- Two axes ------------------------------------------------------------------------------
+
+namespace
+{
+
+// In PadKeys::Hold, Shift holds the point this share of the way from the middle to the edge.
+constexpr double kHoldFineShare = 0.5;
+
+} // namespace
+
+ImVec2 PadPoint(const ImRect& area, const ValueMapping& mappingX, const ValueMapping& mappingY, bool yDown, double x,
+                double y)
+{
+    const double fx = ValueToFraction(mappingX, x);
+    const double fy = ValueToFraction(mappingY, y);
+    const double px = area.Min.x + fx * area.GetWidth();
+    const double py = yDown ? area.Min.y + fy * area.GetHeight() : area.Max.y - fy * area.GetHeight();
+    return ImVec2(static_cast<float>(px), static_cast<float>(py));
+}
+
+void PadFractions(const ImRect& area, bool yDown, ImVec2 point, double* fx, double* fy)
+{
+    const double width = area.GetWidth();
+    const double height = area.GetHeight();
+    *fx = width > 0.0 ? (point.x - area.Min.x) / width : 0.0;
+    *fy = height > 0.0 ? (yDown ? point.y - area.Min.y : area.Max.y - point.y) / height : 0.0;
+}
+
+void ClampToDisc(double* fx, double* fy)
+{
+    const double u = *fx * 2.0 - 1.0;
+    const double v = *fy * 2.0 - 1.0;
+    const double r = std::sqrt(u * u + v * v);
+    if (!(r > 1.0) || !std::isfinite(r))
+        return;
+    *fx = 0.5 + 0.5 * u / r;
+    *fy = 0.5 + 0.5 * v / r;
+}
+
+ValueDrag2DResult ValueDrag2DBehavior(const ItemState& item, double* x, double* y, const ImRect& area,
+                                      const ValueDrag2DOptions& options)
+{
+    ValueDrag2DResult result;
+    ImGuiContext* context = ImGui::GetCurrentContext();
+    if (context == nullptr || x == nullptr || y == nullptr || item.id == 0)
+        return result;
+    ImGuiContext& g = *context;
+    ImGuiWindow* window = g.CurrentWindow;
+    ImGuiIO& io = g.IO;
+    Session2D& session = CurrentSession2D();
+    const ImGuiID id = item.id;
+    const ValueMapping mx = NormalizeMapping(options.mappingX);
+    const ValueMapping my = NormalizeMapping(options.mappingY);
+    const bool readOnly = options.readOnly || item.readOnly;
+    const double width = std::max(1.0f, area.GetWidth());
+    const double height = std::max(1.0f, area.GetHeight());
+    // Up on screen is toward max.y, or toward min.y when y grows downward.
+    const int upSign = options.yDown ? -1 : 1;
+
+    // A session of an item that stopped being active (released, focus moved) is over.
+    if (session.id == id && g.ActiveId != id)
+    {
+        session = {};
+        result.ended = true;
+    }
+    if (item.disabled || item.forced != ForcedItemState::None)
+    {
+        // As ValueDragBehavior: a key session without an input source would never be released.
+        if (session.id == id)
+        {
+            if (session.keyboard && g.ActiveId == id && g.ActiveIdSource == ImGuiInputSource_None)
+                ImGui::ClearActiveID();
+            session = {};
+            result.ended = true;
+        }
+        return result;
+    }
+
+    const auto write = [&](double nx, double ny) {
+        if (readOnly)
+            return;
+        bool wrote = false;
+        if (options.moveX && !std::isnan(nx) && options.clampLowX <= options.clampHighX)
+        {
+            nx = std::clamp(nx, options.clampLowX, options.clampHighX);
+            if (nx != *x)
+            {
+                *x = nx;
+                wrote = true;
+            }
+        }
+        if (options.moveY && !std::isnan(ny) && options.clampLowY <= options.clampHighY)
+        {
+            ny = std::clamp(ny, options.clampLowY, options.clampHighY);
+            if (ny != *y)
+            {
+                *y = ny;
+                wrote = true;
+            }
+        }
+        if (wrote)
+        {
+            result.changed = true;
+            ImGui::MarkItemEdited(id);
+        }
+    };
+    const auto cancel = [&]() {
+        if (!readOnly && (*x != session.startX || *y != session.startY))
+        {
+            *x = session.startX;
+            *y = session.startY;
+            result.changed = true;
+            ImGui::MarkItemEdited(id);
+        }
+        result.canceled = true;
+        result.ended = true;
+        MarkEditCanceled(id);
+        session = {};
+        ImGui::ClearActiveID();
+    };
+    // The value at a fraction of one axis, snapped to the coarse grid while Ctrl is held.
+    const auto valueAt = [&](const ValueMapping& m, double t) {
+        t = Clamp01(t);
+        if (!io.KeyCtrl)
+            return FractionToValue(m, t);
+        if (m.step > 0.0)
+        {
+            const double coarse = m.step * kCoarseSteps;
+            return SnapValue(m, m.min + std::round((FractionToValue(m, t) - m.min) / coarse) * coarse);
+        }
+        return FractionToValue(m, std::round(t * kKeyboardGridCoarse) / kKeyboardGridCoarse);
+    };
+
+    // ---- Mouse drag ----
+    if (g.ActiveId == id && g.ActiveIdSource == ImGuiInputSource_Mouse && item.held)
+    {
+        const ImVec2 mouse = io.MousePos;
+        if (session.id != id || !session.mouse)
+        {
+            // From where the button went down, also for a press handed over from another item.
+            const ImVec2 press = ImGui::IsMousePosValid(&io.MouseClickedPos[ImGuiMouseButton_Left])
+                                     ? io.MouseClickedPos[ImGuiMouseButton_Left]
+                                     : mouse;
+            session = {};
+            session.id = id;
+            session.mouse = true;
+            session.startX = *x;
+            session.startY = *y;
+            double fx = ValueToFraction(mx, *x);
+            double fy = ValueToFraction(my, *y);
+            if (options.grabRadius >= 0.0f)
+            {
+                const ImVec2 point = PadPoint(area, mx, my, options.yDown, *x, *y);
+                const float dx = options.moveX ? press.x - point.x : 0.0f;
+                const float dy = options.moveY ? press.y - point.y : 0.0f;
+                if (dx * dx + dy * dy > options.grabRadius * options.grabRadius)
+                {
+                    double px = 0.0;
+                    double py = 0.0;
+                    PadFractions(area, options.yDown, press, &px, &py);
+                    px = Clamp01(px);
+                    py = Clamp01(py);
+                    if (options.disc)
+                        ClampToDisc(&px, &py);
+                    if (options.moveX)
+                        fx = px;
+                    if (options.moveY)
+                        fy = py;
+                    write(FractionToValue(mx, fx), FractionToValue(my, fy));
+                }
+            }
+            session.trackerX.Begin(fx, width);
+            session.trackerY.Begin(fy, height);
+            session.lastMouse = press;
+            session.anchorX = *x;
+            session.anchorY = *y;
+        }
+        else if (!ImGui::IsMousePosValid(&mouse))
+        {
+            // The pointer is unknown: the point stays, and the drag goes on from where it returns.
+            session.pointerLost = true;
+        }
+        else if (session.pointerLost)
+        {
+            session.pointerLost = false;
+            session.lastMouse = mouse;
+        }
+        else
+        {
+            const double dx = mouse.x - session.lastMouse.x;
+            const double dy = options.yDown ? mouse.y - session.lastMouse.y : -(mouse.y - session.lastMouse.y);
+            session.lastMouse = mouse;
+            session.trackerX.Move(dx);
+            session.trackerY.Move(dy);
+            if (dx != 0.0 || dy != 0.0 || io.KeyCtrl || io.KeyShift)
+            {
+                const double sx = session.trackerX.StartFraction();
+                const double sy = session.trackerY.StartFraction();
+                double fx = session.trackerX.Fraction();
+                double fy = session.trackerY.Fraction();
+                bool backX = fx == sx;
+                bool backY = fy == sy;
+                // Shift keeps the axis with the larger travel since the press.
+                if (options.axisLock && io.KeyShift && options.moveX && options.moveY)
+                {
+                    if (std::fabs(fx - sx) * width >= std::fabs(fy - sy) * height)
+                        backY = true;
+                    else
+                        backX = true;
+                }
+                if (backX)
+                    fx = sx;
+                if (backY)
+                    fy = sy;
+                fx = Clamp01(fx);
+                fy = Clamp01(fy);
+                if (options.disc)
+                {
+                    ClampToDisc(&fx, &fy);
+                    // The edge of the disc moves both axes, so only a return of both is exact.
+                    backX = backY = backX && backY;
+                }
+                // Back where the drag started: exactly the values it started from.
+                const double nx = backX && !io.KeyCtrl ? session.anchorX : valueAt(mx, fx);
+                const double ny = backY && !io.KeyCtrl ? session.anchorY : valueAt(my, fy);
+                write(nx, ny);
+            }
+        }
+        result.dragging = true;
+        ImGui::SetKeyOwner(ImGuiKey_Escape, id);
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, id))
+        {
+            cancel();
+            result.dragging = false;
+        }
+        return result;
+    }
+
+    // ---- Keyboard ----
+    const bool focused = item.focused && g.NavId == id;
+    const bool keysEnabled = options.keyboard && focused && !readOnly;
+    const bool hold = options.keys == PadKeys::Hold;
+    ImGuiKey keys[14];
+    int keyCount = 0;
+    if (options.moveX)
+    {
+        for (const ImGuiKey key : {ImGuiKey_LeftArrow, ImGuiKey_RightArrow, ImGuiKey_GamepadDpadLeft, ImGuiKey_GamepadDpadRight})
+            keys[keyCount++] = key;
+    }
+    if (options.moveY)
+    {
+        for (const ImGuiKey key : {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_GamepadDpadUp, ImGuiKey_GamepadDpadDown})
+            keys[keyCount++] = key;
+        if (!hold)
+        {
+            keys[keyCount++] = ImGuiKey_PageUp;
+            keys[keyCount++] = ImGuiKey_PageDown;
+        }
+    }
+    if (!hold && (options.moveX || options.moveY))
+    {
+        keys[keyCount++] = ImGuiKey_Home;
+        keys[keyCount++] = ImGuiKey_End;
+    }
+    const std::span<const ImGuiKey> sessionKeys(keys, static_cast<size_t>(keyCount));
+
+    // A key session lasts while one of its keys is held.
+    if (session.id == id && session.keyboard)
+    {
+        bool anyDown = false;
+        for (const ImGuiKey key : sessionKeys)
+            anyDown = anyDown || ImGui::IsKeyDown(key);
+        if (!anyDown || !focused)
+        {
+            session = {};
+            ImGui::ClearActiveID();
+            result.ended = true;
+        }
+    }
+
+    double nx = *x;
+    double ny = *y;
+    bool stepped = false;
+    if (keysEnabled && keyCount > 0)
+    {
+        for (const ImGuiKey key : sessionKeys)
+            ImGui::SetKeyOwner(key, id);
+        const auto count = [&](ImGuiKey key, ImGuiKey pad) { return PressCount(key, id) + PressCount(pad, id); };
+        if (!hold)
+        {
+            const StepSize size = io.KeyCtrl ? StepSize::Coarse : (io.KeyShift ? StepSize::Fine : StepSize::Normal);
+            const int right = options.moveX ? count(ImGuiKey_RightArrow, ImGuiKey_GamepadDpadRight) : 0;
+            const int left = options.moveX ? count(ImGuiKey_LeftArrow, ImGuiKey_GamepadDpadLeft) : 0;
+            const int up = options.moveY ? count(ImGuiKey_UpArrow, ImGuiKey_GamepadDpadUp) : 0;
+            const int down = options.moveY ? count(ImGuiKey_DownArrow, ImGuiKey_GamepadDpadDown) : 0;
+            const int pageUp = options.moveY ? PressCount(ImGuiKey_PageUp, id) : 0;
+            const int pageDown = options.moveY ? PressCount(ImGuiKey_PageDown, id) : 0;
+            const int home = PressCount(ImGuiKey_Home, id);
+            const int end = PressCount(ImGuiKey_End, id);
+            if (right > 0)
+                nx = KeyboardStep(mx, nx, 1, size, right);
+            if (left > 0)
+                nx = KeyboardStep(mx, nx, -1, size, left);
+            if (up > 0)
+                ny = KeyboardStep(my, ny, upSign, size, up);
+            if (down > 0)
+                ny = KeyboardStep(my, ny, -upSign, size, down);
+            if (pageUp > 0)
+                ny = PageStep(my, ny, upSign, pageUp);
+            if (pageDown > 0)
+                ny = PageStep(my, ny, -upSign, pageDown);
+            // Home and End act on x, or on y for an item that moves y only.
+            if (home > 0)
+                (options.moveX ? nx : ny) = options.moveX ? mx.min : my.min;
+            if (end > 0)
+                (options.moveX ? nx : ny) = options.moveX ? mx.max : my.max;
+            stepped = right > 0 || left > 0 || up > 0 || down > 0 || pageUp > 0 || pageDown > 0 || home > 0 || end > 0;
+            if (stepped && options.disc)
+            {
+                double fx = ValueToFraction(mx, nx);
+                double fy = ValueToFraction(my, ny);
+                const double ox = fx;
+                const double oy = fy;
+                ClampToDisc(&fx, &fy);
+                if (fx != ox || fy != oy)
+                {
+                    nx = FractionToValue(mx, fx);
+                    ny = FractionToValue(my, fy);
+                }
+            }
+        }
+        else
+        {
+            const auto down = [&](ImGuiKey key, ImGuiKey pad) {
+                return (ImGui::TestKeyOwner(key, id) && ImGui::IsKeyDown(key)) ||
+                       (ImGui::TestKeyOwner(pad, id) && ImGui::IsKeyDown(pad));
+            };
+            const int dirX = options.moveX ? static_cast<int>(down(ImGuiKey_RightArrow, ImGuiKey_GamepadDpadRight)) -
+                                                 static_cast<int>(down(ImGuiKey_LeftArrow, ImGuiKey_GamepadDpadLeft))
+                                           : 0;
+            const int dirUp = options.moveY ? static_cast<int>(down(ImGuiKey_UpArrow, ImGuiKey_GamepadDpadUp)) -
+                                                  static_cast<int>(down(ImGuiKey_DownArrow, ImGuiKey_GamepadDpadDown))
+                                            : 0;
+            bool anyArrow = false;
+            for (const ImGuiKey key : sessionKeys)
+                anyArrow = anyArrow || ImGui::IsKeyDown(key);
+            if (anyArrow)
+            {
+                const double amount = io.KeyShift ? kHoldFineShare : 1.0;
+                double u = dirX * amount;
+                double v = dirUp * upSign * amount;
+                // A round stick holds the diagonal on its edge, a square one in the corner.
+                if (options.disc && u != 0.0 && v != 0.0)
+                {
+                    const double r = std::sqrt(u * u + v * v);
+                    u = u / r * amount;
+                    v = v / r * amount;
+                }
+                nx = FractionToValue(mx, 0.5 + 0.5 * u);
+                ny = FractionToValue(my, 0.5 + 0.5 * v);
+                stepped = true;
+            }
+        }
+        if (stepped)
+            ImGui::SetNavCursorVisible(true);
+    }
+
+    if (stepped)
+    {
+        if (g.ActiveId != id)
+        {
+            // One edit session per key press with its repeats (in Hold, while any arrow is down).
+            ImGui::SetActiveID(id, window);
+            g.ActiveIdSource = ImGuiInputSource_None;
+            if (g.NavId != id)
+                ImGui::SetFocusID(id, window);
+            session = {};
+            session.id = id;
+            session.keyboard = true;
+            session.startX = *x;
+            session.startY = *y;
+        }
+        write(nx, ny);
         result.keyboard = true;
     }
 

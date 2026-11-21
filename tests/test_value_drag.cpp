@@ -885,3 +885,300 @@ TEST_CASE("Value drag: a key session ends when focus leaves while the key is hel
     CHECK(slider.value == value);
     session.KeyUp(ImGuiKey_RightArrow);
 }
+
+TEST_CASE("Value drag: crossArrows steps with the arrows across the track as well")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestSlider slider;
+    slider.options.crossArrows = true;
+    Install(session, slider);
+    session.Click(TestSlider::At(session, 0.5));
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("slider"));
+    const int commits = slider.commits;
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(slider.value == doctest::Approx(0.51));
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(slider.value == doctest::Approx(0.49));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(slider.value == doctest::Approx(0.5));
+    CHECK(slider.commits == commits + 4);
+    // Held across the track, one session with its repeats.
+    session.HoldKey(ImGuiKey_UpArrow, 1.0f);
+    CHECK(slider.value > 0.55);
+    CHECK(slider.commits == commits + 5);
+}
+
+// ---- Two axes ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// A bare two-axis control: a 200 x 100 pixel area, x and y from 0 to 1, y up unless yDown.
+struct TestPad
+{
+    double x = 0.5;
+    double y = 0.5;
+    facet::internal::ValueDrag2DOptions options;
+    int changes = 0;
+    int commits = 0;
+    int cancels = 0;
+    int ended = 0;
+    bool leadingButton = false;
+
+    TestPad() { options.grabRadius = 10.0f; }
+
+    void Ui(facet::test::Session& session)
+    {
+        if (leadingButton)
+        {
+            ImGui::Button("first");
+            session.Track("first");
+        }
+        ItemOptions item;
+        item.press = PressMode::Click;
+        const facet::internal::ItemState state = facet::internal::ItemBehavior(ImGui::GetID("pad"), ImVec2(200.0f, 100.0f), item);
+        const facet::internal::ValueDrag2DResult result = facet::internal::ValueDrag2DBehavior(state, &x, &y, state.rect, options);
+        changes += result.changed ? 1 : 0;
+        ended += result.ended ? 1 : 0;
+        commits += facet::IsItemEditCommitted() ? 1 : 0;
+        cancels += facet::IsItemEditCanceled() ? 1 : 0;
+        session.Track("pad");
+        ImGui::Button("below");
+        session.Track("below");
+    }
+
+    // The screen point at fractions (fx, fy) of the area, fy from the bottom.
+    static ImVec2 At(const facet::test::Session& session, double fx, double fy)
+    {
+        const ImRect r = session.ItemRect("pad");
+        return ImVec2(r.Min.x + static_cast<float>(fx) * r.GetWidth(), r.Max.y - static_cast<float>(fy) * r.GetHeight());
+    }
+};
+
+void Install(facet::test::Session& session, TestPad& pad)
+{
+    session.SetUi([&] { pad.Ui(session); });
+    session.Frames(2);
+}
+
+} // namespace
+
+TEST_CASE("Value drag 2D: the disc keeps fractions inside the inscribed ellipse")
+{
+    double fx = 1.0;
+    double fy = 1.0;
+    facet::internal::ClampToDisc(&fx, &fy);
+    CHECK(fx == doctest::Approx(0.5 + 0.5 / std::sqrt(2.0)));
+    CHECK(fy == doctest::Approx(0.5 + 0.5 / std::sqrt(2.0)));
+    fx = 0.6;
+    fy = 0.3;
+    facet::internal::ClampToDisc(&fx, &fy);
+    CHECK(fx == 0.6);
+    CHECK(fy == 0.3);
+    fx = 0.0;
+    fy = 0.5;
+    facet::internal::ClampToDisc(&fx, &fy);
+    CHECK(fx == 0.0);
+    CHECK(fy == 0.5);
+}
+
+TEST_CASE("Value drag 2D: a press on the point grabs it, elsewhere it jumps, and a drag out and back is exact")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    pad.x = 0.3;
+    pad.y = 0.7;
+    Install(session, pad);
+    const ImVec2 point = TestPad::At(session, 0.3, 0.7);
+    session.MouseMove(ImVec2(point.x + 4.0f, point.y - 3.0f));
+    session.MouseDown();
+    CHECK(pad.x == 0.3);
+    CHECK(pad.y == 0.7);
+    // 50 pixels right is a quarter of the width, 20 pixels down a fifth of the height.
+    session.MouseMove(ImVec2(point.x + 54.0f, point.y + 17.0f));
+    CHECK(pad.x == doctest::Approx(0.55));
+    CHECK(pad.y == doctest::Approx(0.5));
+    session.MouseMove(ImVec2(-400.0f, -400.0f));
+    CHECK(pad.x == 0.0);
+    CHECK(pad.y == 1.0);
+    session.MouseMove(ImVec2(point.x + 4.0f, point.y - 3.0f));
+    CHECK(pad.x == 0.3);
+    CHECK(pad.y == 0.7);
+    session.MouseUp();
+    CHECK(pad.commits == 1);
+    CHECK(pad.ended == 1);
+
+    // A press away from the point moves it under the pointer first.
+    session.Click(TestPad::At(session, 0.8, 0.2));
+    CHECK(pad.x == doctest::Approx(0.8));
+    CHECK(pad.y == doctest::Approx(0.2));
+    CHECK(pad.commits == 2);
+}
+
+TEST_CASE("Value drag 2D: Shift keeps the axis with the larger travel, Ctrl snaps both axes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    Install(session, pad);
+    const ImVec2 point = TestPad::At(session, 0.5, 0.5);
+    session.MouseMove(point);
+    session.MouseDown();
+    session.KeyDown(ImGuiMod_Shift);
+    session.MouseMove(ImVec2(point.x + 40.0f, point.y - 10.0f));
+    CHECK(pad.x == doctest::Approx(0.7));
+    CHECK(pad.y == 0.5);
+    session.MouseMove(ImVec2(point.x + 10.0f, point.y - 40.0f));
+    CHECK(pad.x == 0.5);
+    CHECK(pad.y == doctest::Approx(0.9));
+    session.KeyUp(ImGuiMod_Shift);
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.MouseMove(ImVec2(point.x + 27.0f, point.y - 13.0f));
+    CHECK(pad.x == doctest::Approx(0.6));   // 0.635 snapped to tenths
+    CHECK(pad.y == doctest::Approx(0.6));   // 0.63 snapped to tenths
+    session.KeyUp(ImGuiMod_Ctrl);
+    session.MouseUp();
+}
+
+TEST_CASE("Value drag 2D: the arrows step both axes, Up moves up on screen, one session per press")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    pad.leadingButton = true;
+    Install(session, pad);
+    session.Click(session.ItemCenter("first"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("pad"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(pad.x == doctest::Approx(0.51));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(pad.y == doctest::Approx(0.51));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    CHECK(pad.y == doctest::Approx(0.509));
+    session.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Ctrl);
+    CHECK(pad.x == doctest::Approx(0.5));
+    session.KeyPress(ImGuiKey_PageUp);
+    CHECK(pad.y == doctest::Approx(0.6));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(pad.x == 1.0);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(pad.x == 0.0);
+    CHECK(pad.commits == 7);
+    CHECK(pad.ended == 7);
+    // The arrows never move the focus away; Tab does.
+    CHECK(ImGui::GetFocusID() == session.ItemId("pad"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("below"));
+
+    // With y growing downward, Up moves toward min.y.
+    pad.options.yDown = true;
+    pad.y = 0.5;
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("pad"));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(pad.y == doctest::Approx(0.49));
+}
+
+TEST_CASE("Value drag 2D: Escape restores both values during a drag and a held key")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    Install(session, pad);
+    const ImVec2 point = TestPad::At(session, 0.5, 0.5);
+    session.MouseMove(point);
+    session.MouseDown();
+    session.MouseMove(ImVec2(point.x + 40.0f, point.y + 20.0f));
+    CHECK(pad.x != 0.5);
+    CHECK(pad.y != 0.5);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(pad.x == 0.5);
+    CHECK(pad.y == 0.5);
+    CHECK(pad.cancels == 1);
+    session.MouseUp();
+    CHECK(pad.commits == 0);
+
+    session.KeyDown(ImGuiKey_RightArrow);
+    CHECK(pad.x == doctest::Approx(0.51));
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(pad.x == 0.5);
+    CHECK(pad.cancels == 2);
+    session.KeyUp(ImGuiKey_RightArrow);
+}
+
+TEST_CASE("Value drag 2D: held arrows keep a stick at the edge, the disc holds the diagonal on its edge")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    pad.options.mappingX = {.min = -1.0, .max = 1.0};
+    pad.options.mappingY = {.min = -1.0, .max = 1.0};
+    pad.options.keys = facet::internal::PadKeys::Hold;
+    pad.options.disc = true;
+    pad.x = 0.0;
+    pad.y = 0.0;
+    Install(session, pad);
+    session.Click(TestPad::At(session, 0.5, 0.5));
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("pad"));
+    const int ended = pad.ended;
+    session.KeyDown(ImGuiKey_RightArrow);
+    CHECK(pad.x == 1.0);
+    CHECK(pad.y == 0.0);
+    session.KeyDown(ImGuiKey_UpArrow);
+    CHECK(pad.x == doctest::Approx(std::sqrt(0.5)));
+    CHECK(pad.y == doctest::Approx(std::sqrt(0.5)));
+    session.KeyUp(ImGuiKey_RightArrow);
+    CHECK(pad.x == 0.0);
+    CHECK(pad.y == 1.0);
+    CHECK(pad.ended == ended);
+    session.KeyUp(ImGuiKey_UpArrow);
+    session.Frame();
+    // The block leaves the point where the keys held it; the session ended once.
+    CHECK(pad.ended == ended + 1);
+    CHECK(ImGui::GetActiveID() == 0);
+    session.KeyDown(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    CHECK(pad.x == doctest::Approx(-0.5));
+    session.KeyUp(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+}
+
+TEST_CASE("Value drag 2D: an axis the item does not move keeps its value and its arrows, and clamps hold")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    pad.options.moveY = false;
+    pad.options.clampHighX = 0.6;
+    Install(session, pad);
+    session.Drag({TestPad::At(session, 0.5, 0.5), TestPad::At(session, 0.9, 0.9)});
+    CHECK(pad.x == 0.6);
+    CHECK(pad.y == 0.5);
+    session.Click(TestPad::At(session, 0.2, 0.9));
+    CHECK(pad.x == doctest::Approx(0.2));
+    CHECK(pad.y == 0.5);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("pad"));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(pad.y == 0.5);
+    // Up is left to navigation; Home and End act on x.
+    session.KeyPress(ImGuiKey_End);
+    CHECK(pad.x == 0.6);
+}
+
+TEST_CASE("Value drag 2D: disabled and read-only items never write")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TestPad pad;
+    pad.options.readOnly = true;
+    Install(session, pad);
+    session.Drag({TestPad::At(session, 0.5, 0.5), TestPad::At(session, 0.9, 0.9)});
+    session.Click(TestPad::At(session, 0.1, 0.1));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(pad.x == 0.5);
+    CHECK(pad.y == 0.5);
+    CHECK(pad.changes == 0);
+}
