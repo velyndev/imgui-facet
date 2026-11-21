@@ -18,6 +18,7 @@
 
 #include <facet/facet.h>
 
+#include "core/core_internal.h"
 #include "internal/focus.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
@@ -885,4 +886,132 @@ TEST_CASE("A searchable multi dropdown filters its rows and toggles the active o
     CHECK(popup.open);
     session.KeyPress(ImGuiKey_Escape);
     CHECK_FALSE(popup.open);
+}
+
+// ---- BeginCombo, ComboItem, EndCombo --------------------------------------------------------------
+
+namespace
+{
+
+// A combo over kFruit whose rows are ComboItems; returns the row chosen this frame or -1.
+int FruitCombo(const char* label, int current, const facet::ComboOptions& options = {})
+{
+    int chosen = -1;
+    if (facet::BeginCombo(label, kFruit[current].label, options))
+    {
+        for (int i = 0; i < static_cast<int>(std::size(kFruit)); ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::BeginDisabled(kFruit[i].disabled);
+            if (facet::ComboItem(kFruit[i].label, i == current, {.detail = kFruit[i].detail}))
+                chosen = i;
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        facet::EndCombo();
+    }
+    return chosen;
+}
+
+} // namespace
+
+TEST_CASE("A combo opens on a click, its rows are chosen by click, and it closes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int current = 0;
+    PopupProbe popup;
+    session.SetUi([&] {
+        if (const int chosen = FruitCombo("Fruit", current); chosen >= 0)
+            current = chosen;
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("fruit"));
+    REQUIRE(popup.open);
+    session.Click(popup.Row(3));
+    CHECK(current == 3);
+    CHECK_FALSE(popup.open);
+    // A disabled row is shown but refused.
+    session.Click(session.ItemCenter("fruit"));
+    session.Click(popup.Row(2));
+    CHECK(current == 3);
+    CHECK(popup.open);
+}
+
+TEST_CASE("A combo opens with Enter on the selected row; the arrows and Enter choose, Escape closes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int current = 3;
+    PopupProbe popup;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (const int chosen = FruitCombo("Fruit", current); chosen >= 0)
+            current = chosen;
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    REQUIRE(popup.open);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(current == 4);
+    CHECK_FALSE(popup.open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("fruit"));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(popup.open);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(popup.open);
+    CHECK(current == 4);
+    CHECK(ImGui::GetFocusID() == session.ItemId("fruit"));
+}
+
+TEST_CASE("A combo list is at most maxVisibleRows rows tall and a read-only combo does not open")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PopupProbe shortList;
+    PopupProbe readOnly;
+    session.SetUi([&] {
+        FruitCombo("Small", 0, {.maxVisibleRows = 2});
+        session.Track("small");
+        shortList.Record("Small");
+        FruitCombo("Read only", 0, {.readOnly = true});
+        session.Track("readonly");
+        readOnly.Record("Read only");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("small"));
+    session.Frames(2);
+    REQUIRE(shortList.open);
+    const float rows = fi::ListRowHeight(facet::ControlSize::Regular);
+    CHECK(shortList.rect.GetHeight() < rows * 3.0f);
+    CHECK(shortList.rect.GetHeight() >= rows * 2.0f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Click(session.ItemCenter("readonly"));
+    CHECK_FALSE(readOnly.open);
+}
+
+TEST_CASE("A combo item outside a combo is reported and returns false")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool result = true;
+    int reported = 0;
+    session.SetUi([&] {
+        const int before = facet::internal::UsageErrorCount();
+        result = facet::ComboItem("Stray", true);
+        reported = facet::internal::UsageErrorCount() - before;
+    });
+    session.Frame();
+    CHECK_FALSE(result);
+    CHECK(reported == 1);
 }

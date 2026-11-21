@@ -258,6 +258,9 @@ inline bool ListsFlag(std::span<const bool> flags, int index)
 // after an Escape the popup host handles itself.
 void ListsCloseByKey(ImGuiID level);
 
+// The frame hooks of the family (lists_frame.cpp): reset the stacks of open Begin / End pairs.
+void ListsComboEndFrame();
+
 // Marks the last item as edited this frame (ImGui::IsItemEdited), for a widget that wrote its value.
 void ListsMarkEdited();
 

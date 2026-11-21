@@ -59,11 +59,6 @@ void CallListStubs(Values& v)
     const std::span<bool> checked(v.checked);
     const std::span<facet::CheckState> states(v.states);
 
-    CHECK_BALANCED(if (facet::BeginCombo("Combo", "Option 1")) {
-        FAIL("BeginCombo opened");
-        facet::EndCombo();
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::ComboItem("Option 1", true)));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
     CHECK_BALANCED({

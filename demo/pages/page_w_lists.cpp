@@ -33,6 +33,7 @@ enum CaptureState
     kDropdownSearch,
     kFocused,
     kMultiOpen,
+    kComboOpen,
 };
 
 const facet::ChoiceItem kOptions[] = {
@@ -285,17 +286,46 @@ void MultiDropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
          CountChecked(s.multiCounted), static_cast<int>(std::size(kLabels)));
 }
 
-void ComboSection(ListsState& s)
+void ComboSection(facet::demo::PageCtx& ctx, ListsState& s)
 {
     SectionHeader("Combo with custom rows");
-    LabeledRow("Custom rows");
-    if (facet::BeginCombo("##combo", kLabels[s.combo]))
+    Paragraph("The caller submits the rows. The list takes the keyboard focus on the chosen row; the arrows move, "
+              "Enter or a click chooses, Escape closes. Rows wrapped in a disabled block are shown but refused.");
+    if (ctx.capture && ctx.captureState == kComboOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    if (facet::BeginCombo("Custom rows", kOptions[s.combo].label, {.icon = kOptions[s.combo].icon, .width = 320.0f}))
     {
-        for (int i = 0; i < 4; ++i)
-            if (facet::ComboItem(kLabels[i], s.combo == i, {.detail = "Detail"}))
+        for (int i = 0; i < static_cast<int>(std::size(kOptions)); ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::BeginDisabled(kOptions[i].disabled);
+            if (facet::ComboItem(kOptions[i].label, s.combo == i,
+                                 {.icon = kOptions[i].icon, .detail = kOptions[i].detail}))
+            {
                 s.combo = i;
+                ++s.writes;
+            }
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
         facet::EndCombo();
     }
+    ctx.Probe("lists.combo");
+    ProbePopup(ctx, "lists.combo.popup");
+    if (ctx.capture && ctx.captureState == kComboOpen)
+        ctx.RevealInCapture(0.25f);
+    LabeledRow("Read-only");
+    {
+        facet::ComboScope combo("##comboreadonly", kLabels[1], {.width = 200.0f, .readOnly = true});
+    }
+    LabeledRow("Error");
+    {
+        facet::ComboScope combo("##comboerror", nullptr, {.width = 200.0f, .error = "Choose an option"});
+        if (combo)
+            for (int i = 0; i < 4; ++i)
+                facet::ComboItem(kLabels[i], false);
+    }
+    Note("Combo choice: %s.", OptionName(s.combo));
 }
 
 void ChooseSeveral(ListsState& s)
@@ -337,7 +367,7 @@ void Hierarchies(ListsState& s)
 } // namespace
 
 FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dropdown-search", "focused",
-                 "multi-open")
+                 "multi-open", "combo-open")
 {
     facet::demo::PageHeader("Lists",
                             "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
@@ -348,7 +378,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     ListBoxSection(ctx, s);
     SelectableListSection(ctx, s);
     MultiDropdownSection(ctx, s);
-    ComboSection(s);
+    ComboSection(ctx, s);
     ChooseSeveral(s);
     SelectAndReorder(s);
     Hierarchies(s);
@@ -494,4 +524,25 @@ FACET_DEMO_SELFTEST("lists")
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("the filter field finds Option 3 and Enter clears it", [] { return !State().multiCounted[2]; });
     test.KeyPress(ImGuiKey_Escape);
+
+    // Combo: the caller's rows. Rows: Option 1 to Option 5, Option 4 disabled.
+    test.Do([] { State().combo = 0; });
+    test.Click("lists.combo");
+    test.MouseMove(popupRow("lists.combo.popup", 2));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click on the third row chooses Option 3", [] { return State().combo; }, 2.0, 0.0);
+    test.Click("lists.combo");
+    test.MouseMove(popupRow("lists.combo.popup", 3));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the disabled row is refused", [] { return State().combo; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectFocused("lists.combo");
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("Enter opens on the chosen row; Down passes the disabled row, Enter chooses Option 5",
+                    [] { return State().combo; }, 4.0, 0.0);
+    test.ExpectFocused("lists.combo");
 }

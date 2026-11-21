@@ -104,8 +104,6 @@ Status: ready.
 
 ### BeginCombo, ComboItem, EndCombo
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginCombo(const char* label, const char* preview, const ComboOptions& options = {});
 void EndCombo();
@@ -113,7 +111,31 @@ bool ComboItem(const char* label, bool selected, const ComboItemOptions& options
 class ComboScope;
 ```
 
-The field of a combo whose rows the caller submits, for rows a `ChoiceItem` cannot describe.
+The field of a combo whose rows the caller submits, for rows a `ChoiceItem` cannot describe. The
+field is the one of Dropdown: the label in front, `options.icon` and `preview` (or `Strings::select`
+in labelSecondary), the chevron, the message line, the width rule and the three sizes.
+
+- **Opening:** a click, Space, Enter or Down opens the list below the field (above when there is no
+  room); BeginCombo then returns true and the caller submits rows until EndCombo. While closed it
+  returns false and EndCombo must not be called. A read-only or disabled combo does not open.
+- **The open list** takes the keyboard focus: the row passed `selected` gets it and is scrolled
+  into view, the arrows move between the rows (Dear ImGui navigation), Enter, Space or a click on a
+  ComboItem returns true from that call and closes the list, and Escape, a click outside or a click
+  on the field closes it. The focus then goes back to the field.
+- **Rows:** ComboItem draws the row as the rows of Dropdown: a check mark slot showing `selected`,
+  `icon`, the label (semibold while selected, cut with an ellipsis and a tooltip) and `detail` at the
+  end. Rows wrapped in `ImGui::BeginDisabled` are shown in labelTertiary and refused. Other widgets
+  may be submitted between the rows.
+- **Height:** as tall as the rows submitted while the list was last open, at most `maxVisibleRows`
+  rows (`list.popupRows` by default); more rows scroll. The first opening uses the maximum.
+- **Calls out of place:** ComboItem outside BeginCombo / EndCombo is reported and returns false; an
+  EndCombo without its BeginCombo is reported and does nothing; a BeginCombo left open is reported
+  by `facet::EndFrame`.
+
+State kept under the id: the row count of the last opening; the list's scroll position under its
+popup level.
+
+Status: ready.
 
 ### ListBox
 
