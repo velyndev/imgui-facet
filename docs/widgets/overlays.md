@@ -82,15 +82,24 @@ Status: ready.
 
 ### BeginContextMenu
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginContextMenu(const char* id, const ContextMenuOptions& options = {});
 void EndContextMenu();
 class ContextMenuScope;
 ```
 
-A menu that opens on right click, the Menu key or Shift+F10 over an item or empty window space.
+A menu that opens on a right click (released over the target), or on the Menu key or Shift+F10 while
+the target has keyboard focus, read through key ownership so they work without
+`ImGuiConfigFlags_NavEnableKeyboard`. `ContextTarget::LastItem` is the item submitted right before
+the call; `Window` is empty space of the current window. It opens at the pointer, or below the focused
+item for the keys, at least `overlay.menuMinWidth` wide, flipped and moved into the display.
+
+Its rows are menu rows (`facet::MenuItem`, `BeginMenu` of the navigation family, on the shared menu
+row block): a row that runs its action closes the whole menu, a submenu opens after a short rest.
+Escape closes one level per press and a click outside closes it; the focus moves to its first row
+and comes back to the target.
+
+Status: ready.
 
 ### ItemTooltip, BeginRichTooltip
 

@@ -693,3 +693,103 @@ TEST_CASE("Popover content taller than the display scrolls inside the card")
     CHECK(Inside(card, DisplayMinusMargin()));
     CHECK(card.GetHeight() > facet::Px(facet::T().metrics.controlHeight));
 }
+
+// ---- Context menu --------------------------------------------------------------------------------
+
+TEST_CASE("A context menu opens on a right click at the pointer; a row runs and closes it; Escape closes it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    int ran = 0;
+    bool menuOpen = false;
+    ImRect menu;
+    session.SetUi([&] {
+        ImGui::SetCursorPos(ImVec2(200.0f, 150.0f));
+        facet::Button("Target");
+        session.Track("target");
+        if (facet::BeginContextMenu("menu"))
+        {
+            const ImGuiID level = fi::CurrentPopupLevel();
+            if (fi::MenuRow(level, "Rename").pressed)
+                ++ran;
+            session.Track("row");
+            facet::EndContextMenu();
+        }
+        menuOpen = fi::IsPopupLevelOpen(ImGui::GetID("menu"));
+        menu = fi::PopupLevelRect(ImGui::GetID("menu"));
+    });
+    session.Frame();
+    const ImVec2 at = session.ItemCenter("target");
+    session.Click(at, ImGuiMouseButton_Right);
+    session.Seconds(0.3f);
+    REQUIRE(menuOpen);
+    CHECK(menu.Min.y >= at.y - 1.0f);
+    CHECK(menu.GetWidth() >= facet::Px(facet::T().overlay.menuMinWidth) - 1.0f);
+    session.Click(session.ItemCenter("row"));
+    session.Frame();
+    CHECK(ran == 1);
+    CHECK_FALSE(menuOpen);
+    session.Click(at, ImGuiMouseButton_Right);
+    session.Seconds(0.3f);
+    REQUIRE(menuOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(menuOpen);
+}
+
+TEST_CASE("The Menu key and Shift+F10 open a context menu at the focused item; the focus comes back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool menuOpen = false;
+    ImRect menu;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Button("Target");
+        session.Track("target");
+        if (facet::BeginContextMenu("menu"))
+        {
+            (void)fi::MenuRow(fi::CurrentPopupLevel(), "Copy");
+            facet::EndContextMenu();
+        }
+        menuOpen = fi::IsPopupLevelOpen(ImGui::GetID("menu"));
+        menu = fi::PopupLevelRect(ImGui::GetID("menu"));
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("target"));
+    session.KeyPress(ImGuiKey_Menu);
+    session.Seconds(0.3f);
+    REQUIRE(menuOpen);
+    CHECK(menu.Min.y >= session.ItemRect("target").Max.y - 1.0f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(menuOpen);
+    CHECK(ImGui::GetFocusID() == session.ItemId("target"));
+    session.KeyPress(ImGuiKey_F10 | ImGuiMod_Shift);
+    session.Seconds(0.3f);
+    CHECK(menuOpen);
+}
+
+TEST_CASE("A window context menu opens on a right click on empty space")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool menuOpen = false;
+    session.SetUi([&] {
+        ImGui::Button("item");
+        if (facet::BeginContextMenu("space", {.target = facet::ContextTarget::Window}))
+        {
+            (void)fi::MenuRow(fi::CurrentPopupLevel(), "Paste");
+            facet::EndContextMenu();
+        }
+        menuOpen = fi::IsPopupLevelOpen(ImGui::GetID("space"));
+    });
+    session.Frame();
+    session.Click(ImVec2(400.0f, 400.0f), ImGuiMouseButton_Right);
+    session.Frames(2);
+    CHECK(menuOpen);
+}
