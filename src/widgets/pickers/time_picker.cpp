@@ -246,7 +246,8 @@ struct TimeColumnsResult
 // `generation` counts the openings of a popover: each opening gets columns of its own, so the
 // keyboard focus starts on the chosen entries, not where it was the last time.
 TimeColumnsResult TimeColumns(ImGuiID id, const TimeLayout& layout, const TimeOfDay& time, const TimePickerOptions& options,
-                              int minuteStep, bool opened, bool readOnly, bool live, int generation)
+                              int minuteStep, bool opened, bool readOnly, bool live, int generation,
+                              const ImVec4& fadeSurface)
 {
     using namespace internal;
     TimeColumnsResult result;
@@ -267,6 +268,7 @@ TimeColumnsResult TimeColumns(ImGuiID id, const TimeLayout& layout, const TimeOf
         view.rowCount = source.Count();
         view.size = options.size;
         view.areaSize = area;
+        view.fadeSurface = fadeSurface;
         view.choice = &choice;
         view.pill = true;
         view.readOnly = readOnly || !live;
@@ -585,7 +587,7 @@ bool TimePicker(const char* label, TimeOfDay* time, const TimePickerOptions& opt
         // The columns scroll to the time whenever it changed elsewhere (the field, the caller).
         const int seconds = TimeToSeconds(shown);
         const TimeColumnsResult result = TimeColumns(inlineId, layout, shown, options, minuteStep, state.revealed != seconds,
-                                                     readOnly, !item.disabled && columnsForced.state == ForcedItemState::None, 0);
+                                                     readOnly, !item.disabled && columnsForced.state == ForcedItemState::None, 0, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         if (result.shown)
             state.revealed = result.changed ? TimeToSeconds(result.time) : seconds;
         ImGui::EndDisabled();
@@ -610,7 +612,7 @@ bool TimePicker(const char* label, TimeOfDay* time, const TimePickerOptions& opt
             const int seconds = TimeToSeconds(shown);
             const TimeColumnsResult result =
                 TimeColumns(level, layout, shown, options, minuteStep, state.revealed != seconds || item.open, readOnly,
-                            !item.open, state.generation);
+                            !item.open, state.generation, c.bgElevated);
             if (result.shown)
                 state.revealed = result.changed ? TimeToSeconds(result.time) : seconds;
             if (result.changed)

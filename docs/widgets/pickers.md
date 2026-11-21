@@ -331,8 +331,33 @@ bool IconPicker(const char* label, Icon* icon, const IconPickerOptions& options 
 bool IconPicker(const char* label, Icon* icon, std::span<const ChoiceItem> icons, const IconPickerOptions& options = {});
 ```
 
-A field that opens a searchable grid of icons, every registered icon or a given list in groups.
-Status: planned.
+A field that shows the icon and its name (the item label, or the registered name in the first form;
+the placeholder or `Strings::select` while there is none) with a chevron, like a Dropdown field: the
+label in front, the available width by default. A click, Enter, Space, Down or Alt+Down opens a
+popover below it (above when there is no room) with a search field (`searchable`) over a grid of
+icon tiles one Large control height square. The recently picked icons come first under
+`Strings::recent` (`showRecent`, up to eight, kept under the id while the widget is shown), then
+every icon, in sections under their `ChoiceItem::group` text; the first form offers every
+registered icon (`IconCount`, `IconNameAt`), sorted by name. `columns` sets the columns; 0 fits as
+many as the wider of the field and six tiles allow, at most the display width. The grid shows six
+lines at most and scrolls; only its visible lines are submitted, and the tiles are rebuilt only when
+the filter, the item count, the columns or the recent icons change, so a set of any size costs the
+same per frame.
+
+The search field takes the typing from the moment the popover opens and filters by the fuzzy
+matcher on the names (in item order when there are sections, best match first otherwise); with no
+match the grid shows `Strings::noResults`. Down moves from the search field into the grid. In the
+grid the arrows move in two dimensions (Up and Down keep the column and pass over section headers),
+Home and End go to the first and last icon, Page Up and Down by the lines in view; disabled items
+are shown but skipped. Enter, Space or a click picks, writes, adds the icon to the recent ones and
+closes, and the focus returns to the field; Escape (after clearing the search) or a click outside
+closes without writing. Without `searchable`, the focus starts on the chosen icon. The chosen tile
+has a ring in the accent text color; each tile shows its name as a tooltip on hover and keyboard
+focus.
+
+`readOnly` (or a null pointer) shows the icon but does not open. `mixed` shows `Strings::mixed`
+until an icon is picked. `error` and `helpText` show under the field. Captures:
+`ForcedItemState::Open` shows the popover. Status: ready.
 
 ### ThumbnailPicker
 

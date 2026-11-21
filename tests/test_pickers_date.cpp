@@ -21,6 +21,7 @@
 #include "internal/popup_host.h"
 #include "support/session.h"
 #include "widgets/pickers/date_picker_parts.h"
+#include "widgets/pickers/icon_picker_parts.h"
 
 namespace
 {
@@ -886,4 +887,204 @@ TEST_CASE("The degrees field writes a typed angle, and a read-only angle picker 
     session.Click(ImVec2(fixedDial.Min.x + 2.0f, fixedDial.GetCenter().y));
     session.KeyPress(ImGuiKey_RightArrow);
     CHECK(fixed == 0.5f);
+}
+// ---- IconPicker ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// The popover of an IconPicker as the last frame left it.
+struct IconProbe
+{
+    ImGuiID level = 0;
+    ImGuiID grid = 0;
+    bool open = false;
+    ImRect rect;
+
+    void Record(const char* label)
+    {
+        level = ImHashStr("##icons", 0, ImGui::GetID(label));
+        grid = ImHashStr("##tiles", 0, level);
+        open = fi::IsPopupLevelOpen(level);
+        rect = fi::PopupLevelRect(level);
+    }
+    // The id of the tile of item `item` (a recent tile when `recent`).
+    ImGuiID Tile(int item, bool recent = false) const
+    {
+        const ImGuiID key = static_cast<ImGuiID>(item) * 2u + (recent ? 1u : 0u) + 1u;
+        return ImHashData(&key, sizeof(key), ImHashStr("##tile", 0, grid));
+    }
+};
+
+const facet::ChoiceItem kIconItems[] = {
+    {"Grid", facet::Icon("grid")},  {"List", facet::Icon("list")},     {"Sun", facet::Icon("sun")},
+    {"Moon", facet::Icon("moon")},  {"Star", facet::Icon("star")},     {"Heart", facet::Icon("heart")},
+    {"Bell", facet::Icon("bell")},  {"Clock", facet::Icon("clock")},   {"File", facet::Icon("file")},
+    {"Folder", facet::Icon("folder")},
+};
+
+} // namespace
+
+TEST_CASE("An icon picker filters by name and Down and Enter pick the match")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Icon icon = facet::Icon("grid");
+    int writes = 0;
+    IconProbe popup;
+    session.SetUi([&] {
+        if (facet::IconPicker("Icon", &icon, kIconItems))
+            ++writes;
+        session.Track("icon");
+        popup.Record("Icon");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("icon"));
+    session.Frames(2);
+    REQUIRE(popup.open);
+    session.Type("moo");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == popup.Tile(3));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(icon == facet::Icon("moon"));
+    CHECK(writes == 1);
+    CHECK_FALSE(popup.open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("icon"));
+}
+
+TEST_CASE("The icon grid moves in two dimensions and keeps the recent icons first")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Icon icon = facet::Icon("grid");
+    IconProbe popup;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::IconPicker("Icon", &icon, kIconItems, {.searchable = false, .columns = 4});
+        session.Track("icon");
+        popup.Record("Icon");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("icon"));
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    REQUIRE(popup.open);
+    CHECK(ImGui::GetFocusID() == popup.Tile(0));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ImGui::GetFocusID() == popup.Tile(1));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == popup.Tile(5));
+    session.KeyPress(ImGuiKey_DownArrow);  // the last line holds 8 and 9
+    CHECK(ImGui::GetFocusID() == popup.Tile(9));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == popup.Tile(9));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ImGui::GetFocusID() == popup.Tile(5));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ImGui::GetFocusID() == popup.Tile(0));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(ImGui::GetFocusID() == popup.Tile(9));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(icon == facet::Icon("file"));
+    CHECK_FALSE(popup.open);
+
+    // Opened again: the picked icon leads under Recent, and the focus starts on the chosen tile.
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    REQUIRE(popup.open);
+    CHECK(ImGui::GetFocusID() == popup.Tile(8));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ImGui::GetFocusID() == popup.Tile(8, true));
+}
+
+TEST_CASE("An icon search without a match shows the empty state and keeps the icon")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Icon icon = facet::Icon("sun");
+    IconProbe popup;
+    ImRect tile;
+    session.SetUi([&] {
+        facet::IconPicker("Icon", &icon, kIconItems);
+        session.Track("icon");
+        popup.Record("Icon");
+        tile = fi::PickerGridTileRect(popup.grid, 0);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("icon"));
+    session.Frames(2);
+    REQUIRE(popup.open);
+    CHECK(tile.GetWidth() > 0.0f);
+    session.Type("qqqq");
+    session.Frames(3);
+    CHECK(popup.open);
+    CHECK(tile.GetWidth() == 0.0f);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(icon == facet::Icon("sun"));
+}
+
+TEST_CASE("An icon grid over a very large set submits only its visible lines and reaches the last icon")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static constexpr int kCount = 20000;
+    static facet::ChoiceItem items[kCount];
+    static char labels[kCount][16];
+    for (int i = 0; i < kCount; ++i)
+    {
+        std::snprintf(labels[i], sizeof(labels[i]), "Option %d", i + 1);
+        items[i] = facet::ChoiceItem{labels[i], facet::Icon(i % 2 == 0 ? "grid" : "list")};
+    }
+    facet::Icon icon;
+    IconProbe popup;
+    ImRect first;
+    ImRect last;
+    int drawn = 0;
+    session.SetUi([&] {
+        facet::IconPicker("Icon", &icon, std::span<const facet::ChoiceItem>(items, kCount), {.searchable = false});
+        session.Track("icon");
+        popup.Record("Icon");
+        first = fi::PickerGridTileRect(popup.grid, 0);
+        last = fi::PickerGridTileRect(popup.grid, kCount - 1);
+        drawn = 0;
+        for (int i = 0; i < 200; ++i)
+            drawn += fi::PickerGridTileRect(popup.grid, i).GetWidth() > 0.0f ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("icon"));
+    session.Frames(2);
+    REQUIRE(popup.open);
+    CHECK(first.GetWidth() > 0.0f);
+    CHECK(last.GetWidth() == 0.0f);
+    CHECK(drawn < 200);  // the visible lines, not every tile
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(3);
+    CHECK(ImGui::GetFocusID() == popup.Tile(kCount - 1));
+    CHECK(last.GetWidth() > 0.0f);
+    CHECK(first.GetWidth() == 0.0f);
+}
+
+TEST_CASE("A read-only icon picker does not open")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Icon icon = facet::Icon("sun");
+    IconProbe popup;
+    session.SetUi([&] {
+        facet::IconPicker("Icon", &icon, kIconItems, {.readOnly = true});
+        session.Track("icon");
+        popup.Record("Icon");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("icon"));
+    session.Frames(2);
+    CHECK_FALSE(popup.open);
+    CHECK(icon == facet::Icon("sun"));
 }

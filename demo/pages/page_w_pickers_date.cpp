@@ -38,6 +38,7 @@ enum CaptureState
     kRangeOpen,
     kTimeOpen,
     kAngleFocused,
+    kIconOpen,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -68,6 +69,8 @@ struct OtherPickersUi
     float angleSigned = -1.5707964f;
     float angleLarge = 0.7853982f;
     facet::Icon icon = facet::Icon("star");
+    facet::Icon iconSection = facet::Icon("sun");
+    facet::Icon iconEmpty;
     int thumbnail = 0;
     std::string path;
 };
@@ -307,10 +310,38 @@ void AngleSection(facet::demo::PageCtx& ctx)
     Note("Angle: %.1f degrees.", ui.angle * 180.0f / 3.14159265f);
 }
 
+void IconSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("IconPicker");
+    Paragraph("A field that opens a grid of icons: the recently picked ones first, then every icon, in sections when "
+              "the items have groups. Typing filters by name; Down moves from the search field into the grid, where "
+              "the arrows move in two dimensions and Enter picks.");
+    if (ctx.capture && ctx.captureState == kIconOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    facet::IconPicker("Built-in icons", &ui.icon, {.width = DemoWidth(320.0f)});
+    ctx.Probe("pickers.icon");
+    if (ctx.capture && ctx.captureState == kIconOpen)
+        ctx.RevealInCapture(0.2f);
+    facet::IconPicker("Sections", &ui.iconSection, kIcons, {.searchable = false, .columns = 2, .width = DemoWidth(320.0f)});
+    ctx.Probe("pickers.icon.sections");
+    facet::IconPicker("No icon yet", &ui.iconEmpty, {.width = DemoWidth(320.0f)});
+    facet::Icon fixed = facet::Icon("bell");
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::IconPicker("##disabled", &fixed, {.width = DemoWidth(240.0f)});
+    ImGui::EndDisabled();
+    LabeledRow("Read-only");
+    facet::IconPicker("##readonly", &fixed, {.width = DemoWidth(240.0f), .readOnly = true});
+    LabeledRow("Error");
+    facet::IconPicker("##error", &fixed, {.width = DemoWidth(240.0f), .error = "Pick another icon"});
+    const char* name = facet::IconName(ui.icon);
+    Note("Picked: %s.", name != nullptr ? name : "none");
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
-                "time-open", "angle-focused")
+                "time-open", "angle-focused", "icon-open")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
@@ -323,9 +354,9 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
 
     AngleSection(ctx);
 
+    IconSection(ctx);
+
     SectionHeader("Other pickers");
-    LabeledRow("Icon");
-    facet::IconPicker("##icon", &ui.icon, kIcons);
     LabeledRow("Thumbnails");
     facet::ThumbnailPicker("##thumbnails", &ui.thumbnail, kThumbnails);
 
@@ -476,6 +507,31 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.MouseDown();
     test.MouseUp();
     test.ExpectNear("the large dial points at the pointer", [degrees] { return degrees(ui.angleLarge); }, 0.0, 0.01);
+
+    // IconPicker: typing filters, Down enters the grid, Enter picks; the arrows move in two dimensions.
+    test.Reveal("pickers.icon");
+    test.WaitSeconds(0.4f);
+    test.Click("pickers.icon");
+    test.WaitSeconds(0.3f);
+    test.Type("moo");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("typing, Down and Enter pick the matching icon", [] { return ui.icon == facet::Icon("moon"); });
+    test.ExpectFocused("pickers.icon");
+    test.Click("pickers.icon.sections");
+    test.KeyPress(ImGuiKey_Escape);
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Right from Sun picks Moon in the next column", [] { return ui.iconSection == facet::Icon("moon"); });
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Up past the section header and Left reach Grid", [] { return ui.iconSection == facet::Icon("grid"); });
 
     // The planned pickers are placeholders: clicks and keys write nothing.
 
