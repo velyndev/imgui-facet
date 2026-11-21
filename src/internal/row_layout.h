@@ -98,6 +98,15 @@ bool EndRow();
 void BeginRowGroup(const char* id);
 void EndRowGroup();
 
+// The column of settings rows (facet::BeginSettingsRow) the cursor is in. The rows of one window
+// under one id stack top and one column key keep one reset reserve; a container that narrows the
+// work rect (the container inset of a card, a group box or an accordion) sets a key of its own while
+// its content runs, so its rows form a column apart from the rows around it. 0 outside any; a key
+// set in an earlier frame reads as 0.
+ImGuiID RowColumnKey();
+// Sets the column key and returns the one it replaces, to be put back with this call again.
+ImGuiID SetRowColumnKey(ImGuiID key);
+
 // The y at which text in the current font sits on `baseline` (screen pixels).
 float TextTopForBaseline(float baseline);
 

@@ -401,4 +401,38 @@ void EndFrameRows()
     groups.depth = groups.overflow = 0;
 }
 
+namespace
+{
+
+struct RowColumnRecord
+{
+    int frame = -1;
+    ImGuiID key = 0;
+};
+
+RowColumnRecord& RowColumn()
+{
+    static RowColumnRecord record;
+    return record;
+}
+
+} // namespace
+
+ImGuiID RowColumnKey()
+{
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    const RowColumnRecord& record = RowColumn();
+    return g != nullptr && record.frame == g->FrameCount ? record.key : 0;
+}
+
+ImGuiID SetRowColumnKey(ImGuiID key)
+{
+    const ImGuiID previous = RowColumnKey();
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    RowColumnRecord& record = RowColumn();
+    record.frame = g != nullptr ? g->FrameCount : -1;
+    record.key = key;
+    return previous;
+}
+
 } // namespace facet::internal

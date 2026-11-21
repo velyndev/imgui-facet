@@ -261,7 +261,8 @@ the control (whatever the caller submits between Begin and End) in the rest of t
   `spacing.sm` gap included, so in a column of settings rows every control starts at one x whatever
   the label lengths. A label too long for its column ends in an ellipsis and shows in full as a
   tooltip on hover, and under the label while the row's control has the keyboard focus. The rows of
-  one window under one id stack top form a column: each keeps the widest reset slot of the column
+  one window under one id stack top form a column, and the rows inside a card, a group box or an
+  accordion section form a column of their own: each keeps the widest reset slot of the column
   (as measured in the last frame) free at its end, so the controls also end in one line (rows
   indented by a dependent group included) and every row of the column stacks at the same width.
 - Narrow widths: when the column and `layout.minRowControl` do not fit, the label goes on its own

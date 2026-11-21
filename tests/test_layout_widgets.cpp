@@ -165,6 +165,35 @@ TEST_CASE("A column of settings rows stacks at one width when one row has a rese
     CHECK(session.ItemRect("plain").Max.x == doctest::Approx(session.ItemRect("resettable").Max.x));
 }
 
+TEST_CASE("Settings rows in a card form a column apart from the rows around it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float cardRight = 0.0f;
+    session.SetUi([&] {
+        facet::BeginSettingsRow("Outside", {.modified = true, .resetButton = true});
+        ImGui::Button("##value", ImVec2(-FLT_MIN, 0.0f));
+        session.Track("outside");
+        facet::EndSettingsRow();
+        facet::BeginCard("Card");
+        cardRight = ImGui::GetCurrentWindow()->WorkRect.Max.x;
+        facet::BeginSettingsRow("Inside");
+        ImGui::Button("##value", ImVec2(-FLT_MIN, 0.0f));
+        session.Track("inside");
+        facet::EndSettingsRow();
+        facet::EndCard();
+        // Back outside the card: a plain row keeps the reset slot of the outside column.
+        facet::BeginSettingsRow("After");
+        ImGui::Button("##value", ImVec2(-FLT_MIN, 0.0f));
+        session.Track("after");
+        facet::EndSettingsRow();
+    });
+    session.Frames(3);
+    // No row of the card has a reset button, so its control reaches the card's inner edge.
+    CHECK(session.ItemRect("inside").Max.x == doctest::Approx(cardRight));
+    CHECK(session.ItemRect("after").Max.x == doctest::Approx(session.ItemRect("outside").Max.x));
+}
+
 TEST_CASE("A settings row lines its label up with the text of a control of any size")
 {
     facet::test::Session session;

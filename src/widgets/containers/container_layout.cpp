@@ -16,6 +16,7 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/row_layout.h"
 #include "internal/state_storage.h"
 
 namespace facet::internal
@@ -161,6 +162,17 @@ void BeginContainerInset(ContainerInset* inset, float width, float padding)
     inset->padding = padding;
     inset->savedWorkMaxX = window->WorkRect.Max.x;
     inset->savedContentMaxX = window->ContentRegionRect.Max.x;
+    // The n-th inset of the frame: the same container gets the same column key in every frame
+    // while the layout keeps its order.
+    static int frame = -1;
+    static int ordinal = 0;
+    if (frame != GImGui->FrameCount)
+    {
+        frame = GImGui->FrameCount;
+        ordinal = 0;
+    }
+    ++ordinal;
+    inset->columnKey = ImHashData(&ordinal, sizeof(ordinal), ImHashStr("##facet.insetcolumn", 0, window->ID));
     ImGui::BeginGroup();
 }
 
@@ -171,6 +183,9 @@ void OpenContainerInset(ContainerInset& inset)
     const float innerRight = std::max(window->DC.CursorPos.x, inset.right - inset.padding);
     window->WorkRect.Max.x = std::min(window->WorkRect.Max.x, innerRight);
     window->ContentRegionRect.Max.x = std::min(window->ContentRegionRect.Max.x, innerRight);
+    // Settings rows inside form a column of their own, so they do not keep room for the reset
+    // buttons of rows outside the container.
+    inset.savedColumnKey = SetRowColumnKey(inset.columnKey);
     inset.opened = true;
 }
 
@@ -180,6 +195,8 @@ void RestoreContainerInset(const ContainerInset& inset)
         return;
     inset.window->WorkRect.Max.x = inset.savedWorkMaxX;
     inset.window->ContentRegionRect.Max.x = inset.savedContentMaxX;
+    if (inset.opened)
+        (void)SetRowColumnKey(inset.savedColumnKey);
 }
 
 ImRect EndContainerInset(const ContainerInset& inset, float bottomPadding, float minHeight)

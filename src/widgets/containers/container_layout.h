@@ -106,6 +106,8 @@ struct ContainerInset
     float savedWorkMaxX = 0.0f;
     float savedContentMaxX = 0.0f;
     bool opened = false;          // OpenContainerInset ran
+    ImGuiID columnKey = 0;        // the settings-row column of the content (RowColumnKey, row_layout.h)
+    ImGuiID savedColumnKey = 0;   // the column key around the inset, put back by RestoreContainerInset
 };
 
 // Starts a group `width` pixels wide at the cursor of the current window.

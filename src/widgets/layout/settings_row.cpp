@@ -6,9 +6,11 @@
 // Rows outside a row group take the label column of the options or the labelColumn token, so in a
 // column of settings rows every control starts at one x whatever the label lengths; a label longer
 // than its column ends in an ellipsis and shows in full as a tooltip. The rows of one window under one
-// id stack top form a column: each keeps free at its end the widest reset slot the column had in the
-// last frame (RowOptions::endReserve), so the controls also end in one line (rows indented by a
-// dependent group included) and every row of the column stacks at the same width.
+// id stack top and one column key (RowColumnKey, row_layout.h: a card, a group box or an
+// accordion section starts its own) form a column: each keeps free at its end the widest reset
+// slot the column had in the last frame (RowOptions::endReserve), so the controls also end in one
+// line (rows indented by a dependent group included) and every row of the column stacks at the
+// same width.
 //
 // The label lines up with the text of the control: the block centers it on a control of the size
 // it is given. The row measures the height of its control in each frame (the last item submitted in
@@ -45,9 +47,9 @@ struct SettingsRowMeasure
     float scale = 0.0f;          // the scale it was measured at
 };
 
-// The settings rows of one window under one id stack top form a column. Every row of a column keeps
-// free at its end the widest reset slot of the column in the last frame, so their controls end in
-// one line and the rows stack at the same width.
+// The settings rows of one window under one id stack top and one column key form a column. Every
+// row of a column keeps free at its end the widest reset slot of the column in the last frame, so
+// their controls end in one line and the rows stack at the same width.
 struct SettingsRowColumn
 {
     int frame = -1;
@@ -144,7 +146,9 @@ void BeginSettingsRow(const char* label, const SettingsRowOptions& options)
 
     // The column this row belongs to, and the room its reset slots take.
     ImGuiContext& g = *GImGui;
-    const ImGuiID columnId = ImHashStr("##facet.settingscolumn", 0, window->IDStack.back());
+    const ImGuiID columnKey = internal::RowColumnKey();
+    const ImGuiID columnId =
+        ImHashData(&columnKey, sizeof(columnKey), ImHashStr("##facet.settingscolumn", 0, window->IDStack.back()));
     SettingsRowColumn& column = internal::GetState<SettingsRowColumn>(columnId);
     if (column.frame != g.FrameCount)
     {
