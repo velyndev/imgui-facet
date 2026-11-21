@@ -1229,6 +1229,32 @@ TEST_CASE("The shortcut sheet filters by the typed text and says when nothing ma
     facet::UnregisterShortcut(save);
 }
 
+TEST_CASE("The shortcut sheet stays inside a display narrower than the modal width")
+{
+    facet::test::SessionOptions options;
+    options.displaySize = ImVec2(320.0f, 500.0f);
+    facet::test::Session session(options);
+    REQUIRE(session.Ready());
+    REQUIRE(facet::Px(facet::T().overlay.modalWidth) > options.displaySize.x);
+    bool open = true;
+    ImGuiID sheet = 0;
+    session.SetUi([&] {
+        sheet = ImGui::GetID("Shortcuts");
+        facet::ShortcutSheet("Shortcuts", &open);
+    });
+    session.Seconds(0.3f);
+    const ImRect level = facet::internal::PopupLevelRect(sheet);
+    REQUIRE(level.GetWidth() > 0.0f);
+    CHECK(level.Min.x >= 0.0f);
+    CHECK(level.Max.x <= options.displaySize.x);
+    const ImRect close = NavigationPartRect(sheet, facet::internal::kNavigationPartClose);
+    REQUIRE(close.GetWidth() > 0.0f);
+    CHECK(close.Max.x <= options.displaySize.x);
+    session.Click(Center(close));
+    session.Frames(2);
+    CHECK_FALSE(open);
+}
+
 TEST_CASE("A shortcut sheet for a group without shortcuts shows the empty state")
 {
     facet::test::Session session;
