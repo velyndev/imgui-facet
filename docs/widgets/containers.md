@@ -102,8 +102,36 @@ void ToolbarSpacer();
 class ToolbarScope;
 ```
 
-A row of tool buttons whose lowest-priority buttons move into a "more" menu when it is narrow.
-Status: planned.
+A row of plain tool buttons at one control height (`size`), filling the available width unless
+`width` is set.
+
+- **Buttons.** `ToolbarButton` returns true when it is activated: a click, Space or Enter while it
+  has keyboard focus, or its row in the more menu. An icon-only button (the default) is square and
+  shows its visible label as a tooltip on hover and keyboard focus; with `iconOnly` off it shows the
+  icon and the label. `selected` shows the on look (the accent's subtle fill under accent text, so it
+  does not rely on the fill alone); the caller flips its state on activation. Outside a toolbar a
+  tool button is a plain button of its own.
+- **Groups.** `ToolbarSeparator` draws a hairline between groups. `ToolbarSpacer` is flexible space:
+  the items after the last spacer sit at the trailing end.
+- **Overflow.** When the buttons do not fit, the ones with the lowest `priority` move into a menu
+  behind a more button at the trailing end; among equal priorities the button furthest to the end
+  goes first. A separator shows only with a visible item on each side, so a row never starts or ends
+  with one. The menu lists the hidden buttons in toolbar order with their icons (a check mark for a
+  selected one), and a row activates the same action: the button's call returns true on the frame
+  after the row was chosen. A hidden button comes back once the row fits it with `spacing.lg` to
+  spare, so a slowly resized window does not make it blink. The widths are those of the last frame,
+  kept under the id; in the first frame a button shows while it fits.
+- **Keys.** Each button and the more button are Tab stops; Left and Right move along the row
+  (Dear ImGui keyboard navigation). Enter, Space or a click opens the menu, whose rows take Up,
+  Down, Enter and Escape; closing it returns the focus to the more button.
+- **Other widgets** submitted between `BeginToolbar` and `EndToolbar` sit on the row after the
+  previous item and never overflow; their width is taken off the room the buttons have.
+- **States.** A button inside `ImGui::BeginDisabled` draws in labelTertiary, is not a Tab stop and
+  never returns true, also from the menu, where its row is disabled.
+
+`EndToolbar` is always called; after it the toolbar is one item of its full width. Up to 48 buttons
+and separators per toolbar take part in the overflow; later ones show while they fit and never move
+into the menu. Status: ready.
 
 ### BeginStatusBar
 

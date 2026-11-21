@@ -93,13 +93,6 @@ void CallContainerStubs(Values& v)
         facet::EndMiniWindow();
     });
     CHECK_BALANCED({
-        facet::BeginToolbar("Toolbar");
-        CHECK_FALSE(facet::ToolbarButton("Add", facet::Icon("plus")));
-        facet::ToolbarSeparator();
-        facet::ToolbarSpacer();
-        facet::EndToolbar();
-    });
-    CHECK_BALANCED({
         facet::BeginStatusBar("Status");
         facet::StatusItem("Item 1");
         facet::EndStatusBar();
@@ -155,8 +148,8 @@ TEST_CASE("Containers placeholders outside a frame draw nothing and return the n
     session.Frame();
     const int before = facet::internal::UsageErrorCount();
     CHECK_FALSE(facet::BeginOverlay("outside", nullptr));
-    facet::BeginToolbar("outside");
-    facet::EndToolbar();
+    facet::BeginStatusBar("outside");
+    facet::EndStatusBar();
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK(facet::internal::UsageErrorCount() == before);
 }
@@ -168,12 +161,11 @@ TEST_CASE("Containers placeholders end only what began")
     Values v;
     int reported = 0;
     session.SetUi([&] {
-        CHECK_BALANCED({ facet::ToolbarScope toolbar("toolbar"); });
         CHECK_BALANCED({ facet::StatusBarScope status("status"); });
         // An End without its Begin is reported and changes no stack.
         const int before = facet::internal::UsageErrorCount();
         const Snapshot start = Snapshot::Take(v);
-        facet::EndToolbar();
+        facet::EndStatusBar();
         facet::EndShell();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;

@@ -5,7 +5,11 @@
 // controller and mini windows are root containers that a host calls outside every window, so they
 // are not called inside this page; the page says so and the family doc shows their host code.
 
+#include <algorithm>
+#include <string>
+
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
@@ -28,6 +32,7 @@ enum CaptureState
     kCaptureShell = 1,
     kCaptureFocused = 2,
     kCaptureHovered = 3,
+    kCaptureMenu = 4,
 };
 
 constexpr int kScrollLines = 40;
@@ -54,6 +59,11 @@ struct ContainersState
     float scrollMax = 0.0f;
     int scrollPresses = 0;
     bool resetOpen = false;     // the selftest asks for the default open states
+    // Toolbar
+    const char* lastTool = "none";
+    int toolPresses = 0;
+    int view = 0;
+    bool narrowShown[4] = {};
 };
 
 // Height of the sample regions: a few large control heights in design units, so it follows the
@@ -130,16 +140,69 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
          "docs/widgets/containers.md shows the host code for each.");
 }
 
+// One toolbar button that records its activation, probed while it shows. Returns whether it shows.
+bool Tool(facet::demo::PageCtx& ctx, ContainersState& s, const char* label, const char* icon, const char* probe,
+          const facet::ToolbarButtonOptions& options = {})
+{
+    if (facet::ToolbarButton(label, facet::Icon(icon), options))
+    {
+        s.lastTool = label;
+        ++s.toolPresses;
+    }
+    const bool shown = ImGui::GetItemID() == ImGui::GetID(label);
+    if (shown)
+        ctx.Probe(probe);
+    return shown;
+}
+
+void Toolbars(facet::demo::PageCtx& ctx, ContainersState& s)
+{
+    SectionHeader("Toolbar");
+    Paragraph("Plain tool buttons with tooltips; the view buttons latch. The second toolbar is narrow: "
+              "the buttons that do not fit move into the more menu, lowest priority first.");
+    facet::BeginToolbar("toolbar");
+    Tool(ctx, s, "Add", "plus", "containers.toolbar.add", {.priority = 2});
+    Tool(ctx, s, "Remove", "trash", "containers.toolbar.remove", {.priority = 2});
+    facet::ToolbarSeparator();
+    Tool(ctx, s, "Undo", "undo", "containers.toolbar.undo");
+    Tool(ctx, s, "Redo", "redo", "containers.toolbar.redo");
+    facet::ToolbarSeparator();
+    if (facet::ToolbarButton("Grid view", facet::Icon("grid"), {.selected = s.view == 0, .priority = 1}))
+        s.view = 0;
+    if (ImGui::GetItemID() == ImGui::GetID("Grid view"))
+        ctx.Probe("containers.toolbar.grid");
+    if (facet::ToolbarButton("List view", facet::Icon("list"), {.selected = s.view == 1, .priority = 1}))
+        s.view = 1;
+    if (ImGui::GetItemID() == ImGui::GetID("List view"))
+        ctx.Probe("containers.toolbar.list");
+    facet::ToolbarSpacer();
+    Tool(ctx, s, "Settings", "settings", "containers.toolbar.settings", {.iconOnly = false, .priority = 1});
+    facet::EndToolbar();
+    Note("Last tool: %s (%d presses). View: %s.", s.lastTool, s.toolPresses, s.view == 0 ? "grid" : "list");
+
+    ImGui::Spacing();
+    // Room for two buttons and the more button.
+    const float narrow = facet::T().metrics.controlHeight * 3.0f + facet::T().spacing.xs * 2.0f + facet::T().spacing.sm;
+    facet::BeginToolbar("narrow", {.width = narrow});
+    const float left = ImGui::GetCursorScreenPos().x;
+    s.narrowShown[0] = Tool(ctx, s, "Refresh", "refresh", "containers.narrow.refresh");
+    s.narrowShown[1] = Tool(ctx, s, "Copy", "copy", "containers.narrow.copy", {.priority = 1});
+    s.narrowShown[2] = Tool(ctx, s, "Paste", "paste", "containers.narrow.paste", {.priority = 2});
+    s.narrowShown[3] = Tool(ctx, s, "Download", "download", "containers.narrow.download");
+    const ImGuiID more = ImGui::GetID("##more");
+    if (ctx.capture && ctx.captureState == kCaptureMenu)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    facet::EndToolbar();
+    const float side = facet::ControlHeight(facet::ControlSize::Inherit);
+    const ImVec2 max = ImGui::GetItemRectMax();
+    facet::demo::ProbeRect(ctx, "containers.narrow.more", more, ImVec2(std::max(left, max.x - side), max.y - side), max);
+    if (ctx.capture && ctx.captureState == kCaptureMenu)
+        ctx.RevealInCapture(0.3f);
+}
+
 void Bars(ContainersState&)
 {
-    SectionHeader("Toolbar and status bar");
-    facet::BeginToolbar("toolbar");
-    facet::ToolbarButton("Add", facet::Icon("plus"), {.priority = 2});
-    facet::ToolbarButton("Remove", facet::Icon("trash"));
-    facet::ToolbarSeparator();
-    facet::ToolbarSpacer();
-    facet::ToolbarButton("Settings", facet::Icon("settings"), {.iconOnly = false});
-    facet::EndToolbar();
+    SectionHeader("Status bar");
     facet::BeginStatusBar("statusbar");
     facet::StatusItem("Status 1", {.icon = facet::Icon("info")});
     facet::StatusItem("Status 2", {.tone = facet::Tone::Success});
@@ -337,7 +400,7 @@ void Lists(ContainersState& s)
 
 } // namespace
 
-FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "focused", "hovered")
+FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "focused", "hovered", "menu")
 {
     facet::demo::PageHeader("Containers",
                             "The floating shell, the app frame and its title bar, the overlay controller, mini "
@@ -346,6 +409,7 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
     facet::demo::PlannedFamilyNote("containers");
     ContainersState& s = State();
     Windows(ctx, s);
+    Toolbars(ctx, s);
     Bars(s);
     Cards(ctx, s);
     GroupBoxes(ctx, s);
@@ -377,6 +441,52 @@ FACET_DEMO_SELFTEST("containers")
     test.Expect("the checkbox opens the shell", [] { return State().shellOpen; });
     test.Click("containers.shell");
     test.Expect("the checkbox closes the shell", [] { return !State().shellOpen; });
+
+    // Toolbar: clicks and Space or Enter activate; the arrows move along the row; the view buttons latch.
+    test.Click("containers.toolbar.add");
+    test.ExpectText("a click activates a tool button", [] { return std::string(State().lastTool); }, "Add");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("containers.toolbar.add");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectFocused("containers.toolbar.remove");
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectText("Space activates the focused tool button", [] { return std::string(State().lastTool); }, "Remove");
+    test.Click("containers.toolbar.list");
+    test.Expect("the list view button latches", [] { return State().view == 1; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectFocused("containers.toolbar.grid");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter on the grid view button latches it", [] { return State().view == 0; });
+    test.Click("containers.toolbar.settings");
+    test.ExpectText("the labelled button at the trailing end works", [] { return std::string(State().lastTool); },
+                    "Settings");
+    // Narrow toolbar: Copy and Paste show, Refresh and Download wait in the more menu.
+    test.ExpectVisible("containers.narrow.paste");
+    test.Expect("Refresh and Download wait in the more menu", [] {
+        const ContainersState& s = State();
+        return !s.narrowShown[0] && s.narrowShown[1] && s.narrowShown[2] && !s.narrowShown[3];
+    });
+    test.Click("containers.narrow.paste");
+    test.ExpectText("a visible button of the narrow toolbar works", [] { return std::string(State().lastTool); },
+                    "Paste");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectFocused("containers.narrow.more");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.ExpectText("Enter on the first menu row activates Refresh", [] { return std::string(State().lastTool); },
+                    "Refresh");
+    test.ExpectFocused("containers.narrow.more");  // the focus came back from the closed menu
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.ExpectText("the second menu row activates Download", [] { return std::string(State().lastTool); },
+                    "Download");
 
     // Card: the content works and fills the inner width.
     test.Click("containers.card.button");

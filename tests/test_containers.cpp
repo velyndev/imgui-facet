@@ -13,6 +13,7 @@
 #include <facet/facet.h>
 
 #include "internal/focus.h"
+#include "internal/popup_host.h"
 #include "support/session.h"
 #include "support/structure_stub_check.h"
 
@@ -226,13 +227,14 @@ TEST_CASE("An End of a container without its Begin is reported and changes nothi
         facet::EndAccordionSection();
         facet::EndAccordion();
         facet::EndScrollArea();
+        facet::EndToolbar();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;
         end.errors = start.errors;
         CHECK(end == start);
     });
     session.Frame();
-    CHECK(reported == 6);
+    CHECK(reported == 7);
 }
 
 // ---- Group box ----------------------------------------------------------------------------------
@@ -652,4 +654,238 @@ TEST_CASE("Scroll areas leave every stack as they found it")
     });
     session.Frames(3);
     CHECK(facet::internal::OpenScopeCount() == 0);
+}
+
+// ---- Toolbar ------------------------------------------------------------------------------------
+
+namespace
+{
+
+// A toolbar of four buttons A, B, C, D with priorities 0, 2, 0, 1 and a separator after B; C shows
+// its label, so it is wider than the square icon buttons. Records which buttons showed and how
+// often each was activated.
+struct ToolbarProbe
+{
+    const char* labels[4] = {"A", "B", "C", "D"};
+    int priorities[4] = {0, 2, 0, 1};
+    bool iconOnly[4] = {true, true, false, true};
+    bool shown[4] = {};
+    int presses[4] = {};
+    float width = 0.0f;  // units; 0 fills
+    int separatorVertices = 0;
+    ImRect bar;
+    ImGuiID moreId = 0;
+    bool menuOpen = false;
+
+    void Draw(facet::test::Session& session)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int before = drawList->VtxBuffer.Size;
+        facet::BeginToolbar("tools", {.width = width});
+        for (int i = 0; i < 4; ++i)
+        {
+            if (facet::ToolbarButton(labels[i], facet::Icon("plus"), {.iconOnly = iconOnly[i], .priority = priorities[i]}))
+                ++presses[i];
+            shown[i] = ImGui::GetItemID() == ImGui::GetID(labels[i]);
+            if (shown[i])
+                session.Track(labels[i]);
+            if (i == 1)
+                facet::ToolbarSeparator();
+        }
+        moreId = ImGui::GetID("##more");
+        menuOpen = facet::internal::IsPopupLevelOpen(ImGui::GetID("##moremenu"));
+        facet::EndToolbar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        separatorVertices = CountColor(drawList, before, facet::ToU32(facet::T().colors.separator));
+    }
+};
+
+} // namespace
+
+TEST_CASE("A toolbar button activates on click, Space and Enter, and the arrows move between buttons")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ToolbarProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    for (int i = 0; i < 4; ++i)
+        CHECK(probe.shown[i]);
+    CHECK(probe.separatorVertices > 0);
+    // Icon-only buttons are square at the control height; C shows its label too.
+    CHECK(session.ItemRect("A").GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(session.ItemRect("C").GetWidth() > session.ItemRect("A").GetWidth());
+    session.Click(session.ItemCenter("B"));
+    CHECK(probe.presses[1] == 1);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("B"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ImGui::GetFocusID() == session.ItemId("C"));
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.presses[2] == 2);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(ImGui::GetFocusID() == session.ItemId("B"));
+}
+
+TEST_CASE("A narrow toolbar moves the lowest priority into the more menu, the last of equals first")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ToolbarProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    const float scale = facet::Px(1.0f);
+    const float button = session.ItemRect("A").GetWidth() / scale;  // units
+    const float wide = session.ItemRect("C").GetWidth() / scale;
+    const float gap = facet::T().spacing.xs;
+    const float separator = facet::T().spacing.sm;
+    // Short of the whole row by half of what C is wider than the more button: C (priority 0, the
+    // last of the two lowest) goes first and the more button takes its place.
+    probe.width = button * 3.0f + wide + separator + gap * 4.0f - (wide - button) * 0.5f;
+    session.Frames(3);
+    CHECK(probe.shown[0]);
+    CHECK(probe.shown[1]);
+    CHECK_FALSE(probe.shown[2]);
+    CHECK(probe.shown[3]);
+    CHECK(probe.separatorVertices > 0);
+    // Room for B, the separator, D and the more button: A (priority 0) goes next, D (priority 1)
+    // stays, and the separator keeps dividing B from D.
+    probe.width = button * 3.0f + separator + gap * 3.0f;
+    session.Frames(3);
+    CHECK_FALSE(probe.shown[0]);
+    CHECK(probe.shown[1]);
+    CHECK_FALSE(probe.shown[2]);
+    CHECK(probe.shown[3]);
+    CHECK(probe.separatorVertices > 0);
+    CHECK(probe.bar.GetWidth() == doctest::Approx(facet::Px(probe.width)));
+    // Nothing leaves the bar.
+    CHECK(session.ItemRect("D").Max.x <= probe.bar.Max.x + 0.5f);
+    CHECK(session.ItemRect("B").Min.x >= probe.bar.Min.x - 0.5f);
+    // Room for one button and the more button: only B, the highest priority, stays, and the
+    // separator goes, because nothing is left on its other side.
+    probe.width = button * 2.0f + gap;
+    session.Frames(3);
+    CHECK(probe.shown[1]);
+    CHECK_FALSE(probe.shown[0]);
+    CHECK_FALSE(probe.shown[2]);
+    CHECK_FALSE(probe.shown[3]);
+    CHECK(probe.separatorVertices == 0);
+    // Wide again: everything comes back.
+    probe.width = 0.0f;
+    session.Frames(3);
+    for (int i = 0; i < 4; ++i)
+        CHECK(probe.shown[i]);
+}
+
+TEST_CASE("The rows of a toolbar's more menu activate the hidden buttons")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ToolbarProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    const float button = facet::ControlHeight(facet::ControlSize::Regular) / facet::Px(1.0f);
+    probe.width = button * 3.0f + facet::T().spacing.xs * 2.0f;
+    session.Frames(3);
+    REQUIRE_FALSE(probe.shown[0]);
+    REQUIRE_FALSE(probe.shown[2]);
+    REQUIRE_FALSE(probe.shown[3]);
+    const float h = facet::ControlHeight(facet::ControlSize::Regular);
+    const ImVec2 more(probe.bar.Max.x - h * 0.5f, probe.bar.GetCenter().y);
+    // By mouse: the menu lists A, C and D in toolbar order.
+    session.Click(more);
+    session.Frames(2);
+    CHECK(probe.menuOpen);
+    session.Click(session.ItemCenter("B"));  // a click outside closes the menu and B sees nothing
+    session.Frames(2);
+    CHECK_FALSE(probe.menuOpen);
+    CHECK(probe.presses[1] == 0);
+    // By keyboard: B, then Right to the more button, Enter opens the menu on its first row.
+    session.Click(session.ItemCenter("B"));
+    CHECK(probe.presses[1] == 1);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ImGui::GetFocusID() == probe.moreId);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(probe.menuOpen);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(probe.presses[0] == 1);
+    CHECK(probe.presses[2] == 0);
+    CHECK_FALSE(probe.menuOpen);
+    // The focus went back to the more button: the second row is C.
+    CHECK(ImGui::GetFocusID() == probe.moreId);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(probe.presses[2] == 1);
+    CHECK(probe.presses[0] == 1);
+    // Activations are counted once.
+    session.Frames(3);
+    CHECK(probe.presses[2] == 1);
+}
+
+TEST_CASE("Items after a toolbar spacer sit at the trailing end")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImRect bar;
+    float available = 0.0f;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        facet::BeginToolbar("tools");
+        (void)facet::ToolbarButton("Start", facet::Icon("plus"));
+        facet::ToolbarSpacer();
+        (void)facet::ToolbarButton("End", facet::Icon("settings"), {.iconOnly = false});
+        session.Track("end");
+        facet::EndToolbar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    });
+    session.Frames(3);
+    CHECK(session.ItemRect("end").Max.x == doctest::Approx(bar.Max.x).epsilon(0.001));
+    CHECK(bar.GetWidth() == doctest::Approx(available));
+}
+
+TEST_CASE("Toolbars leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::ToolbarScope outer("outer");
+            CHECK_FALSE(facet::ToolbarButton("A", facet::Icon("plus")));
+            facet::ToolbarSeparator();
+            ImGui::TextUnformatted("text");
+            facet::ToolbarSpacer();
+            facet::ToolbarScope inner("inner", {.size = facet::ControlSize::Small});
+            CHECK_FALSE(facet::ToolbarButton("B", facet::Icon("plus")));
+        });
+        CHECK_BALANCED({
+            facet::ToolbarScope narrow("narrow", {.width = 1.0f});
+            CHECK_FALSE(facet::ToolbarButton("A", facet::Icon("plus")));
+            CHECK_FALSE(facet::ToolbarButton("B", facet::Icon("plus")));
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::ToolbarScope disabled("disabled");
+            CHECK_FALSE(facet::ToolbarButton("A", facet::Icon("plus")));
+        });
+        ImGui::EndDisabled();
+        // Outside a toolbar a tool button is a plain button of its own.
+        CHECK_BALANCED(CHECK_FALSE(facet::ToolbarButton("Alone", facet::Icon("plus"))));
+        CHECK_BALANCED(facet::ToolbarSeparator());
+        CHECK_BALANCED(facet::ToolbarSpacer());
+    });
+    session.Frames(3);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    facet::BeginToolbar("outside a frame");
+    CHECK_FALSE(facet::ToolbarButton("A", facet::Icon("plus")));
+    facet::EndToolbar();
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK(facet::internal::UsageErrorCount() == before);
 }
