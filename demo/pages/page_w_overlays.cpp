@@ -4,8 +4,8 @@
 // button, so none opens over the gallery by itself; in capture runs each state opens its layer alone.
 // Sample content is neutral ("Command 1", "Option A"); the watermark fields say they are placeholders.
 //
-// The context menu rows are facet::MenuItem, a widget of the navigation family: where it is still a
-// placeholder, the rows show its placeholder and do nothing, and the selftest checks only the menu.
+// The context menu rows are facet::MenuItem of the navigation family; the note under the target
+// names the row picked last, and the selftest picks rows by mouse and by typeahead.
 
 #include <cstdio>
 #include <string>
@@ -94,6 +94,7 @@ struct OverlaysState
     int outsidePresses = 0;
     // Context menu
     bool contextShown = false;
+    int contextPick = 0;  // 0 none, else the row picked last (1 to 3)
     // Tooltips
     bool tooltipShown = false;
     bool richShown = false;
@@ -326,13 +327,20 @@ void ContextMenuSection(facet::demo::PageCtx& ctx, OverlaysState& s)
     if (facet::BeginContextMenu("context"))
     {
         s.contextShown = true;
-        facet::MenuItem("Option A");
-        facet::MenuItem("Option B");
-        facet::MenuItem("Delete", {.destructive = true});
+        if (facet::MenuItem("Option A"))
+            s.contextPick = 1;
+        ctx.Probe("overlays.context.a");
+        if (facet::MenuItem("Option B"))
+            s.contextPick = 2;
+        ctx.Probe("overlays.context.b");
+        if (facet::MenuItem("Delete", {.destructive = true}))
+            s.contextPick = 3;
         facet::EndContextMenu();
     }
     if (ctx.capture && ctx.captureState == kContext)
         ctx.RevealInCapture(0.3f);
+    static constexpr const char* kPicks[] = {"none yet", "Option A", "Option B", "Delete"};
+    Note("Picked from the menu: %s.", kPicks[s.contextPick]);
 }
 
 void TooltipsSection(facet::demo::PageCtx& ctx, OverlaysState& s)
@@ -766,6 +774,23 @@ FACET_DEMO_SELFTEST("overlays")
     test.Wait(2);
     test.Expect("Shift+F10 opens the context menu", [] { return State().contextShown; });
     test.KeyPress(ImGuiKey_Escape);
+    // Its rows act: a click runs a row and closes the menu, and so does typeahead with Enter.
+    test.Click("overlays.context", ImGuiMouseButton_Right);
+    test.Wait(2);
+    test.Click("overlays.context.b");
+    test.Wait(2);
+    test.Expect("a click on a row runs it and closes the menu",
+                [] { return State().contextPick == 2 && !State().contextShown; });
+    test.Click("overlays.context");
+    test.KeyPress(ImGuiKey_Menu);
+    test.WaitSeconds(0.4f);
+    test.Type("o");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.Expect("typeahead and Enter run a row and close the menu",
+                [] { return State().contextPick == 1 && !State().contextShown; });
+    test.ExpectFocused("overlays.context");
 
     // Tooltips: hover and keyboard focus show them, a disabled item never does, an interactive one
     // takes a click.
