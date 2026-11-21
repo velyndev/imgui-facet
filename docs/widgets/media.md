@@ -72,7 +72,13 @@ Status: ready.
 bool AvatarGroup(const char* label, std::span<const AvatarItem> items, const AvatarGroupOptions& options = {});
 ```
 
-Overlapping avatars with a "+N" chip; the names show on hover. Status: planned.
+Avatars overlapping by `media.avatarOverlap` of their diameter, each ringed in the surface color
+so the edge between them shows, and a pill with `Strings::moreCount` for the members that are not
+shown. `maxVisible` caps the avatars; 0 shows as many as fit the available width, giving way to
+the chip. The group is one item and one Tab stop, activated by a click, Enter or Space; hovering
+or focusing it shows the visible label part as the heading of a tooltip with every name. A group
+without members holds its place with an empty outline and lists `Strings::empty`. Descriptions of
+the items are not shown yet. Status: ready.
 
 ### ThumbnailStrip
 

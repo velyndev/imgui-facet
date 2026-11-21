@@ -308,3 +308,43 @@ TEST_CASE("An avatar takes the control height of its size, even, and activates o
     session.KeyPress(ImGuiKey_Enter);
     CHECK(activations == 2);
 }
+
+// ---- AvatarGroup -------------------------------------------------------------------------------
+
+TEST_CASE("An avatar group shows maxVisible avatars and a chip, and fits the width when maxVisible is 0")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::AvatarItem members[] = {{"Placeholder 1"}, {"Placeholder 2"}, {"Placeholder 3"},
+                                                {"Placeholder 4"}, {"Placeholder 5"}, {"Placeholder 6"}};
+    int activations = 0;
+    float narrowWidth = 0.0f;
+    session.SetUi([&] {
+        facet::AvatarGroup("all", members);
+        session.Track("all");
+        facet::AvatarGroup("two", members, {.maxVisible = 2});
+        session.Track("two");
+        if (facet::AvatarGroup("one", std::span(members, 1), {}))
+            ++activations;
+        session.Track("one");
+        ImGui::BeginChild("narrow", ImVec2(facet::ControlHeight(facet::ControlSize::Regular) * 3.0f, 0.0f));
+        facet::AvatarGroup("fit", members);
+        narrowWidth = ImGui::GetItemRectSize().x;
+        ImGui::EndChild();
+        facet::AvatarGroup("none", std::span<const facet::AvatarItem>());
+        session.Track("none");
+    });
+    session.Frame();
+    const float d = facet::ControlHeight(facet::ControlSize::Regular);
+    const float step = d - std::round(d * facet::T().media.avatarOverlap);
+    CHECK(session.ItemRect("all").GetWidth() == doctest::Approx(d + 5.0f * step));
+    CHECK(session.ItemRect("two").GetWidth() < session.ItemRect("all").GetWidth());
+    CHECK(session.ItemRect("two").GetWidth() > d + step);  // the chip follows the two avatars
+    CHECK(session.ItemRect("one").GetWidth() == doctest::Approx(d));
+    CHECK(narrowWidth <= d * 3.0f);
+    CHECK(session.ItemRect("none").GetWidth() == doctest::Approx(d));
+    session.Click(session.ItemCenter("one"));
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(activations == 2);
+}
