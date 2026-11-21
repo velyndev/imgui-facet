@@ -854,6 +854,42 @@ TEST_CASE("A banner collapses over the standard duration after a click on its cl
     CHECK(height == 0.0f);
 }
 
+// ==== InlineAlert ====
+
+TEST_CASE("An inline alert's action and close button are Tab stops; a banner without open has no close button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool open = true;
+    int actions = 0;
+    int dismissed = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const facet::InlineAlertAction action =
+            facet::InlineAlert("Check the path##alert", &open, "The folder does not exist yet.",
+                               {.tone = facet::Tone::Destructive, .actionLabel = "Create"});
+        actions += action == facet::InlineAlertAction::Action ? 1 : 0;
+        dismissed += action == facet::InlineAlertAction::Dismissed ? 1 : 0;
+        facet::Banner("##fixed", nullptr, "A banner that stays.");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);  // Create
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(actions == 1);
+    session.KeyPress(ImGuiKey_Tab);  // close
+    session.KeyPress(ImGuiKey_Tab);  // the banner without open has nothing to focus
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(dismissed == 1);
+    CHECK_FALSE(open);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

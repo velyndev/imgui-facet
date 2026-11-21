@@ -81,7 +81,11 @@ the disabled colors. Status: ready.
 InlineAlertAction InlineAlert(const char* label, bool* open, const char* message, const InlineAlertOptions& options = {});
 ```
 
-Tinted callout inside the content with one optional action. Status: planned.
+The callout box of Banner for a place inside the content: the same wash, icon, Headline title,
+wrapped message and close button, with a hairline around it and its one action as a small Secondary
+button under the message. The action and the close button are Tab stops; Escape on either one
+dismisses it, which writes `*open = false`, returns `Dismissed` and collapses it like a banner.
+Status: ready.
 
 ### EmptyState
 
