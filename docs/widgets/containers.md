@@ -45,10 +45,9 @@ is called while another window is being submitted, so a page may open one from i
   are. Facet's grip marks the bottom-right corner and brightens while a band is hovered or held. The
   bands lie inside the window, so the pointer over them is over the shell and never reaches what is
   behind it. The size stays within `minSize` (0: the title bar and one control row inside the
-  padding, at least `overlay.menuMinWidth` wide) and `maxSize` (0: the display).
+  padding, and at least `containers.shellMinSize`) and `maxSize` (0: the display).
 - **Place and size.** The first place is the display center (`centered`) or the display corner of
-  `corner`, at `initialSize` (0: `overlay.modalWidth` wide and a quarter taller, until a size token
-  exists). Position and size are kept in design units, the position relative to the display's work
+  `corner`, at `initialSize` (0: `containers.shellSize`). Position and size are kept in design units, the position relative to the display's work
   area, under the window name, and with `persist` saved in Dear ImGui's ini file: the shell reopens
   at the same place and apparent size at any scale and after a restart. With `keepInDisplay` it is
   clamped into the display every frame, so a smaller display or a larger scale brings it back.

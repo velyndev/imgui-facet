@@ -57,9 +57,6 @@ constexpr Icon kShellCloseIcon("close");
 constexpr int kShellElevation = 2;
 // Shells open at once (a shell opened from inside another one's content).
 constexpr int kShellDepth = 8;
-// The default size while no saved size exists and initialSize is 0, in multiples of
-// overlay.modalWidth: a dialog width and a little taller than wide. Requested as a token.
-constexpr float kShellDefaultHeightShare = 1.25f;
 
 // Edges a resize band moves, as bits.
 enum ShellEdge : int
@@ -177,9 +174,11 @@ ShellMetrics GetShellMetrics(const ShellOptions& options)
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     m.display = ImRect(viewport->WorkPos, ImVec2(viewport->WorkPos.x + viewport->WorkSize.x,
                                                  viewport->WorkPos.y + viewport->WorkSize.y));
-    // The smallest shell keeps the title bar and one control row inside the content padding.
-    const ImVec2 floor(Px(t.overlay.menuMinWidth),
-                       m.titleHeight + ControlHeight(ControlSize::Regular) + Px(t.spacing.lg) * 2.0f);
+    // The smallest shell (containers.shellMinSize), never smaller than the title bar and one
+    // control row inside the content padding.
+    const ImVec2 floor = ImMax(Px(t.containers.shellMinSize),
+                               ImVec2(Px(t.overlay.menuMinWidth),
+                                      m.titleHeight + ControlHeight(ControlSize::Regular) + Px(t.spacing.lg) * 2.0f));
     m.minSize = ImVec2(options.minSize.x > 0.0f ? Px(options.minSize.x) : floor.x,
                        options.minSize.y > 0.0f ? Px(options.minSize.y) : floor.y);
     m.maxSize = ImVec2(options.maxSize.x > 0.0f ? Px(options.maxSize.x) : m.display.GetWidth(),
@@ -197,7 +196,7 @@ ImRect FirstShellRect(const ShellOptions& options, const ShellMetrics& m)
     const Theme& t = T();
     const ImVec2 units = options.initialSize.x > 0.0f && options.initialSize.y > 0.0f
                              ? options.initialSize
-                             : ImVec2(t.overlay.modalWidth, t.overlay.modalWidth * kShellDefaultHeightShare);
+                             : t.containers.shellSize;
     const ImVec2 size = ImClamp(Px(units), m.minSize, m.maxSize);
     ImVec2 pos;
     if (options.centered)

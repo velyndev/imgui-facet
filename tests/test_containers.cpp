@@ -971,6 +971,27 @@ TEST_CASE("A shell opens centered at its initial size as a window of its own and
     CHECK_FALSE(probe.open);
 }
 
+TEST_CASE("A shell without sizes of its own opens at containers.shellSize and stops at containers.shellMinSize")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###tokens"};
+    probe.options.initialSize = {0.0f, 0.0f};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.shown);
+    const facet::ContainerTokens& tokens = facet::T().containers;
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(tokens.shellSize.x));
+    CHECK(Units(probe.window.GetHeight()) == doctest::Approx(tokens.shellSize.y));
+    // Dragging the bottom-right corner onto the top-left one stops at the smallest shell.
+    const float band = facet::Px(tokens.resizeBorder);
+    const ImRect r = probe.window;
+    session.Drag({ImVec2(r.Max.x - band * 0.5f, r.Max.y - band * 0.5f), ImVec2(r.Min.x, r.Min.y)});
+    session.Frame();
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(tokens.shellMinSize.x));
+    CHECK(Units(probe.window.GetHeight()) == doctest::Approx(tokens.shellMinSize.y));
+}
+
 TEST_CASE("A click on a shell never reaches the page behind it")
 {
     facet::test::Session session;
