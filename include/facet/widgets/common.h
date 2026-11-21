@@ -295,6 +295,8 @@ struct Strings
     const char* jumpToLatest = "Jump to latest";  // LogView while it no longer follows new entries
     const char* invalidValue = "Not a valid value";  // a number-like field after a typed text it cannot read (since 0.1)
     const char* presets = "Presets";        // the SizeInput presets menu button (since 0.1)
+    const char* selectedCount = "{count} selected";  // MultiDropdown count summary, SearchableChecklist (since 0.1)
+    const char* add = "Add";                // TransferList button that moves rows to the target list (since 0.1)
 };
 
 // Replaces the table. Every string is copied; a null member keeps the English default.
