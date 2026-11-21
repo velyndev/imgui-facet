@@ -21,7 +21,14 @@ header describes.
 void StyledText(const char* text, const StyledTextOptions& options = {});
 ```
 
-Text in a theme text style and a semantic tone, with wrapping and alignment. Status: planned.
+Text in a theme text style (size and weight from `T().type`) and a tone: Neutral draws `label`
+(`labelSecondary` with `secondary`), Accent `accentText`, the status tones their status color, so the
+text reaches 4.5:1 on the content surfaces. One line per line break by default, at its own width (a
+line longer than a set width runs past it); with `wrap` it wraps at the item width, which is then the
+available width unless `width` says otherwise, and `align` places each line inside that width. Text
+sits on the line's text offset like `ImGui::Text`, so it lines up after a control on the same line.
+Not interactive; inside `ImGui::BeginDisabled` it draws in `labelTertiary`. Long texts are measured
+and drawn in batches of lines without allocating. Status: ready.
 
 ### TruncatedText
 
@@ -343,6 +350,13 @@ facet::KeyValue("Path", path.c_str());
 facet::KeyValue("Modified", modifiedText);
 facet::EndKeyValueList();
 ```
+
+### Tones
+
+Every tone is drawn with a second cue: an icon, a word or a shape. Text in a tone is readable (4.5:1)
+on the content surfaces (`bg`, `bgSecondary`, `bgTertiary`); on a tone's wash the text is `label`,
+and the tone shows in its icon or dot (3:1). A test (`tests/test_display.cpp`) computes these pairs
+from the theme tokens in both themes.
 
 ## Planned, not declared yet
 

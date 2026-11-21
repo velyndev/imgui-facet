@@ -1,11 +1,13 @@
-// Behaviour of the display family (facet/widgets/display.h, DataTable excepted). ProgressBar: its
-// layout with and without a label line, the width rule, the eased fill, clamping, the
-// indeterminate sweep and the disabled look. The API checks of every display widget are in
-// tests/test_api_display.cpp.
+// Behaviour of the display family (facet/widgets/display.h, DataTable excepted): one block of test
+// cases per widget, in the order the widgets were implemented. The API checks of every display
+// widget are in tests/test_api_display.cpp.
 
 #include <cfloat>
 #include <cmath>
+#include <cstring>
 #include <limits>
+#include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -13,7 +15,14 @@
 
 #include <facet/facet.h>
 
+#include "internal/control.h"
+#include "internal/focus.h"
+#include "internal/list_view.h"
+#include "internal/loading.h"
+#include "internal/popup_host.h"
+#include "internal/text_util.h"
 #include "support/session.h"
+#include "widgets/display/display_look.h"
 
 namespace
 {
@@ -27,7 +36,7 @@ struct Span
     bool Empty() const { return max < min; }
 };
 
-Span ColorSpan(int from, ImU32 color)
+inline Span ColorSpan(int from, ImU32 color)
 {
     const ImDrawList* drawList = ImGui::GetWindowDrawList();
     Span span;
@@ -42,11 +51,31 @@ Span ColorSpan(int from, ImU32 color)
     return span;
 }
 
+// Vertices of `color` (any alpha when `anyAlpha`) the window draw list received since `from`.
+inline int CountColor(int from, ImU32 color, bool anyAlpha = false)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    int count = 0;
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+    {
+        const ImU32 c = drawList->VtxBuffer[i].col;
+        if (anyAlpha ? (c & ~IM_COL32_A_MASK) == (color & ~IM_COL32_A_MASK) && (c & IM_COL32_A_MASK) != 0 : c == color)
+            ++count;
+    }
+    return count;
+}
+
+inline int VertexCount()
+{
+    return ImGui::GetWindowDrawList()->VtxBuffer.Size;
+}
+
 // The theme and the motion settings a test changes, restored at the end.
 struct DisplayGuard
 {
     facet::Theme saved = facet::T();
     bool follow = facet::FollowsSystemMotion();
+    float scale = facet::UiScale();
     DisplayGuard()
     {
         facet::SetFollowSystemMotion(false);
@@ -54,12 +83,62 @@ struct DisplayGuard
     }
     ~DisplayGuard()
     {
+        facet::SetUiScale(scale);
         facet::SetTheme(saved, false);
         facet::SetFollowSystemMotion(follow);
     }
+    static void ReduceMotion(bool reduce)
+    {
+        facet::Theme theme = facet::T();
+        theme.motion.reduceMotion = reduce;
+        facet::SetTheme(theme, false);
+    }
 };
 
+// Whether the zero-terminated 	ext is valid UTF-8: every lead byte has its continuation bytes.
+inline bool ValidUtf8(const char* text)
+{
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(text);
+    while (*p != 0)
+    {
+        int extra = 0;
+        if (*p < 0x80)
+            extra = 0;
+        else if ((*p & 0xE0) == 0xC0)
+            extra = 1;
+        else if ((*p & 0xF0) == 0xE0)
+            extra = 2;
+        else if ((*p & 0xF8) == 0xF0)
+            extra = 3;
+        else
+            return false;
+        ++p;
+        for (int i = 0; i < extra; ++i, ++p)
+            if ((*p & 0xC0) != 0x80)
+                return false;
+    }
+    return true;
+}
+
+inline bool TooltipOpen(ImGuiID itemId)
+{
+    return facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(itemId));
+}
+
+// The baseline of Body text whose line starts at `top`.
+inline float BodyBaseline(float top)
+{
+    facet::PushTextStyle(facet::TextStyle::Body);
+    const float baseline = top + std::round(facet::internal::DisplayFontAscent());
+    facet::PopTextStyle();
+    return baseline;
+}
+
+constexpr const char* kUtf8Text = "Gr\xC3\xBC\xC3\x9F\x65 aus K\xC3\xB6ln \xE2\x82\xAC \xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E und mehr Text";
+
 } // namespace
+
+// ==== ProgressBar ====
 
 TEST_CASE("A progress bar is one control height without a label line and a line plus its track with one")
 {
@@ -198,4 +277,127 @@ TEST_CASE("A disabled progress bar draws no tone color")
     });
     session.Frame();
     CHECK(fill.Empty());
+}
+
+// ==== StyledText ====
+
+TEST_CASE("Styled text takes its own width, wraps at the available width and aligns its lines")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float available = 0.0f;
+    float ownWidth = 0.0f;
+    float lineHeight = 0.0f;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        ownWidth = std::ceil(facet::MeasureText(facet::TextStyle::Headline, "Heading").x);
+        lineHeight = facet::MeasureText(facet::TextStyle::Body, "").y;
+        facet::StyledText("Heading", {.style = facet::TextStyle::Headline});
+        session.Track("own");
+        facet::StyledText("Two words that wrap into several lines at this narrow width",
+                          {.wrap = true, .width = 80.0f});
+        session.Track("wrapped");
+        facet::StyledText("Short", {.wrap = true});
+        session.Track("fill");
+        facet::StyledText("First\nSecond");
+        session.Track("breaks");
+        facet::StyledText(nullptr);
+        session.Track("null");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("own").GetWidth() == doctest::Approx(ownWidth));
+    CHECK(session.ItemRect("wrapped").GetWidth() == doctest::Approx(facet::Px(80.0f)));
+    CHECK(session.ItemRect("wrapped").GetHeight() >= lineHeight * 3.0f - 0.5f);
+    CHECK(session.ItemRect("fill").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("breaks").GetHeight() == doctest::Approx(lineHeight * 2.0f));
+    CHECK(session.ItemRect("null").GetHeight() == doctest::Approx(lineHeight));
+}
+
+TEST_CASE("Styled text draws its tone, the secondary label and the disabled color")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    int success = 0;
+    int accent = 0;
+    int secondary = 0;
+    int disabled = 0;
+    float endRight = 0.0f;
+    float itemRight = 0.0f;
+    session.SetUi([&] {
+        int from = VertexCount();
+        facet::StyledText("Saved", {.tone = facet::Tone::Success});
+        success = CountColor(from, facet::ToU32(c.success));
+        from = VertexCount();
+        facet::StyledText("Link", {.tone = facet::Tone::Accent});
+        accent = CountColor(from, facet::ToU32(c.accentText));
+        from = VertexCount();
+        facet::StyledText("Note", {.secondary = true});
+        secondary = CountColor(from, facet::ToU32(c.labelSecondary));
+        ImGui::BeginDisabled();
+        from = VertexCount();
+        facet::StyledText("Off", {.tone = facet::Tone::Destructive});
+        disabled = CountColor(from, facet::ToU32(c.labelTertiary));
+        ImGui::EndDisabled();
+        from = VertexCount();
+        facet::StyledText("End", {.align = facet::Align::End, .width = 200.0f});
+        endRight = ColorSpan(from, facet::ToU32(c.label)).max;
+        itemRight = ImGui::GetItemRectMax().x;
+    });
+    session.Frame();
+    CHECK(success > 0);
+    CHECK(accent > 0);
+    CHECK(secondary > 0);
+    CHECK(disabled > 0);
+    CHECK(endRight == doctest::Approx(itemRight).epsilon(0.02));
+}
+
+// ==== Contrast ====
+
+TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        DisplayGuard guard;
+        facet::SetTheme(theme, false);
+        const facet::Colors& c = facet::T().colors;
+        const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary};
+        for (const facet::Tone tone : {facet::Tone::Neutral, facet::Tone::Accent, facet::Tone::Success,
+                                       facet::Tone::Warning, facet::Tone::Destructive})
+        {
+            CAPTURE(static_cast<int>(tone));
+            const facet::internal::DisplayToneColors look = facet::internal::DisplayToneLook(tone, false);
+            // Text on a solid mark.
+            for (const ImVec4& surface : surfaces)
+            {
+                const ImVec4 solid = facet::Over(look.solid, surface);
+                CHECK(facet::ContrastRatio(look.onSolid, solid) >= 4.5f);
+                // Tone text on the surface; label on the wash; the tone glyph on the wash and the
+                // surface (3:1 for graphics).
+                CHECK(facet::ContrastRatio(look.text, surface) >= 4.5f);
+                const ImVec4 wash = facet::Over(look.wash, surface);
+                CHECK(facet::ContrastRatio(c.label, wash) >= 4.5f);
+                CHECK(facet::ContrastRatio(c.labelSecondary, wash) >= 4.5f);
+                CHECK(facet::ContrastRatio(look.glyph, wash) >= 3.0f);
+                CHECK(facet::ContrastRatio(look.glyph, surface) >= 3.0f);
+                // Log icons on a selected or hovered row.
+                for (const ImVec4& row : {c.accentSubtle, c.fill[1], c.fill[2]})
+                    CHECK(facet::ContrastRatio(look.glyph, facet::Over(row, surface)) >= 3.0f);
+                // Progress marks.
+                CHECK(facet::ContrastRatio(facet::internal::DisplayProgressColor(tone), surface) >= 3.0f);
+            }
+        }
+        // Key caps and inline code: label on the cap fill; the cap boundary at 3:1.
+        for (const ImVec4& surface : surfaces)
+        {
+            CHECK(facet::ContrastRatio(c.label, facet::Over(c.fill[2], surface)) >= 4.5f);
+            CHECK(facet::ContrastRatio(facet::ControlBoundaryColor(c), surface) >= 3.0f);
+        }
+        // Code view and stat tile text on their bgSecondary surface.
+        for (const ImVec4& tint : {c.codeKeyword, c.codeString, c.codeNumber, c.labelSecondary, c.label})
+            CHECK(facet::ContrastRatio(tint, c.bgSecondary) >= 4.5f);
+        CHECK(facet::ContrastRatio(c.label, facet::Over(c.accentSubtle, c.bgSecondary)) >= 4.5f);
+    }
 }

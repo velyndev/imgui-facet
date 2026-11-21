@@ -3,8 +3,7 @@
 // function is called once inside a real Dear ImGui frame, in a window and again inside
 // ImGui::BeginDisabled. After each call the stacks must be as before, a widget must have
 // submitted one item of non-zero size with the id of its label, the neutral result must come back
-// and no value argument may have changed. This holds for the implemented widgets as well as for
-// the placeholders. Behaviour tests of implemented widgets go into tests/test_display.cpp.
+// and no value argument may have changed. Behaviour tests are in tests/test_display.cpp.
 
 #include <cmath>
 #include <cstddef>
@@ -212,15 +211,13 @@ TEST_CASE("Display placeholders are at least as tall as a small control")
             CHECK(ImGui::GetItemRectSize().y >= minimum);
             ++checked;
         };
-        tall("StyledText", [] { StyledText("A"); });
-        tall("StyledText, footnote", [] { StyledText("A", {.style = TextStyle::Footnote}); });
         tall("TruncatedText", [] { TruncatedText("A"); });
         tall("Skeleton, one line", [] { Skeleton({.lines = 1}); });
         tall("Skeleton, low", [] { Skeleton({.shape = SkeletonShape::Rect, .height = 4.0f}); });
         tall("StatusDot", [] { StatusDot("##dot"); });
     });
     session.Frame();
-    CHECK(checked == 6);
+    CHECK(checked == 4);
 }
 
 TEST_CASE("Content-sized display placeholders are wide enough to name the widget and say planned")
@@ -238,7 +235,6 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
             CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
             ++checked;
         };
-        wide("StyledText", [] { StyledText("A"); });
         wide("ProgressRing", [] { ProgressRing("##ring", 0.5f); });
         wide("Spinner", [] { Spinner("##spinner"); });
         wide("Badge", [] { Badge("A"); });
@@ -251,7 +247,7 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
         wide("InlineCode", [] { InlineCode("a"); });
     });
     session.Frame();
-    CHECK(checked == 11);
+    CHECK(checked == 10);
 }
 
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")
