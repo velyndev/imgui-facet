@@ -883,3 +883,85 @@ TEST_CASE("Breadcrumbs collapse middle segments into a menu that activates them"
     CHECK(activated == 1);
 }
 
+// --- Pagination ---------------------------------------------------------------------------------
+
+TEST_CASE("Pagination writes the clicked page, steps with previous and next, and stops at the ends")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int page = 0;
+    int writes = 0;
+    ImGuiID row = 0;
+    session.SetUi([&] {
+        row = ImGui::GetID("pages");
+        writes += facet::Pagination("pages", &page, 20) ? 1 : 0;
+    });
+    session.Frame();
+    // 1 2 3 4 5 ... 20
+    CHECK(NavigationPartRect(row, 4).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(row, 19).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(row, 10).GetWidth() == 0.0f);
+    session.Click(Center(NavigationPartRect(row, facet::internal::kNavigationPartPrevious)));
+    CHECK(page == 0);  // disabled at the start
+    session.Click(Center(NavigationPartRect(row, facet::internal::kNavigationPartNext)));
+    CHECK(page == 1);
+    session.Click(Center(NavigationPartRect(row, 19)));
+    CHECK(page == 19);
+    session.Click(Center(NavigationPartRect(row, facet::internal::kNavigationPartNext)));
+    CHECK(page == 19);
+    CHECK(writes == 2);
+    // The row is one Tab stop (the current page); Left moves the focus, Enter activates.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(page == 17);
+}
+
+TEST_CASE("A pagination gap opens a field whose Enter goes to the typed page")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int page = 0;
+    ImGuiID row = 0;
+    session.SetUi([&] {
+        row = ImGui::GetID("pages");
+        facet::Pagination("pages", &page, 50);
+    });
+    session.Frame();
+    const ImRect gap = NavigationPartRect(row, facet::internal::kNavigationPartGapBase + 1);
+    REQUIRE(gap.GetWidth() > 0.0f);
+    session.Click(gap.GetCenter());
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("37");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(page == 36);
+}
+
+TEST_CASE("Pagination takes the compact form when asked or when the row does not fit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int page = 3;
+    ImGuiID full = 0;
+    ImGuiID compact = 0;
+    float compactWidth = 0.0f;
+    float fullWidth = 0.0f;
+    session.SetUi([&] {
+        full = ImGui::GetID("full");
+        facet::Pagination("full", &page, 20);
+        fullWidth = ImGui::GetItemRectSize().x;
+        compact = ImGui::GetID("compact");
+        facet::Pagination("compact", &page, 20, {.compact = true});
+        compactWidth = ImGui::GetItemRectSize().x;
+    });
+    session.Frame();
+    CHECK(NavigationPartRect(full, 3).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(compact, 3).GetWidth() == 0.0f);
+    CHECK(compactWidth < fullWidth);
+    session.Click(Center(NavigationPartRect(compact, facet::internal::kNavigationPartNext)));
+    CHECK(page == 4);
+}
+
