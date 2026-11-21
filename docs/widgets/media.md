@@ -87,7 +87,17 @@ bool ThumbnailStrip(const char* label, int* selected, std::span<const ImageItem>
 bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGetter getter, void* user, const ThumbnailStripOptions& options = {});
 ```
 
-Scrolling row of thumbnails with one selected. Status: planned.
+A horizontally scrolling row of square thumbnails (`thumbnailHeight` units, four times
+`spacing.xxxl` by default) in Cover fit, the chosen one with an accent ring inside its edge and its
+caption in label. One item and one Tab stop: a click that does not move chooses, Left and Right
+move the selection, Home and End jump, and the focus ring sits on the chosen thumbnail. A drag
+scrolls the row and a released drag glides on for `drag.inertiaTime` before it settles; the wheel
+(also a sideways one) scrolls while there is more row than fits. A new selection is scrolled into
+view. The row settles on the standard spring, and jumps while motion is reduced. Read-only shows the
+selection and the arrows scroll the row instead. `Loading` draws skeleton thumbnails, `Error` the
+error message, and no items the empty message; then the strip is not a Tab stop. Without captions,
+the tooltip also names the thumbnail under the pointer, or the chosen one on keyboard focus. The
+getter overload is asked for the visible entries only. Reordering by drag is planned. Status: ready.
 
 ### Carousel
 

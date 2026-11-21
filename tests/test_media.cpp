@@ -348,3 +348,128 @@ TEST_CASE("An avatar group shows maxVisible avatars and a chip, and fits the wid
     session.KeyPress(ImGuiKey_Space);
     CHECK(activations == 2);
 }
+
+// ---- ThumbnailStrip ----------------------------------------------------------------------------
+
+TEST_CASE("A thumbnail strip chooses by click and by the arrows, Home and End, and never in read-only")
+{
+    ReducedMotion reduced;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem items[] = {{"Image 1"}, {"Image 2"}, {"Image 3"}, {"Image 4"}};
+    int selected = -1;
+    int other = 1;
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::ThumbnailStrip("strip", &selected, items, {.thumbnailHeight = 40.0f}))
+            ++writes;
+        session.Track("strip");
+        facet::ThumbnailStrip("fixed", &other, items, {.thumbnailHeight = 40.0f, .readOnly = true});
+        session.Track("fixed");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("strip");
+    const float inset = std::ceil(facet::internal::FocusRingOutset());
+    const float thumb = facet::PxSnapped(40.0f);
+    const float stride = thumb + facet::PxSnapped(facet::T().spacing.sm);
+    const auto thumbCenter = [&](const ImRect& strip, int i) {
+        return ImVec2(strip.Min.x + inset + stride * static_cast<float>(i) + thumb * 0.5f, strip.Min.y + inset + thumb * 0.5f);
+    };
+    session.Click(thumbCenter(r, 2));
+    CHECK(selected == 2);
+    CHECK(writes == 1);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(selected == 3);
+    session.KeyPress(ImGuiKey_RightArrow);  // at the end it stays
+    CHECK(selected == 3);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(selected == 0);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(selected == 3);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(selected == 2);
+    CHECK(writes == 5);
+    session.Click(thumbCenter(session.ItemRect("fixed"), 3));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(other == 1);
+}
+
+TEST_CASE("A thumbnail strip scrolls by drag and by the wheel without choosing")
+{
+    ReducedMotion reduced;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static facet::ImageItem items[12];
+    for (facet::ImageItem& item : items)
+        item.label = "Placeholder";
+    int selected = 0;
+    session.SetUi([&] {
+        facet::ThumbnailStrip("strip", &selected, items, {.thumbnailHeight = 60.0f, .width = 200.0f});
+        session.Track("strip");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("strip");
+    // Dragging from the second thumbnail to the left scrolls, and the release does not choose.
+    session.Drag({At(r, 0.6f, 0.5f), At(r, 0.1f, 0.5f)}, 6);
+    session.Frames(2);
+    CHECK(selected == 0);
+    // The wheel scrolls once the strip owned it for a frame; the selection stays.
+    session.MouseMove(At(r, 0.5f, 0.5f));
+    session.Wheel(At(r, 0.5f, 0.5f), -1.0f);
+    session.Wheel(At(r, 0.5f, 0.5f), -1.0f);
+    session.Frames(2);
+    CHECK(selected == 0);
+    // End scrolls the last thumbnail into view: a click near the right edge now picks it.
+    session.Click(At(r, 0.02f, 0.5f));
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(2);
+    CHECK(selected == 11);
+    session.Click(ImVec2(r.Max.x - std::ceil(facet::internal::FocusRingOutset()) - 4.0f, r.GetCenter().y));
+    CHECK(selected == 11);
+}
+
+TEST_CASE("A thumbnail strip with no items, loading or failed is not a Tab stop and writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem items[] = {{"Image 1"}};
+    int selected = -1;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::ThumbnailStrip("empty", &selected, std::span<const facet::ImageItem>());
+        facet::ThumbnailStrip("loading", &selected, items, {.state = facet::DataState::Loading});
+        facet::ThumbnailStrip("error", &selected, items, {.state = facet::DataState::Error});
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(selected == -1);
+}
+
+TEST_CASE("A thumbnail strip from a getter skips the entries it refuses")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int selected = -1;
+    int calls = 0;
+    struct User
+    {
+        int* calls;
+    } user{&calls};
+    session.SetUi([&] {
+        facet::ThumbnailStrip("strip", &selected, 1000, [](void* u, int index, facet::ImageItem* out) {
+            ++*static_cast<User*>(u)->calls;
+            out->label = "Generated";
+            return index % 2 == 0;
+        }, &user, {.thumbnailHeight = 40.0f, .width = 300.0f});
+    });
+    session.Frame();
+    // Only the visible entries are asked for.
+    CHECK(calls > 0);
+    CHECK(calls < 20);
+}
