@@ -49,6 +49,8 @@ constexpr float kArcRangePi = 3.14159265358979f;
 // The default dial is four control heights across, twice a knob: two handles and both values,
 // three digits each, have to fit in it.
 constexpr float kArcRangeDiameterHeights = 4.0f;
+// A handle is at most this share of the dial's diameter, so four fit across a small dial.
+constexpr float kArcRangeKnobShare = 0.25f;
 // The parts: the two handles, then the band.
 constexpr int kArcRangeBandPart = 2;
 // Animation sub key of the hover amount of a part: the dial item takes the pointer for all of them.
@@ -228,7 +230,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
         diameter = std::min(diameter, std::floor(available));
     diameter = std::max(2.0f, diameter);
     // Handles shrink on a small dial, so four of them would still fit across it.
-    const float knob = std::min(m.knob, std::max(2.0f, std::floor(diameter * 0.125f) * 2.0f));
+    const float knob = std::min(m.knob, std::max(2.0f, std::floor(diameter * kArcRangeKnobShare * 0.5f) * 2.0f));
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
     const bool hasLabel = labelEnd != label;
     float caption = 0.0f;

@@ -15,6 +15,8 @@ namespace facet::internal
 namespace
 {
 
+// A knob is at most this share of the pad's shorter side, so a small pad keeps room to move it.
+constexpr float kPadKnobShare = 0.5f;
 // More grid lines than this on one axis would crowd the pad into a texture: quarters instead.
 constexpr int kPadMaxGridLines = 32;
 
@@ -55,7 +57,7 @@ PadFrame LayoutPadFrame(ImVec2 origin, float width, float height, const SliderMe
     height = std::max(1.0f, std::round(height));
     p.frame = ImRect(origin, ImVec2(origin.x + width, origin.y + height));
     // A pad smaller than two knobs gets a smaller knob, so the knob never leaves the frame.
-    p.knob = std::min(m.knob, std::max(2.0f, std::floor(std::min(width, height) * 0.25f) * 2.0f));
+    p.knob = std::min(m.knob, std::max(2.0f, std::floor(std::min(width, height) * kPadKnobShare * 0.5f) * 2.0f));
     const float half = p.knob * 0.5f;
     p.area = ImRect(p.frame.Min.x + half, p.frame.Min.y + half, std::max(p.frame.Min.x + half, p.frame.Max.x - half),
                     std::max(p.frame.Min.y + half, p.frame.Max.y - half));

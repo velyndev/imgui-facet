@@ -38,6 +38,8 @@ namespace facet
 namespace
 {
 
+// The largest deadzone, as a share of the radius: a stick needs some travel outside it.
+constexpr double kJoystickMaxDeadzone = 0.95;
 // Animation sub keys of the drawn stick position.
 constexpr int kJoystickStickSubX = 0x0E00;
 constexpr int kJoystickStickSubY = 0x0E01;
@@ -116,7 +118,7 @@ bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& o)
     const Theme& t = T();
     const Colors& c = t.colors;
     const bool readOnly = o.readOnly || value == nullptr || (next.itemFlags & ImGuiItemFlags_ReadOnly) != 0;
-    const double deadzone = std::isfinite(o.deadzone) ? std::clamp(static_cast<double>(o.deadzone), 0.0, 0.95) : 0.0;
+    const double deadzone = std::isfinite(o.deadzone) ? std::clamp(static_cast<double>(o.deadzone), 0.0, kJoystickMaxDeadzone) : 0.0;
 
     // The size: `diameter`, or the pad token at most the available width.
     float diameter = 0.0f;
