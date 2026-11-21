@@ -22,6 +22,7 @@
 #include "internal/focus.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
+#include "internal/scope_stack.h"
 #include "support/session.h"
 #include "widgets/lists/list_parts.h"
 
@@ -1014,4 +1015,184 @@ TEST_CASE("A combo item outside a combo is reported and returns false")
     session.Frame();
     CHECK_FALSE(result);
     CHECK(reported == 1);
+}
+
+// ---- TreeView -------------------------------------------------------------------------------------
+
+namespace
+{
+
+// A tree of two groups: Group 1 (Item 1, Item 2), Group 2 (Item 3), and a top-level Item 4.
+struct TreeUi
+{
+    ImGuiSelectionBasicStorage selection;
+    facet::TreeViewOptions options;
+    bool group2Loading = false;
+    bool group2Toggled = false;
+    int activated = 0;
+    bool open = false;
+    bool selectionChanged = false;
+
+    void Ui(facet::test::Session& session)
+    {
+        open = facet::BeginTreeView("tree", &selection, options);
+        session.Track("tree");
+        if (!open)
+            return;
+        if (facet::BeginTreeNode("Group 1", {.icon = facet::Icon("folder"), .defaultOpen = true, .id = 1}))
+        {
+            session.Track("group1");
+            if (facet::TreeLeaf("Item 1", {.id = 11}))
+                activated = 11;
+            session.Track("item1");
+            if (facet::TreeLeaf("Item 2", {.id = 12}))
+                activated = 12;
+            session.Track("item2");
+            facet::EndTreeNode();
+        }
+        else
+        {
+            session.Track("group1");
+        }
+        const bool group2 = facet::BeginTreeNode("Group 2", {.id = 2, .loading = group2Loading});
+        session.Track("group2");
+        if (ImGui::IsItemToggledOpen())
+            group2Toggled = true;
+        if (group2)
+        {
+            if (!group2Loading && facet::TreeLeaf("Item 3", {.id = 21}))
+                activated = 21;
+            session.Track("item3");
+            facet::EndTreeNode();
+        }
+        if (facet::TreeLeaf("Item 4", {.id = 4}))
+            activated = 4;
+        session.Track("item4");
+        facet::EndTreeView();
+        selectionChanged = selectionChanged || facet::TreeViewSelectionChanged();
+    }
+};
+
+} // namespace
+
+TEST_CASE("A tree view selects nodes by click, Ctrl and Shift click, and keeps them when a parent closes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("item1"));
+    CHECK(ui.selection.Contains(11));
+    CHECK(ui.selectionChanged);
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Click(session.ItemCenter("item4"));
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(ui.selection.Size == 2);
+    // Closing Group 1 with its expander keeps Item 1 selected.
+    const ImRect group = session.ItemRect("group1");
+    const float indent = facet::Px(facet::T().list.indent);
+    session.Click(ImVec2(group.Min.x + facet::Px(facet::T().spacing.xs) + indent * 0.5f, group.GetCenter().y));
+    CHECK(ui.selection.Contains(11));
+    CHECK(ui.selection.Size == 2);
+    // Shift+click from Item 4 up to Group 1 selects the visible nodes between.
+    session.KeyDown(ImGuiMod_Shift);
+    session.Click(session.ItemCenter("group1"));
+    session.KeyUp(ImGuiMod_Shift);
+    CHECK(ui.selection.Contains(1));
+    CHECK(ui.selection.Contains(2));
+    CHECK(ui.selection.Contains(4));
+}
+
+TEST_CASE("Left and Right close, open and move between parent and child in a tree view")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("item2"));
+    session.KeyPress(ImGuiKey_LeftArrow);  // a leaf: to its parent
+    CHECK(ImGui::GetFocusID() == session.ItemId("group1"));
+    session.KeyPress(ImGuiKey_LeftArrow);  // an open node: closes
+    session.Frame();
+    CHECK(session.ItemRect("item1").GetHeight() == 0.0f);
+    session.KeyPress(ImGuiKey_RightArrow);  // a closed node: opens
+    session.Frame();
+    CHECK(session.ItemRect("item1").GetHeight() > 0.0f);
+    session.KeyPress(ImGuiKey_RightArrow);  // an open node: to its first child
+    CHECK(ImGui::GetFocusID() == session.ItemId("item1"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.activated == 11);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == session.ItemId("group2"));
+}
+
+TEST_CASE("A tree view reports a toggle for lazy children and shows a loading row under an open node")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    ui.group2Loading = true;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    const float before = session.ItemRect("item4").Min.y;
+    session.Click(session.ItemCenter("group2"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frame();
+    CHECK(ui.group2Toggled);
+    // The loading row takes one row between Group 2 and Item 4.
+    CHECK(session.ItemRect("item4").Min.y == doctest::Approx(before + fi::ListRowHeight(facet::ControlSize::Regular)));
+}
+
+TEST_CASE("Tree rows of every level span the width of the view at the list row height")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    // The indent (list.indent per level) moves the row content, not the row: the selection and hover
+    // fills of a child reach as far left as its parent's.
+    CHECK(session.ItemRect("item1").Min.x == doctest::Approx(session.ItemRect("group1").Min.x));
+    CHECK(session.ItemRect("item1").GetHeight() == doctest::Approx(fi::ListRowHeight(facet::ControlSize::Regular)));
+}
+
+TEST_CASE("A tree view in the loading or error state draws the state and returns false")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    ui.options.state = facet::DataState::Loading;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    CHECK_FALSE(ui.open);
+    CHECK(session.ItemRect("tree").GetHeight() >= fi::ListRowHeight(facet::ControlSize::Regular));
+    ui.options.state = facet::DataState::Error;
+    session.Frame();
+    CHECK_FALSE(ui.open);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+}
+
+TEST_CASE("Tab enters a tree view with a selection at its first node and leaves it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TreeUi ui;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        ui.Ui(session);
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("group1"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(ui.selection.Size == 0);
 }

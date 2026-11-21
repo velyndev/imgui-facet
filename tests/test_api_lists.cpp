@@ -61,21 +61,6 @@ void CallListStubs(Values& v)
 
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
-    CHECK_BALANCED({
-        const bool open = facet::BeginTreeView("Tree", &selection);
-        CHECK(open);
-        if (open)
-        {
-            if (facet::BeginTreeNode("Node"))
-            {
-                FAIL("BeginTreeNode opened");
-                facet::EndTreeNode();
-            }
-            CHECK_FALSE(facet::TreeLeaf("Leaf"));
-            facet::EndTreeView();
-        }
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::TreeViewSelectionChanged()));
     CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));

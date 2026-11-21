@@ -97,7 +97,12 @@ struct ListsState
     facet::ChoiceItem reorder[4] = {{.label = "Option 1", .id = 1}, {.label = "Option 2", .id = 2},
                                     {.label = "Option 3", .id = 3}, {.label = "Option 4", .id = 4}};
     ImGuiSelectionBasicStorage selection;
+
+    // TreeView
     ImGuiSelectionBasicStorage treeSelection;
+    const char* treeActivated = nullptr;
+    int lazyState = 0;  // 0 not loaded, 1 loading, 2 loaded
+    double lazyStart = 0.0;
 };
 
 ListsState& State()
@@ -347,20 +352,80 @@ void SelectAndReorder(ListsState& s)
         facet::ApplyReorderMove(s.reorder, move);
 }
 
-void Hierarchies(ListsState& s)
+// A leaf of the sample tree with its probe "lists.tree.<label>"; counts an activation.
+void SampleLeaf(facet::demo::PageCtx& ctx, ListsState& s, const char* label, ImGuiID id)
 {
-    SectionHeader("Hierarchies");
-    if (facet::BeginTreeView("tree", &s.treeSelection))
+    if (facet::TreeLeaf(label, {.icon = facet::Icon("file"), .id = id}))
+        s.treeActivated = label;
+    char probe[64];
+    std::snprintf(probe, sizeof(probe), "lists.tree.%s", label);
+    ctx.Probe(probe);
+}
+
+void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
+{
+    SectionHeader("Tree view");
+    Paragraph("Nodes with icons, details and indent guides. The arrows move; Right opens a node or goes to its first "
+              "child, Left closes it or goes to its parent; Enter or a double click opens a node or activates a leaf. "
+              "Click, Ctrl+click and Shift+click select; a closed node keeps its selected children selected.");
+    if (ctx.capture && ctx.captureState == kFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 2);
+    if (facet::BeginTreeView("tree", &s.treeSelection, {.width = 360.0f}))
     {
-        if (facet::BeginTreeNode("Group 1", {.icon = facet::Icon("folder"), .defaultOpen = true}))
+        if (facet::BeginTreeNode("Group 1", {.icon = facet::Icon("folder"), .detail = "3 entries", .defaultOpen = true,
+                                             .id = 1}))
         {
-            facet::TreeLeaf("Option 1", {.icon = facet::Icon("file")});
-            facet::TreeLeaf("Option 2", {.icon = facet::Icon("file")});
+            ctx.Probe("lists.tree.Group 1");
+            SampleLeaf(ctx, s, "Option 1", 11);
+            SampleLeaf(ctx, s, "Option 2", 12);
+            if (facet::BeginTreeNode("Group 1.1", {.icon = facet::Icon("folder"), .defaultOpen = true, .id = 13}))
+            {
+                SampleLeaf(ctx, s, "Option 3", 131);
+                facet::EndTreeNode();
+            }
             facet::EndTreeNode();
         }
-        facet::TreeLeaf("Option 3", {.icon = facet::Icon("file")});
+        else
+        {
+            ctx.Probe("lists.tree.Group 1");
+        }
+        // Children that arrive later: the node shows the loading row for a second after it first
+        // opens (a simulated delay standing in for a real fetch).
+        const bool open = facet::BeginTreeNode("Loaded on open", {.icon = facet::Icon("folder"), .id = 2,
+                                                                  .loading = s.lazyState == 1});
+        ctx.Probe("lists.tree.lazy");
+        if (ImGui::IsItemToggledOpen() && s.lazyState == 0)
+        {
+            s.lazyState = 1;
+            s.lazyStart = ImGui::GetTime();
+        }
+        if (s.lazyState == 1 && ImGui::GetTime() - s.lazyStart > 1.0)
+            s.lazyState = 2;
+        if (open)
+        {
+            if (s.lazyState == 2)
+                SampleLeaf(ctx, s, "Option 4", 21);
+            facet::EndTreeNode();
+        }
+        SampleLeaf(ctx, s, "Option 5", 3);
         facet::EndTreeView();
     }
+    ctx.Probe("lists.tree");  // the view's area, recorded also while it is out of sight
+    Note("Selected nodes: %d. Last activated: %s.", s.treeSelection.Size,
+         s.treeActivated != nullptr ? s.treeActivated : "none");
+
+    LabeledRow("Empty");
+    if (facet::BeginTreeView("emptytree", nullptr, {.indentGuides = false, .emptyText = "No entries (placeholder)",
+                                                    .width = 240.0f}))
+        facet::EndTreeView();
+    LabeledRow("Loading");
+    if (facet::BeginTreeView("loadingtree", nullptr, {.state = facet::DataState::Loading, .width = 240.0f}))
+        facet::EndTreeView();
+}
+
+void Hierarchies(ListsState& s)
+{
+    SectionHeader("Checkbox tree");
     facet::CheckboxTree("checktree", s.checkTree, kCheckTree);
 }
 
@@ -379,6 +444,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     SelectableListSection(ctx, s);
     MultiDropdownSection(ctx, s);
     ComboSection(ctx, s);
+    TreeViewSection(ctx, s);
     ChooseSeveral(s);
     SelectAndReorder(s);
     Hierarchies(s);
@@ -545,4 +611,44 @@ FACET_DEMO_SELFTEST("lists")
     test.ExpectNear("Enter opens on the chosen row; Down passes the disabled row, Enter chooses Option 5",
                     [] { return State().combo; }, 4.0, 0.0);
     test.ExpectFocused("lists.combo");
+
+    // TreeView. Ids: Group 1 = 1, Option 1 = 11, Option 2 = 12, Option 5 = 3.
+    test.Do([] {
+        ListsState& s = State();
+        s.treeSelection.Clear();
+        s.treeActivated = nullptr;
+        s.lazyState = 0;
+    });
+    test.Reveal("lists.tree");
+    test.Click("lists.tree.Option 1");
+    test.Expect("a click selects Option 1", [] { return State().treeSelection.Contains(11); });
+    test.KeyDown(ImGuiMod_Ctrl);
+    test.Click("lists.tree.Option 5");
+    test.KeyUp(ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+click adds Option 5", [] { return State().treeSelection.Size; }, 2.0, 0.0);
+    // The expander of Group 1 (spacing.xs plus half the indent from the row start) closes it; its
+    // selected child stays selected.
+    test.MouseMove(T::Item("lists.tree.Group 1", 0.0f, 0.5f).Offset(12.0f, 0.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNotVisible("lists.tree.Option 1");
+    test.Expect("closing Group 1 keeps Option 1 selected", [] { return State().treeSelection.Contains(11); });
+    test.Click("lists.tree.Group 1");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectVisible("lists.tree.Option 1");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectFocused("lists.tree.Option 1");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Enter activates the leaf",
+                    [] { return std::string(State().treeActivated != nullptr ? State().treeActivated : ""); }, "Option 1");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectFocused("lists.tree.Group 1");
+    // Children that load after the node opens.
+    test.Click("lists.tree.lazy");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("opening the node starts loading", [] { return State().lazyState; }, 1.0, 0.0);
+    test.WaitSeconds(1.2f);
+    test.ExpectNear("the children arrive", [] { return State().lazyState; }, 2.0, 0.0);
+    test.Reveal("lists.tree.Option 4");
+    test.ExpectVisible("lists.tree.Option 4");
 }

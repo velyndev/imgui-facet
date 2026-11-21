@@ -227,8 +227,6 @@ its index after it. `ApplyReorderMove` is implemented and tested; it takes a `st
 
 ### BeginTreeView, BeginTreeNode, TreeLeaf
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginTreeView(const char* id, ImGuiSelectionBasicStorage* selection,
                                  const TreeViewOptions& options = {});
@@ -241,8 +239,41 @@ class TreeViewScope;
 class TreeNodeScope;
 ```
 
-A hierarchy with indent guides, icons, multiple selection, lazily loaded children and nodes that
-stock drag and drop can move.
+A hierarchy over the caller's nodes, submitted in depth-first order between BeginTreeView and
+EndTreeView. Default width: the available width; with `height` 0 the view grows with its nodes,
+with a height it scrolls.
+
+- **Rows:** one per node at the list row height, the full width of the view. The content is
+  indented by `list.indent` per level after the chevron of a node with children (chevron-right
+  closed, chevron-down open); then the icon, the label (cut with an ellipsis and a tooltip) and the
+  detail at the end in labelSecondary. `indentGuides` draws a hairline from an open node down along
+  its children.
+- **Selection** (a non-null storage): click, Ctrl+click and Shift+click through
+  `ImGui::BeginMultiSelect`, keyed by `TreeNodeOptions::id` or the node's id; Ctrl+A selects the
+  visible nodes, Escape and a click in empty space clear. Closing a parent leaves its selected
+  children selected. `TreeViewSelectionChanged()` is true after an EndTreeView that wrote the storage.
+- **Keys:** the view is one Tab stop, also with a selection (Tab lands on the focused node, else the
+  first). Up and Down move, Right opens a closed node or goes to the first child of an open one,
+  Left closes an open node or goes to the parent, Enter or a double click opens or closes a node and
+  activates a leaf (TreeLeaf returns true), and typing jumps to the next node whose label starts with
+  the typed text. A click on the chevron opens or closes without selecting.
+- **Lazy children:** `ImGui::IsItemToggledOpen()` right after BeginTreeNode reports the toggle;
+  `loading` shows the loading row under the open node until the children arrive.
+- **Nodes inside `ImGui::BeginDisabled`** are shown in labelTertiary, are not focusable and are
+  left out of ranges and select-all.
+- **States:** while `state` is Loading or Error, BeginTreeView draws the loading row or `errorText`
+  in the view (one row tall when the view fits its nodes) and returns false; a tree without nodes
+  shows `emptyText`.
+- **Pairs:** BeginTreeView returns false while the view is out of sight or not Ready; call
+  EndTreeView only after true. BeginTreeNode returns true while the node is open; call EndTreeNode
+  only after true. An End without its Begin is reported and does nothing; a Begin left open is
+  reported by `facet::EndFrame`. The node row is the last item after BeginTreeNode and TreeLeaf, so
+  stock drag and drop on it works.
+
+State kept: the open state of each node under its id (`ImGui::SetNextItemOpen` sets it), the
+focused node and the typeahead text under the view id, the scroll position of a view with a height.
+
+Status: ready.
 
 ### CheckboxTree
 
