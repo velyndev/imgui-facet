@@ -771,6 +771,89 @@ TEST_CASE("A skeleton with circular corners is a true circle")
     CHECK(farthest <= 32.0f + 1.5f);  // the anti-aliasing fringe
 }
 
+// ==== Banner ====
+
+TEST_CASE("A banner's actions and close button work by keyboard, and Escape on an action dismisses it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    bool open = true;
+    facet::BannerAction last = facet::BannerAction::None;
+    ImGuiID bannerId = 0;
+    int primary = 0;
+    int secondary = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        bannerId = ImGui::GetID("Offline##net");
+        const facet::BannerAction action = facet::Banner("Offline##net", &open, "Changes are kept on this device.",
+                                                         {.tone = facet::Tone::Warning, .primaryAction = "Retry",
+                                                          .secondaryAction = "Details"});
+        session.Track("banner");
+        if (action != facet::BannerAction::None)
+            last = action;
+        primary += action == facet::BannerAction::Primary ? 1 : 0;
+        secondary += action == facet::BannerAction::Secondary ? 1 : 0;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);  // Retry
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(primary == 1);
+    session.KeyPress(ImGuiKey_Tab);  // Details
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(secondary == 1);
+    session.KeyPress(ImGuiKey_Tab);  // the close button
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(last == facet::BannerAction::Dismissed);
+    CHECK_FALSE(open);
+    // Collapsed after the standard duration, then it takes no space.
+    session.Seconds(facet::T().motion.durationStandard + 0.1f);
+    CHECK(session.ItemId("banner") != bannerId);
+    // Back open: Escape on a focused action dismisses it.
+    open = true;
+    last = facet::BannerAction::None;
+    session.Seconds(facet::T().motion.durationStandard + 0.1f);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(last == facet::BannerAction::Dismissed);
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("A banner collapses over the standard duration after a click on its close button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    bool open = true;
+    float height = 0.0f;
+    ImRect banner;
+    session.SetUi([&] {
+        const float top = ImGui::GetCursorScreenPos().y;
+        facet::Banner("Update##up", &open, "A new version is ready.");
+        session.Track("banner");
+        banner = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        height = ImGui::GetCursorScreenPos().y - top;
+    });
+    session.Frame();
+    const float full = height;
+    CHECK(full > facet::ControlHeight(facet::ControlSize::Small));
+    // The close button sits at the end of the first line.
+    const float pad = facet::Px(facet::T().spacing.md);
+    const float close = facet::ControlHeight(facet::ControlSize::Small);
+    session.Click(ImVec2(banner.Max.x - pad - close * 0.5f, banner.Min.y + pad + close * 0.25f));
+    CHECK_FALSE(open);
+    session.Frame();
+    CHECK(height < full);
+    CHECK(height > 0.0f);
+    session.Seconds(facet::T().motion.durationStandard + 0.1f);
+    CHECK(height == 0.0f);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

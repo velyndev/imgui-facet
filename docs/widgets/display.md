@@ -63,7 +63,17 @@ without an action the header is not a Tab stop. Width: the available width. Stat
 BannerAction Banner(const char* label, bool* open, const char* message, const BannerOptions& options = {});
 ```
 
-Full-width strip for view-wide conditions, with up to two actions and a close button. Status: planned.
+A full-width strip in the tone's wash (Neutral: the control fill) with the tone's icon in its glyph
+color (or `icon`), a bold title (Headline) and the wrapped message in `label`, which stays readable on
+every wash. Up to two actions as small buttons (the primary one Secondary, the other Plain) sit at the
+end of the title line while the text keeps at least `layout.minRowControl`, and under the message
+otherwise. With `open` a close button (`Strings::close` as its tooltip) ends the first line. Every
+button is a Tab stop, also while the banner is scrolled out of sight, and Escape on a focused action
+or on the close button dismisses it; dismissing writes `*open = false` and returns `Dismissed`. A
+dismissed banner collapses over `motion.durationStandard` (at once with reduced motion; its buttons
+are not active meanwhile) and then submits nothing; writing `*open = true` grows it back. Without
+`open` it has no close button and stays. Inside `ImGui::BeginDisabled` the wash, icon and text take
+the disabled colors. Status: ready.
 
 ### InlineAlert
 
