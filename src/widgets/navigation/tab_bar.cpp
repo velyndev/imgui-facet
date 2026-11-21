@@ -60,8 +60,9 @@ using namespace internal;
 
 // Tabs one bar lays out; later tabs are left out with a usage error.
 constexpr int kTabBarMax = kOverflowInlineItems;
-// Captures: how far right of its place a forced drag shows the dragged tab, in tab heights.
-constexpr float kTabForcedDragHeights = 1.5f;
+// Captures: how far right of its place a forced drag shows the dragged tab, in tab heights: past
+// the middle of the next tab, so the capture shows the tabs moving apart.
+constexpr float kTabForcedDragHeights = 3.0f;
 // A row measured this much wider than its room counts as fitting (rounding of the edges).
 constexpr float kTabFitSlack = 0.5f;
 // The payload type names the bar: "facet.tab." and eight hex digits.
@@ -458,6 +459,21 @@ bool TabBarImpl(const char* id, int* index, const SelectionItems& items, const T
             const float closeTop = std::round(rect.GetCenter().y - closeSide * 0.5f);
             closeRect = ImRect(closeRight - closeSide, closeTop, closeRight, closeTop + closeSide);
             right = closeRect.Min.x - m.iconGap;
+        }
+        else
+        {
+            // A tab wider than its content (tabs.minWidth) centers it, as a segment does.
+            float content = slot.labelWidth;
+            if (item.icon.IsValid())
+                content += iconSize + m.iconGap;
+            if (slot.badgeWidth > 0.0f)
+                content += m.iconGap + slot.badgeWidth;
+            const float spare = right - left - content;
+            if (spare > 0.0f)
+            {
+                left += std::floor(spare * 0.5f);
+                right = left + content;
+            }
         }
         if (item.icon.IsValid())
         {

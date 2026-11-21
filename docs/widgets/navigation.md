@@ -70,8 +70,9 @@ the content of the selected tab.
 
 - **Tabs.** Each tab is its icon, its label and the item `detail` as a badge, plus `paddingX` on
   both sides, between `tabs.minWidth` and `tabs.maxWidth`; a longer label is cut with an ellipsis and
-  shown in full on hover and keyboard focus. Tabs start at the left edge, `spacing.xs` apart. A tab
-  whose `ChoiceItem::disabled` is set cannot be chosen, closed or moved.
+  shown in full on hover and keyboard focus. A tab wider than its content (without a close button)
+  centers it. Tabs start at the left edge, `spacing.xs` apart. A tab whose `ChoiceItem::disabled`
+  is set cannot be chosen, closed or moved.
 - **Selection.** `TabStyle::Pill` puts the selection pill (`accentSubtle`) behind the selected tab;
   `TabStyle::Underline` draws a `tabs.underlineHeight` line in the focus ring color under it, over a
   hairline under the whole strip. Both slide with the spring of `SegmentedControl`, rest on whole
