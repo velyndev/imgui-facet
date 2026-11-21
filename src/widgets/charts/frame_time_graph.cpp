@@ -1,5 +1,5 @@
 // FrameTimeGraph (facet/widgets/charts.h): planned. A placeholder until Phase 2 implements it.
-// The frame time samples will be taken in the content subsystem (src/widgets/content_frame.cpp).
+// The frame time samples will be taken in the charts subsystem (src/widgets/charts/charts_frame.cpp).
 
 #include "facet/widgets/charts.h"
 #include "widgets/content_stub.h"

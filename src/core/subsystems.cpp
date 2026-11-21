@@ -30,13 +30,13 @@
 //
 // Widgets (Phase 1c and 2), after the blocks they build on:
 //   widgets common     the control size stack; EndFrame closes sizes left pushed
-//   one entry per family implemented on its own (buttons, selection, sliders, text inputs,
-//                      value inputs, lists, containers, display), in that order; each fills
-//                      its own accessor in a file of its family
-//   widgets controls   pickers
-//   widgets structure  navigation, layout, overlays, and the placeholder frames of every
-//                      family; EndFrame draws the toast stack, after every page has drawn
-//   widgets content    DataTable, charts, media, composites
+//   one entry per family or part of a family that is built on its own (buttons, selection,
+//                      sliders, text inputs, value inputs, lists, containers, display, color
+//                      pickers, date and other pickers, navigation, layout, overlays), in that
+//                      order; each fills its own accessor in a file of its own. The overlays'
+//                      EndFrame runs after every page has drawn (the toast stack).
+//   widgets structure  forgets the placeholder frames of structure_stub.h left open
+//   DataTable, charts, media, composites, in that order, each with an entry of its own
 //
 // Last:
 //   scopes             EndFrame reports Begin / End pairs still open, after every module
@@ -51,7 +51,7 @@ namespace facet::internal
 
 std::span<const Subsystem> Subsystems()
 {
-    static const std::array<Subsystem, 28> table = {
+    static const std::array<Subsystem, 35> table = {
         ThemeSubsystem(),
         ScaleSubsystem(),
         StateStorageSubsystem(),
@@ -76,9 +76,16 @@ std::span<const Subsystem> Subsystems()
         WidgetsListsSubsystem(),
         WidgetsContainersSubsystem(),
         WidgetsDisplaySubsystem(),
-        WidgetsControlsSubsystem(),
+        WidgetsColorPickersSubsystem(),
+        WidgetsDatePickersSubsystem(),
+        WidgetsNavigationSubsystem(),
+        WidgetsLayoutSubsystem(),
+        WidgetsOverlaysSubsystem(),
         WidgetsStructureSubsystem(),
-        WidgetsContentSubsystem(),
+        WidgetsDataTableSubsystem(),
+        WidgetsChartsSubsystem(),
+        WidgetsMediaSubsystem(),
+        WidgetsCompositesSubsystem(),
         ScopesSubsystem(),
     };
     return table;

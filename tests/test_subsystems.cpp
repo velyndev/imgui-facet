@@ -79,8 +79,11 @@ TEST_CASE("The subsystem table lists every module once in dependency order")
                               "widgets_sliders", "widgets_text_inputs",
                               "widgets_value_inputs", "widgets_lists",
                               "widgets_containers", "widgets_display",
-                              "widgets_controls", "widgets_structure",
-                              "widgets_content", "scopes"};
+                              "widgets_color_pickers", "widgets_date_pickers",
+                              "widgets_navigation", "widgets_layout",
+                              "widgets_overlays", "widgets_structure",
+                              "widgets_data_table", "widgets_charts",
+                              "widgets_media", "widgets_composites", "scopes"};
     REQUIRE(table.size() == std::size(expected));
     for (size_t i = 0; i < table.size(); ++i)
     {

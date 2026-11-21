@@ -76,10 +76,16 @@ Subsystem WidgetsValueInputsSubsystem(); // src/widgets/inputs/value_inputs_fram
 Subsystem WidgetsListsSubsystem();       // src/widgets/lists/lists_frame.cpp
 Subsystem WidgetsContainersSubsystem();  // src/widgets/containers/containers_frame.cpp
 Subsystem WidgetsDisplaySubsystem();     // src/widgets/display/display_frame.cpp (DataTable excluded)
-// The families that are still grouped.
-Subsystem WidgetsControlsSubsystem();    // src/widgets/controls_frame.cpp: pickers
-Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp: navigation, layout, overlays
-Subsystem WidgetsContentSubsystem();     // src/widgets/content_frame.cpp: DataTable, charts, media, composites
+Subsystem WidgetsColorPickersSubsystem();  // src/widgets/pickers/color_pickers_frame.cpp: the color pickers
+Subsystem WidgetsDatePickersSubsystem(); // src/widgets/pickers/date_pickers_frame.cpp: date, time and the other pickers
+Subsystem WidgetsNavigationSubsystem();  // src/widgets/navigation/navigation_frame.cpp
+Subsystem WidgetsLayoutSubsystem();      // src/widgets/layout/layout_frame.cpp
+Subsystem WidgetsOverlaysSubsystem();    // src/widgets/overlays/overlays_frame.cpp
+Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp: the placeholder frames (structure_stub.h)
+Subsystem WidgetsDataTableSubsystem();   // src/widgets/display/data_table_frame.cpp: DataTable
+Subsystem WidgetsChartsSubsystem();      // src/widgets/charts/charts_frame.cpp
+Subsystem WidgetsMediaSubsystem();       // src/widgets/media/media_frame.cpp
+Subsystem WidgetsCompositesSubsystem();  // src/widgets/composites/composites_frame.cpp
 Subsystem ScopesSubsystem();             // src/internal/scope_stack.cpp
 
 // The ordered table (src/core/subsystems.cpp). Built on first use, valid for the whole run.

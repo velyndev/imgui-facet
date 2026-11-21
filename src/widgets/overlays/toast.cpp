@@ -1,5 +1,5 @@
 // ShowToast and the toast queries (overlays.h). Planned: nothing is queued until Phase 2
-// implements the toast stack (drawn from src/widgets/structure_frame.cpp), so ShowToast returns
+// implements the toast stack (drawn from src/widgets/overlays/overlays_frame.cpp), so ShowToast returns
 // an invalid id and every query answers for a toast that does not exist.
 
 #include "facet/widgets/overlays.h"
