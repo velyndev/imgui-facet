@@ -344,6 +344,53 @@ TEST_CASE("Tabs that do not fit move into the more menu and the selected tab alw
     CHECK(NavigationPartRect(bar, 1).GetWidth() > 0.0f);
 }
 
+TEST_CASE("Shown navigation bars allocate nothing per frame in the steady state")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kLabels[] = {"One", "Two", "Three", "Four", "Five", "Six"};
+    static const facet::ChoiceItem kSteps[] = {{"One"}, {"Two"}, {"Three"}};
+    int tab = 2;
+    int page = 3;
+    int step = 1;
+    session.SetUi([&] {
+        facet::TabBar("tabs", &tab, kLabels, {.closable = true, .width = 200.0f, .reorderable = true});
+        if (facet::BeginSidebar("nav", {.mode = facet::SidebarMode::Expanded, .height = 120.0f}))
+        {
+            facet::SidebarItem("Page", facet::Icon("list"), {.selected = true, .badge = 4});
+            facet::EndSidebar();
+        }
+        if (facet::BeginMenuBar("bar"))
+        {
+            if (facet::BeginMenu("File"))
+                facet::EndMenu();
+            facet::EndMenuBar();
+        }
+        (void)facet::Breadcrumbs("path", kLabels, {.width = 160.0f});
+        facet::Pagination("pages", &page, 30);
+        facet::StepIndicator("steps", &step, kSteps);
+    });
+    session.Frames(10);
+    session.MouseMove(ImVec2(20.0f, 14.0f));  // hover a tab
+    session.Frames(30);
+
+    static int allocations = 0;
+    allocations = 0;
+    ImGuiMemAllocFunc oldAlloc = nullptr;
+    ImGuiMemFreeFunc oldFree = nullptr;
+    void* oldUser = nullptr;
+    ImGui::GetAllocatorFunctions(&oldAlloc, &oldFree, &oldUser);
+    ImGui::SetAllocatorFunctions(
+        [](size_t size, void*) -> void* {
+            ++allocations;
+            return std::malloc(size);
+        },
+        [](void* pointer, void*) { std::free(pointer); });
+    session.Frames(20);
+    ImGui::SetAllocatorFunctions(oldAlloc, oldFree, oldUser);
+    CHECK(allocations == 0);
+}
+
 TEST_CASE("Ctrl+Page Down and Up switch the tabs of the bar while the focus is in its window")
 {
     facet::test::Session session;
