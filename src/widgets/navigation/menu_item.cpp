@@ -36,9 +36,10 @@ struct MenuItemRow
     char shortcut[kMenuShortcutText] = {};
 };
 
-MenuItemRow BuildMenuItemRow(const MenuItemOptions& options, bool disabled)
+// Fills `row` in place: its description points into its own shortcut buffer, so the row must not
+// be copied afterwards.
+void BuildMenuItemRow(MenuItemRow& row, const MenuItemOptions& options, bool disabled)
 {
-    MenuItemRow row;
     row.desc.icon = options.icon;
     row.desc.destructive = options.destructive;
     row.desc.disabled = disabled;
@@ -57,7 +58,6 @@ MenuItemRow BuildMenuItemRow(const MenuItemOptions& options, bool disabled)
         ChordToText(chord, row.shortcut, kMenuShortcutText);
         row.desc.shortcut = row.shortcut;
     }
-    return row;
 }
 
 // The level the rows belong to: the popup level being submitted, else the current window.
@@ -91,7 +91,8 @@ bool MenuItem(const char* label, const MenuItemOptions& options)
 {
     if (ControlWindow() == nullptr)
         return false;
-    MenuItemRow row = BuildMenuItemRow(options, PushedDisabled());
+    MenuItemRow row;
+    BuildMenuItemRow(row, options, PushedDisabled());
     return MenuItemPressed(label, row, options);
 }
 
@@ -100,7 +101,8 @@ bool MenuCheckItem(const char* label, bool* checked, const MenuItemOptions& opti
     if (ControlWindow() == nullptr)
         return false;
     // A null value pointer shows the row and never writes (rule 14): it cannot be activated.
-    MenuItemRow row = BuildMenuItemRow(options, PushedDisabled() || checked == nullptr);
+    MenuItemRow row;
+    BuildMenuItemRow(row, options, PushedDisabled() || checked == nullptr);
     row.desc.checked = checked != nullptr && *checked;
     row.desc.slot = true;
     if (!MenuItemPressed(label, row, options) || checked == nullptr)
@@ -114,7 +116,8 @@ bool MenuRadioItem(const char* label, int* selection, int value, const MenuItemO
 {
     if (ControlWindow() == nullptr)
         return false;
-    MenuItemRow row = BuildMenuItemRow(options, PushedDisabled() || selection == nullptr);
+    MenuItemRow row;
+    BuildMenuItemRow(row, options, PushedDisabled() || selection == nullptr);
     row.desc.checked = selection != nullptr && *selection == value;
     row.desc.radio = true;
     row.desc.slot = true;

@@ -9,6 +9,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -754,6 +755,42 @@ TEST_CASE("Check and radio items write their values; a command item triggers its
     session.KeyPress(ImGuiKey_K | ImGuiMod_Ctrl);
     session.Frames(2);
     CHECK(fired == 2);
+    facet::UnregisterShortcut(command);
+}
+
+TEST_CASE("A menu row shows its shortcut, the registered chord of a command, and a disabled command disables it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId command = facet::RegisterShortcut("test.nav.chord", ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_K);
+    float plain = 0.0f;
+    float shortcut = 0.0f;
+    float registered = 0.0f;
+    int presses = 0;
+    session.SetUi([&] {
+        // A narrow child: each row takes its content width, which includes the shortcut text.
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(40.0f), facet::Px(200.0f)));
+        facet::MenuItem("Cut");
+        plain = ImGui::GetItemRectSize().x;
+        facet::MenuItem("Cut##chord", {.shortcut = ImGuiMod_Ctrl | ImGuiKey_X});
+        shortcut = ImGui::GetItemRectSize().x;
+        if (facet::MenuItem("Cut##command", {.command = command}))
+            ++presses;
+        registered = ImGui::GetItemRectSize().x;
+        session.Track("command");
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(shortcut > plain + facet::Px(facet::T().overlay.menuShortcutGap));
+    CHECK(registered > shortcut);  // "Ctrl+Shift+K" is longer than "Ctrl+X"
+    facet::SetShortcutEnabled(command, false);
+    session.Frame();
+    session.Click(ImVec2(session.ItemRect("command").Min.x + 4.0f, session.ItemCenter("command").y));  // inside the narrow child
+    CHECK(presses == 0);
+    facet::SetShortcutEnabled(command, true);
+    session.Frame();
+    session.Click(ImVec2(session.ItemRect("command").Min.x + 4.0f, session.ItemCenter("command").y));  // inside the narrow child
+    CHECK(presses == 1);
     facet::UnregisterShortcut(command);
 }
 
