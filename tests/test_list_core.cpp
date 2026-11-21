@@ -530,6 +530,25 @@ TEST_CASE("List view: the focused row stays alive when scrolled out, and it is t
     CHECK(session.ItemVisible("row4"));
 }
 
+TEST_CASE("List tree: a tree that fits its height keeps one row of room for its states")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        if (fi::BeginListTree(ImGui::GetID("loading"), {.fitHeight = true, .state = facet::DataState::Loading}))
+            fi::EndListTree();
+        session.Track("loading");
+        if (fi::BeginListTree(ImGui::GetID("empty"), {.fitHeight = true}))
+            fi::EndListTree();
+        session.Track("empty");
+    });
+    session.Frames(3);
+    const float row = fi::ListRowHeight(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("loading").GetHeight() >= row);
+    CHECK(session.ItemRect("empty").GetHeight() >= row);
+}
+
 TEST_CASE("List view: a double click on a driven list activates once per click")
 {
     MotionGuard guard;

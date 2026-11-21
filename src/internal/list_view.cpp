@@ -1146,7 +1146,15 @@ bool BeginListTree(ImGuiID id, const ListTreeDesc& desc)
     ImGuiWindow* window = g.CurrentWindow;
     if (desc.state != DataState::Ready)
     {
-        DrawListState(window->InnerRect, desc.state, desc.emptyText, desc.errorText);
+        // A tree that fits its height keeps the room of one row for the state.
+        ImRect room = window->InnerRect;
+        if (desc.fitHeight)
+        {
+            const ImVec2 at = window->DC.CursorPos;
+            room = ImRect(at, ImVec2(std::max(at.x + 1.0f, window->WorkRect.Max.x), at.y + ListRowHeight(desc.size)));
+            ImGui::Dummy(room.GetSize());
+        }
+        DrawListState(room, desc.state, desc.emptyText, desc.errorText);
         EndScrollAreaCore();
         return false;
     }
@@ -1451,13 +1459,20 @@ ListTreeResult EndListTree()
         if (match.found && match.id != g.NavId)
             MoveTreeFocus(frame, match.id, match.key, match.rect);
     }
+    // An empty tree shows the empty state in the room of one row, so a tree that fits its height
+    // still has room for it.
     if (frame.position == 0)
-        DrawListState(frame.window->InnerRect, DataState::Ready, frame.desc.emptyText, nullptr);
+    {
+        const ImRect row = TreeRowRect(frame, 0);
+        const ImRect room = frame.desc.fitHeight ? row : frame.window->InnerRect;
+        DrawListState(room, DataState::Ready, frame.desc.emptyText, nullptr);
+    }
     const float radius = Px(T().radii.control);
     if (frame.hasRing)
         DrawItemFocusRing(frame.ring, radius);
-    // The content ends below the last row (the loading rows are not items).
-    frame.window->DC.CursorPos = ImVec2(frame.left, TreeRowRect(frame, frame.position).Min.y);
+    // The content ends below the last row (the loading rows are not items), or below the room of
+    // the empty state.
+    frame.window->DC.CursorPos = ImVec2(frame.left, TreeRowRect(frame, std::max(frame.position, 1)).Min.y);
     ImGui::Dummy(ImVec2(0.0f, 0.0f));
     EndScrollAreaCore();
     if (frame.multi && frame.fingerprinted)
