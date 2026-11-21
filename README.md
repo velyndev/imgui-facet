@@ -7,16 +7,24 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 **Status: early development.** The building blocks of Phase 1 exist inside the library and
 work. Planned blocks: overlay scrollbars inside popup levels and multiline text areas (both still
 use Dear ImGui's own bar there). The fourteen widget family headers in `include/facet/widgets/`
-declare every widget with documentation comments, and every declared function links. Two widgets
-are implemented: `Button` and `ProgressBar`. The other widgets of the buttons, selection,
-sliders, inputs, lists, containers and display families are being implemented; until a widget is
-ready, and for every widget of the other families, the function draws a placeholder that says
-"planned", returns the neutral result and writes nothing, and planned End functions, queries and
-helpers such as `PassesFilter` draw nothing and return neutral values. Besides the ready widgets,
-`ApplyReorderMove`, the built-in strings and the edit session queries in `common.h` work, and the
-`BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it. The
-status of each widget is the last line of its entry on its family page under `docs/widgets/`
-(see `docs/widgets.md`). What exists today:
+declare every widget with documentation comments, and every declared function links. The
+implemented widgets:
+
+- Buttons, Selection, Inputs (text and value inputs), Lists and Containers: every widget of the
+  family.
+- Sliders: `Slider`, `SliderStepped`, `SliderWithInput`, `RangeSlider`, `RangeInput`,
+  `RangeSliderHistogram`, `MultiSlider` and `Knob`. Planned: `XYPad`, `JoystickPad`,
+  `ArcRangeSlider`, `BoxRangePad` and `AllocationBar`.
+- Display: every widget except `DataTable` and its cell editing, which are planned.
+
+The widgets of the Pickers, Navigation, Layout, Overlays, Charts, Media and Composites families
+are planned, apart from the core items listed on the media page (`docs/widgets/media.md`). A
+planned widget function draws a placeholder that says "planned", returns the neutral result and
+writes nothing, and planned End functions, queries and helpers draw nothing and return neutral
+values. Besides the widgets, `ApplyReorderMove`, `PassesFilter`, the built-in strings and the
+edit session queries in `common.h` work, and the `BeginDataTable` placeholder opens a plain Dear
+ImGui table so the caller's cells land in it. The status of each widget is the last line of its
+entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -61,8 +69,9 @@ status of each widget is the last line of its entry on its family page under `do
 - `include/facet/widgets/common.h`: the types the widget families share, the control size
   stack (`PushControlSize`), control heights, the built-in strings (`SetStrings`) and the edit
   session queries (`IsItemEditCommitted`, `IsItemEditCanceled`) work; `NextVisibleRows`
-  forwards to the list core and hands out rows inside the row ranges the list core opens, so
-  inside the placeholder containers, which open none, it returns false. `facet/facet.h`
+  forwards to the list core and hands out rows inside the row ranges the list core opens (a
+  `VirtualList` opens one), so inside a placeholder such as `BeginDataTable`, which opens none, it
+  returns false. `facet/facet.h`
   includes every core and widget header. The rules for widget declarations are in `docs/api-conventions.md`.
 - The building blocks of the widgets, internal to the library (`src/internal/`, each header
   starts with a usage sketch): item behaviour (hover, press, focus, disabled and hit targets
@@ -164,11 +173,13 @@ status of each widget is the last line of its entry on its family page under `do
       field, and the three control sizes.
   - Widgets: one page per widget family (Buttons, Selection, Sliders, Text inputs and Value
     inputs, Pickers, Lists, Navigation, Containers, Layout, Overlays, Display, Charts, Media,
-    Composites). Buttons shows `Button` in every variant, size, icon placement and state, with
-    capture states for hover, press, keyboard focus and loading and a selftest; Display shows
-    `ProgressBar` driven by a value slider, in three sizes and tones and indeterminate, with a
-    selftest. Every other widget on them is a placeholder of its declared size that cannot be
-    operated.
+    Composites). Buttons, Selection, Sliders, Text inputs, Value inputs, Lists, Containers and
+    Display show every implemented widget of their family in its variants, sizes and states
+    (read-only, disabled, error, mixed, loading and empty where the widget has them, and narrow
+    widths), with capture states that force hover, press, keyboard focus, open popups and drags
+    per section, and a selftest that operates each of them by mouse and keyboard and checks the
+    values. The planned widgets on the Sliders and Display pages, and every widget on the pages of
+    the planned families, are placeholders of their declared size that cannot be operated.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection

@@ -23,10 +23,11 @@ Three dials set the character, each from 1 (calm) to 3 (bold):
 
 **Identity motif: the sliding selection pill.** One soft accent-tinted highlight sits behind
 the selected entry and springs to the next one when the selection changes (standard spring).
-Tabs, the sidebar, segmented controls and lists are to share this one gesture once they exist,
-so it is recognisably Facet without any ornament; today the selection pill block in
-`src/internal/selection_pill.h` draws it for the demo navigation, the current item of the
-Overflow page and the prototypes on the Selection pill page.
+Tabs, the sidebar, segmented controls and lists share this one gesture, so it is recognisably
+Facet without any ornament; today the selection pill block in `src/internal/selection_pill.h`
+draws it for segmented controls, toggle button groups, choice chips, the key bind mode
+selector, the lists, the demo navigation and the block prototypes. Tabs and the sidebar are
+planned.
 
 **Dose caps.** Effects are allowed only where they carry meaning:
 
@@ -367,6 +368,167 @@ ProgressBar:
 - **Motion.** A new value eases in over durationStandard; an indeterminate bar sweeps a segment of
   30 % of the track on the shared loading clock, so it moves in step with skeletons, and fades in
   place with reduced motion.
+
+Buttons and selection:
+
+- **Toggle.** Off is the neutral fill with the 3:1 boundary and a labelSecondary knob, on is the
+  accent with an onAccent knob and a focusRing edge, so on and off differ in fill, edge and knob
+  position, not only in hue. The knob moves with the quick spring, because it is a small state change.
+- **Checkbox and radio marks.** Unchecked has no fill and the 3:1 boundary; checked is the accent
+  with a focusRing edge. Mixed is a minus instead of a check, so the three states differ by shape.
+  Box corners are at most a quarter of the side, so a box never reads as a radio circle. The radio
+  dot is 3/8 of the mark and grows in with the fill, so the change reads as one motion.
+- **Read-only selections** (marks, segments, chips, cards) use labelSecondary or fill[0] instead of
+  the accent, so a value that cannot change does not look like a live selection.
+- **Segmented track and toggle groups.** The track is fill[2] with the 3:1 boundary, like a
+  Secondary button. The pill is accentSubtle inset by segmentInset with concentric corners, and
+  hairline dividers stand only between unselected neighbours, so the pill reads as one piece.
+- **Latches** (a latched IconButton, selected chips and cards) take accentSubtle plus a focusRing
+  hairline, so a latch shows by its edge as well as its tint.
+- **Chips** are pills (the radii rule allows pills for toggles and chips). The remove button sits
+  inside the pill's end and is not a Tab stop, so a row of chips keeps one stop per chip; Delete
+  and Backspace remove.
+- **CopyButton.** The confirmation check is in the success color on the neutral variants, because
+  it reports success; the width holds both texts, so nothing moves while it confirms.
+- **Link.** A hairline underline only under the pointer or the keyboard focus marks the link
+  without underlining every link at rest; a visited link uses accentTextVisited.
+- **CycleSelector** takes the text field frame, because it shows a value. Its chevrons are
+  labelSecondary, and labelTertiary at an end that cannot step; page dots use pageDotSize, the
+  chosen one in label.
+- **Option cards** are bgSecondary with radii.card, because they are grouped content on a page. A
+  radio mark stands for one choice and a checkbox mark for several, so the two forms read
+  differently.
+
+Sliders:
+
+- **Knob size.** sliderKnobSize scaled by the control height of the size and kept even, so Small,
+  Regular and Large differ and the knob centre sits on a whole pixel.
+- **Value column.** As wide as the widest value shown so far, giving way below
+  layout.minRowControl, so the value never jitters and the track keeps a usable length.
+- **Range values** read low, a short drawn bar, high, so the pair reads as a range without a word
+  to translate.
+- **Value bubble.** An inverted pill (label fill, bg text) above the knob while it is held or
+  focused, readable over any surface in both themes.
+- **Crowded ticks** are thinned to keep three tick sizes apart, and the last tick always stays, so
+  both ends stay marked.
+- **Stepped stops** are evenly spaced whatever their values, so a list of choices reads as equal
+  steps; stop labels are Caption under the ticks.
+- **Knob.** A track arc in the boundary color, the value as an accent arc, a dot or a wiper, and a
+  bg face with a 3:1 outline like a slider knob.
+- **Histogram bars.** The selected stretch in the accent, the rest in fill[0], top corners rounded
+  with half of radii.element, so the bars read as one chart under the range.
+- **Multi slider segments** take the series colors (the chart palette) unless the caller gives a
+  color; a handle dragged off the track
+  takes the disabled look, which shows that releasing it there removes it.
+
+Text inputs:
+
+- **FieldValidation.** A hairline outline in the tone color around the validated item, matching
+  the error outline of Facet fields.
+- **ValidationSummary.** A block on destructiveSubtle with label-colored, always underlined links
+  and the error glyph, so the list reads as errors without relying on red text.
+- **TagInput** chips are one control size smaller than the field, so a row of chips keeps the
+  field's height.
+- **FilterField** toggles are the glyphs "Aa" and an underlined "ab", which users already read as
+  match case and whole word; the on state is a fill plus the label color.
+- **CopyField.** The copy icon turns into a check for motion.feedbackHold as the confirmation.
+- **PinCodeInput.** Each cell is a field frame one control height square, and the next cell has
+  the active outline. An error shakes the cells three swings over motion.durationSlow,
+  spacing.xs wide, skipped with reduced motion.
+- **MaskedInput.** The unfilled part of the mask shows after the text in labelSecondary as a format
+  hint.
+- **PathField.** Idle paths are shortened in the middle, so the file name stays visible.
+- **InlineRename.** Idle text gets a subtle fill on hover, which shows that it can be edited.
+- **SecureField** strength meter is destructive, warning and success by thirds of the strength,
+  and the Caps Lock hint uses the message line, so the warning sits where help text always is.
+- **TextArea** resize bar is centered on the bottom edge, where a resize is expected.
+- **Autocomplete** shows the inline completion in labelSecondary after the caret, so it reads as a
+  suggestion, not as typed text.
+
+Value inputs:
+
+- **Key caps.** fill[2] with the 3:1 boundary hairline and radii.element, Footnote (Caption at
+  Small), spacing.xs apart, so a cap reads as a key on a page and on a field fill; a held cap
+  takes fill[0] and a focusRing outline. KeyCap, ShortcutHint and KeybindCapture share this look
+  (`src/internal/key_caps.h`) and differ only in placement: on the text baseline inline, centered
+  inside a control in a field.
+- **KeybindCapture.** A listening slot has the focusRing hairline of an active field and shows the
+  held keys as held caps, so the user sees the chord form before it is taken.
+- **Rating.** Filled icons in focusRing, which reaches 3:1 on every surface, empty ones in
+  labelSecondary; a caller's own icon has no filled form, so a filled one also gets an
+  accentSubtle backdrop and the value is never shown by color alone.
+- **DurationInput.** Digits in label and separators in labelSecondary, with half of spacing.xs on
+  both sides of each separator; the segment the keys edit has accentSubtle behind it while
+  focused, so the user sees which unit Up and Down change. It drags vertically with the up-down
+  resize cursor, because Left and Right already pick the segment.
+- **Unit menu and slot buttons.** The unit label and a chevron in the trailing slot, with the plain
+  hover fill of slot buttons, so the unit reads as part of the value and as a menu.
+- **SizeInput.** The lock (lock and unlock icons) sits at the end of the width field, between the
+  two values; swap uses the refresh icon, presets the chevron.
+- **HexInput** shows "0x" and a gap after every two digits only while not typing, so the typed text
+  is the plain digits that overtype edits.
+- **Rejected text.** A committed text a number-like field cannot read shows Strings::invalidValue as
+  its error until the field is used again, so the user sees why nothing changed.
+
+Lists:
+
+- **Popup list rows** (Dropdown, MultiDropdown, BeginCombo) keep a leading slot: an accentText
+  check marks the chosen item, a checkbox in multiple-choice lists, so the choice reads without
+  color alone.
+- **Group headers** are Footnote labelSecondary rows that take no hover or focus, so they read as
+  structure, not as choices.
+- **Filter matches** are label text on a fill[1] wash with the rest of the label in
+  labelSecondary, the contrast rule of the fuzzy block.
+- **Inline framed lists** (ListBox, SelectableList, checklists, transfer lists) have no fill and the
+  boundary hairline, so row hover, selection and pill fills read on any surface.
+- **Search row** of a popup list is a frameless field with a search glyph over a separator
+  hairline, so it reads as part of the list, not as a second control.
+- **Reorderable rows** lead with a grip glyph; the landing place is a fill[2] slot while the rows
+  spring aside.
+- **TransferList** move buttons are Secondary buttons with arrow glyphs (right and left, down and up
+  when stacked), disabled while nothing is selected.
+- **Checkboxes in lists** are the selection family's checkbox mark, so a checked row and a
+  checked Checkbox look the same.
+
+Containers:
+
+- **Section headers** (accordion, disclosure row, collapsible group box) are full-width rows with a
+  chevron and a fill[2] hover, so they read as toggles without a frame; the link disclosure is
+  underlined on hover, so its hover cue does not depend on color.
+- **Card.** A bgSecondary surface with radii.card and no shadow, because it sits on the page and
+  does not float.
+- **Group box.** A separator hairline with radii.card, so it groups without adding a surface.
+- **Accordion sections** are divided by hairlines, so the headers scan as one list.
+- **Toolbar.** A selected tool button gets the accentSubtle fill with accentText, so the on state
+  shows by fill and color; a separator is a hairline inset by spacing.xs, so it divides groups
+  without reaching the row's edges.
+- **Shell.** Glass with an elevation 2 shadow and radii.window, the one floating menu the blur dose
+  cap allows. Its grip is two diagonal hairlines, labelTertiary at rest and labelSecondary while a
+  band is hovered, so resizing is discoverable without a heavy mark.
+- **Title bar close button** takes the destructive fill on hover and press, because it ends the
+  window.
+- **Status bar.** A bgSecondary strip with a top hairline separates chrome from content; status
+  shows as a tone dot or icon.
+- **Mini window.** An opaque elevation 1 surface with radii.card: it floats, but below the shell.
+- **Inspector pane.** bgSecondary when docked and an elevation 2 drawer when Compact; the drawer
+  leaves a strip of spacing.xxxl of the main content in view, and the resize band shows a
+  focusRing-colored hairline on hover.
+
+Display:
+
+- **Marks** (badges, pills, key caps, inline code) are their text line plus two xs steps and put
+  their text on the baseline of the line around them, so they read as part of a sentence at
+  every scale.
+- **Tone washes.** Text on a tone wash is always label; the tone shows in its icon or dot (3:1),
+  so no state depends on color alone.
+- **Banners and inline alerts** share one surface: the tone wash, the tone icon, a Headline title,
+  small Secondary and Plain action buttons, and a close button; an inline alert adds a hairline
+  because it sits among fields.
+- **Code views, logs and stat tiles** sit on bgSecondary with a hairline, so their edges show on bg
+  and on bgSecondary alike.
+- **Count badge.** A pill (a circle for one digit), so it is never mistaken for a status badge.
+- **Live dot.** A pulsing dot grows a fading ring once per pulsePeriod and stands still with
+  reduced motion.
 
 ## Effects
 

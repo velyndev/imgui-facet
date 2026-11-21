@@ -188,8 +188,7 @@ aside) is refused; at `maxTags` nothing more is added. A refused entry stays in 
 true when `*tags` changed (several tags added in one frame are one write). `readOnly`, a null `tags`
 or a pushed `ImGuiItemFlags_ReadOnly` show the chips without remove buttons and add nothing; the
 error or help line sits under the frame. A tag containing "##" shows only the part before it,
-because the chip treats its text as a label. The chips rely on `Chip`, which is still a placeholder
-in this build of the selection family, so they show its placeholder until that widget is ready.
+because the chip treats its text as a label. The chips are the selection family's `Chip`.
 Status: ready.
 
 ### TextArea
