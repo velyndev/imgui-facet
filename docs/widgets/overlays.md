@@ -307,13 +307,25 @@ A strip of name and value fields in a display corner that lets input through.
 
 ### UnsavedChangesBar
 
-Status: planned
-
 ```cpp
 UnsavedChangesAction UnsavedChangesBar(const char* id, int changeCount, const UnsavedChangesBarOptions& options = {});
 ```
 
-A bar that slides in while settings have unsaved changes and returns Apply or Revert.
+A bar pinned `spacing.md` above the bottom of the current window's visible area, over the page
+content, as wide as that area less `spacing.md` on each side, on the elevated surface of level 1 with
+the card radius. It slides up while `changeCount` is above 0 and down when it reaches 0
+(`motion.durationStandard`), with the message (`message`, or `Strings::unsavedChange` /
+`Strings::unsavedChanges` with `{count}` replaced; cut with an ellipsis and shown in full on hover) and
+the Revert (Secondary) and Apply (Primary) buttons at the end.
+
+- **Result:** `Apply` or `Revert` on the frame a button is activated; `applyShortcut` applies from
+  anywhere while there are changes; Escape reverts while one of its buttons has the keyboard focus,
+  after every layer in front of it. While it slides down it keeps the last message and takes no input.
+- Tab reaches its buttons from the page. The window's content grows by the bar's room, so the last
+  rows can still be scrolled above it. Call it after the window's other content, so it draws over the
+  page's own child windows.
+
+Status: ready.
 
 ## Usage examples
 

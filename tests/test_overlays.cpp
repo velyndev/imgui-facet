@@ -1590,3 +1590,47 @@ TEST_CASE("The shortcut palette triggers the picked shortcut")
     CHECK(fired == 1);
     facet::UnregisterShortcut(save);
 }
+
+// ---- Unsaved changes bar -------------------------------------------------------------------------
+
+TEST_CASE("The unsaved changes bar shows while there are changes, applies, reverts and reverts on Escape")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    int changes = 2;
+    int applied = 0;
+    int reverted = 0;
+    session.SetUi([&] {
+        ImGui::Button("page");
+        session.Track("page");
+        switch (facet::UnsavedChangesBar("changes", changes, {.applyLabel = "Apply##bar", .revertLabel = "Revert##bar"}))
+        {
+        case facet::UnsavedChangesAction::Apply:
+            ++applied;
+            break;
+        case facet::UnsavedChangesAction::Revert:
+            ++reverted;
+            break;
+        default:
+            break;
+        }
+    });
+    session.Seconds(0.4f);
+    // The buttons sit at the bottom right of the window: Tab reaches them from the page.
+    session.Click(session.ItemCenter("page"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(reverted == 1);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(reverted == 2);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(applied == 1);
+    changes = 0;
+    session.Seconds(0.4f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(reverted == 2);
+}
