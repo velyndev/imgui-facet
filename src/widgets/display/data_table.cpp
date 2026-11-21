@@ -468,7 +468,8 @@ bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, in
         window->DC.CursorPos = cursorStart;
         window->DC.IsSameLine = false;
         ImGui::ItemSize(frameRect.GetSize());
-        ImGui::ItemAdd(frameRect, tableId, nullptr, ImGuiItemFlags_NoNav);
+        // Dear ImGui already added an item with the table id for its clipped table.
+        ImGui::ItemAdd(frameRect, 0, nullptr, ImGuiItemFlags_NoNav);
         return false;
     }
     ImGuiTable* table = g.CurrentTable;
