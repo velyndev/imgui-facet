@@ -160,3 +160,93 @@ TEST_CASE("The hue memory keeps the hue at grey and the saturation at black")
     CHECK(grey.s == 0.0);
     CHECK(outside.h == 0.0);
 }
+
+// ---- SatValSquare -------------------------------------------------------------------------------
+
+TEST_CASE("SatValSquare moves on both axes with the arrows, fine with Shift and coarse with Ctrl")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color = facet::internal::ColorFromHsv({0.6, 0.5, 0.5}, 0.75f);
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::SatValSquare("Square", &color, {.width = 160.0f}))
+            ++writes;
+        session.Track("square");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("square"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    ColorHsv hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.s == doctest::Approx(0.51).epsilon(1e-4));
+    CHECK(hsv.v == doctest::Approx(0.5).epsilon(1e-4));
+    session.KeyPress(ImGuiKey_UpArrow);
+    hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.v == doctest::Approx(0.51).epsilon(1e-4));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.v == doctest::Approx(0.509).epsilon(1e-4));
+    session.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Ctrl);
+    hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.s == doctest::Approx(0.5).epsilon(1e-4));
+    // Hue and alpha stay.
+    CHECK(hsv.h == doctest::Approx(0.6).epsilon(1e-4));
+    CHECK(color.w == 0.75f);
+    CHECK(writes == 4);
+}
+
+TEST_CASE("SatValSquare keeps hue and saturation when the value goes to zero and back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color = facet::internal::ColorFromHsv({0.3, 0.7, 0.6}, 1.0f);
+    session.SetUi([&] {
+        (void)facet::SatValSquare("Square", &color, {.width = 160.0f});
+        session.Track("square");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("square");
+    // Down to the bottom edge (value 0, black), then up again.
+    session.Drag({r.GetCenter(), ImVec2(r.GetCenter().x, r.Max.y + 20.0f), ImVec2(r.GetCenter().x, r.Min.y + r.GetHeight() * 0.25f)});
+    const ColorHsv hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.h == doctest::Approx(0.3).epsilon(1e-3));
+    CHECK(hsv.s > 0.3);
+    CHECK(hsv.v > 0.5);
+}
+
+TEST_CASE("SatValSquare: a click puts the handle under the pointer and Escape restores the color")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImVec4 start = facet::internal::ColorFromHsv({0.1, 0.2, 0.3}, 1.0f);
+    ImVec4 color = start;
+    bool canceled = false;
+    session.SetUi([&] {
+        (void)facet::SatValSquare("Square", &color, {.width = 160.0f});
+        canceled = canceled || facet::IsItemEditCanceled();
+        session.Track("square");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("square");
+    // The top right corner of the gradient: full saturation and value.
+    session.Click(ImVec2(r.Max.x - 2.0f, r.Min.y + 2.0f));
+    ColorHsv hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.s == doctest::Approx(1.0));
+    CHECK(hsv.v == doctest::Approx(1.0));
+    CHECK(hsv.h == doctest::Approx(0.1).epsilon(1e-4));
+    // A drag, then Escape while the button is still down.
+    const ImVec4 before = color;
+    session.MouseMove(r.GetCenter());
+    session.MouseDown();
+    session.MouseMove(ImVec2(r.Min.x + 10.0f, r.Max.y - 10.0f));
+    CHECK_FALSE(Same(color, before));
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    CHECK(Same(color, before));
+    CHECK(canceled);
+}
