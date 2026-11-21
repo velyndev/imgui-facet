@@ -74,8 +74,6 @@ void CallLayoutStubs(Values& v)
         if (open)
             facet::EndDependentGroup();
     });
-    CHECK_BALANCED(facet::Separator());
-    CHECK_BALANCED(facet::SeparatorText("Section"));
     CHECK_BALANCED({
         const bool open = facet::BeginItemGrid("Items", 50, &selection);
         CHECK(open);

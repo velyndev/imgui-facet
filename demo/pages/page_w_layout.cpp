@@ -34,6 +34,14 @@ constexpr int kDefaultLevel = 40;
 constexpr float kNarrowCard = 220.0f;
 
 const char* const kSegments[] = {"First", "Second", "Third"};
+const char* const kAligns[] = {"Start", "Center", "End"};
+const char* const kGaps[] = {"None", "Tight", "Item", "Loose", "Section"};
+// Grid column limits: index 0 is no limit, the others the column count.
+const char* const kColumns[] = {"Auto", "One", "Two"};
+constexpr int kGridCells = 7;
+constexpr float kGridCell = 80.0f;
+// The width of the stack column.
+constexpr float kColumnWidth = 280.0f;
 
 struct LayoutState
 {
@@ -48,6 +56,18 @@ struct LayoutState
     float largeTextTop = 0.0f;      // where the Large button draws its text
     bool largeStacked = false;      // the Large row is too narrow for label and control on one line
     bool narrowStacked = false;     // the rows in the narrow card stack
+    // Stack
+    int stackPresses[3] = {};
+    float applyRight = 0.0f;
+    float actionsRight = 0.0f;
+    int stackAlign = 1;
+    float sizeCenters[3] = {};
+    int stackGap = 2;
+    float columnTops[2] = {};       // bottom of the first and top of the second item of the column
+    int otherPresses = 0;           // the buttons of the size row and the column
+    // Grid
+    int gridColumns = 0;
+    float gridCellX[kGridCells] = {};
     // Placeholders of the planned widgets
     float splitRatio = 0.4f;
     float panelSizes[3] = {0.25f, 0.5f, 0.25f};
@@ -163,21 +183,112 @@ void SettingsRows(facet::demo::PageCtx& ctx, LayoutState& s)
     ImGui::EndDisabled();
 }
 
+void Stacks(facet::demo::PageCtx& ctx, LayoutState& s)
+{
+    SectionHeader("Stack");
+    Paragraph("Items in a row or a column with a gap token. In the first row a spacer takes the free "
+              "space, so the last button sits at the end; the second row centers controls of three "
+              "sizes on one line.");
+    facet::BeginStack("actions", {.orientation = facet::Orientation::Horizontal, .width = facet::kFill});
+    if (facet::Button("Back"))
+        ++s.stackPresses[0];
+    ctx.Probe("layout.stack.back");
+    if (facet::Button("Next"))
+        ++s.stackPresses[1];
+    ctx.Probe("layout.stack.next");
+    facet::StackSpacer();
+    if (facet::Button("Apply", {.variant = facet::ButtonVariant::Primary}))
+        ++s.stackPresses[2];
+    ctx.Probe("layout.stack.apply");
+    s.applyRight = ImGui::GetItemRectMax().x;
+    facet::EndStack();
+    ctx.Probe("layout.stack.actions");
+    s.actionsRight = ImGui::GetItemRectMax().x;
+    Note("Presses: back %d, next %d, apply %d.", s.stackPresses[0], s.stackPresses[1], s.stackPresses[2]);
+
+    const facet::LayoutAlign aligns[] = {facet::LayoutAlign::Start, facet::LayoutAlign::Center, facet::LayoutAlign::End};
+    facet::BeginSettingsRow("Alignment");
+    facet::SegmentedControl("##value", &s.stackAlign, kAligns);
+    ctx.Probe("layout.stack.align");
+    facet::EndSettingsRow();
+    facet::BeginStack("sizes", {.orientation = facet::Orientation::Horizontal, .align = aligns[s.stackAlign]});
+    if (facet::Button("Small", {.size = facet::ControlSize::Small}))
+        ++s.otherPresses;
+    s.sizeCenters[0] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    facet::StackSpacer();
+    if (facet::Button("Regular"))
+        ++s.otherPresses;
+    s.sizeCenters[1] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    facet::StackSpacer();
+    if (facet::Button("Large", {.size = facet::ControlSize::Large}))
+        ++s.otherPresses;
+    s.sizeCenters[2] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    facet::EndStack();
+
+    facet::BeginSettingsRow("Gap");
+    facet::SegmentedControl("##value", &s.stackGap, kGaps);
+    ctx.Probe("layout.stack.gap");
+    facet::EndSettingsRow();
+    const facet::Gap gaps[] = {facet::Gap::None, facet::Gap::Tight, facet::Gap::Item, facet::Gap::Loose, facet::Gap::Section};
+    facet::BeginStack("column", {.gap = gaps[s.stackGap], .align = facet::LayoutAlign::Stretch,
+                                 .width = facet::demo::DemoWidth(kColumnWidth)});
+    if (facet::Button("First in the column"))
+        ++s.otherPresses;
+    s.columnTops[0] = ImGui::GetItemRectMax().y;
+    if (facet::Button("Second in the column"))
+        ++s.otherPresses;
+    s.columnTops[1] = ImGui::GetItemRectMin().y;
+    facet::EndStack();
+    Note("Presses of the buttons in the size row and the column: %d.", s.otherPresses);
+}
+
+void Grids(facet::demo::PageCtx& ctx, LayoutState& s)
+{
+    SectionHeader("Grid");
+    Paragraph("Equal columns that reflow with the width: as many columns of the minimum cell width "
+              "as fit. The last cell spans two columns. The cells are placeholders.");
+    facet::BeginSettingsRow("Columns");
+    facet::SegmentedControl("##value", &s.gridColumns, kColumns);
+    ctx.Probe("layout.grid.columns");
+    facet::EndSettingsRow();
+    facet::BeginGrid("cells", {.minCellWidth = kGridCell, .maxColumns = s.gridColumns});
+    for (int i = 0; i < kGridCells; ++i)
+    {
+        facet::GridNext({.columnSpan = i == kGridCells - 1 ? 2 : 1});
+        ImGui::PushID(i);
+        facet::BeginCard("##cell");
+        Note("Cell %d", i + 1);
+        facet::EndCard();
+        ImGui::PopID();
+        s.gridCellX[i] = ImGui::GetItemRectMin().x;
+    }
+    facet::EndGrid();
+}
+
+void Separators()
+{
+    SectionHeader("Separator");
+    Paragraph("Hairlines snapped to whole pixels: across the width, between items on one line, and "
+              "with a section text at the start or in the middle.");
+    facet::SeparatorText("Section text");
+    Note("Content of a section.");
+    facet::Separator();
+    facet::Badge("Item 1");
+    ImGui::SameLine();
+    facet::Separator({.orientation = facet::Orientation::Vertical});
+    ImGui::SameLine();
+    facet::Badge("Item 2");
+    ImGui::SameLine();
+    facet::Separator({.orientation = facet::Orientation::Vertical, .opaque = true});
+    ImGui::SameLine();
+    facet::Badge("Item 3");
+    facet::SeparatorText("Centered section text", {.centered = true});
+    facet::Separator({.opaque = true});
+}
+
 void Arrange()
 {
     SectionHeader("Arrange items");
-    facet::BeginStack("stack", {.orientation = facet::Orientation::Horizontal, .align = facet::LayoutAlign::Center});
-    Note("Item 1");
-    facet::StackSpacer();
-    Note("Item 2");
-    facet::EndStack();
-    facet::BeginGrid("grid", {.maxColumns = 3});
-    for (int cell = 0; cell < 3; ++cell)
-    {
-        facet::GridNext();
-        Note("Cell %d", cell + 1);
-    }
-    facet::EndGrid();
     facet::BeginFlow("flow", {.maxLines = 2});
     for (int item = 0; item < 3; ++item)
         if (facet::FlowNext())
@@ -226,8 +337,6 @@ void Dependent(LayoutState& s)
         Note("Content of the group.");
         facet::EndDependentGroup();
     }
-    facet::Separator();
-    facet::SeparatorText("Section");
 }
 
 void Tiles(LayoutState& s)
@@ -254,6 +363,9 @@ FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused")
     facet::demo::PlannedFamilyNote("layout");
     LayoutState& s = State();
     SettingsRows(ctx, s);
+    Stacks(ctx, s);
+    Grids(ctx, s);
+    Separators();
     Arrange();
     Divide(s);
     Dependent(s);
@@ -309,4 +421,54 @@ FACET_DEMO_SELFTEST("layout")
     test.Click("layout.row.small");
     test.Expect("the buttons of both sizes work in rows",
                 [] { return State().largePresses == 1 && State().smallPresses == 1; });
+
+    // Stack: the spacer puts the last button at the end; Tab follows the row; alignment and gap.
+    test.Expect("the spacer puts the last button at the end of the stack",
+                [] { return std::fabs(State().applyRight - State().actionsRight) < 0.5f; });
+    test.Click("layout.stack.back");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.stack.next");
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.stack.apply");
+    test.KeyPress(ImGuiKey_Space);
+    test.Click("layout.stack.apply");
+    test.Expect("each button of the stack works by mouse and keyboard", [] {
+        const LayoutState& s = State();
+        return s.stackPresses[0] == 1 && s.stackPresses[1] == 1 && s.stackPresses[2] == 2;
+    });
+    test.Do([] { State().stackAlign = 1; });
+    test.Wait(3);
+    test.Expect("centered, the three sizes share one center line", [] {
+        const LayoutState& s = State();
+        return std::fabs(s.sizeCenters[0] - s.sizeCenters[2]) < 1.0f && std::fabs(s.sizeCenters[1] - s.sizeCenters[2]) < 1.0f;
+    });
+    test.Click("layout.stack.align");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Wait(3);
+    test.Expect("aligned to the end, the small button ends on the large one's bottom", [] {
+        const LayoutState& s = State();
+        return s.stackAlign == 2 && s.sizeCenters[0] > s.sizeCenters[2];
+    });
+    test.Do([] { State().stackGap = 3; });
+    test.Wait(2);
+    test.Expect("the column takes the Loose gap", [] {
+        const LayoutState& s = State();
+        return std::fabs(s.columnTops[1] - s.columnTops[0] - facet::Px(facet::T().spacing.lg)) < 0.5f;
+    });
+
+    // Grid: one column, then two; the spanning cell starts a row of its own.
+    test.Do([] { State().gridColumns = 1; });
+    test.Wait(2);
+    test.Expect("one column: every cell starts at one x",
+                [] { return std::fabs(State().gridCellX[0] - State().gridCellX[1]) < 0.5f; });
+    test.Click("layout.grid.columns");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Wait(2);
+    test.Expect("two columns: the second cell sits beside the first", [] {
+        const LayoutState& s = State();
+        return s.gridColumns == 2 && s.gridCellX[1] > s.gridCellX[0] + 1.0f && std::fabs(s.gridCellX[2] - s.gridCellX[0]) < 0.5f;
+    });
+    test.Do([] { State().gridColumns = 0; });
 }

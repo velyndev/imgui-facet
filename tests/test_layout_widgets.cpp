@@ -553,3 +553,64 @@ TEST_CASE("A stray GridNext is reported and grids nest in their cells")
     session.Frames(2);
     CHECK(reported == 1);
 }
+
+// ---- Separator ----------------------------------------------------------------------------------
+
+TEST_CASE("A separator is a hairline across the width, or as tall as the line when vertical")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float available = 0.0f;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        facet::Separator();
+        session.Track("horizontal");
+        facet::Button("Line", {.size = facet::ControlSize::Large});
+        session.Track("button");
+        ImGui::SameLine();
+        facet::Separator({.orientation = facet::Orientation::Vertical, .opaque = true});
+        session.Track("vertical");
+        ImGui::SameLine();
+        ImGui::Button("next");
+        session.Track("next");
+    });
+    session.Frames(2);
+    const float hairline = facet::HairlineThickness();
+    CHECK(session.ItemRect("horizontal").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("horizontal").GetHeight() == doctest::Approx(hairline));
+    CHECK(session.ItemRect("vertical").GetHeight() == doctest::Approx(session.ItemRect("button").GetHeight()));
+    CHECK(session.ItemRect("vertical").Min.y == doctest::Approx(session.ItemRect("button").Min.y));
+    CHECK(session.ItemRect("next").Min.x > session.ItemRect("vertical").Max.x);
+    // Not interactive: no id, no focus.
+    CHECK(session.ItemId("horizontal") == 0);
+}
+
+TEST_CASE("A separator text is one footnote line, cut to the width, and takes no keyboard focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float line = 0.0f;
+    session.SetUi([&] {
+        facet::PushTextStyle(facet::TextStyle::Footnote);
+        line = ImGui::GetTextLineHeight();
+        facet::PopTextStyle();
+        ImGui::Button("before");
+        session.Track("before");
+        facet::SeparatorText("Section");
+        session.Track("text");
+        facet::SeparatorText("Centered section", {.centered = true});
+        InRegion("narrow", 40.0f, [&] {
+            facet::SeparatorText("A section title much longer than the region");
+            session.Track("narrow");
+        }, 40.0f);
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    CHECK(session.ItemRect("text").GetHeight() == doctest::Approx(line));
+    CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(40.0f));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}

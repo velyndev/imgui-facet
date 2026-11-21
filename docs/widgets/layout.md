@@ -206,14 +206,25 @@ Settings that are disabled or collapse while their parent setting is off.
 
 ### Separator, SeparatorText
 
-Status: planned
-
 ```cpp
 void Separator(const SeparatorOptions& options = {});
 void SeparatorText(const char* text, const SeparatorTextOptions& options = {});
 ```
 
-A pixel-snapped hairline, horizontal or vertical, optionally with a text.
+Hairline dividers, not interactive (no id, never focused, skipped by Tab). The hairline is
+`metrics.hairline` rounded to whole pixels (at least one) and snapped to the pixel grid, in
+`separator`, or `separatorOpaque` with `opaque` where a translucent line would double up.
+
+- `Separator()` is an item as wide as the available width and one hairline tall; the window's item
+  spacing gives the room above and below it.
+- `Orientation::Vertical` goes on the current line after `ImGui::SameLine`: as tall as the items
+  before it on that line, or one control height (the inherited size) on an empty line.
+- `SeparatorText(text)` is one Footnote line: the text in `labelSecondary` (`labelTertiary` inside
+  `ImGui::BeginDisabled`) at the start, or in the middle with `centered`, and the hairline on the free
+  sides, centered on the text. A text too long for the width ends in an ellipsis and shows in full as
+  a tooltip on hover; the text is read during the call.
+
+Status: ready.
 
 ### BeginItemGrid
 
