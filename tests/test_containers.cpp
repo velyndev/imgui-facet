@@ -14,6 +14,7 @@
 #include <facet/facet.h>
 
 #include "internal/focus.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "widgets/containers/container_layout.h"
 #include "support/session.h"
@@ -1343,5 +1344,186 @@ TEST_CASE("Title bars leave every stack as they found it")
     facet::EndTitleBar();
     CHECK(facet::TitleBarButtonPressed() == facet::WindowButton::None);
     CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK(facet::internal::UsageErrorCount() == before);
+}
+// ---- Virtual list -------------------------------------------------------------------------------
+
+namespace
+{
+
+// A virtual list of `count` rows that counts the rows it submits per frame and remembers the
+// area's scroll position.
+struct VirtualProbe
+{
+    int count = 1000000;
+    ImGuiSelectionBasicStorage* selection = nullptr;
+    facet::VirtualListOptions options{.height = 200.0f};
+    bool shown = false;
+    int submitted = 0;
+    int lastSubmitted = -1;
+    int activated = -1;
+    float scrollY = 0.0f;
+    float scrollMax = 0.0f;
+    float contentHeight = 0.0f;
+
+    void Draw(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        shown = facet::BeginVirtualList("list", count, selection, options);
+        submitted = 0;
+        if (shown)
+        {
+            facet::RowRange rows;
+            while (facet::NextVisibleRows(&rows))
+                for (int row = rows.first; row < rows.last; ++row)
+                {
+                    if (facet::VirtualListRow(row))
+                        activated = row;
+                    if (row == 3)
+                        session.Track("row3");
+                    if (row == 5)
+                        session.Track("row5");
+                    facet::Text(facet::TextStyle::Body, "Row %d", row);
+                    ++submitted;
+                    lastSubmitted = row;
+                }
+            ImGuiWindow* area = ImGui::GetCurrentWindow();
+            scrollY = area->Scroll.y;
+            scrollMax = area->ScrollMax.y;
+            contentHeight = area->ContentSize.y;
+            facet::EndVirtualList();
+        }
+    }
+};
+
+} // namespace
+
+TEST_CASE("A virtual list of a million rows submits only the visible rows and reaches the last by keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    VirtualProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.shown);
+    const float row = facet::internal::ListRowHeight(facet::ControlSize::Regular);
+    const int visible = static_cast<int>(facet::Px(200.0f) / row) + 1;
+    CHECK(probe.submitted <= visible + 3);
+    // The scroll range covers every row.
+    CHECK(probe.contentHeight == doctest::Approx(static_cast<double>(row) * 1000000.0).epsilon(0.001));
+    CHECK(probe.scrollMax > 0.0f);
+    // Keyboard: Tab into the list, End to the last row.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(2);
+    CHECK(probe.lastSubmitted == 999999);
+    CHECK(probe.scrollY == doctest::Approx(probe.scrollMax));
+    CHECK(probe.submitted <= visible + 4);  // the cost stays the same at the end
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.activated == 999999);
+    session.KeyPress(ImGuiKey_Home);
+    session.Frames(2);
+    CHECK(probe.scrollY == doctest::Approx(0.0f));
+}
+
+TEST_CASE("A virtual list writes the selection on click, Ctrl and Shift, and activates on a double click")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    VirtualProbe probe;
+    probe.count = 50;
+    probe.selection = &selection;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("row3"));
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(3));
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Click(session.ItemCenter("row5"));
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(selection.Size == 2);
+    CHECK(selection.Contains(5));
+    session.Click(session.ItemCenter("row3"));
+    session.KeyDown(ImGuiMod_Shift);
+    session.Click(session.ItemCenter("row5"));
+    session.KeyUp(ImGuiMod_Shift);
+    CHECK(selection.Size == 3);
+    CHECK(selection.Contains(4));
+    session.DoubleClick(session.ItemCenter("row5"));
+    CHECK(probe.activated == 5);
+}
+
+TEST_CASE("A virtual list without a selection still activates its rows")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    VirtualProbe probe;
+    probe.count = 50;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    session.DoubleClick(session.ItemCenter("row3"));
+    CHECK(probe.activated == 3);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(probe.activated == 4);
+}
+
+TEST_CASE("A virtual list draws its loading, error and empty states instead of rows and scrolls to a row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    VirtualProbe probe;
+    probe.count = 10000;
+    session.SetUi([&] {
+        // The next-scroll request goes to the next list, so the probe comes first.
+        probe.Draw(session);
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("loading", 10, nullptr, {.state = facet::DataState::Loading, .height = 60.0f})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("error", 10, nullptr, {.state = facet::DataState::Error, .height = 60.0f})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("empty", 0, nullptr, {.emptyText = "No rows", .height = 60.0f})));
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("negative", -5, nullptr, {.height = 60.0f})));
+    });
+    session.Frames(2);
+    CHECK(probe.scrollY == 0.0f);
+    facet::SetNextVirtualListScrollTo(5000);
+    session.Frames(2);
+    CHECK(probe.scrollY > 0.0f);
+    CHECK(probe.lastSubmitted >= 5000);
+}
+
+TEST_CASE("Virtual lists leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    ImGuiSelectionBasicStorage selection;
+    session.SetUi([&] {
+        ImGui::Button("first");  // the item the window's keyboard focus starts on
+        CHECK_BALANCED({
+            facet::VirtualListScope list("list", 1000, &selection, {.rowHeight = 20.0f, .height = 100.0f});
+            if (list)
+            {
+                facet::RowRange rows;
+                while (facet::NextVisibleRows(&rows))
+                    for (int row = rows.first; row < rows.last; ++row)
+                    {
+                        (void)facet::VirtualListRow(row);
+                        ImGui::TextUnformatted("row");
+                    }
+            }
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({ facet::VirtualListScope list("disabled", 10, nullptr, {.height = 60.0f}); });
+        ImGui::EndDisabled();
+    });
+    session.Frames(2);
+    CHECK(selection.Size == 0);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    CHECK_FALSE(facet::BeginVirtualList("outside a frame", 10, nullptr));
     CHECK(facet::internal::UsageErrorCount() == before);
 }

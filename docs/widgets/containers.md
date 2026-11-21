@@ -323,7 +323,35 @@ void SetNextVirtualListScrollTo(int row);
 class VirtualListScope;
 ```
 
-A list of many equal rows with arbitrary content that submits only the visible rows. Status: planned.
+A scrolling list of `rowCount` rows of one height with arbitrary content, on the list view of the
+list core.
+
+- **Rows.** Loop `facet::NextVisibleRows` and start each row with `VirtualListRow(index)`: a
+  full-width row item (hover fill, selection fill, focus ring) that leaves the cursor on the row's
+  line for the caller's content. Only the visible rows are handed out, plus the focused row and the
+  range start of a Shift selection, so a frame costs the same for fifty rows or a million; the rows
+  before and after are skipped with their height, so the scrollbar is right. The row height is
+  `rowHeight` in units, or the list row height of the inherited control size.
+- **Selection.** With `selection` set, click, Ctrl+click, Shift+click, Shift with the arrows, Ctrl+A,
+  Escape and box select (a drag from empty space) write it through `ImGui::BeginMultiSelect`, keyed by
+  the storage's index adapter. With a null `selection` the rows are not selectable but still take
+  focus and activate.
+- **Keys.** The list is one Tab stop; the arrows, Page Up and Page Down move the focus, Home and End
+  go to the first and last row (exact at a million rows), and Enter or a double click activates the
+  focused row: `VirtualListRow` returns true for it on that frame. Typed characters do not search,
+  because the list does not know the rows' text.
+- **States.** While `state` is Loading or Error, or with no rows, the area keeps its size and shows
+  the loading, error (`errorText`, else `Strings::loadFailed`) or empty state (`emptyText`, else
+  `Strings::empty`), and `BeginVirtualList` returns false.
+- **Size.** The width is the next-item width when one was set, else the available width; `height`
+  0 fills the available height. The scroll position is the scroll area's, kept under the id.
+- `SetNextVirtualListScrollTo(row)` scrolls the next `BeginVirtualList` so that `row` is in view,
+  once.
+
+`BeginVirtualList` returns false while hidden, not Ready or empty; call `EndVirtualList` only after
+true. When the list is the first item of a window that takes keyboard focus, Dear ImGui's
+multi-select puts the first row into the selection as the focus lands on it, as in a stock list.
+Status: ready.
 
 ### BeginInspectorPane
 

@@ -37,6 +37,7 @@ enum CaptureState
 };
 
 constexpr int kScrollLines = 40;
+constexpr int kVirtualRows = 10000;
 
 struct ContainersState
 {
@@ -70,6 +71,9 @@ struct ContainersState
     int toolPresses = 0;
     int view = 0;
     bool narrowShown[4] = {};
+    // Virtual list
+    int listState = 0;          // 0 rows, 1 loading, 2 error, 3 empty
+    int listActivated = -1;
 };
 
 // Height of the sample regions: a few large control heights in design units, so it follows the
@@ -446,20 +450,55 @@ void ScrollAreas(facet::demo::PageCtx& ctx, ContainersState& s)
     ctx.Probe("containers.scroll");
 }
 
-void Lists(ContainersState& s)
+void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Virtual list");
-    if (facet::BeginVirtualList("virtual", 10000, &s.selection, {.height = RegionHeight()}))
+    Paragraph("Ten thousand placeholder rows; only the visible ones are submitted. Click, Ctrl and "
+              "Shift select, the arrows, Page Up and Down, Home and End move, Enter or a double "
+              "click activates. The buttons switch the list's data state.");
+    const char* const states[4] = {"Rows", "Loading", "Error", "Empty"};
+    const char* const stateProbes[4] = {"containers.virtual.rows", "containers.virtual.loading",
+                                        "containers.virtual.error", "containers.virtual.empty"};
+    const float right = facet::demo::ContentRight();
+    for (int i = 0; i < 4; ++i)
+    {
+        if (i > 0)
+            facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth(states[i]));
+        if (ImGui::RadioButton(states[i], s.listState == i))
+            s.listState = i;
+        facet::ItemCursor();
+        ctx.Probe(stateProbes[i]);
+    }
+    const facet::DataState data =
+        s.listState == 1 ? facet::DataState::Loading : (s.listState == 2 ? facet::DataState::Error : facet::DataState::Ready);
+    const int count = s.listState == 3 ? 0 : kVirtualRows;
+    const bool list = facet::BeginVirtualList("virtual", count, &s.selection,
+                                              {.state = data,
+                                               .emptyText = "No rows in this placeholder list",
+                                               .height = RegionHeight()});
+    ctx.Probe("containers.virtual");
+    if (list)
     {
         facet::RowRange rows;
         while (facet::NextVisibleRows(&rows))
             for (int row = rows.first; row < rows.last; ++row)
             {
-                facet::VirtualListRow(row);
+                if (facet::VirtualListRow(row))
+                    s.listActivated = row;
+                if (row == 2)
+                    ctx.Probe("containers.virtual.row2");
+                if (row == 4)
+                    ctx.Probe("containers.virtual.row4");
+                if (row == kVirtualRows - 1)
+                    ctx.Probe("containers.virtual.last");
                 facet::Text(facet::TextStyle::Body, "Row %d", row + 1);
             }
         facet::EndVirtualList();
     }
+    if (s.listActivated >= 0)
+        Note("Selected rows: %d. Last activated: row %d.", s.selection.Size, s.listActivated + 1);
+    else
+        Note("Selected rows: %d. No row activated yet.", s.selection.Size);
     SectionHeader("Inspector pane");
     facet::BeginInspectorPane("Inspector", &s.inspectorVisible);
     Note("Main content.");
@@ -488,7 +527,7 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
     if (ctx.capture && ctx.captureState != kCaptureDefault && ctx.captureState != kCaptureShell)
         ctx.RevealInCapture();
     ScrollAreas(ctx, s);
-    Lists(s);
+    Lists(ctx, s);
     s.resetOpen = false;
 }
 
@@ -609,6 +648,40 @@ FACET_DEMO_SELFTEST("containers")
     test.Wait(2);
     test.ExpectText("the second menu row activates Download", [] { return std::string(State().lastTool); },
                     "Download");
+
+    // Virtual list: click, Ctrl and Shift select; End reaches the last row; Enter activates; the states show.
+    test.Do([] {
+        ContainersState& s = State();
+        s.selection.Clear();
+        s.listState = 0;
+        s.listActivated = -1;
+    });
+    test.Reveal("containers.virtual");
+    test.Wait(2);
+    // The page's only virtual list starts at its top; the request needs the list in sight.
+    test.Do([] { facet::SetNextVirtualListScrollTo(0); });
+    test.Wait(2);
+    test.Click("containers.virtual.row2");
+    test.Expect("a click selects a row", [] { return State().selection.Size == 1 && State().selection.Contains(2); });
+    test.KeyDown(ImGuiMod_Shift);
+    test.Click("containers.virtual.row4");
+    test.KeyUp(ImGuiMod_Shift);
+    test.Expect("Shift+click selects the range", [] { return State().selection.Size == 3; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_End);
+    test.Wait(3);
+    test.ExpectVisible("containers.virtual.last");
+    test.ExpectFocused("containers.virtual.last");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter activates the last row", [] { return State().listActivated == kVirtualRows - 1; });
+    test.Do([] { State().listActivated = -1; });
+    test.DoubleClick("containers.virtual.last");
+    test.Expect("a double click activates a row", [] { return State().listActivated == kVirtualRows - 1; });
+    test.Click("containers.virtual.loading");
+    test.Expect("the loading state shows", [] { return State().listState == 1; });
+    test.Click("containers.virtual.empty");
+    test.Click("containers.virtual.rows");
+    test.Expect("the rows come back", [] { return State().listState == 0; });
 
     // Card: the content works and fills the inner width.
     test.Click("containers.card.button");

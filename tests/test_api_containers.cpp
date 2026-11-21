@@ -84,20 +84,6 @@ void CallContainerStubs(Values& v)
         facet::EndStatusBar();
     });
     CHECK_BALANCED({
-        const bool open = facet::BeginVirtualList("Virtual", 100, &selection);
-        CHECK(open);
-        if (open)
-        {
-            facet::RowRange rows;
-            while (facet::NextVisibleRows(&rows))
-                for (int row = rows.first; row < rows.last; ++row)
-                    facet::VirtualListRow(row);
-            CHECK_FALSE(facet::VirtualListRow(0));
-            facet::EndVirtualList();
-        }
-    });
-    CHECK_BALANCED(facet::SetNextVirtualListScrollTo(10));
-    CHECK_BALANCED({
         facet::BeginInspectorPane("Inspector", &v.visible);
         ImGui::TextUnformatted("main");
         if (facet::InspectorPaneNext())
@@ -181,8 +167,6 @@ TEST_CASE("Containers placeholders return false where their own arguments hide t
         });
         CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Hidden overlay", &hidden)));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Overlay without a flag", nullptr)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Loading list", 10, nullptr, {.state = facet::DataState::Loading})));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Empty list", 0, nullptr)));
         CHECK(hidden == false);
     });
     session.Frame();
