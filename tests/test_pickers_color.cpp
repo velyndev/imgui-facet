@@ -331,3 +331,78 @@ TEST_CASE("A read-only or disabled ColorChannelSlider never writes")
     CHECK(Same(readOnly, start));
     CHECK(Same(disabled, start));
 }
+
+// ---- ColorInputs ----------------------------------------------------------------------------------
+
+TEST_CASE("ColorInputs writes a typed channel and leaves the others exactly as they were")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.2001f, 0.4002f, 0.8003f, 1.0f);
+    ImGuiID inputs = 0;
+    session.SetUi([&] {
+        (void)facet::ColorInputs("##inputs", &color, {.modeSwitch = false});
+        inputs = ImGui::GetItemID();
+        session.Track("inputs");
+    });
+    session.Frame();
+    // Every channel is a Tab stop: the red, green and blue fields in order.
+    const ImRect r = session.ItemRect("inputs");
+    session.Click(ImVec2(r.Min.x + 30.0f, r.GetCenter().y));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("128");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(color.x == 128.0f / 255.0f);
+    CHECK(color.y == 0.4002f);
+    CHECK(color.z == 0.8003f);
+    // After a click the first Tab shows the focus where it is, the next ones move it.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(inputs, "R##r"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(inputs, "G##g"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(inputs, "B##b"));
+}
+
+TEST_CASE("ColorInputs parses pasted color text into the whole color")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.0f, 0.0f, 0.0f, 1.0f);
+    session.SetUi([&] {
+        (void)facet::ColorInputs("##inputs", &color, {.model = facet::ColorModel::Hsv, .modeSwitch = false});
+        session.Track("inputs");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("inputs");
+    session.Click(ImVec2(r.Max.x - 10.0f, r.GetCenter().y));
+    session.KeyPress(ImGuiKey_Escape);
+    session.SetClipboard("rgb(51, 102, 255)");
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(color.x == 51.0f / 255.0f);
+    CHECK(color.y == 102.0f / 255.0f);
+    CHECK(color.z == 1.0f);
+    // A single number is not a color: nothing changes.
+    session.SetClipboard("42");
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(color.z == 1.0f);
+}
+
+TEST_CASE("ColorInputs in the hex model writes the typed digits and keeps unchanged channels")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.2001f, 0.4f, 1.0f, 1.0f);
+    session.SetUi([&] {
+        (void)facet::ColorInputs("##inputs", &color, {.model = facet::ColorModel::Hex, .modeSwitch = false});
+        session.Track("inputs");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("inputs"));
+    session.KeyPress(ImGuiKey_Home);
+    session.Type("FF");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(color.x == 1.0f);
+    CHECK(color.y == 0.4f);
+    CHECK(color.z == 1.0f);
+}
