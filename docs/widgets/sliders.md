@@ -356,8 +356,35 @@ bool BoxRangePad(const char* label, ImVec2* low, ImVec2* high, ImVec2 min, ImVec
                  const BoxRangePadOptions& options = {});
 ```
 
-A two-dimensional range with four edge and four corner handles and a draggable body.
-Status: planned.
+A two-dimensional range: the box from `*low` to `*high` on the pad of XYPad (the field frame,
+`width` by `height` units, square at the padSize token by default and at most the available width),
+drawn as a wash of accentSubtle with an accent outline, like the filled span of a range slider.
+Eight handles, each its own item and Tab stop under the widget id, in this order: the left, top,
+right and bottom edges (parts 0 to 3), then the corners from the top left clockwise (parts 4 to 7).
+The corners are slider knobs; each edge has a knob at its middle, drawn when the edge is at least
+three knobs long (a focused edge always). The label is the tooltip, as for XYPad.
+
+- **Rules per axis:** x is one pair of handles of the multi-handle model and y another: the low
+  value never passes the high one, `minGap` holds per axis under every input, and `collision`
+  Push lets a handle move the other side along until it reaches the end of the range.
+- **Pointer:** a press within half a knob (at least half the minimum hit target) of a corner takes
+  it, then one near an edge; a press inside the box takes the body (with `dragSpan`), which moves
+  the whole box and keeps its size; a press anywhere else moves the nearest handle there first.
+  An edge moves one axis, a corner both; Shift during a corner drag keeps one axis, Ctrl snaps to
+  tenths. A drag out of the window and back returns exactly.
+- **Keys** on a focused handle: an edge moves along its axis (Left and Right for the left and right
+  edges, Up and Down for the top and bottom ones, as on screen), with the arrows of the other axis
+  left to keyboard navigation; a corner takes all four. Steps as XYPad (Shift finer, Ctrl coarser);
+  Page Up and Down move a handle that moves y by a tenth; Home and End send the handle's x (or y,
+  for the top and bottom edges) as far as the rules let it. Escape during a drag or a key press
+  restores the whole box from where the edit began.
+- **States:** as XYPad. `mixed` hides the box and the handles until the first edit writes (the
+  handles stay Tab stops and show their focus ring). Values out of range, out of order or closer
+  than the gap are drawn repaired and written only for the values an edit moves. An axis with
+  `min == max` does not move; with both, and with a null pointer, the pad is read-only.
+- **Not done yet:** typed values (the Ctrl+click and Enter of the other sliders).
+
+Status: ready.
 
 ### AllocationBar
 

@@ -1285,6 +1285,177 @@ TEST_CASE("An XY pad read-only, disabled or mixed: written only where it may be"
     CHECK(line.y == 0.5f);
 }
 
+// ---- BoxRangePad ---------------------------------------------------------------------------
+
+TEST_CASE("A box range pad drags corners on both axes and edges on one, keeping the gap per axis")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 low(0.2f, 0.2f);
+    ImVec2 high(0.8f, 0.8f);
+    int commits = 0;
+    session.SetUi([&] {
+        facet::BoxRangePad("Crop", &low, &high, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           {.minGap = {0.1f, 0.2f}, .width = 200.0f});
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("box");
+    });
+    session.Frame();
+    // The top right corner (max.y is at the top) toward the lower left: both axes stop one gap short.
+    session.Drag({PadAt(session, "box", 0.8, 0.8), PadAt(session, "box", 0.0, 0.0)});
+    CHECK(high.x == doctest::Approx(0.3f));
+    CHECK(high.y == doctest::Approx(0.4f));
+    CHECK(low.x == 0.2f);
+    CHECK(low.y == 0.2f);
+    CHECK(commits == 1);
+    // The left edge: x only, whatever the vertical movement.
+    low = ImVec2(0.2f, 0.2f);
+    high = ImVec2(0.8f, 0.8f);
+    session.Frame();
+    session.Drag({PadAt(session, "box", 0.2, 0.5), PadAt(session, "box", 0.5, 0.9)});
+    CHECK(low.x == doctest::Approx(0.5f).epsilon(0.01));
+    CHECK(low.y == 0.2f);
+    CHECK(high.y == 0.8f);
+    // A press outside the box moves the nearest handle there: the bottom edge, down.
+    session.Click(PadAt(session, "box", 0.6, 0.05));
+    CHECK(low.y == doctest::Approx(0.05f).epsilon(0.02));
+    CHECK(low.x == doctest::Approx(0.5f).epsilon(0.01));
+}
+
+TEST_CASE("A box range pad body drags the whole box, keeping its size, and Escape restores it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 low(0.2f, 0.2f);
+    ImVec2 high(0.6f, 0.5f);
+    session.SetUi([&] {
+        facet::BoxRangePad("Crop", &low, &high, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 200.0f});
+        session.Track("box");
+    });
+    session.Frame();
+    session.Drag({PadAt(session, "box", 0.4, 0.35), PadAt(session, "box", 2.0, 2.0)});
+    CHECK(high.x == doctest::Approx(1.0f));
+    CHECK(high.y == doctest::Approx(1.0f));
+    CHECK(high.x - low.x == doctest::Approx(0.4f));
+    CHECK(high.y - low.y == doctest::Approx(0.3f));
+    const ImVec2 at = PadAt(session, "box", 0.8, 0.85);
+    session.MouseMove(at);
+    session.MouseDown();
+    session.MouseMove(ImVec2(at.x - 60.0f, at.y + 40.0f));
+    CHECK(low.x < 0.6f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(low.x == doctest::Approx(0.6f));
+    CHECK(low.y == doctest::Approx(0.7f));
+    CHECK(high.x == doctest::Approx(1.0f));
+    CHECK(high.y == doctest::Approx(1.0f));
+    session.MouseUp();
+}
+
+TEST_CASE("A box range pad has eight Tab stops, the arrows move the focused handle and Push moves the other side")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 low(0.2f, 0.2f);
+    ImVec2 high(0.8f, 0.8f);
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BoxRangePad("Crop", &low, &high, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           {.minGap = {0.1f, 0.1f}, .collision = facet::HandleCollision::Push, .width = 200.0f});
+        session.Track("box");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    const ImGuiID widget = session.ItemId("box");
+    // The id of part n under the widget id, as ImGui::GetID(n) inside PushOverrideID(widget).
+    const auto handleId = [&](int part) { return ImHashData(&part, sizeof(part), widget); };
+    // A click on an edge focuses that edge.
+    session.Click(PadAt(session, "box", 0.2, 0.5));
+    CHECK(ImGui::GetFocusID() == handleId(0));
+    session.Click(PadAt(session, "box", 0.5, 0.8));
+    CHECK(ImGui::GetFocusID() == handleId(1));
+    low = ImVec2(0.2f, 0.2f);
+    high = ImVec2(0.8f, 0.8f);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    for (int part = 0; part < 8; ++part)
+    {
+        CAPTURE(part);
+        session.KeyPress(ImGuiKey_Tab);
+        CHECK(ImGui::GetFocusID() == handleId(part));
+    }
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    // Back to the left edge: Right moves low.x, Up is left to navigation for an edge of x.
+    for (int i = 0; i < 8; ++i)
+        session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    REQUIRE(ImGui::GetFocusID() == handleId(0));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(low.x == doctest::Approx(0.21f));
+    // End sends the left edge right, pushing the right edge to the end one gap later.
+    session.KeyPress(ImGuiKey_End);
+    CHECK(low.x == doctest::Approx(0.9f));
+    CHECK(high.x == 1.0f);
+    // The top edge (part 1) moves y high; Down pushes nothing until the gap.
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == handleId(1));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(high.y == doctest::Approx(0.79f));
+    // A corner (part 6, bottom right) moves both axes.
+    for (int i = 0; i < 5; ++i)
+        session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == handleId(6));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(low.y == doctest::Approx(0.19f));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(high.x == doctest::Approx(0.99f));
+}
+
+TEST_CASE("A box range pad read-only, disabled or mixed: written only where it may be")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 fixedLow(0.2f, 0.2f), fixedHigh(0.8f, 0.8f);
+    ImVec2 offLow(0.2f, 0.2f), offHigh(0.8f, 0.8f);
+    ImVec2 mixLow(0.2f, 0.2f), mixHigh(0.8f, 0.8f);
+    ImVec2 outLow(-1.0f, 0.2f), outHigh(2.0f, 0.8f);
+    bool mixedSet = false;
+    session.SetUi([&] {
+        facet::BoxRangePad("Fixed", &fixedLow, &fixedHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           {.width = 100.0f, .readOnly = true});
+        session.Track("fixed");
+        ImGui::BeginDisabled();
+        facet::BoxRangePad("Off", &offLow, &offHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f});
+        ImGui::EndDisabled();
+        session.Track("off");
+        if (facet::BoxRangePad("Mixed", &mixLow, &mixHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                               {.width = 100.0f, .mixed = !mixedSet}))
+            mixedSet = true;
+        session.Track("mixed");
+        facet::BoxRangePad("Out", &outLow, &outHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f});
+        session.Track("out");
+    });
+    session.Frame();
+    session.Drag({PadAt(session, "fixed", 0.8, 0.8), PadAt(session, "fixed", 0.5, 0.5)});
+    session.Drag({PadAt(session, "off", 0.8, 0.8), PadAt(session, "off", 0.5, 0.5)});
+    CHECK(fixedHigh.x == 0.8f);
+    CHECK(offHigh.x == 0.8f);
+    session.Drag({PadAt(session, "mixed", 0.8, 0.8), PadAt(session, "mixed", 0.6, 0.6)});
+    CHECK(mixedSet);
+    CHECK(mixHigh.x < 0.8f);
+    // Values out of range and out of order are drawn repaired and written only when edited.
+    session.Frames(3);
+    CHECK(outLow.x == -1.0f);
+    CHECK(outHigh.x == 2.0f);
+    // The right edge of the repaired box (at max.x) moves left: only high.x is written.
+    session.Drag({PadAt(session, "out", 1.0, 0.5), PadAt(session, "out", 0.7, 0.5)});
+    CHECK(outHigh.x == doctest::Approx(0.7f).epsilon(0.02));
+    CHECK(outLow.x == -1.0f);
+    CHECK(outLow.y == 0.2f);
+}
+
 // ---- RangeSliderHistogram ------------------------------------------------------------------
 
 TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")

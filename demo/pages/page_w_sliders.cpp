@@ -3,6 +3,7 @@
 // selftest that operates the ready widgets by mouse and keyboard. A widget whose docs entry is not
 // ready yet draws its placeholder at its default size.
 
+#include <cmath>
 #include <cstdio>
 #include <span>
 #include <vector>
@@ -110,12 +111,21 @@ struct SlidersUi
     int pointEdits = 0;    // frames that wrote point
     int pointCommits = 0;  // finished drags and key presses of point
 
+    // BoxRangePad
+    ImVec2 boxLow = {0.25f, 0.25f};
+    ImVec2 boxHigh = {0.75f, 0.75f};
+    ImVec2 cropLow = {20.0f, 10.0f};
+    ImVec2 cropHigh = {70.0f, 60.0f};
+    ImVec2 boxFixedLow = {0.2f, 0.3f}, boxFixedHigh = {0.6f, 0.8f};
+    ImVec2 boxOffLow = {0.4f, 0.2f}, boxOffHigh = {0.8f, 0.7f};
+    ImVec2 boxMixLow = {0.25f, 0.25f}, boxMixHigh = {0.75f, 0.75f};
+    bool boxMixedSet = false;
+    ImVec2 boxSmallLow = {0.1f, 0.1f}, boxSmallHigh = {0.9f, 0.9f};
+
     // The planned widgets below.
     ImVec2 stick = {0.0f, 0.0f};
     float arcLow = 45.0f;
     float arcHigh = 135.0f;
-    ImVec2 boxLow = {0.25f, 0.25f};
-    ImVec2 boxHigh = {0.75f, 0.75f};
     float shares[3] = {0.5f, 0.3f, 0.2f};
 };
 
@@ -417,8 +427,6 @@ void XYPadSection(facet::demo::PageCtx& ctx)
     if (facet::IsItemEditCommitted())
         ++ui.pointCommits;
     ctx.Probe("xy.position");
-    if (padState)
-        ctx.RevealInCapture(0.2f);
     LabeledRow("Steps, y down");
     facet::XYPad("Cell", &ui.cell, ImVec2(0.0f, 0.0f), ImVec2(8.0f, 8.0f),
                  {.format = "%.0f", .step = {1.0f, 1.0f}, .grid = true, .yDown = true, .width = facet::demo::DemoWidth(160.0f)});
@@ -449,6 +457,58 @@ void XYPadSection(facet::demo::PageCtx& ctx)
     ctx.Probe("xy.limit");
     Note("Position %.2f, %.2f: written on %d frames, %d finished edits. Cell %.0f, %.0f.", ui.point.x, ui.point.y,
          ui.pointEdits, ui.pointCommits, ui.cell.x, ui.cell.y);
+    ImGui::PopID();
+}
+
+void BoxRangeSection(facet::demo::PageCtx& ctx)
+{
+    ImGui::PushID("box");
+    SectionHeader("BoxRangePad");
+    Paragraph("A range on two axes: the box between a low and a high corner. The edges move one axis and the corners "
+              "both, each its own Tab stop moved by the arrows; drag the inside to move the whole box. Each axis keeps "
+              "its minimum gap, and Escape restores the box.");
+    LabeledRow("Minimum gap");
+    if (ctx.capture && ctx.captureState == kPads)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 5);
+    facet::BoxRangePad("Area", &ui.boxLow, &ui.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.minGap = {0.1f, 0.1f}});
+    ctx.Probe("box.area");
+    ProbeHandles(ctx, "Area", "box.area", 8);
+    if (ctx.capture && ctx.captureState == kPads)
+        ctx.RevealInCapture(0.4f);
+    LabeledRow("Push, steps, y down");
+    facet::BoxRangePad("Crop", &ui.cropLow, &ui.cropHigh, ImVec2(0.0f, 0.0f), ImVec2(100.0f, 100.0f),
+                       {.step = {5.0f, 5.0f}, .minGap = {10.0f, 10.0f}, .collision = facet::HandleCollision::Push,
+                        .yDown = true, .width = facet::demo::DemoWidth(160.0f)});
+    ctx.Probe("box.crop");
+    ProbeHandles(ctx, "Crop", "box.crop", 8);
+
+    LabeledRow("States");
+    float right = facet::demo::ContentRight();
+    const float small = facet::Px(kSmallPad);
+    facet::BoxRangePad("Read-only", &ui.boxFixedLow, &ui.boxFixedHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                       {.width = facet::demo::DemoWidth(kSmallPad), .readOnly = true});
+    ctx.Probe("box.readOnly");
+    facet::demo::SameLineIfFits(right, small);
+    ImGui::BeginDisabled();
+    facet::BoxRangePad("Disabled", &ui.boxOffLow, &ui.boxOffHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                       {.width = facet::demo::DemoWidth(kSmallPad)});
+    ImGui::EndDisabled();
+    ctx.Probe("box.disabled");
+    facet::demo::SameLineIfFits(right, small);
+    if (facet::BoxRangePad("Mixed", &ui.boxMixLow, &ui.boxMixHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           {.width = facet::demo::DemoWidth(kSmallPad), .mixed = !ui.boxMixedSet}))
+        ui.boxMixedSet = true;
+    ctx.Probe("box.mixed");
+    LabeledRow("");
+    const float boxArea = (ui.boxSmallHigh.x - ui.boxSmallLow.x) * (ui.boxSmallHigh.y - ui.boxSmallLow.y);
+    facet::BoxRangePad("Limit", &ui.boxSmallLow, &ui.boxSmallHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                       {.minGap = {0.05f, 0.05f}, .width = facet::demo::DemoWidth(kSmallPad),
+                        .error = boxArea > 0.5f ? "Keep the box at half the pad or less" : nullptr,
+                        .helpText = "Drag a corner inward"});
+    ctx.Probe("box.limit");
+    ProbeHandles(ctx, "Limit", "box.limit", 8);
+    Note("Area x %.2f to %.2f, y %.2f to %.2f. Crop x %.0f to %.0f, y %.0f to %.0f.", ui.boxLow.x, ui.boxHigh.x, ui.boxLow.y,
+         ui.boxHigh.y, ui.cropLow.x, ui.cropHigh.x, ui.cropLow.y, ui.cropHigh.y);
     ImGui::PopID();
 }
 
@@ -507,9 +567,7 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     XYPadSection(ctx);
 
-    SectionHeader("BoxRangePad");
-    LabeledRow("Box range");
-    facet::BoxRangePad("##box", &ui.boxLow, &ui.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+    BoxRangeSection(ctx);
 
     SectionHeader("AllocationBar");
     LabeledRow("Shares");
@@ -864,4 +922,64 @@ FACET_DEMO_SELFTEST("sliders")
     test.MouseDown();
     test.MouseUp();
     test.Expect("a click toward the lower left clears the error", [] { return ui.padLimit.x + ui.padLimit.y <= 1.5f; });
+
+    // BoxRangePad: a corner moves both axes and stops one gap short, the inside moves the whole
+    // box, each handle is a Tab stop moved by the arrows, Push moves the other side along.
+    // A value v of a pad W wide lies at 9 + v * (W - 18) units: the knob is 18 units and its
+    // centre travels inside the frame inset by half a knob. That is the fraction v of the width
+    // plus (1 - 2v) * 9 units, whatever W is.
+    const auto BoxAt = [](const char* probe, float vx, float vy) {
+        return T::Item(probe, vx, 1.0f - vy).Offset((1.0f - 2.0f * vx) * 9.0f, (2.0f * vy - 1.0f) * 9.0f);
+    };
+    // The pad in the middle of the window first, so nothing scrolls between a probe and a press.
+    test.Reveal("box.area");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.boxLow = {0.25f, 0.25f}; ui.boxHigh = {0.75f, 0.75f}; });
+    test.Drag({BoxAt("box.area", 0.75f, 0.75f), BoxAt("box.area", 0.05f, 0.05f)}, 0.3f);
+    test.ExpectNear("the top right corner stops one gap right of the low x", [] { return ui.boxHigh.x; }, 0.35, 1e-4);
+    test.ExpectNear("and one gap above the low y", [] { return ui.boxHigh.y; }, 0.35, 1e-4);
+    test.Do([] { ui.boxLow = {0.25f, 0.25f}; ui.boxHigh = {0.75f, 0.75f}; });
+    test.Drag({BoxAt("box.area", 0.5f, 0.5f), BoxAt("box.area", 0.6f, 0.4f)}, 0.3f);
+    test.Expect("a drag inside the box moves it whole and keeps its size", [] {
+        return ui.boxLow.x > 0.3f && ui.boxLow.y < 0.2f && std::fabs(ui.boxHigh.x - ui.boxLow.x - 0.5f) < 1e-4f &&
+               std::fabs(ui.boxHigh.y - ui.boxLow.y - 0.5f) < 1e-4f;
+    });
+    test.Do([] { ui.boxLow = {0.25f, 0.25f}; ui.boxHigh = {0.75f, 0.75f}; });
+    test.MouseMove(BoxAt("box.area", 0.25f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectFocused("box.area.h0");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right moves the left edge", [] { return ui.boxLow.x; }, 0.26, 1e-6);
+    test.ExpectFocused("box.area.h0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("box.area.h1");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down moves the top edge down", [] { return ui.boxHigh.y; }, 0.74, 1e-6);
+    for (int i = 0; i < 4; ++i)
+        test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("box.area.h5");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.Expect("the top right corner moves on both axes",
+                [] { return std::fabs(ui.boxHigh.x - 0.74f) < 1e-6f && std::fabs(ui.boxHigh.y - 0.75f) < 1e-6f; });
+    for (int i = 0; i < 3; ++i)
+        test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("box.crop.h0");
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End on the left edge pushes the right one to the end, a gap apart",
+                [] { return ui.cropLow.x == 90.0f && ui.cropHigh.x == 100.0f; });
+    test.Drag({T::Item("box.readOnly", 0.5f, 0.5f), T::Item("box.readOnly", 0.9f, 0.1f)}, 0.2f);
+    test.Expect("the read-only box keeps its values", [] { return ui.boxFixedLow.x == 0.2f && ui.boxFixedHigh.x == 0.6f; });
+    test.Drag({T::Item("box.disabled", 0.5f, 0.5f), T::Item("box.disabled", 0.1f, 0.9f)}, 0.2f);
+    test.Expect("the disabled box keeps its values", [] { return ui.boxOffLow.x == 0.4f && ui.boxOffHigh.x == 0.8f; });
+    test.Drag({T::Item("box.mixed", 0.5f, 0.5f), T::Item("box.mixed", 0.6f, 0.5f)}, 0.2f);
+    test.Expect("the first edit of a mixed box sets it", [] { return ui.boxMixedSet; });
+    // The limit pad has a message line under it, so its y comes from the top: the corner at 0.9 of
+    // the 112 unit pad is 9 + 0.1 * 94 units down.
+    test.Drag({T::Item("box.limit", 0.9f, 0.0f).Offset(-7.2f, 18.4f), T::Item("box.limit", 0.5f, 0.0f).Offset(0.0f, 56.0f)},
+              0.3f);
+    test.Expect("dragging the corner inward clears the error", [] {
+        return (ui.boxSmallHigh.x - ui.boxSmallLow.x) * (ui.boxSmallHigh.y - ui.boxSmallLow.y) <= 0.5f;
+    });
 }
