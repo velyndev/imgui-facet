@@ -1391,3 +1391,176 @@ TEST_CASE("List-details leave every stack balanced, disabled, with a null flag a
     facet::EndListDetail();
     CHECK(fi::OpenScopeCount() == 0);
 }
+
+// ---- Panels -------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Three panels with a button each. Every test uses its own id: the collapsed states are persistent.
+struct PanelsUi
+{
+    const char* id = "panels";
+    float sizes[3] = {0.25f, 0.5f, 0.25f};
+    facet::PanelsOptions options{.width = 700.0f, .height = 200.0f};
+    bool collapsible[3] = {true, false, true};
+    bool open[3] = {};
+    int presses[3] = {};
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginPanels(id, sizes, options);
+        const char* const titles[] = {"First", "Second", "Third"};
+        const char* const names[] = {"p0", "p1", "p2"};
+        for (int i = 0; i < 3; ++i)
+        {
+            open[i] = facet::BeginPanel(titles[i], {.collapsible = collapsible[i]});
+            session.Track(names[i]);  // the header, or the strip's button while collapsed
+            if (open[i])
+            {
+                if (ImGui::Button("button", ImVec2(-FLT_MIN, 0.0f)))
+                    ++presses[i];
+                char name[16];
+                std::snprintf(name, sizeof(name), "b%d", i);
+                session.Track(name);
+                facet::EndPanel();
+            }
+        }
+        facet::EndPanels();
+        session.Track("view");
+    }
+};
+
+} // namespace
+
+TEST_CASE("Panels share the view by their sizes and a divider moves room between its neighbours only")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PanelsUi ui;
+    ui.id = "panels share";
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    const float band = facet::Px(facet::T().layout.dividerBand);
+    const float room = 700.0f - band * 2.0f;
+    CHECK(session.ItemRect("b0").GetWidth() <= room * 0.25f + 0.5f);
+    CHECK(session.ItemRect("b1").Min.x > session.ItemRect("b0").Max.x);
+    CHECK(session.ItemRect("b1").GetWidth() > session.ItemRect("b0").GetWidth() * 1.8f);
+    // Drag the first divider 50 pixels right: the first two entries move, the sum stays, the third stays.
+    const float x = session.ItemRect("view").Min.x + room * 0.25f + band * 0.5f;
+    const float y = session.ItemRect("view").GetCenter().y;
+    session.Drag({ImVec2(x, y), ImVec2(x + 50.0f, y)});
+    CHECK(ui.sizes[0] + ui.sizes[1] == doctest::Approx(0.75f));
+    CHECK(ui.sizes[0] == doctest::Approx(0.25f + 50.0f / room).epsilon(0.02));
+    CHECK(ui.sizes[2] == 0.25f);
+}
+
+TEST_CASE("A collapsible panel collapses to a strip from its header and expands from the strip")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PanelsUi ui;
+    ui.id = "panels collapse";
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    const float before = session.ItemRect("b1").GetWidth();
+    session.Click(session.ItemCenter("p0"));
+    session.Frames(2);
+    CHECK_FALSE(ui.open[0]);
+    // The strip is one header height wide; the middle panel takes the room.
+    CHECK(session.ItemRect("p0").GetWidth() <= facet::Px(facet::T().layout.panelHeaderHeight) + 0.5f);
+    CHECK(session.ItemRect("b1").GetWidth() > before);
+    CHECK(ui.sizes[0] == 0.25f);
+    session.Click(session.ItemCenter("p0"));
+    session.Frames(2);
+    CHECK(ui.open[0]);
+    // A panel that is not collapsible ignores clicks on its header.
+    session.Click(session.ItemCenter("p1"));
+    session.Frames(2);
+    CHECK(ui.open[1]);
+}
+
+TEST_CASE("Panel headers and dividers work by keyboard")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PanelsUi ui;
+    ui.id = "panels keys";
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);  // shows the focus on the button
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("p0"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("b0"));
+    session.KeyPress(ImGuiKey_Tab);  // the divider between the first and second panel
+    const float first = ui.sizes[0];
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.sizes[0] > first);
+    CHECK(ui.sizes[0] + ui.sizes[1] == doctest::Approx(0.75f));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(ImGui::GetFocusID() == session.ItemId("p0"));
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK_FALSE(ui.open[0]);
+}
+
+TEST_CASE("Horizontal panels stack in a Compact width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PanelsUi ui;
+    ui.id = "panels compact";
+    ui.options.width = facet::T().layout.regularFrom * 0.75f;
+    ui.options.height = 400.0f;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    CHECK(session.ItemRect("p1").Min.y > session.ItemRect("b0").Max.y);
+    CHECK(session.ItemRect("p1").Min.x == doctest::Approx(session.ItemRect("p0").Min.x));
+}
+
+TEST_CASE("Panels leave every stack balanced, nested, disabled and outside a frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    int reported = 0;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::PanelsScope panels("outer", v.sizes, {.height = 200.0f});
+            if (facet::PanelScope panel("One"); panel)
+            {
+                float inner[2] = {0.5f, 0.5f};
+                facet::PanelsScope nested("inner", inner, {.orientation = facet::Orientation::Vertical});
+                if (facet::PanelScope a("A"); a)
+                    ImGui::TextUnformatted("a");
+            }
+            ImGui::BeginDisabled();
+            if (facet::PanelScope panel("Two", {.icon = facet::Icon("layers")}); panel)
+                ImGui::Button("disabled");
+            ImGui::EndDisabled();
+        });
+        const int before = fi::UsageErrorCount();
+        float one[1] = {1.0f};
+        facet::BeginPanels("one", one, {.height = 100.0f});
+        if (facet::BeginPanel("Only"))
+            facet::EndPanel();
+        CHECK_FALSE(facet::BeginPanel("Extra"));
+        facet::EndPanels();
+        reported = fi::UsageErrorCount() - before;
+    });
+    session.Frames(2);
+    CHECK(reported == 1);
+    CHECK(fi::OpenScopeCount() == 0);
+    facet::BeginPanels("outside", v.sizes);
+    CHECK_FALSE(facet::BeginPanel("x"));
+    facet::EndPanels();
+    CHECK(fi::OpenScopeCount() == 0);
+}

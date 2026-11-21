@@ -19,6 +19,7 @@ void LayoutEndFrame()
     ClearSplitViewStack();
     ClearDependentGroupStack();
     ClearListDetailStack();
+    ClearPanelsStack();
 }
 
 } // namespace

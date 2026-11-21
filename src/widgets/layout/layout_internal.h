@@ -94,6 +94,9 @@ struct LayoutDividerRecord
     bool vertical = false;  // the panes sit one above the other
 };
 const LayoutDividerRecord& LastSplitViewDivider();
+// The divider before panel `index` (1 or more) of the panels view ended last; an empty record for
+// none (also beside a collapsed panel, where only the hairline is drawn).
+LayoutDividerRecord LastPanelsDivider(int index);
 
 // ---- Settings row ---------------------------------------------------------------------------------
 

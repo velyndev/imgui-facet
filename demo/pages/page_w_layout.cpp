@@ -113,8 +113,11 @@ struct LayoutState
     bool detailOpen = false;
     int entry = 0;
     int detailPresses = 0;
-    // Placeholders of the planned widgets
+    // Panels
     float panelSizes[3] = {0.25f, 0.5f, 0.25f};
+    bool panelOpen[3] = {};
+    int panelPresses = 0;
+    // Placeholders of the planned widgets
     ImGuiSelectionBasicStorage selection;
 };
 
@@ -468,20 +471,48 @@ void ListDetails(facet::demo::PageCtx& ctx, LayoutState& s)
     facet::EndCard();
 }
 
-void Divide(LayoutState& s)
+void PanelsSection(facet::demo::PageCtx& ctx, LayoutState& s)
 {
-    SectionHeader("Divide a region");
-    facet::BeginPanels("panels", s.panelSizes, {.height = RegionHeight()});
-    const char* const titles[] = {"Panel 1", "Panel 2", "Panel 3"};
-    for (const char* title : titles)
+    SectionHeader("Panels");
+    Paragraph("Resizable panels with headers. A divider moves room between its two neighbours only; the "
+              "header of a collapsible panel folds it to a strip, and the strip's button brings it back. "
+              "The middle panel cannot collapse. The texts are placeholders.");
+    // Stacked in a Compact width, the panels need more height.
+    const float height = RegionHeight() * (facet::AvailableWidthClass() == facet::WidthClass::Compact ? 2.0f : 1.0f);
+    facet::BeginPanels("panels", s.panelSizes, {.height = height});
+    const char* const titles[] = {"First panel", "Middle panel", "Last panel"};
+    const char* const probes[] = {"layout.panels.0", "layout.panels.1", "layout.panels.2"};
+    const facet::Icon icons[] = {facet::Icon("layers"), facet::Icon(), facet::Icon("sliders")};
+    for (int i = 0; i < 3; ++i)
     {
-        if (facet::BeginPanel(title))
+        const bool open = facet::BeginPanel(titles[i], {.icon = icons[i], .collapsible = i != 1});
+        // The header, or the strip's button while collapsed: the last item after BeginPanel. It is
+        // recorded once the panel's content (a child window) has ended, in the window it belongs to.
+        const ImGuiID headerId = ImGui::GetItemID();
+        const ImVec2 headerMin = ImGui::GetItemRectMin();
+        const ImVec2 headerMax = ImGui::GetItemRectMax();
+        s.panelOpen[i] = open;
+        if (!open)
         {
-            Note("%s content.", title);
-            facet::EndPanel();
+            facet::demo::ProbeRect(ctx, probes[i], headerId, headerMin, headerMax);
+            continue;
         }
+        Note("Placeholder content of the %s.", i == 0 ? "first panel" : (i == 1 ? "middle panel" : "last panel"));
+        if (i == 1)
+        {
+            if (facet::Button("Count a press##panel"))
+                ++s.panelPresses;
+            ctx.Probe("layout.panels.button");
+            Note("Presses: %d.", s.panelPresses);
+        }
+        facet::EndPanel();
+        facet::demo::ProbeRect(ctx, probes[i], headerId, headerMin, headerMax);
     }
     facet::EndPanels();
+    const facet::internal::LayoutDividerRecord divider = facet::internal::LastPanelsDivider(1);
+    if (divider.id != 0)
+        facet::demo::ProbeRect(ctx, "layout.panels.divider", divider.id, divider.band.Min, divider.band.Max);
+    Note("Sizes %.2f, %.2f, %.2f.", s.panelSizes[0], s.panelSizes[1], s.panelSizes[2]);
 }
 
 void Dependent(facet::demo::PageCtx& ctx, LayoutState& s)
@@ -558,7 +589,7 @@ FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrang
     Flows(ctx, s);
     SplitViews(ctx, s);
     ListDetails(ctx, s);
-    Divide(s);
+    PanelsSection(ctx, s);
     Tiles(s);
 }
 
@@ -810,6 +841,54 @@ FACET_DEMO_SELFTEST("layout")
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Enter on the focused back button returns to the list", [] { return !State().detailOpen; });
     test.Do([] { State().listDetailNarrow = false; });
+
+    // Panels: a divider moves room between two neighbours; headers fold and unfold, also by keyboard.
+    test.Do([] {
+        LayoutState& s = State();
+        s.panelSizes[0] = 0.25f;
+        s.panelSizes[1] = 0.5f;
+        s.panelSizes[2] = 0.25f;
+        s.panelPresses = 0;
+    });
+    test.Reveal("layout.panels.1");
+    test.WaitSeconds(0.4f);
+    test.Drag({T::Item("layout.panels.divider"), T::Item("layout.panels.divider").Offset(40.0f, 40.0f)}, 0.3f);
+    test.Expect("dragging a divider moves room between its two neighbours only", [] {
+        const LayoutState& s = State();
+        return s.panelSizes[0] > 0.26f && std::fabs(s.panelSizes[0] + s.panelSizes[1] - 0.75f) < 0.001f &&
+               s.panelSizes[2] == 0.25f;
+    });
+    test.Click("layout.panels.0");
+    test.WaitSeconds(0.5f);
+    test.Expect("a click on the header collapses the first panel", [] { return !State().panelOpen[0]; });
+    test.Click("layout.panels.0");
+    test.WaitSeconds(0.5f);
+    test.Expect("the strip's button expands it again", [] { return State().panelOpen[0]; });
+    // Keyboard: from the middle panel's button back to the divider and the first header. The panel's
+    // content is skipped while out of sight, so its header is revealed first.
+    test.Reveal("layout.panels.1");
+    test.WaitSeconds(0.4f);
+    test.Click("layout.panels.button");
+    test.Expect("the middle panel's button works", [] { return State().panelPresses == 1; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.panels.button");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("layout.panels.divider");
+    test.Do([] { State().panelSizes[0] = 0.25f; State().panelSizes[1] = 0.5f; });
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End on the focused divider moves room to the first panel", [] {
+        const LayoutState& s = State();
+        return s.panelSizes[0] > 0.25f && std::fabs(s.panelSizes[0] + s.panelSizes[1] - 0.75f) < 0.001f;
+    });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("layout.panels.0");
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.5f);
+    test.Expect("Enter on the focused header collapses the panel", [] { return !State().panelOpen[0]; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.5f);
+    test.Expect("Enter on the focused strip button expands it", [] { return State().panelOpen[0]; });
 
     test.Reveal("layout.split.vertical");
     test.WaitSeconds(0.4f);

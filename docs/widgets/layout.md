@@ -167,8 +167,6 @@ Status: ready.
 
 ### BeginPanels, BeginPanel
 
-Status: planned
-
 ```cpp
 void BeginPanels(const char* id, std::span<float> sizes, const PanelsOptions& options = {});
 void EndPanels();
@@ -178,8 +176,37 @@ class PanelsScope;
 class PanelScope;
 ```
 
-Several resizable panels with headers that collapse to a strip; a divider moves room only between
-its two neighbours.
+Resizable panels with headers, side by side (or stacked with `Orientation::Vertical`) in a view of
+`width` x `height` units (0 fills the available room; with no height left, `metrics.panelHeight`).
+Submit one `BeginPanel` per entry of `sizes`, in order; further panels are reported and skipped, as
+are panels past 16.
+
+- Sizes: a collapsed panel takes a strip of `layout.panelHeaderHeight`; the expanded panels share the
+  rest in the proportion of their `sizes` entries (normalized; negative entries count as 0, and all 0
+  share equally). Between neighbours sits a band of `layout.dividerBand`.
+- Dividers: the same divider as `BeginSplitView` between two expanded neighbours, submitted with the
+  second one, so Tab goes from a panel's content to the divider to the next panel's header. Dragging
+  it, the arrows of its axis (Shift fine, Ctrl coarse), Home and End move room between its two
+  neighbours only: their two entries of `sizes` are written, keeping their sum, and neither gets
+  shorter than `layout.minRowControl` while both fit it. The new sizes show from the next frame.
+  Beside a collapsed panel only the hairline is drawn.
+- Header: a row of `layout.panelHeaderHeight` with the icon and the title in Headline, cut with an
+  ellipsis and a tooltip when narrow, and a hairline under it. With `collapsible` (the default) the
+  header is the containers family's header row with its chevron: a click, Enter or Space collapses
+  the panel, and the hover fill and focus ring show it is an item. Without `collapsible` the title is
+  drawn as text, not an item.
+- Collapsed: side by side, the strip shows an icon button with a right chevron whose tooltip and
+  name are the title (`Strings::expand` without a title); it expands the panel. Stacked, the header
+  row stays and expands it. The panel collapses and expands over `motion.durationStandard` (at once
+  with reduced motion), and its neighbours grow and shrink with it. The collapsed state is kept under
+  the panel's id in the Dear ImGui ini file.
+- `BeginPanel` returns true while the panel is expanded: its content goes into a scroll area of the
+  scroll core under the header (ids under the panel), and `EndPanel` follows; false while collapsed or
+  out of sight. Panel labels are hashed under the view's id.
+- Compact width: horizontal panels stack. `EndPanels` is always called; the view is one group, the
+  last item after it. Views nest in their panels.
+
+Status: ready.
 
 ### BeginListDetail
 
