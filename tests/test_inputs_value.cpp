@@ -19,6 +19,7 @@
 
 #include "internal/control.h"
 #include "internal/focus.h"
+#include "internal/keys.h"
 #include "support/session.h"
 
 namespace
@@ -345,4 +346,186 @@ TEST_CASE("DragNumber wraps a finite range when asked and keeps an open float in
     session.KeyPress(ImGuiKey_Enter);
     CHECK(std::isfinite(open));
     CHECK(open == FLT_MAX);
+}
+
+// ---- KeybindCapture ----------------------------------------------------------------------------
+
+namespace
+{
+
+// The slot rects of a KeybindCapture without a label: the primary slot starts at the widget's
+// left edge; with the alternate slot each takes half the width less the gap.
+ImVec2 PrimarySlot(const ImRect& widget)
+{
+    return ImVec2(widget.Min.x + widget.GetHeight() * 0.5f, widget.Min.y + widget.GetHeight() * 0.5f);
+}
+
+} // namespace
+
+TEST_CASE("KeybindCapture listens after a click, owns the keys and writes the chord on release")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind bind;
+    Signals signals;
+    bool appSawK = false;
+    const facet::ShortcutId shortcut = facet::RegisterShortcut("test.capture.leak", ImGuiKey_K | ImGuiMod_Ctrl);
+    bool shortcutFired = false;
+    session.SetUi([&] {
+        signals.Take(facet::KeybindCapture("##bind", &bind));
+        session.Track("bind");
+        appSawK |= ImGui::IsKeyPressed(ImGuiKey_K);
+        shortcutFired |= facet::ShortcutPressed(shortcut);
+    });
+    session.Frames(2);
+    session.Click(PrimarySlot(session.ItemRect("bind")));
+    CHECK(ImGui::GetIO().WantCaptureKeyboard);
+    CHECK(facet::internal::ActiveChordCaptureOwner() != 0);
+    session.KeyPress(ImGuiKey_K | ImGuiMod_Ctrl);
+    session.Frame();
+    CHECK(bind.primary == (ImGuiKey_K | ImGuiMod_Ctrl));
+    CHECK(signals.writes == 1);
+    CHECK(signals.commits == 1);
+    CHECK_FALSE(appSawK);
+    CHECK_FALSE(shortcutFired);
+    CHECK_FALSE(ImGui::IsAnyItemActive());
+    facet::UnregisterShortcut(shortcut);
+}
+
+TEST_CASE("KeybindCapture: Escape cancels, a click elsewhere cancels, the clear button clears")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind bind{.primary = ImGuiKey_F5};
+    session.SetUi([&] {
+        facet::KeybindCapture("##bind", &bind);
+        session.Track("bind");
+        ImGui::Button("elsewhere");
+        session.Track("elsewhere");
+    });
+    session.Frames(2);
+    const ImRect rect = session.ItemRect("bind");
+    session.Click(PrimarySlot(rect));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK(bind.primary == ImGuiKey_F5);
+    CHECK_FALSE(ImGui::IsAnyItemActive());
+    session.Click(PrimarySlot(rect));
+    REQUIRE(ImGui::IsAnyItemActive());
+    session.Click(session.ItemCenter("elsewhere"));
+    CHECK(bind.primary == ImGuiKey_F5);
+    CHECK(ImGui::GetActiveID() != session.ItemId("bind"));
+    // The clear button sits at the end of the slot.
+    session.Click(ImVec2(rect.Max.x - rect.GetHeight() * 0.5f, rect.GetCenter().y));
+    CHECK(bind.primary == ImGuiKey_None);
+}
+
+TEST_CASE("KeybindCapture: Enter on the focused slot listens; Backspace and Delete clear it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind bind{.primary = ImGuiKey_F5, .alternate = ImGuiKey_F6};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::KeybindCapture("##bind", &bind, {.showAlternate = true});
+        session.Track("bind");
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);  // the primary slot
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(bind.primary == ImGuiKey_None);
+    CHECK(bind.alternate == ImGuiKey_F6);
+    session.KeyPress(ImGuiKey_Tab);  // the alternate slot
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(bind.alternate == ImGuiKey_None);
+    session.KeyPress(ImGuiKey_Enter);
+    session.KeyPress(ImGuiKey_G);
+    session.Frame();
+    CHECK(bind.alternate == ImGuiKey_G);
+    CHECK(bind.primary == ImGuiKey_None);
+}
+
+TEST_CASE("KeybindCapture takes modifiers alone only when allowed, and mouse buttons when allowed")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind keys;
+    facet::Keybind modifiers;
+    facet::Keybind mouse;
+    session.SetUi([&] {
+        facet::KeybindCapture("##keys", &keys, {.allowMouse = false});
+        session.Track("keys");
+        facet::KeybindCapture("##modifiers", &modifiers, {.allowModifierOnly = true});
+        session.Track("modifiers");
+        facet::KeybindCapture("##mouse", &mouse);
+        session.Track("mouse");
+    });
+    session.Frames(2);
+    session.Click(PrimarySlot(session.ItemRect("keys")));
+    session.KeyPress(ImGuiKey_LeftShift);
+    CHECK(keys.primary == ImGuiKey_None);  // still listening
+    session.Click(session.ItemCenter("keys"), ImGuiMouseButton_Right);
+    CHECK(keys.primary == ImGuiKey_None);  // mouse buttons are not taken here
+    session.KeyPress(ImGuiKey_Escape);
+
+    session.Click(PrimarySlot(session.ItemRect("modifiers")));
+    session.KeyPress(ImGuiKey_LeftCtrl | ImGuiMod_Ctrl);  // a backend sends the key and its modifier
+    session.Frame();
+    CHECK(facet::ChordMods(modifiers.primary) == ImGuiMod_Ctrl);
+
+    session.Click(PrimarySlot(session.ItemRect("mouse")));
+    REQUIRE(facet::internal::ActiveChordCaptureOwner() == ImGui::GetActiveID());
+    session.Click(session.ItemCenter("mouse"), ImGuiMouseButton_Middle);
+    session.Frame();
+    CHECK(mouse.primary == ImGuiKey_MouseMiddle);
+}
+
+TEST_CASE("KeybindCapture shows a conflict the caller found with FindChordConflict")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId save = facet::RegisterShortcut("test.capture.save", ImGuiKey_S | ImGuiMod_Ctrl,
+                                                           {.label = "Save"});
+    facet::Keybind bind;
+    session.SetUi([&] {
+        const facet::ShortcutId conflict = facet::FindChordConflict(bind.primary);
+        facet::KeybindCapture("##bind", &bind, {.error = conflict.IsValid() ? "Used by Save" : nullptr});
+        session.Track("bind");
+    });
+    session.Frames(2);
+    CHECK_FALSE(ErrorShown("Used by Save"));
+    session.Click(PrimarySlot(session.ItemRect("bind")));
+    session.KeyPress(ImGuiKey_S | ImGuiMod_Ctrl);
+    session.Frames(2);
+    CHECK(bind.primary == (ImGuiKey_S | ImGuiMod_Ctrl));
+    CHECK(ErrorShown("Used by Save"));
+    facet::UnregisterShortcut(save);
+}
+
+TEST_CASE("KeybindCapture read-only and disabled never listen or write")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Keybind readOnly{.primary = ImGuiKey_F1};
+    facet::Keybind disabled{.primary = ImGuiKey_F2};
+    session.SetUi([&] {
+        facet::KeybindCapture("##readonly", &readOnly, {.readOnly = true});
+        session.Track("readonly");
+        ImGui::BeginDisabled();
+        facet::KeybindCapture("##disabled", &disabled);
+        session.Track("disabled");
+        ImGui::EndDisabled();
+    });
+    session.Frames(2);
+    session.Click(PrimarySlot(session.ItemRect("readonly")));
+    session.KeyPress(ImGuiKey_A);
+    session.KeyPress(ImGuiKey_Delete);
+    session.Click(PrimarySlot(session.ItemRect("disabled")));
+    session.KeyPress(ImGuiKey_B);
+    CHECK(readOnly.primary == ImGuiKey_F1);
+    CHECK(disabled.primary == ImGuiKey_F2);
+    CHECK(facet::internal::ActiveChordCaptureOwner() == 0);
 }

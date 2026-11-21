@@ -433,8 +433,23 @@ other buttons inside fields. Status: ready.
 bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOptions& options = {});
 ```
 
-Records a key bind (`Keybind` from `core/input.h`): chords, mouse and gamepad buttons, a primary and
-an alternate slot, and the bind mode. Status: planned.
+Records a key bind (`Keybind` from `core/input.h`). The label is drawn in front; then the primary
+slot and, with `showAlternate`, the alternate slot share the width, each a field-like Tab stop that
+shows its chord as key caps (the chord as cut text with a tooltip when the caps do not fit) or the
+placeholder (`Strings::unbound`). A click, Enter or Space on a slot starts listening: the slot shows
+`Strings::listening`, then the held keys as pressed caps, and takes the chord when its last key is
+released (the modifiers held when the main key went down, plus that key). While it listens the slot
+is the active item, `io.WantCaptureKeyboard` is true and every key is locked to it, so no shortcut,
+key bind, `ImGui::IsKeyPressed` or keyboard navigation sees the keys. Escape cancels, so Escape cannot
+be bound; a left click anywhere cancels and still reaches what it lands on. Modifiers alone are taken
+only with `allowModifierOnly`; the right, middle and side mouse buttons only with `allowMouse` (the
+left button never binds); gamepad buttons only with `allowGamepad`. A slot that holds a chord shows a
+clear button at its end (not a Tab stop); Backspace or Delete on the focused slot clears it as well.
+`showMode` adds a `KeybindModeSelector` (selection.h) beside the slots, or under them when the slots
+would get narrower than `metrics.numberFieldWidth` each. Facet does not look for conflicts itself
+(validation belongs to the caller): call `FindChordConflict` with the chords and pass the result as
+`error`; the demo page shows this. Every write returns true once and ends one edit session
+(`IsItemEditCommitted`). Status: ready.
 
 ### Rating
 

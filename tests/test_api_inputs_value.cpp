@@ -51,10 +51,11 @@ void CallReadyValueInputs(Values& v)
     FACET_CHECK_STUB(false, DragNumber("Drag 1", &v.integer));
     FACET_CHECK_STUB(false, DragNumber("Drag 2", &v.number, {.speed = 0.01}));
     FACET_CHECK_STUB(false, DragNumber("Drag 3", &v.real, {.wrap = true}));
+    FACET_CHECK_STUB(false, KeybindCapture("Keybind 1", &v.bind, {.showMode = true, .showAlternate = true}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallReadyValueInputs.
-constexpr int kReadyValueInputCalls = 6;
+constexpr int kReadyValueInputCalls = 7;
 
 // Every placeholder of these widgets once, with the overloads, as an app would call it.
 void CallValueInputStubs(Values& v)
@@ -70,13 +71,12 @@ void CallValueInputStubs(Values& v)
     FACET_CHECK_STUB(false, HexInput("Hex 1", &v.hex32, {.prefix = true}));
     FACET_CHECK_STUB(false, HexInput("Hex 2", &v.hex64));
     FACET_CHECK_STUB(false, DurationInput("Duration 1", &v.seconds, {.showMilliseconds = true}));
-    FACET_CHECK_STUB(false, KeybindCapture("Keybind 1", &v.bind, {.showMode = true, .showAlternate = true}));
     FACET_CHECK_STUB(false, Rating("Rating 1", &v.rating, {.halfSteps = true}));
     FACET_CHECK_STUB(false, Rating("Rating 2", &v.ratingInt));
 }
 
 // Number of FACET_CHECK_STUB calls in CallValueInputStubs.
-constexpr int kValueInputStubCalls = 13;
+constexpr int kValueInputStubCalls = 12;
 
 } // namespace
 
