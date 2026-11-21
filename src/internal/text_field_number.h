@@ -129,6 +129,12 @@ struct NumberFieldParams
     // typed (the number filter is off), so its grammar can use letters and separators.
     NumberParseFn parser = nullptr;
     void* parserUser = nullptr;
+    // A trailing slot of the widget's own at the end of the frame (a unit menu, a lock button),
+    // as TextFieldParams::trailingWidth, trailingSlot and trailingUser. Used only without
+    // steppers, which take the slot themselves.
+    float trailingWidth = 0.0f;
+    TextFieldSlotFn trailingSlot = nullptr;
+    void* trailingUser = nullptr;
 };
 
 struct NumberFieldResult

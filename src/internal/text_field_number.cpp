@@ -507,6 +507,12 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
         field.trailingSlot = NumberStepperSlot;
         field.trailingUser = &steppers;
     }
+    else if (params.trailingSlot != nullptr && params.trailingWidth > 0.0f)
+    {
+        field.trailingWidth = params.trailingWidth;
+        field.trailingSlot = params.trailingSlot;
+        field.trailingUser = params.trailingUser;
+    }
 
     ItemState dragItem;
     ItemState labelItem;
