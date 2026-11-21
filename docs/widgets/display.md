@@ -112,7 +112,15 @@ with reduced motion. Values outside 0 to 1 are drawn clamped. Status: ready.
 void ProgressRing(const char* label, float fraction, const ProgressRingOptions& options = {});
 ```
 
-Circular progress arc with center text. Status: planned.
+A circular progress arc with round caps, from the top clockwise, over a `fill[0]` track, with the
+visible label part to its right. The diameter is the control height of `size` or `diameter`; the
+stroke is an eighth of it. The tone colors the arc as in ProgressBar (3:1 on the content surfaces).
+`centerText`, or the percentage with `showPercent`, sits inside the ring in Footnote or Caption,
+whichever fits; a ring too small for it shows it after the label instead. A new value eases in over
+`motion.durationStandard`; `kIndeterminate` turns a quarter arc on the shared loading clock, which
+stands at the top and fades in place with reduced motion. The ring sits so its label meets the text
+of the line around it. Not interactive; inside `ImGui::BeginDisabled` it draws in the disabled
+colors. Status: ready.
 
 ### Spinner
 

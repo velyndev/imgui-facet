@@ -650,6 +650,38 @@ TEST_CASE("A status pill crossfades to a new tone over the fast duration")
     CHECK(target > 0);
 }
 
+// ==== ProgressRing ====
+
+TEST_CASE("A progress ring is one control height, eases its arc and shows its percentage inside")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const ImU32 tone = facet::ToU32(facet::T().colors.focusRing);
+    float fraction = 0.0f;
+    int arc = 0;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::ProgressRing("Upload##ring", fraction, {.showPercent = true});
+        arc = CountColor(from, tone);
+        session.Track("ring");
+        facet::ProgressRing("##big", 0.5f, {.diameter = 64.0f});
+        session.Track("big");
+        facet::ProgressRing("Busy##busy", facet::kIndeterminate);
+        session.Track("busy");
+    });
+    session.Frame();
+    CHECK(arc == 0);
+    CHECK(session.ItemRect("ring").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(session.ItemRect("big").GetHeight() == doctest::Approx(facet::Px(64.0f)));
+    fraction = 1.0f;
+    session.Frame();
+    const int early = arc;
+    session.Seconds(facet::T().motion.durationStandard + 0.1f);
+    CHECK(arc > 0);
+    CHECK(arc >= early);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
