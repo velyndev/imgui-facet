@@ -207,6 +207,10 @@ struct ValueDragOptions
     // and are taken from keyboard navigation while focused: for a control with no direction of
     // its own on screen, such as a knob. Off: those arrows keep moving the focus.
     bool crossArrows = false;
+    // The arrows across the track (and the gamepad's) step as well while focused: Right and Up
+    // increase, Left and Down decrease. For controls without a direction of their own, such as a
+    // round dial; they no longer move the focus to a neighbour. (since 0.1)
+    bool bothAxes = false;
 };
 
 // Speed factor of a delta mode drag or step with Ctrl held (coarser), and of Page Up and Down.
