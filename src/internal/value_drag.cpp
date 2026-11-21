@@ -165,6 +165,7 @@ struct Session2D
     DragTracker trackerY;
     ImVec2 lastMouse;
     bool pointerLost = false;
+    int keptAxis = -1;     // while Shift is held: 0 the drag keeps x only, 1 y only; -1 not decided
 };
 
 Session2D& CurrentSession2D()
@@ -960,13 +961,24 @@ ValueDrag2DResult ValueDrag2DBehavior(const ItemState& item, double* x, double* 
                 double fy = session.trackerY.Fraction();
                 bool backX = fx == sx;
                 bool backY = fy == sy;
-                // Shift keeps the axis with the larger travel since the press.
+                // Shift keeps the axis the drag goes along when it is pressed (the larger travel
+                // since the press), until it is let go.
                 if (options.axisLock && io.KeyShift && options.moveX && options.moveY)
                 {
-                    if (std::fabs(fx - sx) * width >= std::fabs(fy - sy) * height)
+                    const double travelX = std::fabs(fx - sx) * width;
+                    const double travelY = std::fabs(fy - sy) * height;
+                    if (session.keptAxis < 0 && travelX != travelY)
+                        session.keptAxis = travelX > travelY ? 0 : 1;
+                    if (session.keptAxis == 0)
                         backY = true;
-                    else
+                    else if (session.keptAxis == 1)
                         backX = true;
+                    else
+                        backX = backY = true;
+                }
+                else
+                {
+                    session.keptAxis = -1;
                 }
                 if (backX)
                     fx = sx;

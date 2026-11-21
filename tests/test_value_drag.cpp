@@ -1018,7 +1018,7 @@ TEST_CASE("Value drag 2D: a press on the point grabs it, elsewhere it jumps, and
     CHECK(pad.commits == 2);
 }
 
-TEST_CASE("Value drag 2D: Shift keeps the axis with the larger travel, Ctrl snaps both axes")
+TEST_CASE("Value drag 2D: Shift keeps the axis the drag goes along while held, Ctrl snaps both axes")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -1031,7 +1031,16 @@ TEST_CASE("Value drag 2D: Shift keeps the axis with the larger travel, Ctrl snap
     session.MouseMove(ImVec2(point.x + 40.0f, point.y - 10.0f));
     CHECK(pad.x == doctest::Approx(0.7));
     CHECK(pad.y == 0.5);
+    // The axis stays the one chosen while Shift is held, even when the drag turns.
     session.MouseMove(ImVec2(point.x + 10.0f, point.y - 40.0f));
+    CHECK(pad.x == doctest::Approx(0.55));
+    CHECK(pad.y == 0.5);
+    session.KeyUp(ImGuiMod_Shift);
+    session.MouseMove(ImVec2(point.x + 10.0f, point.y - 41.0f));
+    CHECK(pad.y == doctest::Approx(0.91));
+    // Pressed again, Shift chooses anew: now y has the larger travel.
+    session.KeyDown(ImGuiMod_Shift);
+    session.MouseMove(ImVec2(point.x + 11.0f, point.y - 40.0f));
     CHECK(pad.x == 0.5);
     CHECK(pad.y == doctest::Approx(0.9));
     session.KeyUp(ImGuiMod_Shift);

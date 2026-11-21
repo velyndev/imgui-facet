@@ -306,8 +306,9 @@ than two knobs gets a smaller knob. The visible label is not drawn: it is the to
 keyboard focus. One item and one Tab stop under the label's id.
 
 - **Pointer:** a press on the point grabs it without moving it, a press elsewhere moves it there
-  first. A drag moves both axes, Shift keeps only the axis with the larger travel since the press,
-  Ctrl snaps both to tenths of the range (or ten steps). A drag out of the window and back returns
+  first. A drag moves both axes; Shift keeps the axis the drag goes along when it is pressed (the
+  one with the larger travel since the press) until it is let go, and Ctrl snaps both to tenths of
+  the range (or ten steps). A drag out of the window and back returns
   exactly to the values it passed. There is no fine drag, because Shift is the axis lock.
 - **Keys** while focused: Left and Right step x, Up and Down move the point up and down on screen
   (a hundredth of the range or one step, Shift a tenth of that, Ctrl ten times); Page Up and Down

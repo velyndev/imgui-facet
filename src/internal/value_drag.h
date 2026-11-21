@@ -249,9 +249,10 @@ double TrackToFraction(const ImRect& track, Orientation orientation, ImVec2 poin
 // Mouse: as ValueDragBehavior on both axes at once. A press within grabRadius of the point grabs
 // it without moving it, a press further away first moves the point under the pointer. The
 // pointer travel since the press maps onto fractions of the area, so a drag out of the window and
-// back returns exactly to the values it passed. Shift during a drag keeps only the axis with the
-// larger travel since the press (the other one goes back to its value at the press), Ctrl snaps
-// both axes to the coarse grid. There is no fine drag: Shift is the axis lock.
+// back returns exactly to the values it passed. Shift during a drag keeps the axis the drag goes
+// along when Shift is pressed (the one with the larger travel since the press) until Shift is let
+// go; the other axis goes back to its value at the press. Ctrl snaps both axes to the coarse
+// grid. There is no fine drag: Shift is the axis lock.
 // Keyboard, while the item has keyboard focus, in PadKeys::Step: Left and Right step x, Up and
 // Down move the point up and down on screen (toward max.y, or toward min.y with yDown), by the
 // steps of KeyboardStep with Shift finer and Ctrl coarser; Page Up and Page Down move it up and
