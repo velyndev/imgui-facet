@@ -98,7 +98,7 @@ void ChartCalls()
 
 } // namespace
 
-TEST_CASE("The chart stubs submit one item each, return the neutral result and keep every stack")
+TEST_CASE("The chart widgets submit one item each, return false without input and keep every stack")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -108,7 +108,7 @@ TEST_CASE("The chart stubs submit one item each, return the neutral result and k
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
-TEST_CASE("A vertical level meter stub follows kFill and widths relative to the available width")
+TEST_CASE("A vertical level meter follows kFill and widths relative to the available width")
 {
     // Rule 6: kFill is the available width, any other negative width the available width minus
     // that many units.

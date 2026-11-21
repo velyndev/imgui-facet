@@ -6,13 +6,16 @@
 // pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
 // tests/test_api_charts.cpp.
 
+#include <cfloat>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <span>
 #include <string>
 #include <vector>
 
+#include <crtdbg.h>
 #include <doctest/doctest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -24,6 +27,7 @@
 #include "internal/popup_host.h"
 #include "support/session.h"
 #include "widgets/charts/chart_parts.h"
+#include "widgets/display/display_look.h"
 
 namespace
 {
@@ -478,4 +482,612 @@ TEST_CASE("Legend entries wrap within the legend width, cut long labels and keep
     std::swap(items[0], items[2]);
     session.Frame();
     CHECK(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 11, 0));
+}
+
+// ---- Axes -------------------------------------------------------------------------------------------
+
+namespace
+{
+
+int LongLabel(char* buffer, int size, double value, void*)
+{
+    return std::snprintf(buffer, static_cast<std::size_t>(size), "value %.1f units", value);
+}
+
+} // namespace
+
+TEST_CASE("Chart axes: labels along x never overlap, and automatic ranges end on ticks")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        fi::ControlTextScope text(fi::kChartTickStyle);
+        for (const float length : {40.0f, 120.0f, 300.0f, 900.0f})
+        {
+            INFO("length " << length);
+            const facet::ChartAxis axis{.formatter = &LongLabel};
+            const fi::ChartNumericAxis x = fi::ChartValueAxis(axis, {0.0, 1000.0, true}, length, false, 8.0f);
+            int labelled = 0;
+            int major = 0;
+            for (int i = 0; i < x.count; ++i)
+                if (x.ticks[i].major && major++ % x.labelEvery == 0)
+                    ++labelled;
+            // Neighbouring labels are labelEvery steps apart, at least one label and a gap.
+            const float pitch = length / static_cast<float>(std::max(1, major - 1)) * static_cast<float>(x.labelEvery);
+            if (labelled > 1)
+                CHECK(pitch >= x.labelWidth + 8.0f - 0.5f);
+            ++checked;
+        }
+        // Data from 1 to 6.4 with 5 % padding, about four ticks: the range ends on whole steps of its ticks.
+        const facet::ChartAxis automatic;
+        const fi::Range range = fi::ChartResolveRange(automatic, {1.0, 6.4, true}, {.pad = true, .nice = true}, 4);
+        const fi::ChartNumericAxis y = fi::ChartValueAxis(automatic, range, 120.0f, true, 16.0f);
+        REQUIRE(y.count >= 2);
+        CHECK(y.ticks[0].value == doctest::Approx(range.min));
+        CHECK(y.ticks[y.count - 1].value == doctest::Approx(range.max));
+        // Bars and areas keep the baseline at 0, without padding below it.
+        const fi::Range bars = fi::ChartResolveRange(automatic, {2.0, 7.0, true}, {.includeZero = true, .pad = true}, 4);
+        CHECK(bars.min == 0.0);
+        ++checked;
+    });
+    session.Frame();
+    CHECK(checked == 5);
+}
+
+// ---- Charts with axes --------------------------------------------------------------------------------
+
+namespace
+{
+
+const float kRamp[] = {1.0f, 2.0f, 4.0f, 3.0f, 5.0f, 2.0f, 6.0f, 4.0f, 3.0f, 5.0f};
+const float kFlat[] = {2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f};
+constexpr ImU32 kRed = IM_COL32(200, 30, 30, 255);
+constexpr ImU32 kBlue = IM_COL32(30, 30, 200, 255);
+
+// Whether every vertex the window draw list received since `from` lies inside `rect`, or belongs to
+// a draw command whose clip rectangle lies inside it (so what reaches past it is cut there).
+bool DrawnInside(int fromVertex, const ImRect& rect)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    for (const ImDrawCmd& cmd : drawList->CmdBuffer)
+    {
+        const bool clipped = cmd.ClipRect.x >= rect.Min.x - 0.5f && cmd.ClipRect.y >= rect.Min.y - 0.5f &&
+                             cmd.ClipRect.z <= rect.Max.x + 0.5f && cmd.ClipRect.w <= rect.Max.y + 0.5f;
+        for (unsigned int k = 0; k < cmd.ElemCount; ++k)
+        {
+            const unsigned int index = drawList->IdxBuffer[static_cast<int>(cmd.IdxOffset + k)] + cmd.VtxOffset;
+            if (static_cast<int>(index) < fromVertex || clipped)
+                continue;
+            const ImVec2 pos = drawList->VtxBuffer[static_cast<int>(index)].pos;
+            if (!ImRect(rect.Min.x - 1.0f, rect.Min.y - 1.0f, rect.Max.x + 1.0f, rect.Max.y + 1.0f).Contains(pos))
+                return false;
+        }
+    }
+    return true;
+}
+
+// The horizontal (x) or vertical (y) extent of the vertices of `color` since `from`.
+ImVec2 ColorExtent(int from, ImU32 color, bool vertical)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 extent(FLT_MAX, -FLT_MAX);
+    for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+    {
+        if (drawList->VtxBuffer[i].col != color)
+            continue;
+        const float v = vertical ? drawList->VtxBuffer[i].pos.y : drawList->VtxBuffer[i].pos.x;
+        extent.x = std::min(extent.x, v);
+        extent.y = std::max(extent.y, v);
+    }
+    return extent;
+}
+
+} // namespace
+
+TEST_CASE("A line chart fills the width at the chart height and is one Tab stop")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ChartSeries series[] = {{.label = "Series 1", .values = kRamp}};
+    float available = 0.0f;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        available = ImGui::GetContentRegionAvail().x;
+        facet::LineChart("line", series);
+        session.Track("line");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("line").GetWidth() == doctest::Approx(available));
+    CHECK(session.ItemRect("line").GetHeight() == doctest::Approx(std::round(facet::Px(facet::T().metrics.chartHeight))));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("line"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("The line chart readout follows the pointer to the nearest x and steps with the keys")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ChartSeries series[] = {{.label = "Series 1", .values = kRamp}, {.label = "Series 2", .values = kFlat}};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::LineChart("line", series, {.width = 400.0f});
+        session.Track("line");
+    });
+    session.Frame();
+    const ImGuiID id = session.ItemId("line");
+    const ImRect rect = session.ItemRect("line");
+    // The plot spans most of the width: the pointer at 95 % reads the last sample.
+    session.MouseMove(ImVec2(rect.Min.x + rect.GetWidth() * 0.97f, rect.GetCenter().y));
+    CHECK(fi::ChartReadoutIndex(id) == 9);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == id);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(fi::ChartReadoutIndex(id) == 0);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(fi::ChartReadoutIndex(id) == 2);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(fi::ChartReadoutIndex(id) == 1);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(fi::ChartReadoutIndex(id) == 9);
+    CHECK(ImGui::GetFocusID() == id);  // the arrows stayed with the chart
+}
+
+TEST_CASE("A hidden series is neither drawn nor part of the range; colors follow the series index")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int shown = -1;
+    int hidden = -1;
+    int palette = -1;
+    session.SetUi([&] {
+        facet::ChartSeries series[] = {{.label = "a", .values = kRamp, .color = kRed},
+                                       {.label = "b", .values = kFlat, .color = kBlue}};
+        int from = VertexCount();
+        facet::LineChart("visible", series);
+        shown = CountColor(from, kBlue);
+        series[1].hidden = true;
+        from = VertexCount();
+        facet::LineChart("hidden", series);
+        hidden = CountColor(from, kBlue);
+        series[1].color = 0;
+        series[1].hidden = false;
+        from = VertexCount();
+        facet::LineChart("palette", series);
+        palette = CountColor(from, facet::ToU32(fi::SeriesColor(facet::T().colors, 1)));
+    });
+    session.Frame();
+    CHECK(shown > 0);
+    CHECK(hidden == 0);
+    CHECK(palette > 0);
+}
+
+TEST_CASE("Charts with axes keep their size in Loading, Error and empty states and take no focus then")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ChartSeries series[] = {{.label = "a", .values = kRamp}};
+    static const char* const categories[] = {"One", "Two"};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::LineChart("loading", series, {.state = facet::DataState::Loading});
+        session.Track("loading");
+        facet::BarChart("error", series, categories, {.state = facet::DataState::Error});
+        session.Track("error");
+        facet::LineChart("empty", std::span<const facet::ChartSeries>{});
+        session.Track("empty");
+        facet::DonutChart("zero", std::span<const facet::DonutSlice>{});
+        session.Track("zero");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    const float height = std::round(facet::Px(facet::T().metrics.chartHeight));
+    CHECK(session.ItemRect("loading").GetHeight() == doctest::Approx(height));
+    CHECK(session.ItemRect("error").GetHeight() == doctest::Approx(height));
+    CHECK(session.ItemRect("empty").GetHeight() == doctest::Approx(height));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("Charts with extreme data and tiny sizes draw inside their box")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float one[] = {3.0f};
+    static const float gaps[] = {kNaN, 1.0f, kNaN, 2.0f, 3.0f, kNaN};
+    static const float nan[] = {kNaN, kNaN};
+    static const float huge[] = {-3e30f, 1e30f, 2e30f};
+    static const float negatives[] = {-1.0f, 0.5f, -3.0f, 2.0f};
+    static const char* const categories[] = {"A category label that is far too long for its slot", "B", "C", "D"};
+    static const facet::DonutSlice slices[] = {{"A", 1.0}, {"B", -2.0}, {"C", 0.0}, {"D", 1e-9}};
+    int checked = 0;
+    session.SetUi([&] {
+        const auto check = [&](const char* name, auto&& draw) {
+            INFO(name);
+            const int from = VertexCount();
+            draw();
+            const ImRect rect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            CHECK(rect.GetWidth() >= 1.0f);
+            CHECK(rect.GetHeight() >= 1.0f);
+            CHECK(DrawnInside(from, rect));
+            ++checked;
+        };
+        for (const float width : {3.0f, 40.0f, 300.0f})
+        {
+            const float height = width < 10.0f ? 4.0f : 0.0f;
+            const facet::ChartSeries a[] = {{.label = "one", .values = one}};
+            const facet::ChartSeries b[] = {{.label = "gaps", .values = gaps}, {.label = "nan", .values = nan}};
+            const facet::ChartSeries c[] = {{.label = "huge", .values = huge}, {.label = "negative", .values = negatives}};
+            check("one point", [&] { facet::LineChart("one", a, {.markers = true, .width = width, .height = height}); });
+            check("gaps", [&] { facet::LineChart("gaps", b, {.area = true, .stacked = true, .legend = true, .width = width, .height = height}); });
+            check("huge", [&] { facet::LineChart("huge", c, {.area = true, .width = width, .height = height}); });
+            check("log", [&] {
+                facet::LineChart("log", c, {.yAxis = {.scale = facet::ValueScale::Logarithmic}, .width = width, .height = height});
+            });
+            check("flat", [&] { facet::LineChart("flat", a, {.yAxis = {.min = 2.0, .max = 2.0}, .width = width, .height = height}); });
+            check("bars", [&] { facet::BarChart("bars", c, categories, {.stacked = true, .legend = true, .width = width, .height = height}); });
+            check("horizontal", [&] {
+                facet::BarChart("horizontal", c, categories,
+                                {.orientation = facet::Orientation::Horizontal, .width = width, .height = height});
+            });
+            check("brush", [&] {
+                double low = -5.0, high = 1e9;
+                facet::ChartRangeBrush("brush", &low, &high, 0.0, 3.0, c, {.width = width, .height = height});
+            });
+            check("frames", [&] { facet::FrameTimeGraph("frames", gaps, {.width = width, .height = height}); });
+            check("meter", [&] { facet::LevelMeter("Meter", negatives, -1.0, 1.0, {.segments = true, .width = width}); });
+        }
+        check("donut", [&] { facet::DonutChart("donut", slices, {.minSliceFraction = 0.2f, .legend = true, .diameter = 3.0f}); });
+        check("gauge", [&] { facet::Gauge("Gauge", 1e12, 0.0, 1.0, {.diameter = 3.0f}); });
+    });
+    session.Frame();
+    CHECK(checked == 32);
+}
+
+TEST_CASE("A bar chart picks categories by pointer and keys; horizontal bars take Up and Down too")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float values[] = {1.0f, 2.0f, 3.0f};
+    static const char* const categories[] = {"A", "B", "C", "D"};  // one more label than values
+    const facet::ChartSeries series[] = {{.label = "a", .values = values}};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BarChart("bars", series, categories, {.width = 400.0f});
+        session.Track("bars");
+        facet::BarChart("rows", series, categories, {.orientation = facet::Orientation::Horizontal, .width = 400.0f});
+        session.Track("rows");
+    });
+    session.Frame();
+    const ImRect bars = session.ItemRect("bars");
+    session.MouseMove(ImVec2(bars.Max.x - 4.0f, bars.GetCenter().y));
+    CHECK(fi::ChartReadoutIndex(session.ItemId("bars")) == 3);  // four categories
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("bars"));
+    session.KeyPress(ImGuiKey_Home);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(fi::ChartReadoutIndex(session.ItemId("bars")) == 1);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("rows"));
+    session.KeyPress(ImGuiKey_Home);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(fi::ChartReadoutIndex(session.ItemId("rows")) == 2);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(fi::ChartReadoutIndex(session.ItemId("rows")) == 1);
+}
+
+TEST_CASE("Stacked bar segments follow each other with a gap and never overlap")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float lower[] = {3.0f};
+    static const float upper[] = {2.0f};
+    static const char* const categories[] = {"A"};
+    ImVec2 red, blue;
+    session.SetUi([&] {
+        const facet::ChartSeries series[] = {{.label = "lower", .values = lower, .color = kRed},
+                                             {.label = "upper", .values = upper, .color = kBlue}};
+        const int from = VertexCount();
+        facet::BarChart("bars", series, categories, {.stacked = true, .width = 300.0f});
+        red = ColorExtent(from, kRed, true);
+        blue = ColorExtent(from, kBlue, true);
+    });
+    session.Frame();
+    REQUIRE(red.x < red.y);
+    REQUIRE(blue.x < blue.y);
+    // Screen y grows downward: the upper segment ends above the lower one, a bar gap apart.
+    CHECK(blue.y <= red.x - facet::Px(facet::T().charts.barGap) + 1.0f);
+}
+
+// ---- Donut chart ------------------------------------------------------------------------------------
+
+TEST_CASE("A donut chart picks slices by pointer and keys and merges small slices into one")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::DonutSlice slices[] = {{"A", 50.0}, {"B", 30.0}, {"C", 1.0}, {"D", 1.0}, {"E", 18.0}};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::DonutChart("donut", slices, {.minSliceFraction = 0.05f, .diameter = 160.0f});
+        session.Track("donut");
+    });
+    session.Frame();
+    const ImGuiID id = session.ItemId("donut");
+    const ImRect rect = session.ItemRect("donut");
+    const float d = facet::Px(160.0f);
+    // Just right of the top of the ring: the first slice.
+    session.MouseMove(ImVec2(rect.Min.x + d * 0.55f, rect.Min.y + d * 0.06f));
+    CHECK(fi::ChartReadoutIndex(id) == 0);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == id);
+    // A, B, E kept and the merged C and D: four slices.
+    session.KeyPress(ImGuiKey_End);
+    CHECK(fi::ChartReadoutIndex(id) == 3);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(fi::ChartReadoutIndex(id) == 2);
+}
+
+// ---- Gauge and level meter ----------------------------------------------------------------------------
+
+TEST_CASE("A gauge springs to its value, jumps there with reduced motion, and is not a Tab stop")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double value = 0.1;
+    float right = 0.0f;
+    const ImU32 fill = facet::ToU32(fi::DisplayProgressColor(facet::Tone::Accent));
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int from = VertexCount();
+        facet::Gauge("Gauge", value, 0.0, 1.0, {.diameter = 120.0f});
+        session.Track("gauge");
+        right = ColorExtent(from, fill, false).y;
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(30);
+    const float low = right;
+    value = 1.0;
+    session.Frame();
+    CHECK(right < session.ItemRect("gauge").Max.x - facet::Px(20.0f));  // still on its way
+    session.Seconds(1.0f);
+    CHECK(right > low + facet::Px(40.0f));
+
+    facet::Theme reduced = facet::T();
+    reduced.motion.reduceMotion = true;
+    facet::SetTheme(reduced, false);
+    value = 0.1;
+    session.Frame();
+    CHECK(right == doctest::Approx(low).epsilon(0.02));
+
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("A level meter smooths its value and holds its peak, then lets it fall")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float level = 1.0f;
+    float peakX = 0.0f;
+    const ImU32 mark = facet::ToU32(facet::T().colors.label);
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::LevelMeter("##meter", std::span<const float>(&level, 1), 0.0, 1.0, {.width = 300.0f});
+        peakX = ColorExtent(from, mark, false).x;
+    });
+    session.Seconds(0.5f);
+    const float top = peakX;
+    level = 0.1f;
+    session.Seconds(facet::T().charts.peakHold * 0.5f);
+    CHECK(peakX == doctest::Approx(top));  // held
+    session.Seconds(facet::T().charts.peakHold + 2.0f);
+    CHECK(peakX < top - facet::Px(100.0f));  // fallen
+}
+
+// ---- Frame time graph -------------------------------------------------------------------------------
+
+TEST_CASE("The frame time graph marks frames over the target and the subsystem records every frame")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float fast[] = {0.010f, 0.012f, 0.011f};
+    static const float slow[] = {0.010f, 0.030f, 0.011f};
+    int fastWarnings = -1;
+    int slowWarnings = -1;
+    session.SetUi([&] {
+        const ImU32 warning = facet::ToU32(facet::T().colors.warning);
+        int from = VertexCount();
+        facet::FrameTimeGraph("fast", fast);
+        fastWarnings = CountColor(from, warning);
+        from = VertexCount();
+        facet::FrameTimeGraph("slow", slow);
+        slowWarnings = CountColor(from, warning);
+        facet::FrameTimeGraph("own", {.compact = true});
+    });
+    fi::ResetChartFrameTimes();
+    session.Frames(12);
+    CHECK(fastWarnings == 0);
+    CHECK(slowWarnings > 0);
+    const fi::SeriesView times = fi::ChartFrameTimes();
+    CHECK(times.count == 12);
+    CHECK(times.YAt(11) == doctest::Approx(session.Options().deltaTime));
+    session.Frames(fi::kChartFrameHistory);
+    CHECK(fi::ChartFrameTimes().count == fi::kChartFrameHistory);
+}
+
+// ---- Range brush ----------------------------------------------------------------------------------------
+
+TEST_CASE("The range brush keeps its edges apart, drags its window and steps each edge by keys")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double low = 20.0;
+    double high = 40.0;
+    int writes = 0;
+    ImGuiID brushId = 0;
+    const facet::ChartSeries series[] = {{.label = "a", .values = kRamp}};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        brushId = ImGui::GetID("Range");
+        if (facet::ChartRangeBrush("Range", &low, &high, 0.0, 100.0, series, {.minGap = 10.0, .width = 400.0f}))
+            ++writes;
+        session.Track("brush");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("brush");
+    // The low edge dragged past the high one stops one gap before it.
+    session.Drag({fi::ChartBrushHandleRect(brushId, 0).GetCenter(), ImVec2(rect.Max.x - 2.0f, rect.GetCenter().y)});
+    CHECK(low == doctest::Approx(30.0));
+    CHECK(high == doctest::Approx(40.0));
+    // The window body drags both edges by the same amount.
+    const ImVec2 body((fi::ChartBrushHandleRect(brushId, 0).GetCenter().x + fi::ChartBrushHandleRect(brushId, 1).GetCenter().x) * 0.5f,
+                      rect.GetCenter().y);
+    session.Drag({body, ImVec2(body.x + rect.GetWidth() * 0.2f, body.y)});
+    CHECK(high - low == doctest::Approx(10.0));
+    CHECK(low > 40.0);
+    // Each edge is a Tab stop; the arrows step it, Escape during a held key restores it.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == fi::ChartBrushHandleId(brushId, 0));
+    const double before = low;
+    // Off the keyboard grid (a hundredth of the range), the first step lands on the grid point below.
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(low == doctest::Approx(std::ceil(before) - 2.0));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == fi::ChartBrushHandleId(brushId, 1));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(high == doctest::Approx(100.0));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(writes >= 4);
+}
+
+TEST_CASE("The range brush zooms with Alt and the wheel, and a read-only brush writes nothing")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double low = 20.0, high = 60.0;
+    double lockedLow = 20.0, lockedHigh = 60.0;
+    const facet::ChartSeries series[] = {{.label = "a", .values = kRamp}};
+    session.SetUi([&] {
+        facet::ChartRangeBrush("Range", &low, &high, 0.0, 100.0, series, {.width = 400.0f});
+        session.Track("brush");
+        facet::ChartRangeBrush("Locked", &lockedLow, &lockedHigh, 0.0, 100.0, series, {.width = 400.0f, .readOnly = true});
+        session.Track("locked");
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("brush"));
+    session.KeyDown(ImGuiMod_Alt);
+    session.Wheel(session.ItemCenter("brush"), 1.0f);
+    session.Frame();
+    CHECK(high - low == doctest::Approx(40.0 * 0.8));
+    session.Wheel(session.ItemCenter("locked"), 1.0f);
+    session.KeyUp(ImGuiMod_Alt);
+    const ImRect locked = session.ItemRect("locked");
+    session.Drag({ImVec2(locked.Min.x + 4.0f, locked.GetCenter().y), ImVec2(locked.Max.x - 4.0f, locked.GetCenter().y)});
+    CHECK(lockedLow == 20.0);
+    CHECK(lockedHigh == 60.0);
+}
+
+// ---- Steady state --------------------------------------------------------------------------------------
+
+TEST_CASE("Charts that are shown allocate nothing per frame in the steady state")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float channels[] = {0.3f, 0.8f};
+    static const char* const categories[] = {"A", "B"};
+    static const facet::DonutSlice slices[] = {{"A", 2.0}, {"B", 1.0}};
+    static facet::LegendItem legend[] = {{"a"}, {"b"}};
+    double low = 1.0, high = 5.0;
+    const facet::ChartSeries series[] = {{.label = "a", .values = kRamp}, {.label = "b", .values = kFlat}};
+    session.SetUi([&] {
+        facet::Sparkline("spark", kRamp);
+        facet::Legend("legend", legend);
+        facet::LineChart("line", series, {.area = true, .stacked = true, .markers = true, .legend = true});
+        facet::BarChart("bars", series, categories, {.legend = true});
+        facet::DonutChart("donut", slices, {.legend = true});
+        facet::Gauge("gauge", 0.4, 0.0, 1.0);
+        facet::LevelMeter("meter", channels, 0.0, 1.0, {.segments = true});
+        facet::FrameTimeGraph("frames");
+        facet::ChartRangeBrush("brush", &low, &high, 0.0, 9.0, series);
+    });
+    session.Frames(10);
+    session.MouseMove(ImVec2(300.0f, 300.0f));  // hover something
+    session.Frames(30);
+
+    static int allocations = 0;
+    allocations = 0;
+    ImGuiMemAllocFunc oldAlloc = nullptr;
+    ImGuiMemFreeFunc oldFree = nullptr;
+    void* oldUser = nullptr;
+    ImGui::GetAllocatorFunctions(&oldAlloc, &oldFree, &oldUser);
+    ImGui::SetAllocatorFunctions(
+        [](size_t size, void*) -> void* {
+            ++allocations;
+            return std::malloc(size);
+        },
+        [](void* pointer, void*) { std::free(pointer); });
+#ifdef _DEBUG
+    static long crtAllocations = 0;
+    crtAllocations = 0;
+    const _CRT_ALLOC_HOOK previous =
+        _CrtSetAllocHook([](int type, void*, size_t, int, long, const unsigned char*, int) -> int {
+            if (type == _HOOK_ALLOC || type == _HOOK_REALLOC)
+                ++crtAllocations;
+            return 1;
+        });
+#endif
+    session.Frames(20);
+#ifdef _DEBUG
+    _CrtSetAllocHook(previous);
+    CHECK(crtAllocations == 0);
+#endif
+    ImGui::SetAllocatorFunctions(oldAlloc, oldFree, oldUser);
+    CHECK(allocations == 0);
 }
