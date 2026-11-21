@@ -173,6 +173,41 @@ PopupAnchor ListsFieldAnchor(const ImRect& frame);
 // the list is open), so navigation does not move the focus off the field.
 void ListsClaimListKeys(ImGuiID level, bool tab);
 
+// ---- Framed inline lists (ListBox, SelectableList, SearchableChecklist, TransferList) --------------
+
+struct ListsBoxDesc
+{
+    ControlSize size = ControlSize::Inherit;  // the row height
+    float width = 0.0f;                // units, the options' width; 0 fills
+    const NextItemData* next = nullptr;
+    int visibleRows = 0;               // 0 for list.inlineRows
+    bool readOnly = false;
+    const char* error = nullptr;
+    const char* helpText = nullptr;
+    const char* trailing = nullptr;    // text at the end of the label line (a count); null for none
+    float headerHeight = 0.0f;         // pixels between the label and the frame for content of the widget (a filter field)
+};
+
+struct ListsBoxLayout
+{
+    ImVec2 origin;        // top-left of the widget
+    float width = 0.0f;   // pixels
+    ImRect header;        // the room of headerHeight under the label, empty without one
+    ImRect frame;         // the outlined frame the rows scroll in
+    ImVec2 areaSize;      // for ListViewDesc::areaSize: the frame
+    bool disabled = false;
+};
+
+// Opens the group of a framed list at the cursor: the label above it (rule 6: a list is taller than
+// a label line), cut with an ellipsis, with `trailing` at the end of its line; then headerHeight of
+// room; then the frame of visibleRows rows (no fill, the boundary hairline, destructive with
+// `error`, fill[3] while disabled). The cursor is left at the frame's top-left corner for the list
+// view. Close with EndListsBox.
+ListsBoxLayout BeginListsBox(const char* label, const ListsBoxDesc& desc);
+// The message line under the frame (help text or error, recorded under `id`), then the group, so
+// item `id` covers the whole widget.
+void EndListsBox(ImGuiID id, const ListsBoxLayout& layout, const ListsBoxDesc& desc);
+
 // ---- The open list of Dropdown and MultiDropdown --------------------------------------------------
 
 struct ListsPopupDesc

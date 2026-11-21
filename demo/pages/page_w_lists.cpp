@@ -3,6 +3,7 @@
 // every ready widget by mouse and keyboard. A widget that is still planned draws its placeholder.
 // Sample entries are neutral ("Option 1") with built-in icons; generated entries are numbered.
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 
@@ -73,8 +74,12 @@ struct ListsState
     int narrow = 2;
     int writes = 0;
 
-    // The planned widgets below.
+    // ListBox and SelectableList
     int listBox = 1;
+    int listBoxLong = 41;
+    int activated = -1;
+
+    // The planned widgets below.
     int combo = 0;
     bool multi[5] = {true, false, true, false, false};
     bool checklist[kChecklistCount] = {};
@@ -163,9 +168,76 @@ void DropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
          s.searchable + 1, s.writes);
 }
 
-void ChooseOne(ListsState& s)
+// Two widgets side by side while the content is wide enough, one under the other otherwise.
+struct Columns
 {
-    SectionHeader("Custom rows and list boxes");
+    bool split = facet::AvailableWidthClass() != facet::WidthClass::Compact;
+    float width = split ? (ImGui::GetContentRegionAvail().x - facet::Px(facet::T().spacing.xl)) * 0.5f
+                        : ImGui::GetContentRegionAvail().x;
+    float start = ImGui::GetCursorPosX();
+    float top = ImGui::GetCursorPosY();
+    float bottom = 0.0f;
+    void Next()
+    {
+        bottom = ImGui::GetCursorPosY();
+        if (split)
+            ImGui::SetCursorPos(ImVec2(start + width + facet::Px(facet::T().spacing.xl), top));
+    }
+    void End()
+    {
+        if (split)
+            ImGui::SetCursorPosY(std::max(bottom, ImGui::GetCursorPosY()));
+        ImGui::Dummy(ImVec2(0.0f, 0.0f));
+    }
+};
+
+void ListBoxSection(facet::demo::PageCtx& ctx, ListsState& s)
+{
+    SectionHeader("List box");
+    Paragraph("A framed list with one chosen row on the selection pill. It is one Tab stop: the arrows, Page Up and "
+              "Down, Home and End move the choice, typing jumps to a matching label.");
+    Columns columns;
+    if (ctx.capture && ctx.captureState == kFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 2);
+    if (facet::ListBox("Icons and groups", &s.listBox, kOptions, {.visibleRows = 5, .width = columns.width / facet::Px(1.0f)}))
+        ++s.writes;
+    ctx.Probe("lists.listbox");
+    columns.Next();
+    if (facet::ListBox("Generated entries", &s.listBoxLong, kGeneratedCount, &NumberedOption, nullptr,
+                       {.visibleRows = 5, .width = columns.width / facet::Px(1.0f),
+                        .helpText = "10000 generated entries, only the visible rows are drawn"}))
+        ++s.writes;
+    ctx.Probe("lists.listbox.long");
+    columns.End();
+
+    Columns states;
+    facet::ListBox("Loading", &s.listBox, kOptions,
+                   {.visibleRows = 2, .state = facet::DataState::Loading, .width = states.width / facet::Px(1.0f)});
+    states.Next();
+    facet::ListBox("Failed", &s.listBox, kOptions,
+                   {.visibleRows = 2, .state = facet::DataState::Error, .width = states.width / facet::Px(1.0f),
+                    .error = "Choose an option"});
+    states.End();
+    Note("List box choice: %s, Option %d.", OptionName(s.listBox), s.listBoxLong + 1);
+}
+
+void SelectableListSection(facet::demo::PageCtx& ctx, ListsState& s)
+{
+    SectionHeader("Selectable list");
+    Paragraph("A click selects, Ctrl+click toggles, Shift+click and Shift with the arrows extend, Ctrl+A selects all "
+              "enabled rows, Escape clears, and a drag from empty space selects the rows it covers. Double click or "
+              "Enter activates a row.");
+    if (facet::SelectableList("Rows", &s.selection, kOptions, {.visibleRows = 5, .width = 320.0f}))
+        ++s.writes;
+    ctx.Probe("lists.selectable");
+    if (const int row = facet::SelectableListActivatedRow(); row >= 0)
+        s.activated = row;
+    Note("Selected rows: %d. Last activated: %s.", s.selection.Size, OptionName(s.activated));
+}
+
+void ComboSection(ListsState& s)
+{
+    SectionHeader("Combo with custom rows");
     LabeledRow("Custom rows");
     if (facet::BeginCombo("##combo", kLabels[s.combo]))
     {
@@ -174,8 +246,6 @@ void ChooseOne(ListsState& s)
                 s.combo = i;
         facet::EndCombo();
     }
-    LabeledRow("List box");
-    facet::ListBox("##listbox", &s.listBox, kLabels, {.visibleRows = 4});
 }
 
 void ChooseSeveral(ListsState& s)
@@ -193,8 +263,7 @@ void ChooseSeveral(ListsState& s)
 
 void SelectAndReorder(ListsState& s)
 {
-    SectionHeader("Select and reorder");
-    facet::SelectableList("Selectable list", &s.selection, kOptions, {.visibleRows = 4});
+    SectionHeader("Reorder");
     facet::ReorderMove move;
     if (facet::ReorderableList("reorder", &move, s.reorder))
         facet::ApplyReorderMove(s.reorder, move);
@@ -227,7 +296,9 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     facet::demo::PlannedFamilyNote("lists");
     ListsState& s = State();
     DropdownSection(ctx, s);
-    ChooseOne(s);
+    ListBoxSection(ctx, s);
+    SelectableListSection(ctx, s);
+    ComboSection(s);
     ChooseSeveral(s);
     SelectAndReorder(s);
     Hierarchies(s);
@@ -287,6 +358,48 @@ FACET_DEMO_SELFTEST("lists")
 
     // Disabled: no list, no choice.
     test.Click("lists.dropdown.disabled");
-    test.KeyPress(ImGuiKey_Enter);
     test.ExpectNear("a disabled dropdown does not change", [] { return State().states[0]; }, 1.0, 0.0);
+
+    // ListBox: rows counted from the bottom of the frame (5 rows of 32 units, 4 units of padding).
+    // Rows: Group 1, Option 1, Option 2, Group 2, Option 3.
+    const auto boxRow = [](const char* probe, int row) {
+        return T::Item(probe, 0.5f, 1.0f).Offset(0.0f, -(4.0f + 32.0f * (5.0f - static_cast<float>(row) - 0.5f)));
+    };
+    test.MouseMove(boxRow("lists.listbox", 1));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click chooses Option 1 in the list box", [] { return State().listBox; }, 0.0, 0.0);
+    test.MouseMove(boxRow("lists.listbox", 0));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click on a group header chooses nothing", [] { return State().listBox; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down twice passes the group header to Option 3", [] { return State().listBox; }, 2.0, 0.0);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End skips the disabled last but one row to Option 5", [] { return State().listBox; }, 4.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectNear("Tab leaves the list box without a change", [] { return State().listBox; }, 4.0, 0.0);
+
+    // SelectableList: no group headers, one row per item.
+    test.Do([] { State().selection.Clear(); });
+    test.MouseMove(boxRow("lists.selectable", 0));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a click selects one row", [] { return State().selection.Size; }, 1.0, 0.0);
+    test.KeyDown(ImGuiMod_Shift);
+    test.MouseMove(boxRow("lists.selectable", 4));
+    test.MouseDown();
+    test.MouseUp();
+    test.KeyUp(ImGuiMod_Shift);
+    test.ExpectNear("Shift+click selects the range without the disabled row", [] { return State().selection.Size; },
+                    4.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectNear("Escape clears the selection", [] { return State().selection.Size; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+A selects every enabled row", [] { return State().selection.Size; }, 4.0, 0.0);
+    test.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Shift);
+    test.ExpectNear("Shift+Up shrinks the range to three rows", [] { return State().selection.Size; }, 3.0, 0.0);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("Enter activates the focused row", [] { return State().activated; }, 2.0, 0.0);
 }

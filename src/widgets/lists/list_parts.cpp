@@ -591,6 +591,63 @@ ListsFieldResult ListsField(ImGuiID id, const char* label, const ListsFieldDesc&
     return result;
 }
 
+// ---- Framed inline lists ------------------------------------------------------------------------
+
+ListsBoxLayout BeginListsBox(const char* label, const ListsBoxDesc& desc)
+{
+    ListsBoxLayout layout;
+    ImGuiWindow* window = GImGui->CurrentWindow;
+    const Theme& theme = T();
+    static const NextItemData kNoNext;
+    const NextItemData& next = desc.next != nullptr ? *desc.next : kNoNext;
+    layout.width = ResolveItemWidth(desc.width, next, kFill);
+    layout.disabled = (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
+    const ControlSize size = ResolveControlSize(desc.size);
+
+    ImGui::BeginGroup();
+    layout.origin = window->DC.CursorPos;
+    const AboveLabel above = MeasureAboveLabel(label, size);
+    if (above.height > 0.0f || desc.trailing != nullptr)
+    {
+        // A trailing text without a label still gets its line.
+        const float lineHeight = above.height > 0.0f ? above.height : MeasureAboveLabel("x", size).height;
+        DrawAboveLabel(window->DrawList, above, layout.origin, layout.width, size, layout.disabled, desc.trailing);
+        layout.header.Min = ImVec2(layout.origin.x, layout.origin.y + lineHeight);
+    }
+    else
+    {
+        layout.header.Min = layout.origin;
+    }
+    layout.header.Max = ImVec2(layout.origin.x + layout.width, layout.header.Min.y + desc.headerHeight);
+    const int rows = desc.visibleRows > 0 ? desc.visibleRows : theme.list.inlineRows;
+    const float height = ListRowHeight(size) * static_cast<float>(std::max(rows, 1)) + FocusRingOutset() * 2.0f;
+    const float top = layout.header.Max.y;
+    layout.frame = ImRect(layout.origin.x, top, layout.origin.x + layout.width, top + height);
+    layout.areaSize = layout.frame.GetSize();
+    if (desc.headerHeight <= 0.0f)
+        layout.header = ImRect();
+
+    FieldFrameLook look;
+    look.disabled = layout.disabled;
+    look.readOnly = !layout.disabled;  // no fill: the rows carry the hover and selection fills
+    look.error = desc.error != nullptr;
+    DrawFieldFrame(window->DrawList, layout.frame, look);
+    window->DC.CursorPos = layout.frame.Min;
+    return layout;
+}
+
+void EndListsBox(ImGuiID id, const ListsBoxLayout& layout, const ListsBoxDesc& desc)
+{
+    ImGuiWindow* window = GImGui->CurrentWindow;
+    window->DC.CursorPos = ImVec2(layout.frame.Min.x, layout.frame.Max.y);
+    ImGui::Dummy(ImVec2(layout.width, 0.0f));
+    const ControlMessage message = PickControlMessage(desc.error, desc.helpText);
+    DrawControlMessage(message, ImVec2(layout.frame.Min.x, layout.frame.Max.y), layout.width, layout.disabled, id,
+                       layout.frame);
+    ImGui::EndGroup();
+    FinishWidgetGroup(id);
+}
+
 // ---- The open list ----------------------------------------------------------------------------
 
 ListsPopupResult ListsPopupList(const ListsPopupDesc& desc)

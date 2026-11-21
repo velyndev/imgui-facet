@@ -66,13 +66,6 @@ void CallListStubs(Values& v)
         facet::EndCombo();
     });
     CHECK_BALANCED(CHECK_FALSE(facet::ComboItem("Option 1", true)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List", &v.index, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List labels", &v.index, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List getter", &v.index, 3, &Getter, nullptr)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable", &selection, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable labels", &selection, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable getter", &selection, 3, &Getter, nullptr)));
-    CHECK_BALANCED(CHECK(facet::SelectableListActivatedRow() == -1));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
     CHECK_BALANCED({

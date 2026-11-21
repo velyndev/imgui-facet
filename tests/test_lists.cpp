@@ -472,3 +472,280 @@ TEST_CASE("A dropdown outside a frame or with a null index gives the neutral res
     CHECK_FALSE(popup.open);
     CHECK(index == 2);
 }
+
+// ---- ListBox and SelectableList ----------------------------------------------------------------
+
+namespace
+{
+
+// The center of row `row` of a framed list `rect` (the tracked widget, without a message line)
+// showing `visibleRows` rows.
+ImVec2 BoxRowCenter(const ImRect& rect, int visibleRows, int row, facet::ControlSize size = facet::ControlSize::Regular)
+{
+    const float height = fi::ListRowHeight(size);
+    const float top = rect.Max.y - fi::FocusRingOutset() - height * static_cast<float>(visibleRows);
+    return ImVec2(rect.GetCenter().x, top + height * (static_cast<float>(row) + 0.5f));
+}
+
+} // namespace
+
+TEST_CASE("A list box chooses the clicked row, skips disabled rows and group headers")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 0;
+    int grouped = -1;
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::ListBox("Fruit", &index, kFruit, {.visibleRows = 5}))
+            ++writes;
+        session.Track("fruit");
+        facet::ListBox("Grouped", &grouped, kGrouped, {.visibleRows = 5});
+        session.Track("grouped");
+    });
+    session.Frame();
+    session.Click(BoxRowCenter(session.ItemRect("fruit"), 5, 3));
+    CHECK(index == 3);
+    CHECK(writes == 1);
+    session.Click(BoxRowCenter(session.ItemRect("fruit"), 5, 2));
+    CHECK(index == 3);
+    // Rows: header 1, Option 1, Option 2, header 2, Option 3.
+    session.Click(BoxRowCenter(session.ItemRect("grouped"), 5, 0));
+    CHECK(grouped == -1);
+    session.Click(BoxRowCenter(session.ItemRect("grouped"), 5, 4));
+    CHECK(grouped == 2);
+    // The arrows skip the header between the groups.
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(grouped == 1);
+}
+
+TEST_CASE("A list box is one Tab stop whose arrows, Home, End and typing move the choice")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const char* const labels[] = {"Alpha", "Bravo", "Charlie", "Delta", "Echo"};
+    int index = 1;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::ListBox("Names", &index, labels, {.visibleRows = 3}))
+            ++writes;
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(index == 4);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(index == 0);
+    session.Type("d");
+    session.Frame();
+    CHECK(index == 3);
+    CHECK(writes == 4);
+    // One Tab leaves the list.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("A read-only list box moves the focus but never writes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 1;
+    session.SetUi([&] {
+        facet::ListBox("Fruit", &index, kFruit, {.visibleRows = 5, .readOnly = true});
+        session.Track("fruit");
+    });
+    session.Frame();
+    session.Click(BoxRowCenter(session.ItemRect("fruit"), 5, 3));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(index == 1);
+}
+
+TEST_CASE("A list box keeps its height and shows the loading, error and empty states")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 0;
+    facet::DataState state = facet::DataState::Ready;
+    std::span<const facet::ChoiceItem> items = kFruit;
+    float readyHeight = 0.0f;
+    bool result = false;
+    session.SetUi([&] {
+        result = facet::ListBox("Remote", &index, items, {.visibleRows = 3, .state = state});
+        session.Track("remote");
+    });
+    session.Frame();
+    readyHeight = session.ItemRect("remote").GetHeight();
+    for (const facet::DataState s : {facet::DataState::Loading, facet::DataState::Error})
+    {
+        state = s;
+        session.Frame();
+        CHECK(session.ItemRect("remote").GetHeight() == doctest::Approx(readyHeight));
+        session.Click(BoxRowCenter(session.ItemRect("remote"), 3, 1));
+        CHECK(index == 0);
+        CHECK_FALSE(result);
+    }
+    state = facet::DataState::Ready;
+    items = {};
+    session.Frame();
+    CHECK(session.ItemRect("remote").GetHeight() == doctest::Approx(readyHeight));
+}
+
+TEST_CASE("A list box over a long getter list asks only for the rows shown")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 5000;
+    int calls = 0;
+    session.SetUi([&] {
+        facet::ListBox("Long", &index, 100000, &CountedOption, &calls, {.visibleRows = 6});
+        session.Track("long");
+    });
+    session.Frames(2);
+    calls = 0;
+    session.Frame();
+    CHECK(calls < 200);
+}
+
+TEST_CASE("A selectable list selects by click, Ctrl and Shift click, leaving disabled rows out")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    int changes = 0;
+    session.SetUi([&] {
+        if (facet::SelectableList("Fruit", &selection, kFruit, {.visibleRows = 5}))
+            ++changes;
+        session.Track("fruit");
+    });
+    session.Frame();
+    const auto row = [&](int i) { return BoxRowCenter(session.ItemRect("fruit"), 5, i); };
+    session.Click(row(0));
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(0));
+    // Shift+click: the range 0 to 4 without the disabled Cherry.
+    session.KeyDown(ImGuiMod_Shift);
+    session.Click(row(4));
+    session.KeyUp(ImGuiMod_Shift);
+    CHECK(selection.Size == 4);
+    CHECK_FALSE(selection.Contains(2));
+    // Ctrl+click toggles one row.
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Click(row(1));
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(selection.Size == 3);
+    CHECK_FALSE(selection.Contains(1));
+    // A plain click selects only that row.
+    session.Click(row(3));
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(3));
+    CHECK(changes >= 4);
+}
+
+TEST_CASE("A selectable list extends with Shift and arrows, selects all with Ctrl+A and clears with Escape")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    session.SetUi([&] {
+        facet::SelectableList("Fruit", &selection, kFruit, {.visibleRows = 5});
+        session.Track("fruit");
+    });
+    session.Frame();
+    session.Click(BoxRowCenter(session.ItemRect("fruit"), 5, 0));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    CHECK(selection.Size == 2);
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    CHECK(selection.Size == 3);  // Cherry is skipped by the arrows and left out
+    CHECK(selection.Contains(3));
+    CHECK_FALSE(selection.Contains(2));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    CHECK(selection.Size == 4);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(selection.Size == 0);
+}
+
+TEST_CASE("A selectable list reports the row activated by double click or Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    int activated = -1;
+    session.SetUi([&] {
+        facet::SelectableList("Fruit", &selection, kFruit, {.visibleRows = 5});
+        session.Track("fruit");
+        if (facet::SelectableListActivatedRow() >= 0)
+            activated = facet::SelectableListActivatedRow();
+    });
+    session.Frame();
+    session.DoubleClick(BoxRowCenter(session.ItemRect("fruit"), 5, 1));
+    CHECK(activated == 1);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activated == 4);
+    CHECK(facet::SelectableListActivatedRow() == -1);  // outside the frame of the call
+}
+
+TEST_CASE("A read-only selectable list or one without storage changes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    selection.SetItemSelected(1, true);
+    bool changed = false;
+    session.SetUi([&] {
+        changed |= facet::SelectableList("Read only", &selection, kFruit, {.visibleRows = 5, .readOnly = true});
+        session.Track("readonly");
+        changed |= facet::SelectableList("No storage", nullptr, kFruit, {.visibleRows = 5});
+        session.Track("none");
+    });
+    session.Frame();
+    session.Click(BoxRowCenter(session.ItemRect("readonly"), 5, 3));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Click(BoxRowCenter(session.ItemRect("none"), 5, 3));
+    CHECK_FALSE(changed);
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(1));
+}
+
+TEST_CASE("Tab and Shift+Tab enter and leave a selectable list without changing the selection")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    selection.SetItemSelected(3, true);
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::SelectableList("Fruit", &selection, kFruit, {.visibleRows = 5});
+        session.Track("fruit");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    const ImGuiID row = ImGui::GetFocusID();
+    CHECK(row != session.ItemId("before"));
+    CHECK(row != session.ItemId("after"));
+    CHECK(selection.Size == 1);
+    CHECK(selection.Contains(3));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(selection.Size == 1);
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(ImGui::GetFocusID() == row);
+    CHECK(selection.Size == 1);
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(ImGui::GetFocusID() == session.ItemId("before"));
+    CHECK(selection.Size == 1);
+}

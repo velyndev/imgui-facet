@@ -101,8 +101,6 @@ The field of a combo whose rows the caller submits, for rows a `ChoiceItem` cann
 
 ### ListBox
 
-Status: planned
-
 ```cpp
 bool ListBox(const char* label, int* index, std::span<const ChoiceItem> items, const ListBoxOptions& options = {});
 bool ListBox(const char* label, int* index, std::span<const char* const> items, const ListBoxOptions& options = {});
@@ -110,11 +108,33 @@ bool ListBox(const char* label, int* index, int itemCount, ChoiceGetter getter, 
              const ListBoxOptions& options = {});
 ```
 
-A framed, scrolling list with one chosen row, typeahead and empty, loading and error states.
+A framed, scrolling list with one chosen row, which sits on the sliding selection pill and has a
+semibold label. The visible label part is drawn above the frame (a list is taller than a label line),
+cut with an ellipsis when the width is short. The frame has no fill and the boundary hairline, so
+the row fills read on any surface; it is `visibleRows` rows tall (`list.inlineRows` by default) at
+the row height of `size`, also with fewer items. Default width: the available width.
+
+- **Rows:** the icon, the label (cut with an ellipsis, shown in full as a tooltip on hover and
+  keyboard focus) and the detail at the end in labelSecondary. `ChoiceItem::group` adds a header row
+  before each run of equal group text; headers and disabled items cannot be chosen.
+- **Keys:** the list is one Tab stop (the focused row, else the chosen row, else the first). The
+  arrows move the choice past headers and disabled items and write it at once, Page Up and Down move
+  by a page, Home and End go to the first and last enabled item, and typing jumps to the next item
+  whose label starts with the typed text. A click chooses a row.
+- **Long lists:** only the visible rows are submitted. The span overloads follow the caller's items
+  every frame; the getter overload reads every item only when its count changes (for the group
+  headers), and otherwise only the rows shown.
+- **States:** disabled (`ImGui::BeginDisabled`: rows not focusable, nothing written), read-only
+  (the focus moves, the choice is never written), `error` (destructive frame and message, recorded
+  for `ValidationSummary`), `helpText`. While `state` is Loading or Error, or with no items, the
+  frame keeps its height and shows the loading row, `errorText` or `emptyText`.
+- **Result:** true on the frame `*index` was written; `ImGui::IsItemEdited` is true then.
+
+State kept under the id: the focused row, the typeahead text, the scroll position and the rows.
+
+Status: ready.
 
 ### SelectableList
-
-Status: planned
 
 ```cpp
 bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, std::span<const ChoiceItem> items,
@@ -126,7 +146,26 @@ bool SelectableList(const char* label, ImGuiSelectionBasicStorage* selection, in
 int SelectableListActivatedRow();
 ```
 
-A scrolling list with Ctrl, Shift, box and Ctrl+A selection through `ImGui::BeginMultiSelect`.
+A framed, scrolling list with multiple selection through `ImGui::BeginMultiSelect`, with the label,
+frame, rows, width, long-list behaviour, states and message line of ListBox. Each item is one row
+(no group headers), so the storage keys row `i` by `AdapterIndexToStorageId(i)`.
+
+- **Pointer:** a click selects one row, Ctrl+click toggles a row, Shift+click selects the range from
+  the last clicked row, and a drag that starts in empty space selects the rows it covers
+  (`boxSelect`). A click in empty space clears the selection.
+- **Keys:** one Tab stop; the arrows move the focus and select the row, Shift with the arrows,
+  Home or End extends the range, Ctrl with the arrows moves the focus alone, Space toggles, Ctrl+A
+  selects every enabled row, Escape clears. Selected rows show accentSubtle while the list has the
+  focus and fill[1] otherwise, with a semibold label.
+- **Disabled rows** are shown in labelTertiary, are skipped by the arrows and left out of ranges,
+  select-all and box selection.
+- **Activation:** a double click or Enter on a row; `SelectableListActivatedRow()` returns that row
+  after the call in the same frame, -1 otherwise.
+- **Read-only:** the selection shows and the focus moves, but nothing is written; a null `selection`
+  shows the rows without selection.
+- **Result:** true on the frame the selection changed.
+
+Status: ready.
 
 ### ReorderableList
 
