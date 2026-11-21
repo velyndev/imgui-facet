@@ -279,7 +279,9 @@ struct DurationGeometry
     float end = 0.0f;
 };
 
-DurationGeometry DurationMeasure(const DurationParts& parts, const DurationLayout& layout, float left)
+// gap pixels stand on both sides of every separator, so the segments read apart and the
+// highlight of one never covers a separator.
+DurationGeometry DurationMeasure(const DurationParts& parts, const DurationLayout& layout, float left, float gap)
 {
     DurationGeometry geometry;
     float x = left;
@@ -291,7 +293,7 @@ DurationGeometry DurationMeasure(const DurationParts& parts, const DurationLayou
     for (int i = 0; i < layout.count; ++i)
     {
         if (i > 0)
-            x += ImGui::CalcTextSize(layout.units[i] == 3 ? "." : ":").x;
+            x += ImGui::CalcTextSize(layout.units[i] == 3 ? "." : ":").x + gap * 2.0f;
         geometry.x[i] = x;
         geometry.width[i] = ImGui::CalcTextSize(parts.text[i]).x;
         x += geometry.width[i];
@@ -388,7 +390,8 @@ bool DurationInput(const char* label, double* seconds, const DurationInputOption
     const bool live = !item.disabled && item.forced == ForcedItemState::None;
     internal::ControlTextScope text(m);
     const DurationParts parts = DurationSplit(current, layout);
-    const DurationGeometry geometry = DurationMeasure(parts, layout, frame.Min.x + m.fieldPadding);
+    const float separatorGap = std::round(Px(t.spacing.xs) * 0.5f);
+    const DurationGeometry geometry = DurationMeasure(parts, layout, frame.Min.x + m.fieldPadding, separatorGap);
 
     bool written = false;
     // A press picks the segment under the pointer.
@@ -396,7 +399,7 @@ bool DurationInput(const char* label, double* seconds, const DurationInputOption
     {
         const float mouse = g.IO.MousePos.x;
         for (int i = 0; i < layout.count; ++i)
-            if (mouse >= geometry.x[i] - m.fieldPadding * 0.5f)
+            if (mouse >= geometry.x[i] - separatorGap)
                 state.segment = i;
         state.dragStart = current;
     }
@@ -489,7 +492,7 @@ bool DurationInput(const char* label, double* seconds, const DurationInputOption
                                   .readOnly = readOnly,
                                   .error = error != nullptr});
         const DurationParts shown = DurationSplit(current, layout);
-        const DurationGeometry at = DurationMeasure(shown, layout, frame.Min.x + m.fieldPadding);
+        const DurationGeometry at = DurationMeasure(shown, layout, frame.Min.x + m.fieldPadding, separatorGap);
         const float textY = CenteredTextY(frame.Min.y, frame.GetHeight());
         ImGui::PushClipRect(ImVec2(frame.Min.x + m.fieldPadding * 0.5f, frame.Min.y),
                             ImVec2(frame.Max.x - m.fieldPadding * 0.5f, frame.Max.y), true);
@@ -505,7 +508,7 @@ bool DurationInput(const char* label, double* seconds, const DurationInputOption
                                                         Has(item.forced, ForcedItemState::Dragging));
             if (showSegment)
             {
-                const float pad = std::round(Px(t.spacing.xs) * 0.5f);
+                const float pad = separatorGap;
                 const ImVec2 min(at.x[state.segment] - pad, frame.Min.y + Px(t.spacing.xs));
                 const ImVec2 max(at.x[state.segment] + at.width[state.segment] + pad, frame.Max.y - Px(t.spacing.xs));
                 FillRect(drawList, min, max, ToU32(c.accentSubtle), Px(t.radii.element));
@@ -519,7 +522,7 @@ bool DurationInput(const char* label, double* seconds, const DurationInputOption
                 if (i > 0)
                 {
                     const char* mark = layout.units[i] == 3 ? "." : ":";
-                    drawList->AddText(ImVec2(at.x[i] - ImGui::CalcTextSize(mark).x, textY), marks, mark);
+                    drawList->AddText(ImVec2(at.x[i] - separatorGap - ImGui::CalcTextSize(mark).x, textY), marks, mark);
                 }
                 drawList->AddText(ImVec2(at.x[i], textY), digits, shown.text[i]);
             }
