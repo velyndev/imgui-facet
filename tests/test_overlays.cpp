@@ -1448,3 +1448,43 @@ TEST_CASE("A resizable drawer's inner edge drags its width")
     CHECK(rect.GetWidth() == doctest::Approx(before + 60.0f).epsilon(0.02));
     CHECK(rect.Min.x == doctest::Approx(0.0f));
 }
+
+// ---- Loading overlay -----------------------------------------------------------------------------
+
+TEST_CASE("A loading overlay keeps the region's size and blocks clicks and Tab while it loads")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool loading = true;
+    int presses = 0;
+    ImRect region;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginLoadingOverlay("region", {.loading = loading});
+        if (facet::Button("Inside"))
+            ++presses;
+        session.Track("inside");
+        ImGui::TextUnformatted("More content in the region");
+        facet::EndLoadingOverlay();
+        region = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Seconds(0.3f);
+    const ImRect loadingRegion = region;
+    session.Click(session.ItemCenter("inside"));
+    CHECK(presses == 0);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    loading = false;
+    session.Seconds(0.3f);
+    CHECK(region.GetWidth() == doctest::Approx(loadingRegion.GetWidth()));
+    CHECK(region.GetHeight() == doctest::Approx(loadingRegion.GetHeight()));
+    session.Click(session.ItemCenter("inside"));
+    CHECK(presses == 1);
+    CHECK(fi::OpenScopeCount() == 0);
+}

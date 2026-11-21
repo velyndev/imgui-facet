@@ -245,15 +245,22 @@ Status: ready.
 
 ### BeginLoadingOverlay
 
-Status: planned
-
 ```cpp
 void BeginLoadingOverlay(const char* id, const LoadingOverlayOptions& options = {});
 void EndLoadingOverlay();
 class LoadingOverlayScope;
 ```
 
-Dims and blocks a region while it loads, with a spinner or a progress bar and a message.
+Wraps a region: its content is always laid out, in one group, so the region keeps its size whether it
+loads or not, and `EndLoadingOverlay` is always called. While `loading` is set, the content runs
+inside `ImGui::BeginDisabled` (Facet widgets show their disabled look, nothing takes a click and Tab
+passes over it), and over the region lie the scrim and a small card with the spinner, or a bar while
+`progress` is 0 to 1, and the message (`Strings::loading` by default, cut with an ellipsis), so the
+message keeps AA contrast over any content. The scrim and the card fade over
+`motion.durationStandard`; the blocking starts and ends at once. After the call the region is the last
+item.
+
+Status: ready.
 
 ### CommandPalette
 

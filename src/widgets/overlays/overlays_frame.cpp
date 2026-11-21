@@ -21,6 +21,7 @@ void OverlaysEndFrame()
     OverlayPopoverResetStack();
     OverlayModalResetStack();
     OverlayDrawerResetStack();
+    OverlayLoadingResetStack();
     OverlayToastEndFrame();
 }
 
