@@ -715,6 +715,31 @@ TEST_CASE("A spinner turns, and stands still in its resting shape while motion i
     CHECK(std::memcmp(first.data(), last.data(), first.size() * sizeof(ImVec2)) == 0);
 }
 
+// ==== Skeleton circle ====
+
+TEST_CASE("A skeleton with circular corners is a true circle")
+{
+    // Continuous corners would square a circle off: its corner vertices would lie outside the circle.
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float farthest = 0.0f;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        const ImVec2 a(100.0f, 100.0f);
+        const ImVec2 b(164.0f, 164.0f);
+        facet::internal::DrawSkeleton(drawList, a, b, 32.0f, true);
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        {
+            const ImVec2 v = drawList->VtxBuffer[i].pos;
+            farthest = std::fmax(farthest, std::sqrt((v.x - 132.0f) * (v.x - 132.0f) + (v.y - 132.0f) * (v.y - 132.0f)));
+        }
+    });
+    session.Frame();
+    CHECK(farthest > 30.0f);
+    CHECK(farthest <= 32.0f + 1.5f);  // the anti-aliasing fringe
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

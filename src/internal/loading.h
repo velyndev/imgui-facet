@@ -27,6 +27,9 @@ float SpinnerOpacity();
 // A placeholder block: fill[2] in the shape of FillRect (radius in pixels), with a brighter
 // fill[3] band sweeping from left to right. The band is clipped to the shape.
 void DrawSkeleton(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius);
+// The same with circular corners whatever the radius (FillRoundRect), for circles (a square with
+// radius half its side) and capsules, which the continuous corners of FillRect would square off.
+void DrawSkeleton(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, bool circularCorners);
 
 // A spinner: three quarters of a ring with round caps, `radius` to the middle of the stroke,
 // turning clockwise. A faint full ring in fill[1] marks the track.

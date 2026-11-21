@@ -90,16 +90,25 @@ float SpinnerOpacity()
 
 void DrawSkeleton(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius)
 {
+    DrawSkeleton(drawList, pMin, pMax, radius, false);
+}
+
+void DrawSkeleton(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, float radius, bool circularCorners)
+{
     if (drawList == nullptr || pMax.x <= pMin.x || pMax.y <= pMin.y)
         return;
     const Colors& c = T().colors;
-    FillRect(drawList, pMin, pMax, ToU32(c.fill[2]), radius);
+    if (circularCorners)
+        FillRoundRect(drawList, pMin, pMax, ToU32(c.fill[2]), radius);
+    else
+        FillRect(drawList, pMin, pMax, ToU32(c.fill[2]), radius);
 
     const float phase = ShimmerPhase();
     if (phase < 0.0f)
         return;
     ImVec2 outline[kMaxOutlinePoints];
-    const int outlineCount = RoundRectOutline(pMin, pMax, radius, 0, UsesContinuousCorners(radius), outline);
+    const int outlineCount =
+        RoundRectOutline(pMin, pMax, radius, 0, !circularCorners && UsesContinuousCorners(radius), outline);
     // The band enters fully from the left and leaves fully on the right.
     const float width = pMax.x - pMin.x;
     const float band = width * kBandFraction;
