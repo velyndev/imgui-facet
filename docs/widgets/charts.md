@@ -247,7 +247,31 @@ Status: ready.
 bool ChartRangeBrush(const char* label, double* low, double* high, double min, double max, std::span<const ChartSeries> overview, const ChartRangeBrushOptions& options = {});
 ```
 
-Overview with a two-handle window that selects the x range of a larger chart. Status: planned.
+An overview of the visible `overview` series (lines without axes, over `min` to `max` on x) with a
+window from `*low` to `*high` over it: a wash outside the window, the accent wash inside, and the
+edges as lines in the focus ring color with a grip in the middle. The selected range then drives
+the x axis of a larger chart (see the usage below).
+
+- **Edges** are the two handles of the multi-handle block, as on RangeSlider: each its own item,
+  Tab stop and focus ring around its grip. Dragging moves an edge; the window body drags both; a
+  press outside the window moves the nearer edge there. The edges never cross and keep `minGap`
+  (clamped to the range). With keyboard focus on an edge, the arrows step it by a hundredth of the
+  range (Shift a thousandth, Ctrl a tenth), Home and End move it to the ends. Escape during a drag
+  or a held key restores both edges. The item queries describe the whole brush; while an edge is
+  active they report that edge, so `IsItemDeactivatedAfterEdit` and `facet::IsItemEditCommitted`
+  report one edit per drag and per key press.
+- **Wheel:** with `wheelZoom`, the wheel over the brush zooms the window around the pointer (one
+  notch toward the user to 80 % of its width) while an edge has keyboard focus or Alt is held;
+  otherwise the wheel scrolls the page.
+- **Read-only** (`readOnly`, a pushed `ImGuiItemFlags_ReadOnly`, a null pointer or `min == max`):
+  the window is shown and the edges can be focused but nothing is written. Disabled: the disabled
+  colors, no Tab stops.
+- **Label:** not drawn beside the brush; it is the tooltip of the overview on hover and on keyboard
+  focus of an edge.
+- **Returns** true on the frame `*low` or `*high` was written.
+- **Size:** `width` 0 fills, `height` 0 is twice the control height.
+
+Status: ready.
 
 ## Usage
 
