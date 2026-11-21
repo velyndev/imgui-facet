@@ -22,8 +22,6 @@ after true. Every pair has a scope class with the same rule.
 
 ### BeginStack
 
-Status: planned
-
 ```cpp
 void BeginStack(const char* id, const StackOptions& options = {});
 void StackSpacer();
@@ -31,7 +29,34 @@ void EndStack();
 class StackScope;
 ```
 
-Items in a row or a column with a gap token, cross-axis alignment and flexible spacers.
+Items in a column or a row with a gap token between them. Dear ImGui lays the items out itself, so
+any item works inside, stock or Facet:
+
+- Vertical (the default): the gap is the vertical item spacing while the items are laid out. The
+  stack is `width` units wide (0 fills the available width, rule 6 otherwise) and narrows the
+  window's work rect to that width, so items that fill the available width stop at its edge.
+- Horizontal: the window switches to Dear ImGui's horizontal layout type (as a menu bar does), so
+  each item follows the previous one on the line with the gap between them; the vertical layout
+  comes back at `EndStack`. `width` 0 fits the items.
+- `gap`: `Gap::None` 0, `Tight` `spacing.xs`, `Item` `spacing.sm` (the window's own item spacing),
+  `Loose` `spacing.lg`, `Section` `spacing.xxl`. The gap is also the item spacing of stock content
+  nested inside an item of the stack, until a nested stack sets its own.
+- `StackSpacer()` splits the items into runs. With a set length on the main axis (`width` of a
+  horizontal stack, `height` of a vertical one) every spacer takes an equal share of the free space,
+  so the items after the last spacer end at the stack's end; with no set length a spacer only
+  separates runs. Up to 16 runs are measured; further spacers join their items to the last run.
+- `align` places each run on the cross axis, from its size in the last frame: Start, Center or End
+  of the stack's cross size (the width of a vertical stack; a set `height`, else the tallest run, of
+  a horizontal one). The items inside one run share the run's start; to center controls of different
+  heights on one line, put a spacer between them (with no set width it takes no room). In a vertical
+  stack, `Stretch` also pushes the stack width as the item width, so fields and buttons fill it; in
+  a horizontal stack it is Start.
+- The run sizes of the last frame are kept under the id, so the first frame places runs at the start.
+- The stack is one group, the last item after `EndStack`, as large as its set lengths or its items.
+  Stacks nest in each other and in every other container. `StackSpacer` outside a stack, or inside a
+  container nested in one, is reported as a usage error and ignored.
+
+Status: ready.
 
 ### BeginGrid
 

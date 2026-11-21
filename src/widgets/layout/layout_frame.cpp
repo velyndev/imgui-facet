@@ -13,6 +13,7 @@ namespace
 void LayoutEndFrame()
 {
     ClearSettingsRowStack();
+    ClearStackStack();
 }
 
 } // namespace

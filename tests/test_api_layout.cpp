@@ -41,12 +41,6 @@ void CallLayoutStubs(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
     CHECK_BALANCED({
-        facet::BeginStack("Stack");
-        ImGui::TextUnformatted("child");
-        facet::StackSpacer();
-        facet::EndStack();
-    });
-    CHECK_BALANCED({
         facet::BeginGrid("Grid");
         facet::GridNext();
         ImGui::TextUnformatted("cell");

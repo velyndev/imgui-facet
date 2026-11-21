@@ -288,3 +288,130 @@ TEST_CASE("Settings rows leave every stack balanced, also nested, disabled and o
     CHECK(fi::OpenScopeCount() == 0);
     CHECK_FALSE(facet::SettingsRowResetPressed());
 }
+
+// ---- Stack --------------------------------------------------------------------------------------
+
+TEST_CASE("A vertical stack puts its gap between the items and fills its width with Stretch")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const float width = 200.0f;
+    session.SetUi([&] {
+        facet::BeginStack("column", {.gap = facet::Gap::Loose, .align = facet::LayoutAlign::Stretch, .width = width});
+        ImGui::Button("first");
+        session.Track("first");
+        facet::Button("second", {.width = facet::kFill});
+        session.Track("second");
+        ImGui::Button("third", ImVec2(-FLT_MIN, 0.0f));
+        session.Track("third");
+        facet::EndStack();
+        session.Track("stack");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    const float gap = facet::Px(facet::T().spacing.lg);
+    CHECK(session.ItemRect("second").Min.y - session.ItemRect("first").Max.y == doctest::Approx(gap));
+    CHECK(session.ItemRect("third").Min.y - session.ItemRect("second").Max.y == doctest::Approx(gap));
+    // Fields and fill-width items take the stack width, not the window's.
+    CHECK(session.ItemRect("second").GetWidth() == doctest::Approx(facet::Px(width)));
+    CHECK(session.ItemRect("third").GetWidth() == doctest::Approx(facet::Px(width)));
+    // The stack is the last item and covers its items; the window's spacing follows it.
+    const ImRect stack = session.ItemRect("stack");
+    CHECK(stack.GetWidth() == doctest::Approx(facet::Px(width)));
+    CHECK(stack.Max.y == doctest::Approx(session.ItemRect("third").Max.y));
+    CHECK(session.ItemRect("after").Min.y - stack.Max.y == doctest::Approx(ImGui::GetStyle().ItemSpacing.y));
+}
+
+TEST_CASE("A horizontal stack lines its items up, and a spacer pushes the rest to the end")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const float width = 400.0f;
+    session.SetUi([&] {
+        facet::BeginStack("row", {.orientation = facet::Orientation::Horizontal, .align = facet::LayoutAlign::Center,
+                                  .width = width});
+        facet::Button("small", {.size = facet::ControlSize::Small});
+        session.Track("small");
+        facet::Button("next", {.size = facet::ControlSize::Small});
+        session.Track("next");
+        facet::StackSpacer();
+        facet::Button("large", {.size = facet::ControlSize::Large});
+        session.Track("large");
+        facet::EndStack();
+        session.Track("stack");
+    });
+    session.Frames(3);
+    const ImRect smallButton = session.ItemRect("small");
+    const ImRect next = session.ItemRect("next");
+    const ImRect large = session.ItemRect("large");
+    const ImRect stack = session.ItemRect("stack");
+    const float gap = facet::Px(facet::T().spacing.sm);
+    // One line, the gap between neighbours.
+    CHECK(next.Min.x - smallButton.Max.x == doctest::Approx(gap));
+    CHECK(next.Min.y == doctest::Approx(smallButton.Min.y));
+    // The spacer takes the free space: the item after it ends at the stack's end.
+    CHECK(large.Max.x == doctest::Approx(stack.Min.x + facet::Px(width)).epsilon(0.001));
+    // Center: the small run sits in the middle of the line the large button sets.
+    CHECK(stack.GetHeight() == doctest::Approx(large.GetHeight()));
+    CHECK((smallButton.Min.y + smallButton.Max.y) * 0.5f == doctest::Approx((large.Min.y + large.Max.y) * 0.5f).epsilon(0.01));
+}
+
+TEST_CASE("A horizontal stack that fits its items reports its own size and restores the layout")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        facet::BeginStack("row", {.orientation = facet::Orientation::Horizontal, .gap = facet::Gap::None});
+        ImGui::Button("a", ImVec2(40.0f, 20.0f));
+        session.Track("a");
+        ImGui::Button("b", ImVec2(30.0f, 20.0f));
+        session.Track("b");
+        facet::EndStack();
+        session.Track("stack");
+        ImGui::Button("below");
+        session.Track("below");
+    });
+    session.Frames(2);
+    CHECK(session.ItemRect("b").Min.x == doctest::Approx(session.ItemRect("a").Max.x));
+    CHECK(session.ItemRect("stack").GetWidth() == doctest::Approx(70.0f));
+    // The window's own layout is vertical again after the stack.
+    CHECK(session.ItemRect("below").Min.y > session.ItemRect("stack").Max.y);
+    CHECK(session.ItemRect("below").Min.x == doctest::Approx(session.ItemRect("stack").Min.x));
+}
+
+TEST_CASE("Stacks nest, leave every stack balanced and report a stray spacer")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    int reported = 0;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::BeginStack("outer", {.orientation = facet::Orientation::Horizontal});
+            facet::BeginStack("inner", {.width = 80.0f});
+            ImGui::TextUnformatted("one");
+            ImGui::TextUnformatted("two");
+            facet::EndStack();
+            facet::StackSpacer();
+            ImGui::TextUnformatted("three");
+            facet::EndStack();
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::StackScope stack("disabled", {.gap = facet::Gap::Section});
+            ImGui::Button("inside");
+        });
+        ImGui::EndDisabled();
+        CHECK_BALANCED({
+            facet::BeginStack("empty");
+            facet::EndStack();
+        });
+        const int before = fi::UsageErrorCount();
+        facet::StackSpacer();
+        reported = fi::UsageErrorCount() - before;
+    });
+    session.Frames(2);
+    CHECK(reported == 1);
+    CHECK(fi::OpenScopeCount() == 0);
+}
