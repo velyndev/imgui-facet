@@ -93,7 +93,13 @@ Status: ready.
 bool EmptyState(const char* label, const EmptyStateOptions& options = {});
 ```
 
-Centered placeholder for a view without content, with one action. Status: planned.
+A placeholder for a view without content: `icon` (`metrics.emptyIconSize`) in `labelSecondary`, or in
+`destructive` with the Destructive tone; the title in Headline; the wrapped message in
+`labelSecondary`; and one Secondary button. Everything is centered in the width, and in `height` when
+it is set (otherwise the content plus `spacing.lg` above and below). `compact` puts it all on one
+line: a small icon, the title, the message cut with an ellipsis, and a small button at the end. Only
+the action is a Tab stop; it is reachable while the state is scrolled out of sight, and the call
+returns true when it is activated. Status: ready.
 
 ### DataStateView
 

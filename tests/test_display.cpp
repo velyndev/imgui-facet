@@ -890,6 +890,39 @@ TEST_CASE("An inline alert's action and close button are Tab stops; a banner wit
     CHECK_FALSE(open);
 }
 
+// ==== EmptyState ====
+
+TEST_CASE("An empty state's action is its only Tab stop and returns true when activated")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::EmptyState("No files yet", {.message = "Files you add show up here.", .icon = facet::Icon("folder"),
+                                               .actionLabel = "Add files"}))
+            ++presses;
+        session.Track("empty");
+        facet::EmptyState("No results", {.message = "Try another word.", .compact = true});
+        session.Track("compact");
+        facet::EmptyState("Centered", {.height = 300.0f});
+        session.Track("tall");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("compact").GetHeight() < session.ItemRect("empty").GetHeight());
+    CHECK(session.ItemRect("tall").GetHeight() == doctest::Approx(std::ceil(facet::Px(300.0f))));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(presses == 1);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
