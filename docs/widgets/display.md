@@ -303,7 +303,14 @@ without its Begin is reported and does nothing. Status: ready.
 void StatTile(const char* label, double value, const StatTileOptions& options = {});
 ```
 
-A value with caption, delta chip and trend line. Status: planned.
+A tile on the grouped surface (card radius, hairline) with the visible label part as a Footnote
+caption, the value in Title1 (`format` or `formatter`, `"%.0f"` by default) counting to a new value on
+the standard spring (jumping with reduced motion), and an optional delta chip after it: the success
+wash for the good direction and the destructive wash for the bad one (a negative delta is good with
+`invertDelta`), an arrow up or down (a dash for 0) and the signed text, so the direction never rests
+on color alone. `trend` draws a line over its samples along the bottom of the tile in the 3:1 accent.
+Loading shows a skeleton in place of the value, Error the error icon with `Strings::loadFailed`.
+Width: the available width. Not interactive. Status: ready.
 
 ### DataTable
 

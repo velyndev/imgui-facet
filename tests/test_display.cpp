@@ -1124,6 +1124,46 @@ TEST_CASE("Key-value rows of a list that does not copy are not Tab stops")
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
 
+// ==== StatTile ====
+
+TEST_CASE("A stat tile colors its delta by direction and shows the loading and error states")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    int up = 0;
+    int down = 0;
+    int inverted = 0;
+    int error = 0;
+    session.SetUi([&] {
+        int from = VertexCount();
+        facet::StatTile("Value##up", 10.0, {.delta = 2.0});
+        up = CountColor(from, facet::ToU32(c.successSubtle));
+        from = VertexCount();
+        facet::StatTile("Value##down", 10.0, {.delta = -2.0});
+        down = CountColor(from, facet::ToU32(c.destructiveSubtle));
+        from = VertexCount();
+        facet::StatTile("Latency##inv", 10.0, {.delta = -2.0, .invertDelta = true});
+        inverted = CountColor(from, facet::ToU32(c.successSubtle));
+        facet::StatTile("Loading##l", 0.0, {.state = facet::DataState::Loading});
+        from = VertexCount();
+        facet::StatTile("Error##e", 0.0, {.state = facet::DataState::Error});
+        error = CountColor(from, facet::ToU32(c.destructive));
+        static const float trend[] = {1.0f, 3.0f, 2.0f, 5.0f};
+        facet::StatTile("Trend##t", 5.0, {.trend = trend});
+        session.Track("trend");
+        facet::StatTile("Plain##p", 5.0);
+        session.Track("plain");
+    });
+    session.Frame();
+    CHECK(up > 0);
+    CHECK(down > 0);
+    CHECK(inverted > 0);
+    CHECK(error > 0);
+    CHECK(session.ItemRect("trend").GetHeight() > session.ItemRect("plain").GetHeight());
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
