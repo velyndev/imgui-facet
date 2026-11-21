@@ -1,7 +1,7 @@
 // Per-frame and per-device work of the sliders family (sliders.h). The entry exists in the
 // subsystem table (src/core/subsystems.cpp) from the start, so the family fills its hooks here
-// without touching a shared file. Init and Shutdown forget a typed value in progress
-// (slider_core.h), so nothing carries over to another Dear ImGui context.
+// without touching a shared file. Init and Shutdown forget a typed value, the multi slider events and
+// an arc range drag in progress (slider_core.h), so nothing carries over to another Dear ImGui context.
 
 #include "internal/subsystem.h"
 #include "widgets/sliders/slider_core.h"
@@ -16,11 +16,13 @@ Subsystem WidgetsSlidersSubsystem()
     subsystem.init = [] {
         ResetSliderTyping();
         ResetMultiSliderEvents();
+        ResetArcRangeSliderDrag();
         return true;
     };
     subsystem.shutdown = [] {
         ResetSliderTyping();
         ResetMultiSliderEvents();
+        ResetArcRangeSliderDrag();
     };
     return subsystem;
 }

@@ -654,6 +654,11 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
 
 } // namespace
 
+void internal::ResetArcRangeSliderDrag()
+{
+    CurrentArcRangeDrag() = {};
+}
+
 bool ArcRangeSlider(const char* label, float* low, float* high, float min, float max, const ArcRangeSliderOptions& options)
 {
     return ArcRangeSliderImpl(label, low, high, internal::SliderFloatToDouble(min), internal::SliderFloatToDouble(max), options);

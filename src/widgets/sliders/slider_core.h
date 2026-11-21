@@ -171,4 +171,8 @@ void ResetSliderTyping();
 // (src/widgets/sliders/multi_slider.cpp; facet::Init and Shutdown through the family subsystem).
 void ResetMultiSliderEvents();
 
+// Forgets the arc range drag in progress (src/widgets/sliders/arc_range_slider.cpp; facet::Init and
+// Shutdown through the family subsystem).
+void ResetArcRangeSliderDrag();
+
 } // namespace facet::internal
