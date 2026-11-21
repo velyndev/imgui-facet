@@ -123,10 +123,8 @@ bool DrawListsRowContent(const ImRect& content, const ItemState& item, const Cho
 void DrawListsRow(const ListRowState& row, const ChoiceItem& entry, const ListsRowLook& look, ControlSize size);
 // A group header row: the group text in Footnote and labelSecondary inside `content`.
 void DrawListsHeader(const ImRect& content, const char* group);
-// A checkbox inside `box` (screen pixels): Off is the hover fill of a neutral control with the
-// boundary hairline; On and Mixed are the accent fill with the check or minus glyph in onAccent
-// (labelSecondary while read-only); disabled is fill[3] with a separator hairline.
-void DrawListsCheckbox(ImDrawList* drawList, const ImRect& box, CheckState state, const ItemState& item, bool readOnly);
+// Checkboxes in rows are the selection family's mark (DrawSelectionCheckbox in
+// widgets/selection/selection_parts.h), so a checked row and a Checkbox look the same.
 
 // The select-all row of a multi-select list: the checkbox showing `state` and Strings::selectAll.
 void DrawListsSelectAllRow(const ListRowState& row, CheckState state, bool readOnly, ControlSize size);

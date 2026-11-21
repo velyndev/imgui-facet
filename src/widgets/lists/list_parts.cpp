@@ -18,6 +18,7 @@
 #include "internal/state_storage.h"
 #include "internal/text_field.h"
 #include "internal/text_util.h"
+#include "widgets/selection/selection_parts.h"
 
 namespace facet::internal
 {
@@ -28,8 +29,6 @@ namespace
 constexpr int kGroupCompareSize = 128;
 // The share of a row's content width the detail text may take before it is cut.
 constexpr float kDetailMaxShare = 0.4f;
-// The share of a checkbox side its corner radius may take, so a box never reads as a circle.
-constexpr float kCheckboxRadiusShare = 0.25f;
 // Seeds of the row ids the entries of a display row get when the item has no id of its own.
 constexpr ImGuiID kItemIdSeed = 0x4C495354u;    // items
 constexpr ImGuiID kHeaderIdSeed = 0x48454144u;  // group headers
@@ -52,40 +51,6 @@ void CopyGroup(char* out, const char* group)
         return;
     }
     ImStrncpy(out, group, kGroupCompareSize);
-}
-
-// The colors of a checkbox for its state.
-struct CheckboxColors
-{
-    ImVec4 fill;
-    ImVec4 outline;
-    ImVec4 glyph;
-};
-
-CheckboxColors CheckboxLook(bool on, const ItemState& item, bool readOnly)
-{
-    const Colors& c = T().colors;
-    CheckboxColors look;
-    if (item.disabled)
-    {
-        look.fill = c.fill[3];
-        look.outline = c.separator;
-        look.glyph = on ? c.labelTertiary : WithAlpha(c.labelTertiary, 0.0f);
-        return look;
-    }
-    if (!on)
-    {
-        const ImVec4 clear = WithAlpha(c.fill[1], 0.0f);
-        look.fill = readOnly ? clear : StateFill(clear, c.fill[1], c.fill[0], item);
-        look.outline = ControlBoundaryColor(c);
-        look.glyph = WithAlpha(c.onAccent, 0.0f);
-        return look;
-    }
-    // Read-only marks are labelSecondary, so a value that cannot change does not claim the accent.
-    look.fill = readOnly ? c.labelSecondary : StateFill(c.accent, c.accentHover, c.accentPressed, item);
-    look.outline = readOnly ? c.labelSecondary : c.focusRing;
-    look.glyph = readOnly ? c.bg : c.onAccent;
-    return look;
 }
 
 struct ListsFieldState
@@ -346,21 +311,6 @@ float ListsGlyphSize(ControlSize size)
     return glyph;
 }
 
-void DrawListsCheckbox(ImDrawList* drawList, const ImRect& box, CheckState state, const ItemState& item, bool readOnly)
-{
-    const CheckboxColors look = CheckboxLook(state != CheckState::Off, item, readOnly);
-    const float radius = std::min(Px(T().radii.element), std::round(box.GetWidth() * kCheckboxRadiusShare));
-    FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);
-    StrokeRect(drawList, box.Min, box.Max, ToU32(look.outline), radius, HairlineThickness());
-    if (state != CheckState::Off)
-    {
-        // The glyphs are drawn at the box size: their artwork keeps a margin to the box edge. Mixed
-        // differs from On by its shape, not by color alone.
-        const Icon glyph = state == CheckState::Mixed ? Icon("minus") : Icon("check");
-        DrawControlIcon(drawList, glyph, box.Min.x, box.GetCenter().y, box.GetWidth(), ToU32(look.glyph));
-    }
-}
-
 bool DrawListsRowContent(const ImRect& content, const ItemState& item, const ChoiceItem& entry,
                          const ListsRowLook& look, ControlSize size)
 {
@@ -381,11 +331,14 @@ bool DrawListsRowContent(const ImRect& content, const ItemState& item, const Cho
     }
     if (look.checkbox)
     {
-        const float side = Px(theme.metrics.checkboxSize);
-        const float top = std::round(centerY - side * 0.5f);
-        const ImRect box(std::round(x), top, std::round(x) + side, top + side);
-        DrawListsCheckbox(drawList, box, look.check, item, look.readOnly);
-        x += side + gap;
+        // The selection family's checkbox mark, so a checked row and a Checkbox look the same.
+        const ImRect box = SelectionMarkRect(x, centerY);
+        ItemState mark = item;
+        mark.readOnly = mark.readOnly || look.readOnly;
+        const bool on = look.check != CheckState::Off;
+        DrawSelectionCheckbox(drawList, box, look.check == CheckState::Mixed ? SelectionMark::Mixed : SelectionMark::On,
+                              on ? 1.0f : 0.0f, mark);
+        x += box.GetWidth() + gap;
     }
     if (entry.icon.IsValid())
     {
