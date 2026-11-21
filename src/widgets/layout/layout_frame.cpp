@@ -14,6 +14,7 @@ void LayoutEndFrame()
 {
     ClearSettingsRowStack();
     ClearStackStack();
+    ClearGridStack();
 }
 
 } // namespace

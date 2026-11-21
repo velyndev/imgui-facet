@@ -60,8 +60,6 @@ Status: ready.
 
 ### BeginGrid
 
-Status: planned
-
 ```cpp
 void BeginGrid(const char* id, const GridOptions& options = {});
 void GridNext(const GridCellOptions& options = {});
@@ -69,7 +67,24 @@ void EndGrid();
 class GridScope;
 ```
 
-Equal columns that reflow with the width from a minimum cell width, with column spans.
+Equal columns that reflow with the width. The grid is `width` units wide (0 fills the available
+width); its column count is the most columns of at least `minCellWidth` units (0:
+`layout.minRowControl`) that fit with the gap between them, at least one and at most `maxColumns`
+when that is set, so a narrower region shows fewer, wider columns. At a width of a few pixels the
+grid has one column of at least one pixel.
+
+- `GridNext()` starts the next cell at the next free column. A cell's item width and the window's work
+  rect are narrowed to the cell, so fields and fill-width items fill it.
+- `columnSpan` covers that many columns (clamped to the column count); a span that does not fit on
+  the current row starts the next row.
+- A row starts one gap below the tallest cell of the row above, measured as its cells end in the
+  same frame, so cells never overlap, also when one grows. The grid keeps no state across frames.
+- Arrow keys move between the items of the cells through Dear ImGui's spatial navigation, and Tab
+  follows the order the cells were submitted in.
+- The grid is one group, the last item after `EndGrid`; with no cell it is as tall as nothing.
+  `GridNext` outside a grid, or inside a container nested in one, is reported and ignored.
+
+Status: ready.
 
 ### BeginFlow
 

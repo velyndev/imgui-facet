@@ -415,3 +415,141 @@ TEST_CASE("Stacks nest, leave every stack balanced and report a stray spacer")
     CHECK(reported == 1);
     CHECK(fi::OpenScopeCount() == 0);
 }
+
+// ---- Grid ---------------------------------------------------------------------------------------
+
+TEST_CASE("A grid fits as many columns of the minimum width as it can and fills them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float width = 600.0f;
+    ImRect cells[5];
+    session.SetUi([&] {
+        facet::BeginGrid("grid", {.minCellWidth = 128.0f, .width = width});
+        for (int i = 0; i < 5; ++i)
+        {
+            facet::GridNext();
+            ImGui::Button("##cell", ImVec2(-FLT_MIN, 20.0f + 10.0f * static_cast<float>(i)));
+            cells[i] = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        }
+        facet::EndGrid();
+        session.Track("grid");
+    });
+    session.Frames(2);
+    const float gap = facet::Px(facet::T().spacing.sm);
+    // (600 + 8) / (128 + 8): four columns.
+    const float cell = std::floor((facet::Px(width) - gap * 3.0f) / 4.0f);
+    CHECK(cells[0].GetWidth() == doctest::Approx(cell));
+    CHECK(cells[1].Min.x - cells[0].Max.x == doctest::Approx(gap));
+    CHECK(cells[3].Min.y == doctest::Approx(cells[0].Min.y));
+    // The fifth cell starts the next row under the tallest cell of the first.
+    CHECK(cells[4].Min.x == doctest::Approx(cells[0].Min.x));
+    CHECK(cells[4].Min.y == doctest::Approx(cells[3].Max.y + gap));
+    CHECK(session.ItemRect("grid").Max.y == doctest::Approx(cells[4].Max.y));
+    // Narrower: fewer, wider columns.
+    width = 300.0f;
+    session.Frames(2);
+    CHECK(cells[1].Min.y == doctest::Approx(cells[0].Min.y));
+    CHECK(cells[2].Min.y > cells[0].Max.y);
+}
+
+TEST_CASE("A grid cell spans columns and moves to the next row when the span does not fit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImRect cells[4];
+    session.SetUi([&] {
+        facet::BeginGrid("grid", {.minCellWidth = 100.0f, .maxColumns = 3, .width = 500.0f});
+        const int spans[] = {2, 2, 1, 9};
+        for (int i = 0; i < 4; ++i)
+        {
+            facet::GridNext({.columnSpan = spans[i]});
+            ImGui::Button("##cell", ImVec2(-FLT_MIN, 20.0f));
+            cells[i] = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        }
+        facet::EndGrid();
+    });
+    session.Frames(2);
+    const float gap = facet::Px(facet::T().spacing.sm);
+    const float cell = std::floor((facet::Px(500.0f) - gap * 2.0f) / 3.0f);
+    CHECK(cells[0].GetWidth() == doctest::Approx(cell * 2.0f + gap));
+    // Two columns do not fit after the first span: the second starts a row.
+    CHECK(cells[1].Min.y > cells[0].Max.y);
+    CHECK(cells[2].Min.y == doctest::Approx(cells[1].Min.y));
+    // A span past the column count is clamped to it.
+    CHECK(cells[3].GetWidth() == doctest::Approx(cell * 3.0f + gap * 2.0f));
+}
+
+TEST_CASE("A grid holds at a width of a few pixels, with no cell and with one, at every scale")
+{
+    ScaleGuard scale;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    ImRect cells[3];
+    int count = 3;
+    float width = 3.0f;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::BeginGrid("grid", {.width = width});
+            for (int i = 0; i < count; ++i)
+            {
+                facet::GridNext();
+                ImGui::Button("##cell", ImVec2(-FLT_MIN, 10.0f));
+                cells[i] = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            }
+            facet::EndGrid();
+            session.Track("grid");
+        });
+    });
+    for (const float uiScale : {0.75f, 1.0f, 2.0f})
+    {
+        CAPTURE(uiScale);
+        facet::SetUiScale(uiScale);
+        width = 3.0f;
+        count = 3;
+        session.Frames(2);
+        // One column, one cell per row, none overlapping.
+        CHECK(cells[0].GetWidth() >= 1.0f);
+        CHECK(cells[1].Min.y > cells[0].Max.y);
+        CHECK(cells[2].Min.y > cells[1].Max.y);
+        CHECK(cells[0].Min.x == doctest::Approx(cells[1].Min.x));
+        count = 1;
+        session.Frames(1);
+        CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(10.0f));
+        count = 0;
+        session.Frames(1);
+        CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(0.0f));
+        // The column count follows the width in units: two minimum cells fit at every scale.
+        width = facet::T().layout.minRowControl * 2.0f + facet::T().spacing.sm * 1.5f;
+        count = 2;
+        session.Frames(1);
+        CHECK(cells[1].Min.y == doctest::Approx(cells[0].Min.y));
+    }
+}
+
+TEST_CASE("A stray GridNext is reported and grids nest in their cells")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    int reported = 0;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::GridScope grid("outer", {.maxColumns = 2});
+            facet::GridNext();
+            {
+                facet::GridScope inner("inner", {.minCellWidth = 40.0f});
+                facet::GridNext();
+                ImGui::TextUnformatted("inner cell");
+            }
+            facet::GridNext();
+            ImGui::TextUnformatted("outer cell");
+        });
+        const int before = fi::UsageErrorCount();
+        facet::GridNext();
+        reported = fi::UsageErrorCount() - before;
+    });
+    session.Frames(2);
+    CHECK(reported == 1);
+}
