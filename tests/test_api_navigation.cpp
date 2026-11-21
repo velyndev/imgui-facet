@@ -1,8 +1,7 @@
 // The frozen API of the navigation family (facet/widgets/navigation.h): every options struct
-// follows the conventions, and every widget that is still planned is safe to call inside a real
-// frame (stacks balanced, no value written, the neutral result) and returns false only where its
-// own arguments hide the content. The placeholder helpers themselves are tested in
-// tests/test_api_structure.cpp.
+// follows the conventions, and every widget is safe to call inside a real frame without input
+// (stacks balanced, no value written, the neutral result), also disabled and outside a frame.
+// The behaviour of each widget is tested in tests/test_navigation.cpp.
 
 #include <type_traits>
 
@@ -15,7 +14,6 @@
 #include "support/options_check.h"
 #include "support/session.h"
 #include "support/structure_stub_check.h"
-#include "widgets/structure_stub.h"
 
 namespace
 {
@@ -40,11 +38,12 @@ static_assert(OptionsFollowConventions<facet::ShortcutSheetOptions>());
 // MenuItem has no overload, so MenuItem("Save", {}) cannot bind to a value form with a null pointer.
 static_assert(std::is_same_v<decltype(&facet::MenuItem), bool (*)(const char*, const facet::MenuItemOptions&)>);
 
-// Calls every function of navigation.h once, checking balance and the neutral result.
-void CallNavigationStubs(Values& v)
+// Calls every function of navigation.h once, checking balance and the neutral result of a frame
+// without input.
+void CallNavigationWidgets(Values& v)
 {
     CHECK_BALANCED({
-        const bool open = facet::BeginSidebar("Sidebar");
+        const bool open = facet::BeginSidebar("Sidebar", {.height = 120.0f});
         CHECK(open);
         if (open)
         {
@@ -57,17 +56,17 @@ void CallNavigationStubs(Values& v)
     CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs", &v.index, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs labels", &v.index, kLabels)));
     CHECK_BALANCED(CHECK(facet::TabBarClosedTab() == -1));
-    CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs reorder", &v.index, kItems, {.reorderable = true})));
+    CHECK_BALANCED(CHECK_FALSE(facet::TabBar("Tabs reorder", &v.index, kItems, {.closable = true, .reorderable = true})));
     CHECK_BALANCED(CHECK_FALSE(facet::TabBarMovedTab().IsValid()));
     CHECK_FALSE(facet::TabBarOptions{}.reorderable);
     CHECK_BALANCED({
+        // Further down the page the bar is out of sight and returns false (rule 8).
         const bool open = facet::BeginMenuBar("Menus");
-        CHECK(open);
         if (open)
         {
             if (facet::BeginMenu("Menu 1"))
             {
-                FAIL("BeginMenu opened");
+                FAIL("BeginMenu opened without input");
                 facet::EndMenu();
             }
             facet::EndMenuBar();
@@ -93,22 +92,26 @@ void CallNavigationStubs(Values& v)
         facet::WizardScope wizard("Wizard labels", &v.step, kLabels);
         ImGui::TextUnformatted("step");
     });
-    CHECK_BALANCED(facet::ShortcutSheet("Shortcuts", &v.open));
+    // A closed sheet shows nothing and leaves the flag alone.
+    CHECK_BALANCED(facet::ShortcutSheet("Shortcuts", &v.closed));
+    CHECK_BALANCED(facet::ShortcutSheet("Shortcuts null", nullptr));
 }
 
 } // namespace
 
-TEST_CASE("Every navigation widget stub is safe to call, also disabled, and returns the neutral result")
+TEST_CASE("Every navigation widget is safe to call, also disabled, and returns the neutral result without input")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     const int errorsBefore = facet::internal::UsageErrorCount();
     Values v;
     session.SetUi([&] {
-        CallNavigationStubs(v);
+        CallNavigationWidgets(v);
+        ImGui::PushID("disabled");
         ImGui::BeginDisabled();
-        CallNavigationStubs(v);
+        CallNavigationWidgets(v);
         ImGui::EndDisabled();
+        ImGui::PopID();
     });
     session.Frames(2);
     CHECK(v == Values{});
@@ -117,7 +120,7 @@ TEST_CASE("Every navigation widget stub is safe to call, also disabled, and retu
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
-TEST_CASE("Navigation placeholders take their width by the precedence of rule 6 and their control size")
+TEST_CASE("Navigation widgets take their width by the precedence of rule 6 and their control size")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -138,59 +141,23 @@ TEST_CASE("Navigation placeholders take their width by the precedence of rule 6 
         session.Track("content");
         facet::TabBar("small", &index, kItems, {.size = facet::ControlSize::Small});
         session.Track("small");
+        facet::Breadcrumbs("crumbs", kItems, {.size = facet::ControlSize::Large});
+        session.Track("crumbs");
     });
     session.Frame();
 
     CHECK(session.ItemRect("units").GetWidth() == doctest::Approx(facet::Px(100.0f)));
     CHECK(session.ItemRect("next").GetWidth() == doctest::Approx(150.0f));
     CHECK(session.ItemRect("default").GetWidth() == doctest::Approx(available));
-    const float content = session.ItemRect("content").GetWidth();
-    CHECK(content == doctest::Approx(facet::internal::StubContentWidth("Pagination", "content")));
-    CHECK(content < available);
+    CHECK(session.ItemRect("content").GetWidth() < available);
     CHECK(session.ItemRect("default").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
     CHECK(session.ItemRect("small").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Small)));
+    CHECK(session.ItemRect("crumbs").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Large)));
+    CHECK(session.ItemRect("crumbs").GetWidth() == doctest::Approx(available));
     CHECK(session.ItemId("default") == defaultId);
 }
 
-TEST_CASE("Menu item placeholders name their own function in the caption")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    const facet::Theme saved = facet::T();
-    facet::SetTheme(facet::Theme::Light(), false);
-    const ImU32 secondary = facet::ToU32(facet::T().colors.labelSecondary);
-    // One glyph quad (4 vertices) per character that is not a space.
-    const auto glyphVertices = [](const char* text) {
-        int count = 0;
-        for (const char* c = text; *c != '\0'; ++c)
-            count += *c != ' ' ? 4 : 0;
-        return count;
-    };
-    bool checked = false;
-    int selection = 0;
-    int plain = 0;
-    int check = 0;
-    int radio = 0;
-    session.SetUi([&] {
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        int from = drawList->VtxBuffer.Size;
-        facet::MenuItem("Item 1");
-        plain = VerticesWithColor(drawList, from, secondary);
-        from = drawList->VtxBuffer.Size;
-        facet::MenuCheckItem("Item 2", &checked);
-        check = VerticesWithColor(drawList, from, secondary);
-        from = drawList->VtxBuffer.Size;
-        facet::MenuRadioItem("Item 3", &selection, 1);
-        radio = VerticesWithColor(drawList, from, secondary);
-    });
-    session.Frame();
-    facet::SetTheme(saved, false);
-    CHECK(plain == glyphVertices("MenuItem: planned (Item 1)"));
-    CHECK(check == glyphVertices("MenuCheckItem: planned (Item 2)"));
-    CHECK(radio == glyphVertices("MenuRadioItem: planned (Item 3)"));
-}
-
-TEST_CASE("Navigation stubs return false where their own arguments hide the content")
+TEST_CASE("Navigation Begins return false where their own arguments hide the content")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -202,7 +169,7 @@ TEST_CASE("Navigation stubs return false where their own arguments hide the cont
     session.Frame();
 }
 
-TEST_CASE("Navigation stubs outside a frame draw nothing and return the neutral result")
+TEST_CASE("Navigation widgets outside a frame draw nothing and return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -211,6 +178,12 @@ TEST_CASE("Navigation stubs outside a frame draw nothing and return the neutral 
     int index = 1;
     CHECK_FALSE(facet::TabBar("outside", &index, kItems));
     CHECK_FALSE(facet::BeginSidebar("outside"));
+    CHECK_FALSE(facet::BeginMenuBar("outside"));
+    CHECK_FALSE(facet::BeginMenu("outside"));
+    CHECK_FALSE(facet::MenuItem("outside"));
+    CHECK(facet::Breadcrumbs("outside", kItems) == -1);
+    CHECK_FALSE(facet::Pagination("outside", &index, 4));
+    CHECK(facet::TabBarClosedTab() == -1);
     CHECK(index == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK(facet::internal::UsageErrorCount() == before);
