@@ -977,6 +977,57 @@ TEST_CASE("A data state view keeps the height of its last Ready frame and report
     CHECK(retries == 1);
 }
 
+// ==== KeyCap ====
+
+TEST_CASE("A key cap draws one cap per modifier and the key, and Strings::unbound for none")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float unboundWidth = 0.0f;
+    session.SetUi([&] {
+        facet::KeyCap(ImGuiKey_S);
+        session.Track("key");
+        facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_S);
+        session.Track("chord");
+        facet::KeyCap(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S);
+        session.Track("three");
+        facet::KeyCap(ImGuiKey_LeftShift | ImGuiMod_Ctrl);
+        session.Track("folded");
+        facet::KeyCap(ImGuiKey_None);
+        session.Track("none");
+        facet::KeyCap(ImGuiKey_S, {.size = facet::ControlSize::Large});
+        session.Track("large");
+        const facet::internal::DisplayMarkMetrics m = facet::internal::DisplayMarkLook(facet::ControlSize::Regular);
+        unboundWidth = std::ceil(facet::MeasureText(m.textStyle, facet::GetStrings().unbound).x);
+    });
+    session.Frame();
+    CHECK(session.ItemRect("chord").GetWidth() > session.ItemRect("key").GetWidth());
+    CHECK(session.ItemRect("three").GetWidth() > session.ItemRect("chord").GetWidth());
+    // LeftShift with Ctrl is "Ctrl" "Shift": as wide as the two modifiers.
+    CHECK(session.ItemRect("folded").GetWidth() > session.ItemRect("key").GetWidth());
+    CHECK(session.ItemRect("none").GetWidth() == doctest::Approx(unboundWidth));
+    CHECK(session.ItemRect("large").GetHeight() > session.ItemRect("key").GetHeight());
+}
+
+TEST_CASE("A live key cap shows the held look while its chord is down")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    int held = 0;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::KeyCap(ImGuiKey_F5, {.live = true});
+        held = CountColor(from, facet::ToU32(facet::T().colors.focusRing));
+    });
+    session.Frame();
+    CHECK(held == 0);
+    session.KeyDown(ImGuiKey_F5);
+    CHECK(held > 0);
+    session.KeyUp(ImGuiKey_F5);
+    CHECK(held == 0);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

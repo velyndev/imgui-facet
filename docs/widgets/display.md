@@ -227,7 +227,12 @@ reduced motion). It sits on the text baseline like a badge. Not interactive. Sta
 void KeyCap(ImGuiKeyChord chord, const KeyCapOptions& options = {});
 ```
 
-A chord drawn as key caps, optionally live. Status: planned.
+A chord as key caps: one cap per modifier (Ctrl, Shift, Alt, Win, in that order) and one for the key,
+named by `KeyNameText`; a modifier key alone folds into the modifiers. A cap is the faint control
+fill with a 3:1 boundary hairline and the key name in `label`. `ImGuiKey_None` draws
+`Strings::unbound` in `labelSecondary`. With `live` the caps show the held look (a stronger fill and
+a `focusRing` outline) while the chord is down. Small, Regular and Large sizes; the caps sit on the
+text baseline like a badge. Not interactive. Status: ready.
 
 ### ShortcutHint
 
