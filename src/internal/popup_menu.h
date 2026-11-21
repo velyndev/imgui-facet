@@ -40,9 +40,19 @@
 //     draw in labelTertiary and do nothing.
 //   - Captures: a forced Open state (ForceNextItemState, item.h) on a row with a submenu shows the
 //     submenu open for that frame (ForcePopupLevelOpen).
+//   - Typeahead: while the level has the keyboard focus and no item is active, typed characters
+//     gather into a text (list.typeaheadTimeout starts a new one) that moves the focus to the next
+//     enabled row whose label starts with it, case-insensitive in ASCII, as lists do
+//     (ListTypeaheadFind, list_view.h); typing the same letter again cycles through the rows that
+//     start with it. The rows of the previous frame are searched, so a level matches from its
+//     second frame on.
+//   - Marks: a check mark (`checked`), or with `radio` a round dot, in the leading slot; `slot`
+//     keeps the slot for a row whose mark is off, so check and radio rows line up whether or not
+//     they are on. A `destructive` row draws its label and icon in the destructive color.
 //
 // State kept per level id (state_storage.h): the row the pointer rests on and since when, the
-// open submenu of the level, the level's parent row, and whether the level keeps a leading slot.
+// open submenu of the level, the level's parent row, whether the level keeps a leading slot, the
+// typed text and the rows of the last frame for typeahead.
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -60,7 +70,13 @@ struct MenuRowDesc
     ImGuiID submenu = 0;             // the popup level the row opens; 0 for a leaf
     bool checked = false;            // a check mark in the leading slot (a toggle item)
     bool disabled = false;
+    bool radio = false;              // `checked` draws a round dot instead of the check mark (a choice of several)
+    bool slot = false;               // keeps the leading slot even when the row has no icon and is not checked
+    bool destructive = false;        // label and icon in the destructive color
 };
+
+// How many rows of a level take part in typeahead; later rows are not matched.
+inline constexpr int kMenuTypeaheadRows = 64;
 
 struct MenuRowResult
 {

@@ -3,6 +3,8 @@
 #include "internal/popup_menu.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
@@ -11,6 +13,7 @@
 #include "facet/core/theme.h"
 #include "facet/widgets/common.h"
 #include "internal/focus.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
 
@@ -18,6 +21,18 @@ namespace facet::internal
 {
 namespace
 {
+
+// Bytes of a row label kept for typeahead; a typed text longer than this matches no row.
+constexpr int kMenuTypeaheadLabel = 32;
+// The dot of a radio row: this share of the icon slot, so it reads lighter than a check mark.
+constexpr float kMenuRadioDotShare = 0.4f;
+
+struct MenuTypeaheadRow
+{
+    ImGuiID id = 0;
+    bool disabled = false;
+    char label[kMenuTypeaheadLabel] = {};
+};
 
 struct MenuLevelState
 {
@@ -29,11 +44,45 @@ struct MenuLevelState
     bool slot = false;         // a row of the last frame had an icon or a check mark
     bool slotNext = false;     // the same for this frame
     int frame = -1;            // frame of the last MenuLevelBegin
+    // Typeahead: the typed text, and the rows of the last frame and of this one.
+    ListTypeahead typeahead;
+    MenuTypeaheadRow rows[kMenuTypeaheadRows];
+    int rowCount = 0;
+    MenuTypeaheadRow rowsNext[kMenuTypeaheadRows];
+    int rowCountNext = 0;
 };
 
 MenuLevelState& LevelState(ImGuiID level)
 {
     return GetState<MenuLevelState>(ImHashStr("##facet.menu", 0, level));
+}
+
+void TypeaheadEntry(void* user, int index, ListEntryInfo* out)
+{
+    const MenuLevelState& state = *static_cast<const MenuLevelState*>(user);
+    out->label = state.rows[index].label;
+    out->disabled = state.rows[index].disabled;
+    out->id = state.rows[index].id;
+}
+
+// Typed characters move the focus to the next row whose label starts with the typed text.
+void MenuTypeahead(MenuLevelState& state)
+{
+    const ImGuiContext& g = *GImGui;
+    if (!ImGui::IsWindowFocused() || g.ActiveId != 0 || state.rowCount == 0)
+        return;
+    if (!state.typeahead.Update())
+        return;
+    int from = -1;
+    for (int i = 0; i < state.rowCount; ++i)
+        if (state.rows[i].id == g.NavId)
+            from = i;
+    const int found = state.typeahead.Find(state.rowCount, std::max(from, 0), TypeaheadEntry, &state);
+    if (found < 0 || found == from)
+        return;
+    ImGui::SetFocusID(state.rows[found].id, ImGui::GetCurrentWindow());
+    ImGui::SetNavCursorVisible(true);
+    SetKeyboardModality(true);
 }
 
 bool InFrame()
@@ -60,13 +109,20 @@ void MenuLevelBegin(ImGuiID level)
     {
         state.slot = state.slotNext;
         state.slotNext = false;
+        // The rows of the frame before become the ones typeahead searches.
+        std::copy(state.rowsNext, state.rowsNext + state.rowCountNext, state.rows);
+        state.rowCount = state.rowCountNext;
+        state.rowCountNext = 0;
         state.frame = frame;
+        MenuTypeahead(state);
     }
     // The Left arrow inside a submenu closes it; the popup host gives the focus back to its row.
     if (state.parent != 0 && ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false))
     {
         ClosePopupLevel(level);
         LevelState(state.parent).hoverRow = 0;
+        // The press is used: the level below (a menu of a bar switching menus on Left) must not see it.
+        ImGui::SetKeyOwner(ImGuiKey_LeftArrow, level, ImGuiInputFlags_LockThisFrame);
     }
 }
 
@@ -80,7 +136,7 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
     const Theme& t = T();
     const Colors& c = t.colors;
     MenuLevelState& state = LevelState(level);
-    const bool hasSlotContent = desc.icon.IsValid() || desc.checked;
+    const bool hasSlotContent = desc.icon.IsValid() || desc.checked || desc.slot;
     state.slotNext = state.slotNext || hasSlotContent;
     const bool slot = state.slot || hasSlotContent;
 
@@ -102,6 +158,15 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
     options.disabled = desc.disabled;
     const ItemState row = ItemBehavior(ImGui::GetID(label), ImVec2(width, height), options);
     result.item = row;
+    if (state.rowCountNext < kMenuTypeaheadRows)
+    {
+        MenuTypeaheadRow& entry = state.rowsNext[state.rowCountNext++];
+        entry.id = row.id;
+        entry.disabled = row.disabled;
+        const std::size_t length = std::min(static_cast<std::size_t>(end - label), sizeof(entry.label) - 1);
+        std::memcpy(entry.label, label, length);
+        entry.label[length] = '\0';
+    }
 
     // ---- Behaviour ----
     const double now = ImGui::GetTime();
@@ -125,12 +190,16 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
         anchor.side = PopupSide::After;
         // The child's first row lines up with this row: offset by the level padding.
         anchor.rect.Min.y -= Px(t.spacing.xs);
-        const PopupOptions childOptions{.minWidth = Px(t.overlay.menuMinWidth)};
         const bool keyOpen = row.focused && ImGui::IsKeyPressed(ImGuiKey_RightArrow, false);
+        // A submenu the pointer opened by resting on its row leaves the keyboard focus in this
+        // level, so the arrows and typeahead keep working here; a click or a key moves it inside.
+        const PopupOptions childOptions{.takeFocus = row.pressed || keyOpen, .minWidth = Px(t.overlay.menuMinWidth)};
         if (row.open)
             ForcePopupLevelOpen(child, anchor, childOptions);
         else if (!row.disabled && (row.pressed || keyOpen || rested) && !open)
             OpenPopupLevel(child, anchor, childOptions);
+        if (keyOpen && !row.disabled)
+            ImGui::SetKeyOwner(ImGuiKey_RightArrow, row.id, ImGuiInputFlags_LockThisFrame);
         SetPopupLevelAnchor(child, anchor);
         MenuLevelState& childState = LevelState(child);
         childState.parent = level;
@@ -165,14 +234,25 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
             const ImVec4 fill = Mix(c.fill[2], c.fill[1], row.pressAmount);
             FillRect(drawList, row.rect.Min, row.rect.Max, ToU32(WithAlpha(fill, fill.w * feedback)), radius);
         }
-        const ImU32 text = ToU32(row.disabled ? c.labelTertiary : c.label);
+        const bool destructive = desc.destructive && !row.disabled;
+        const ImU32 text = ToU32(row.disabled ? c.labelTertiary : (destructive ? c.destructive : c.label));
         const ImU32 secondary = ToU32(row.disabled ? c.labelTertiary : c.labelSecondary);
         const float iconY = row.rect.Min.y + (height - iconSize) * 0.5f;
         float x = row.rect.Min.x + padding;
-        if (desc.checked)
+        if (desc.checked && desc.radio)
+        {
+            const float dot = std::max(1.0f, std::round(iconSize * kMenuRadioDotShare));
+            drawList->AddCircleFilled(ImVec2(x + iconSize * 0.5f, iconY + iconSize * 0.5f), dot * 0.5f,
+                                      ChoiceCheckColor(row.disabled));
+        }
+        else if (desc.checked)
+        {
             DrawIcon(drawList, Icon("check"), ImVec2(x, iconY), iconSize, ChoiceCheckColor(row.disabled));
+        }
         else if (desc.icon.IsValid())
-            DrawIcon(drawList, desc.icon, ImVec2(x, iconY), iconSize, secondary);
+        {
+            DrawIcon(drawList, desc.icon, ImVec2(x, iconY), iconSize, destructive ? text : secondary);
+        }
         x += slotWidth;
         const float textY = CenteredTextY(row.rect.Min.y, height);
         drawList->AddText(ImVec2(x, textY), text, label, end);
