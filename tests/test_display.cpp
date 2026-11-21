@@ -486,6 +486,41 @@ TEST_CASE("A focusable truncated text is a Tab stop and shows its whole text on 
     CHECK(tip);
 }
 
+// ==== SectionHeader ====
+
+TEST_CASE("A section header's action is the only Tab stop and activates by click, Enter and Space")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::SectionHeader("Plain", {.description = "A description line under the heading.", .divider = true});
+        session.Track("plain");
+        if (facet::SectionHeader("With action", {.actionLabel = "Edit"}))
+            ++presses;
+        session.Track("action");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("plain").GetHeight() > facet::MeasureText(facet::TextStyle::Title3, "").y);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    // The plain header is passed over; the action of the second one takes the focus.
+    CHECK(ImGui::GetFocusID() == session.ItemId("action"));
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(presses == 2);
+    const ImRect header = session.ItemRect("action");
+    session.Click(ImVec2(header.Max.x - 4.0f, header.GetCenter().y));
+    CHECK(presses == 3);
+    session.Click(ImVec2(header.Min.x + 4.0f, header.GetCenter().y));  // the heading itself does nothing
+    CHECK(presses == 3);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

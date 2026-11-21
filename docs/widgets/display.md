@@ -50,7 +50,12 @@ tooltip too. A line break ends a one-line text as if the rest did not fit. Statu
 bool SectionHeader(const char* label, const SectionHeaderOptions& options = {});
 ```
 
-Section heading with description, trailing action and divider; true when the action is activated. Status: planned.
+A Title3 heading with an optional link-style action at the end of its line (`accentText`, Body,
+underlined while hovered or pressed so the state does not rest on color), a wrapped Footnote
+description in `labelSecondary` and an optional hairline divider. The action takes at most half the
+width; the heading gives way and is cut with an ellipsis, with the whole heading on hover and with the
+action's keyboard focus. The action is the only Tab stop and activates by click, Enter or Space;
+without an action the header is not a Tab stop. Width: the available width. Status: ready.
 
 ### Banner
 
