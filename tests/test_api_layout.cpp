@@ -81,12 +81,6 @@ void CallLayoutStubs(Values& v)
         facet::EndListDetail();
     });
     CHECK_BALANCED({
-        facet::BeginSettingsRow("Row");
-        ImGui::TextUnformatted("control");
-        facet::EndSettingsRow();
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::SettingsRowResetPressed()));
-    CHECK_BALANCED({
         const bool open = facet::BeginDependentGroup("Dependent", false);
         CHECK(open);
         if (open)

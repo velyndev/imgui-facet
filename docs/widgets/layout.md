@@ -108,8 +108,6 @@ A list and a detail pane side by side, or one at a time with a back button in a 
 
 ### BeginSettingsRow
 
-Status: planned
-
 ```cpp
 void BeginSettingsRow(const char* label, const SettingsRowOptions& options = {});
 void EndSettingsRow();
@@ -117,8 +115,42 @@ bool SettingsRowResetPressed();
 class SettingsRowScope;
 ```
 
-A label column and a control column that stack when narrow, with description, modified mark and
-reset button.
+One labelled row of the row layout block (`src/internal/row_layout.h`): the label in a label column,
+the control (whatever the caller submits between Begin and End) in the rest of the available width.
+
+- Columns: the label column is `labelWidth` units, or the `layout.labelColumn` token, with the
+  `spacing.sm` gap included, so in a column of settings rows every control starts at one x whatever
+  the label lengths. A label too long for its column ends in an ellipsis and shows in full as a
+  tooltip on hover, and under the label while the row's control has the keyboard focus. Rows that
+  start at one x in one window under one id stack top form a column: each keeps the widest reset
+  slot of the column (as measured in the last frame) free at its end, so the controls also end in
+  one line and every row of the column stacks at the same width.
+- Narrow widths: when the column and `layout.minRowControl` do not fit, the label goes on its own
+  line and the control takes the whole width under it.
+- The control slot pushes its width as the item width and narrows the window's work rect, so Facet
+  fields and stock items with a width of `-FLT_MIN` fill the slot and stop before the reset button.
+- Baseline: the label is drawn in the text style of the control and on the line of the control's
+  text. The row measures the height of its control (the last item of the slot, when it starts at the
+  slot's top) and keeps it under its id; when it is the height of the Small, Regular or Large
+  control size, the next frame lines the label up with a control of that size, otherwise with the
+  inherited size (`PushControlSize`). The first frame of a row uses the inherited size.
+- `description`: a Footnote line in `labelSecondary` under the label; it wraps across the control
+  column when nothing sits under the control, else within the label column. `icon` sits before the
+  label in `labelSecondary`.
+- `modified` puts a dot after the label; with `resetButton` the row keeps a square slot at its end,
+  where the reset button (icon "reset", tooltip `Strings::reset`) shows while `modified` is on. It is
+  a Tab stop after the control and activates with a click, Enter or Space;
+  `SettingsRowResetPressed()` reports it for the last row ended in the frame.
+- Ids: the label is pushed on the id stack until `EndSettingsRow`, so every control can use
+  `"##value"`. Two rows with the same visible text need `###`.
+- Disabled: inside `ImGui::BeginDisabled` the label, mark, icon and description turn
+  `labelTertiary` with the control.
+- The row is one group, the last item after `EndSettingsRow`, so rows stack with the window's item
+  spacing (`spacing.sm`) and work in table cells. Rows nest up to the block's depth of 8.
+
+The options have no `error` or `helpText`: the control in the row draws its own message.
+
+Status: ready.
 
 ### BeginDependentGroup
 
