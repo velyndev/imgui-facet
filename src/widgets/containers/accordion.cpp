@@ -256,7 +256,7 @@ bool BeginAccordionSection(const char* label, const AccordionSectionOptions& opt
         state->current.rects[state->current.count] = item.rect;
         ++state->current.count;
     }
-    if (item.pressed)
+    if (item.pressed && !item.readOnly)
     {
         open = !open;
         internal::SetContainerOpenState(id, open);

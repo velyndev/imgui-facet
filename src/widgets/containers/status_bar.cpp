@@ -250,7 +250,8 @@ void StatusItem(const char* text, const StatusItemOptions& options)
                           ToU32(internal::ControlSecondaryColor(disabled)), fitted.text);
     }
     const bool hovered = GImGui->HoveredWindow == window && ImGui::IsMouseHoveringRect(rect.Min, rect.Max);
-    internal::CutTextTooltip(window->GetID(text), rect, hovered, false, text, nullptr, cut);
+    // Its own id, apart from an item of the caller with the same text.
+    internal::CutTextTooltip(ImHashStr("##status", 0, window->GetID(text)), rect, hovered, false, text, nullptr, cut);
     if (entry != nullptr)
     {
         entry->expectedX = rect.Max.x + entry->gap;

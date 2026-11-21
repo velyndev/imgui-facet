@@ -608,6 +608,9 @@ void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
     }
     facet::EndInspectorPane();
     Note("Main presses: %d. Pane presses: %d.", s.inspectorMainPresses, s.inspectorPanePresses);
+    // The overlay capture shows the lower sections under the menu and the mini window.
+    if (ctx.capture && ctx.captureState == kCaptureOverlay)
+        ctx.RevealInCapture(0.7f);
 }
 
 } // namespace
@@ -627,7 +630,7 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
     GroupBoxes(ctx, s);
     Disclosures(ctx, s);
     Accordions(ctx, s);
-    if (ctx.capture && ctx.captureState != kCaptureDefault && ctx.captureState != kCaptureShell)
+    if (Focused(ctx) || Hovered(ctx))
         ctx.RevealInCapture();
     ScrollAreas(ctx, s);
     Lists(ctx, s);

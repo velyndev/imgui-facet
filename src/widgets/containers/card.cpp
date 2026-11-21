@@ -122,7 +122,8 @@ void BeginCard(const char* label, const CardOptions& options)
                          DrawCardHeader(window->DrawList, label, labelEnd, options.icon, line.Min.x, line.Max.x,
                                         line.Min.y, lineHeight, disabled);
         const bool hovered = g.HoveredWindow == window && ImGui::IsMouseHoveringRect(line.Min, line.Max);
-        internal::CutTextTooltip(window->GetID(label), line, hovered, false, label, labelEnd, cut);
+        // The card's ids are not scoped, so the title's tooltip takes an id of its own.
+        internal::CutTextTooltip(ImHashStr("##card.title", 0, window->GetID(label)), line, hovered, false, label, labelEnd, cut);
     }
     ImGui::Dummy(ImVec2(width, headerHeight));
     internal::OpenContainerInset(entry.inset);
