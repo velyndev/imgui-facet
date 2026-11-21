@@ -794,3 +794,110 @@ TEST_CASE("VectorInput normalize keeps a float vector at length 1 after an edit"
     CHECK(length == doctest::Approx(1.0f));
     CHECK(v.x == doctest::Approx(v.y));
 }
+
+// ---- Rating ------------------------------------------------------------------------------------
+
+namespace
+{
+
+// The center of icon `index` (0 based) of a Rating without a label at the left of `rect`, or a
+// point `fraction` across it.
+ImVec2 RatingIcon(const ImRect& rect, int index, float fraction = 0.5f)
+{
+    const float box = rect.GetHeight();
+    return ImVec2(rect.Min.x + box * (static_cast<float>(index) + fraction), rect.GetCenter().y);
+}
+
+} // namespace
+
+TEST_CASE("Rating: a click writes the icon under the pointer, a second click on it clears")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int stars = 0;
+    float halves = 0.0f;
+    Signals signals;
+    session.SetUi([&] {
+        signals.Take(facet::Rating("##stars", &stars));
+        session.Track("stars");
+        facet::Rating("##halves", &halves, {.halfSteps = true});
+        session.Track("halves");
+    });
+    session.Frame();
+    session.MouseMove(RatingIcon(session.ItemRect("stars"), 3));
+    session.Frames(2);
+    CHECK(stars == 0);  // hovering only previews
+    session.Click(RatingIcon(session.ItemRect("stars"), 3));
+    CHECK(stars == 4);
+    CHECK(signals.writes == 1);
+    CHECK(signals.commits == 1);
+    session.Click(RatingIcon(session.ItemRect("stars"), 3));
+    CHECK(stars == 0);
+    session.Click(RatingIcon(session.ItemRect("halves"), 2, 0.25f));
+    CHECK(halves == 2.5f);
+    session.Click(RatingIcon(session.ItemRect("halves"), 2, 0.75f));
+    CHECK(halves == 3.0f);
+}
+
+TEST_CASE("Rating: one Tab stop; Left and Right step, Home and End go to 0 and count")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int stars = 2;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Rating("##stars", &stars, {.count = 7});
+        session.Track("stars");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("stars"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(stars == 3);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(stars == 1);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(stars == 7);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(stars == 0);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("Rating fits a short row by shrinking its icons; read-only and disabled never write")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float rating = 2.0f;
+    int disabled = 1;
+    float available = 0.0f;
+    float wideRating = 0.0f;
+    session.SetUi([&] {
+        facet::Rating("Rating##wide", &rating, {.count = 10, .readOnly = true});
+        wideRating = GImGui->LastItemData.Rect.GetWidth();
+        session.Track("readonly");
+        ImGui::BeginDisabled();
+        facet::Rating("##disabled", &disabled);
+        session.Track("disabled");
+        ImGui::EndDisabled();
+        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(200.0f)));
+        available = ImGui::GetContentRegionAvail().x;
+        facet::Rating("Rating", &rating, {.count = 10});
+        session.Track("short");
+        ImGui::EndChild();
+    });
+    session.Frame();
+    REQUIRE(available > 1.0f);
+    CHECK(wideRating > available);
+    CHECK(session.ItemRect("short").GetWidth() == doctest::Approx(available));
+    session.Click(session.ItemCenter("readonly"));
+    session.Click(session.ItemCenter("disabled"));
+    CHECK(rating == 2.0f);
+    CHECK(disabled == 1);
+}

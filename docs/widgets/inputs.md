@@ -479,7 +479,17 @@ bool Rating(const char* label, float* value, const RatingOptions& options = {});
 bool Rating(const char* label, int* value, const RatingOptions& options = {});
 ```
 
-A row of icons filled up to the value, with half steps and a read-only display. Status: planned.
+A row of `count` icons (1 to 10) after the label, filled up to the value: the built-in "star" and
+"star-filled" icons, or `icon` for both. Filled icons are drawn in `focusRing`, which reaches 3:1
+on every surface, empty ones in `labelSecondary`; a half step fills the left half of an icon. The
+row is one item and one Tab stop. The pointer previews the value under it, a click writes it (the
+icon, or with `halfSteps` on the float overload the half under the pointer), and with `clearable` a
+click on the current value writes 0. Left and Right step, Home and End go to 0 and `count`, Page
+Up and Page Down a tenth (at least one step); a key press is one edit session, so
+`IsItemEditCommitted` reports it. Default width: the label and one control height per icon, at
+most the available width; in a narrower row the icons shrink. `readOnly` shows the value without
+hover preview and is the way to display a rating; `mixed` shows the icons empty until a value is
+written. Status: ready.
 
 ### FieldValidation
 

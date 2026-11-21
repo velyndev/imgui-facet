@@ -58,10 +58,12 @@ void CallReadyValueInputs(Values& v)
     FACET_CHECK_STUB(false, VectorInput("Vector 3", &v.point));
     FACET_CHECK_STUB(false, VectorInput("Vector 4", &v.color));
     FACET_CHECK_STUB(false, VectorInput("Vector 2", std::span<int>(v.vectorInt)));
+    FACET_CHECK_STUB(false, Rating("Rating 1", &v.rating, {.halfSteps = true}));
+    FACET_CHECK_STUB(false, Rating("Rating 2", &v.ratingInt));
 }
 
 // Number of FACET_CHECK_STUB calls in CallReadyValueInputs.
-constexpr int kReadyValueInputCalls = 13;
+constexpr int kReadyValueInputCalls = 15;
 
 // Every placeholder of these widgets once, with the overloads, as an app would call it.
 void CallValueInputStubs(Values& v)
@@ -72,12 +74,10 @@ void CallValueInputStubs(Values& v)
     FACET_CHECK_STUB(false, HexInput("Hex 1", &v.hex32, {.prefix = true}));
     FACET_CHECK_STUB(false, HexInput("Hex 2", &v.hex64));
     FACET_CHECK_STUB(false, DurationInput("Duration 1", &v.seconds, {.showMilliseconds = true}));
-    FACET_CHECK_STUB(false, Rating("Rating 1", &v.rating, {.halfSteps = true}));
-    FACET_CHECK_STUB(false, Rating("Rating 2", &v.ratingInt));
 }
 
 // Number of FACET_CHECK_STUB calls in CallValueInputStubs.
-constexpr int kValueInputStubCalls = 7;
+constexpr int kValueInputStubCalls = 5;
 
 } // namespace
 
@@ -100,28 +100,4 @@ TEST_CASE("Value input placeholders called outside a frame return the neutral re
     CHECK_FALSE(facet::NumberInput("Number 1", &values.integer));
     CHECK_FALSE(facet::KeybindCapture("Keybind 1", &values.bind));
     CHECK(Describe(values) == pristine);
-}
-
-TEST_CASE("The rating placeholder fits a short row")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    float rating = 0.0f;
-    float available = 0.0f;
-    float wideRating = 0.0f;
-    session.SetUi([&] {
-        facet::Rating("Rating##wide", &rating, {.count = 10});
-        wideRating = GImGui->LastItemData.Rect.GetWidth();
-        // A row far narrower than the icons.
-        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(200.0f)));
-        available = ImGui::GetContentRegionAvail().x;
-        facet::Rating("Rating", &rating, {.count = 10});
-        session.Track("rating");
-        ImGui::EndChild();
-    });
-    session.Frame();
-
-    REQUIRE(available > 1.0f);
-    CHECK(wideRating > available);
-    CHECK(session.ItemRect("rating").GetWidth() == doctest::Approx(available));
 }
