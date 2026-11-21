@@ -60,6 +60,24 @@ bool LastItemTooltipTarget(OverlayTooltipTarget* out)
     return true;
 }
 
+// Captures: a page asks for the tooltip with ForcedItemState::Hovered, Focused or Open right before
+// the tooltip call (after its item); it shows below the item for that frame, without input or delay.
+bool BeginForcedTooltip(const OverlayTooltipTarget& target, bool* forced)
+{
+    using namespace internal;
+    const ForcedItemRequest request = TakeForcedItemState();
+    *forced = Has(request.state, ForcedItemState::Hovered) || Has(request.state, ForcedItemState::Focused) ||
+              Has(request.state, ForcedItemState::Open);
+    if (!*forced)
+        return false;
+    PopupOptions options;
+    options.kind = PopupKind::Tooltip;
+    options.takeFocus = false;
+    const ImGuiID level = PopupTooltipLevel(target.id);
+    ForcePopupLevelOpen(level, {.rect = target.rect, .side = PopupSide::Below}, options);
+    return BeginPopupLevel(level);
+}
+
 } // namespace
 
 void ItemTooltip(const char* fmt, ...)
@@ -67,8 +85,12 @@ void ItemTooltip(const char* fmt, ...)
     OverlayTooltipTarget target;
     if (fmt == nullptr || !LastItemTooltipTarget(&target))
         return;
+    bool forced = false;
+    const bool shown = BeginForcedTooltip(target, &forced);
     // Ask the host every frame (also while the item is not hovered), so it can close the tooltip.
-    if (!internal::BeginPopupTooltip(target.id, target.rect, target.hovered, target.focusVisible))
+    if (!forced && !internal::BeginPopupTooltip(target.id, target.rect, target.hovered, target.focusVisible))
+        return;
+    if (forced && !shown)
         return;
     char text[kTooltipTextSize];
     va_list args;
@@ -88,10 +110,14 @@ bool BeginRichTooltip(const TooltipOptions& options)
     OverlayTooltipTarget target;
     if (!LastItemTooltipTarget(&target))
         return false;
+    bool forced = false;
+    const bool shown = BeginForcedTooltip(target, &forced);
+    if (forced && !shown)
+        return false;
     internal::PopupTooltipDesc desc;
     desc.maxWidth = options.maxWidth > 0.0f ? Px(options.maxWidth) : 0.0f;
     desc.interactive = options.interactive;
-    if (!internal::BeginPopupTooltip(target.id, target.rect, target.hovered, target.focusVisible, desc))
+    if (!forced && !internal::BeginPopupTooltip(target.id, target.rect, target.hovered, target.focusVisible, desc))
         return false;
     internal::PushScope("BeginRichTooltip");
     return true;

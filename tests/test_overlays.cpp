@@ -405,3 +405,27 @@ TEST_CASE("A rich tooltip submits its content only while it shows and keeps the 
     const ImRect tip = fi::PopupLevelRect(fi::PopupTooltipLevel(session.ItemId("item")));
     CHECK(tip.GetWidth() <= facet::Px(120.0f) + facet::Px(facet::T().spacing.sm) * 2.0f + 1.0f);
 }
+
+TEST_CASE("A forced capture state shows a tooltip below its item without input")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool shown = false;
+    ImRect tip;
+    session.SetUi([&] {
+        ImGui::SetCursorPos(ImVec2(100.0f, 100.0f));
+        facet::Button("Item");
+        session.Track("item");
+        fi::ForceNextItemState(fi::ForcedItemState::Hovered);
+        facet::ItemTooltip("Forced");
+        shown = fi::IsPopupLevelOpen(fi::PopupTooltipLevel(ImGui::GetItemID()));
+        tip = fi::PopupLevelRect(fi::PopupTooltipLevel(ImGui::GetItemID()));
+    });
+    session.Frames(3);
+    CHECK(shown);
+    CHECK(tip.Min.y >= session.ItemRect("item").Max.y);
+    int visibleTooltips = 0;
+    for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
+        visibleTooltips += window->Active && !window->Hidden && (window->Flags & ImGuiWindowFlags_Tooltip) != 0 ? 1 : 0;
+    CHECK(visibleTooltips == 1);
+}
