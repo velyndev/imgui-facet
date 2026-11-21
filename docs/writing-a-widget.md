@@ -169,6 +169,8 @@ and at `--size 900x600 --scale 2`.
 
 The entry of a widget on its family page is a `### Name` heading, the declarations in a `cpp`
 block, a short description of what it draws and does (variants, sizes, keys, states, width), and
-as its last sentence its status: `Status: planned.` or `Status: ready.` Nothing else changes when
-a widget becomes ready: `docs/widgets.md` and the note at the top of each demo family page point
-to the family pages for the status. Every visual choice that is new gets a one-line reason in `DESIGN.md`.
+as its last sentence its status: `Status: planned.` or `Status: ready.` When a widget becomes
+ready, also update the per-family lists of what is ready in the status section of `README.md` and
+in `docs/widgets.md`. When the last widget of a family becomes ready, the demo family page switches
+its note from `PlannedFamilyNote` to `ReadyFamilyNote` (`demo/gallery.h`). Every visual choice
+that is new gets a one-line reason in `DESIGN.md`.
