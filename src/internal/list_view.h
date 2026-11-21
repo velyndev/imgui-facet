@@ -279,23 +279,15 @@ int ListJumpToEnd(const ListJumpDesc& desc, bool end, bool* changed);
 // also when the row is not submitted this frame, as navigation would, and shows the focus ring.
 void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImRect& rect);
 
-// The tab stop of the view and the tree ("Tab" at the top of this file) for a container that runs
-// its rows through the row block inside a selection scope of its own (ItemGrid). Call it in the
-// surrounding focus scope before BeginListSelection, every frame, with `listId` the list's id and
-// `rect` (screen pixels) the list's visible area in `window`. While no row has the focus
-// (`rowFocused` false) it submits the tab stop and returns true on the frame Tab, Shift+Tab or an
-// arrow key landed on it: move the focus on to the row Tab lands on (ListFocusRow). While a row has
-// the focus it owns Tab, and a press hands the focus to the item after (with Shift, before) the list
-// in the next frame, as from any other item; it then returns false. (since 0.1)
-bool ListTabStop(ImGuiWindow* window, ImGuiID listId, const ImRect& rect, bool rowFocused);
-
-// Tab for a container whose rows are in a selection scope (see "Tab" at the top of this file), as
-// the view does it. While no row has the focus, ListTabProxy submits the tab stop of list `listId`
-// at `rect` (screen pixels) in the surrounding focus scope and returns true when the focus has just
-// landed on it from outside: the container then moves the focus on to the row Tab lands on
-// (ListFocusRow). While a row has the focus, ListClaimTabExit owns Tab for `owner` every frame and,
-// on a press, puts the focus back on that tab stop (`outerScope` is the focus scope around the
-// selection), so the tabbing of the next frame moves on from there.
+// Tab for a container that runs its rows through the row block inside a selection scope of its own
+// (ItemGrid, DataTable; see "Tab" at the top of this file), as the view does it. Call one of the two
+// every frame before BeginListSelection. While no row has the focus, ListTabProxy submits the tab
+// stop of list `listId` at `rect` (screen pixels, the list's visible area) in the surrounding focus
+// scope and returns true when Tab, Shift+Tab or an arrow key has just landed on it from outside: the
+// container then moves the focus on to the row Tab lands on (ListFocusRow). While a row has the
+// focus, ListClaimTabExit owns Tab for `owner` every frame and, on a press, puts the focus back on
+// that tab stop (`outerScope` is the focus scope around the selection), so the tabbing of the next
+// frame moves on to the item after (with Shift, before) the list. (since 0.1)
 bool ListTabProxy(ImGuiID listId, const ImRect& rect);
 void ListClaimTabExit(ImGuiWindow* window, ImGuiID owner, ImGuiID listId, ImGuiID outerScope, const ImRect& rect);
 

@@ -15,9 +15,9 @@
 // ImGui::BeginMultiSelect with two-dimensional box selection: click, Ctrl, Shift, Ctrl+A and Escape
 // as in every Facet list, and the arrows move in two dimensions and wrap at the line ends. The grid
 // is one Tab stop: without a selection the focused tile (else the first) is the only tile Tab stops
-// on; with one, the list view's tab stop (ListTabStop) carries Tab into and out of the selection
-// scope. Home and End jump to the first and last tile (with Shift: a range). The focused tile is
-// kept under the id, so the focus survives scrolling.
+// on; with one, the list view's tab stop (ListTabProxy and ListClaimTabExit) carries Tab into and
+// out of the selection scope. Home and End jump to the first and last tile (with Shift: a range).
+// The focused tile is kept under the id, so the focus survives scrolling.
 //
 // While the state is not Ready, or the grid has no tile, the area keeps its size and shows the
 // loading, error or empty state of the list view (DrawListState), and BeginItemGrid returns false.
@@ -177,8 +177,10 @@ bool BeginItemGrid(const char* id, int itemCount, ImGuiSelectionBasicStorage* se
 
     // The tab stop (with a selection) and Home and End.
     bool enter = false;
-    if (selection != nullptr)
-        enter = internal::ListTabStop(e.window, gridId, e.window->InnerRect, focused);
+    if (selection != nullptr && !focused)
+        enter = internal::ListTabProxy(gridId, e.window->InnerRect);
+    else if (selection != nullptr)
+        internal::ListClaimTabExit(e.window, gridId, gridId, g.CurrentFocusScopeId, e.window->InnerRect);
     e.top = static_cast<double>(e.window->DC.CursorPos.y);
     if (enter)
         FocusItemGridTile(e, e.tabStop);

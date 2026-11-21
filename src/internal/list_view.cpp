@@ -1576,17 +1576,6 @@ void DrawListState(const ImRect& rect, DataState state, const char* emptyText, c
     PopTextStyle();
 }
 
-bool ListTabStop(ImGuiWindow* window, ImGuiID listId, const ImRect& rect, bool rowFocused)
-{
-    if (ImGui::GetCurrentContext() == nullptr || window == nullptr)
-        return false;
-    const ImGuiID proxyId = TabProxyId(listId);
-    if (!rowFocused)
-        return SubmitTabProxy(proxyId, rect);
-    ClaimTabExit(window, listId, proxyId, GImGui->CurrentFocusScopeId, rect);
-    return false;
-}
-
 void ListCoreNewFrame()
 {
     TabExit& exit = PendingTabExit();
