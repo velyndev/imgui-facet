@@ -749,3 +749,140 @@ TEST_CASE("Tab and Shift+Tab enter and leave a selectable list without changing 
     CHECK(ImGui::GetFocusID() == session.ItemId("before"));
     CHECK(selection.Size == 1);
 }
+
+// ---- MultiDropdown ----------------------------------------------------------------------------
+
+TEST_CASE("A multi dropdown toggles rows by click and keeps its list open")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {false, true, false, false, false};
+    int writes = 0;
+    PopupProbe popup;
+    session.SetUi([&] {
+        if (facet::MultiDropdown("Fruit", checked, kFruit))
+            ++writes;
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("fruit"));
+    REQUIRE(popup.open);
+    session.Click(popup.Row(0));
+    CHECK(checked[0]);
+    CHECK(popup.open);
+    session.Click(popup.Row(1));
+    CHECK_FALSE(checked[1]);
+    session.Click(popup.Row(2));  // disabled
+    CHECK_FALSE(checked[2]);
+    CHECK(writes == 2);
+    CHECK(popup.open);
+    session.Click(session.ItemCenter("fruit"));
+    CHECK_FALSE(popup.open);
+}
+
+TEST_CASE("A multi dropdown opens and toggles with the keyboard; Tab and Escape close it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {};
+    PopupProbe popup;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::MultiDropdown("Fruit", checked, kFruit);
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    REQUIRE(popup.open);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(checked[0]);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(checked[1]);
+    CHECK(popup.open);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK_FALSE(popup.open);
+    CHECK(checked[0]);
+    CHECK(checked[1]);
+    CHECK(ImGui::GetFocusID() == session.ItemId("fruit"));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(popup.open);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(popup.open);
+}
+
+TEST_CASE("The select-all row of a multi dropdown checks or clears every enabled item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {true, false, false, false, false};
+    PopupProbe popup;
+    session.SetUi([&] {
+        facet::MultiDropdown("Fruit", checked, kFruit, {.selectAllRow = true});
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("fruit"));
+    session.Click(popup.Row(0));  // Mixed: checks every enabled item
+    CHECK(checked == std::array<bool, 5>{true, true, false, true, true});
+    session.Seconds(0.5f);        // not a double click
+    session.Click(popup.Row(0));  // On: clears them
+    CHECK(checked == std::array<bool, 5>{false, false, false, false, false});
+}
+
+TEST_CASE("A multi dropdown never writes entries missing from its span, and a read-only one does not open")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 2> shortSpan = {};
+    std::array<bool, 5> checked = {};
+    PopupProbe popup;
+    PopupProbe readOnly;
+    session.SetUi([&] {
+        facet::MultiDropdown("Short", shortSpan, kFruit, {.selectAllRow = true});
+        session.Track("short");
+        popup.Record("Short");
+        facet::MultiDropdown("Read only", checked, kFruit, {.readOnly = true});
+        session.Track("readonly");
+        readOnly.Record("Read only");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("short"));
+    session.Click(popup.Row(0));
+    CHECK(shortSpan == std::array<bool, 2>{true, true});
+    session.Click(popup.Row(5));  // Elderberry: no entry to write
+    CHECK(shortSpan == std::array<bool, 2>{true, true});
+    session.KeyPress(ImGuiKey_Escape);
+    session.Click(session.ItemCenter("readonly"));
+    CHECK_FALSE(readOnly.open);
+}
+
+TEST_CASE("A searchable multi dropdown filters its rows and toggles the active one with Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {};
+    PopupProbe popup;
+    session.SetUi([&] {
+        facet::MultiDropdown("Fruit", checked, kFruit, {.searchable = true});
+        session.Track("fruit");
+        popup.Record("Fruit");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("fruit"));
+    session.Frames(2);
+    session.Type("date");
+    session.Frame();
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(checked[3]);
+    CHECK(popup.open);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(popup.open);
+}

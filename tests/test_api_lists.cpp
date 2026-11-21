@@ -59,8 +59,6 @@ void CallListStubs(Values& v)
     const std::span<bool> checked(v.checked);
     const std::span<facet::CheckState> states(v.states);
 
-    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi", checked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi labels", checked, kLabels)));
     CHECK_BALANCED(if (facet::BeginCombo("Combo", "Option 1")) {
         FAIL("BeginCombo opened");
         facet::EndCombo();

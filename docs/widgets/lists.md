@@ -75,8 +75,6 @@ Status: ready.
 
 ### MultiDropdown
 
-Status: planned
-
 ```cpp
 bool MultiDropdown(const char* label, std::span<bool> checked, std::span<const ChoiceItem> items,
                    const MultiDropdownOptions& options = {});
@@ -84,7 +82,25 @@ bool MultiDropdown(const char* label, std::span<bool> checked, std::span<const c
                    const MultiDropdownOptions& options = {});
 ```
 
-A field whose list stays open while items are checked, summed up in the field as a list or a count.
+A field whose list has a checkbox per row and stays open while items are toggled. It shares the
+field, the opening keys, the placement, the group headers, the filter and the states with Dropdown.
+
+- **Field:** the checked labels, comma separated and cut with an ellipsis (`summary` List), or
+  `Strings::selectedCount` with the number of checked items (`summary` Count); the placeholder
+  while nothing is checked.
+- **In the open list:** Space, Enter or a click toggles the active row and writes its entry at
+  once; the list stays open. Tab, Escape, a click outside or a click on the field closes it. In a
+  searchable list Space types into the filter, and Enter toggles.
+- **Select-all row** (`selectAllRow`): the first row, with a checkbox that shows On when every shown
+  enabled item is checked, Mixed when some are and Off when none are; activating it checks every
+  shown enabled item, or clears them when all were checked. While filtering it acts on the matches.
+- **Entries:** `checked` has one entry per item; a missing entry shows as unchecked and is never
+  written; disabled items are never toggled.
+- **States:** disabled, read-only (does not open), `error`, `helpText`, and the item states as
+  Dropdown.
+- **Result:** true on each frame an entry was written; `ImGui::IsItemEdited` is true then.
+
+Status: ready.
 
 ### BeginCombo, ComboItem, EndCombo
 

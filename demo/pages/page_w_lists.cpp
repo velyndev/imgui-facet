@@ -12,7 +12,9 @@
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/popup_host.h"
 #include "pages/pages.h"
+#include "widgets/lists/list_parts.h"
 
 namespace
 {
@@ -30,6 +32,7 @@ enum CaptureState
     kDropdownOpen,
     kDropdownSearch,
     kFocused,
+    kMultiOpen,
 };
 
 const facet::ChoiceItem kOptions[] = {
@@ -79,9 +82,13 @@ struct ListsState
     int listBoxLong = 41;
     int activated = -1;
 
+    // MultiDropdown
+    bool multi[5] = {true, false, true, false, false};
+    bool multiCounted[4] = {false, true, true, false};
+    bool multiNone[4] = {};
+
     // The planned widgets below.
     int combo = 0;
-    bool multi[5] = {true, false, true, false, false};
     bool checklist[kChecklistCount] = {};
     bool transfer[5] = {false, true, false, false, false};
     facet::CheckState checkTree[5] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
@@ -96,6 +103,17 @@ ListsState& State()
 {
     static ListsState state;
     return state;
+}
+
+// Records the open list of the dropdown-like widget submitted last as probe `name`, so the selftest
+// clicks its rows wherever the list opened (below or above the field, at any scale).
+void ProbePopup(facet::demo::PageCtx& ctx, const char* name)
+{
+    const ImGuiID level = facet::internal::ListsLevelId(ImGui::GetItemID());
+    if (!facet::internal::IsPopupLevelOpen(level))
+        return;
+    const ImRect rect = facet::internal::PopupLevelRect(level);
+    facet::demo::ProbeRect(ctx, name, level, rect.Min, rect.Max);
 }
 
 // The label of item `index` of kOptions, or "none".
@@ -118,6 +136,7 @@ void DropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
     if (facet::Dropdown("Icons and groups", &s.dropdown, kOptions, {.width = 320.0f}))
         ++s.writes;
     ctx.Probe("lists.dropdown");
+    ProbePopup(ctx, "lists.dropdown.popup");
     if (ctx.capture && ctx.captureState == kDropdownOpen)
         ctx.RevealInCapture(0.25f);
 
@@ -235,6 +254,37 @@ void SelectableListSection(facet::demo::PageCtx& ctx, ListsState& s)
     Note("Selected rows: %d. Last activated: %s.", s.selection.Size, OptionName(s.activated));
 }
 
+int CountChecked(std::span<const bool> checked)
+{
+    return static_cast<int>(std::count(checked.begin(), checked.end(), true));
+}
+
+void MultiDropdownSection(facet::demo::PageCtx& ctx, ListsState& s)
+{
+    SectionHeader("Multi dropdown");
+    Paragraph("A dropdown whose rows have checkboxes. Space, Enter or a click toggles the active row and the list "
+              "stays open; Escape, Tab or a click outside closes it. The field lists the checked labels or counts "
+              "them.");
+    if (ctx.capture && ctx.captureState == kMultiOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    if (facet::MultiDropdown("With select all", s.multi, kOptions, {.selectAllRow = true, .width = 320.0f}))
+        ++s.writes;
+    ctx.Probe("lists.multi");
+    ProbePopup(ctx, "lists.multi.popup");
+    if (ctx.capture && ctx.captureState == kMultiOpen)
+        ctx.RevealInCapture(0.25f);
+    if (facet::MultiDropdown("Counted", s.multiCounted, kLabels,
+                             {.summary = facet::MultiDropdownSummary::Count, .searchable = true, .width = 320.0f}))
+        ++s.writes;
+    ctx.Probe("lists.multi.count");
+    LabeledRow("Read-only");
+    facet::MultiDropdown("##multireadonly", s.multi, kOptions, {.width = 200.0f, .readOnly = true});
+    LabeledRow("Nothing checked");
+    facet::MultiDropdown("##multinone", s.multiNone, kLabels, {.width = 200.0f, .helpText = "Shows the placeholder"});
+    Note("Checked: %d of %d, %d of %d.", CountChecked(s.multi), static_cast<int>(std::size(kOptions)),
+         CountChecked(s.multiCounted), static_cast<int>(std::size(kLabels)));
+}
+
 void ComboSection(ListsState& s)
 {
     SectionHeader("Combo with custom rows");
@@ -251,8 +301,6 @@ void ComboSection(ListsState& s)
 void ChooseSeveral(ListsState& s)
 {
     SectionHeader("Choose several values");
-    LabeledRow("Multi dropdown");
-    facet::MultiDropdown("##multi", s.multi, kOptions, {.selectAllRow = true});
     Paragraph("A checklist over a thousand generated entries with a filter field, and a transfer "
               "list that moves entries between two lists.");
     facet::SearchableChecklist("Checklist", s.checklist, kChecklistCount, &NumberedOption, nullptr,
@@ -288,7 +336,8 @@ void Hierarchies(ListsState& s)
 
 } // namespace
 
-FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dropdown-search", "focused")
+FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dropdown-search", "focused",
+                 "multi-open")
 {
     facet::demo::PageHeader("Lists",
                             "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
@@ -298,6 +347,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     DropdownSection(ctx, s);
     ListBoxSection(ctx, s);
     SelectableListSection(ctx, s);
+    MultiDropdownSection(ctx, s);
     ComboSection(s);
     ChooseSeveral(s);
     SelectAndReorder(s);
@@ -316,13 +366,18 @@ FACET_DEMO_SELFTEST("lists")
         s.states[0] = 1;
     });
 
-    // Dropdown, pointer: a click opens the list, a click on a row chooses it. The rows start below the
-    // field: the anchor gap, the list padding and the area padding (28 units) before row 0, 32 per row.
+    // Rows of an open list without a filter field: the list padding and the area padding (8 units)
+    // before row 0, 32 units per row, wherever the list opened.
+    const auto popupRow = [](const char* probe, int row) {
+        return T::Item(probe, 0.5f, 0.0f).Offset(0.0f, 8.0f + 32.0f * (static_cast<float>(row) + 0.5f));
+    };
+
+    // Dropdown, pointer: a click opens the list, a click on a row chooses it.
     test.Click("lists.dropdown");
     test.Click("lists.dropdown");  // a click on the field of the open list closes it
     test.ExpectNear("a click on the open field closes without choosing", [] { return State().writes; }, 0.0, 0.0);
     test.Click("lists.dropdown");
-    test.MouseMove(T::Item("lists.dropdown", 0.7f, 1.0f).Offset(0.0f, 28.0f + 32.0f * 2.0f));
+    test.MouseMove(popupRow("lists.dropdown.popup", 2));
     test.MouseDown();
     test.MouseUp();
     test.ExpectNear("a click on the third row (Option 2) chooses it", [] { return State().dropdown; }, 1.0, 0.0);
@@ -402,4 +457,41 @@ FACET_DEMO_SELFTEST("lists")
     test.ExpectNear("Shift+Up shrinks the range to three rows", [] { return State().selection.Size; }, 3.0, 0.0);
     test.KeyPress(ImGuiKey_Enter);
     test.ExpectNear("Enter activates the focused row", [] { return State().activated; }, 2.0, 0.0);
+
+    // MultiDropdown. Rows: Select all, Group 1, Option 1, Option 2, Group 2, Option 3, Option 4, Option 5.
+    test.Do([] {
+        ListsState& s = State();
+        const bool multi[5] = {true, false, true, false, false};
+        const bool counted[4] = {false, true, true, false};
+        std::copy(std::begin(multi), std::end(multi), s.multi);
+        std::copy(std::begin(counted), std::end(counted), s.multiCounted);
+    });
+    test.Click("lists.multi");
+    test.MouseMove(popupRow("lists.multi.popup", 3));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click on Option 2 checks it and the list stays open", [] { return State().multi[1]; });
+    test.Wait(20);
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a second click clears it", [] { return !State().multi[1]; });
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectNear("Space toggles the active row", [] { return CountChecked(State().multi); }, 3.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectNear("Down opens with the first row active; Space on Select all checks every enabled item",
+                    [] { return CountChecked(State().multi); }, 4.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectNear("Tab closes the list without a change", [] { return CountChecked(State().multi); }, 4.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
+
+    test.Click("lists.multi.count");
+    test.Wait(2);
+    test.Type("3");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("the filter field finds Option 3 and Enter clears it", [] { return !State().multiCounted[2]; });
+    test.KeyPress(ImGuiKey_Escape);
 }

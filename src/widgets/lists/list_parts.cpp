@@ -718,6 +718,11 @@ ListsPopupResult ListsPopupList(const ListsPopupDesc& desc)
     }
     const bool spacePressed = !desc.searchable && input && !desc.opened &&
                               ImGui::IsKeyPressed(ImGuiKey_Space, ImGuiInputFlags_None, desc.level);
+    // In a multi-select list Tab closes the list instead of toggling the active row.
+    const bool tabCloses = desc.multi && input && !desc.opened &&
+                           ImGui::IsKeyPressed(ImGuiKey_Tab, ImGuiInputFlags_None, desc.level);
+    if (tabCloses)
+        result.close = true;
 
     const float rowHeight = ListRowHeight(desc.size);
     const int maxRows = desc.maxVisibleRows > 0 ? desc.maxVisibleRows : theme.list.popupRows;
@@ -789,7 +794,7 @@ ListsPopupResult ListsPopupList(const ListsPopupDesc& desc)
         int activated = list.activated;
         if (spacePressed && RowEnabled(desc.source, state.rows, state.highlight))
             activated = state.highlight;
-        if (activated >= 0 && input && !desc.readOnly)
+        if (activated >= 0 && input && !desc.readOnly && !tabCloses)
         {
             // Rows take the pointer on its release, so an activation without one came from a key.
             result.byKey = !ImGui::IsMouseReleased(ImGuiMouseButton_Left);
