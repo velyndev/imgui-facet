@@ -60,7 +60,40 @@ Status: ready.
 void LineChart(const char* id, std::span<const ChartSeries> series, const LineChartOptions& options = {});
 ```
 
-Lines or areas over a shared x axis with a snapping crosshair. Status: planned.
+Lines of one or more series over a shared x axis, with a y axis title above the plot, tick labels
+on both axes and the x axis title under them.
+
+- **Axes:** the x range is the extent of the visible series, the y range the data padded by 5 %
+  and extended to whole tick steps (from 0 with `area` or `stacked`), unless `min` and `max` of
+  the `ChartAxis` differ. Tick labels follow `formatter`, `format` or the shortest text the step
+  needs, and are measured: along x fewer ticks are asked for until the widest label fits between
+  its neighbours, and if it still does not, only every n-th tick is labelled, so labels never
+  overlap. `hideTicks` gives the room to the plot, `hideGrid` leaves out the grid lines; a linear
+  y axis through 0 draws its zero line stronger. A logarithmic axis leaves values at or below 0
+  out of its automatic range.
+- **Series:** `color` or the palette color of the series index; `hidden` series are not drawn and
+  leave the range. NaN values and getter gaps break a line; a stretch of one sample is a dot.
+  Long series are decimated to a few points per pixel column. `area` fills under each line at
+  low opacity; `stacked` adds the series up (they need equal x) and fills the band between one
+  stack and the next, so the fills never overlap; gaps count as 0 in the stacks below.
+  `markers` puts a marker on every sample while samples are at least a marker apart, in a shape
+  per series index (circle, square, diamond, triangle), so series stay apart without color.
+- **Readout:** the chart is one item and one Tab stop. With `crosshair`, the pointer over the plot
+  picks the nearest x of the first visible series: a hairline marks it, each visible series gets
+  a dot at its sample nearest to that x, and a box beside it names the x and every series value
+  (eight rows, then "+{count}"). Without `crosshair` the pointer picks the nearest point of any
+  series and the box names that series alone. With keyboard focus, Left and Right step through
+  the samples of the first visible series, Home and End go to the ends; the keys are taken from
+  navigation while the chart is focused. The inspected sample is kept under the id.
+- **Legend:** `legend` draws a passive legend under the plot (series labels; with `markers`, the
+  marker shapes). Use `Legend` beside the chart to let people toggle series.
+- **States:** `Loading` draws a skeleton over the chart's box, `Error` the error state with
+  `errorText`, and every series empty the empty state with `emptyText`; each keeps the size and
+  is not a Tab stop. Disabled: the disabled colors and no readout.
+- **Size:** `width` 0 fills the available width, `height` 0 is `metrics.chartHeight`. Everything is
+  clipped to the box, down to a few pixels.
+
+Status: ready.
 
 ### BarChart
 

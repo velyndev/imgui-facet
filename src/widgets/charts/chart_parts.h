@@ -158,6 +158,23 @@ void DrawChartLabelsY(ImDrawList* drawList, const ChartAxis& options, const Char
 void DrawChartLabelsX(ImDrawList* drawList, const ChartAxis& options, const ChartNumericAxis& axis,
                       const Scale& scale, float top, float clipMin, float clipMax, bool disabled);
 
+// The bands of a chart with axes, top to bottom (pixels): the y axis title, the plot (with half a
+// tick label of room above it, so the top label is not cut), the x tick labels, the x axis title
+// and the passive legend (`legendHeight`, 0 for none).
+struct ChartBands
+{
+    float yTitleTop = 0.0f;
+    float plotTop = 0.0f;
+    float plotBottom = 0.0f;
+    float xLabelsTop = 0.0f;
+    float xTitleTop = 0.0f;
+    float legendTop = 0.0f;
+};
+ChartBands LayoutChartBands(const ImRect& bounds, bool yTitle, bool xLabels, bool xTitle, float legendHeight);
+// An axis title in Footnote labelSecondary, cut to [left, right], at `top`; centered or at the left.
+void DrawChartAxisTitle(ImDrawList* drawList, const char* title, float left, float right, float top, bool center,
+                        bool disabled);
+
 // ---- Readout ----------------------------------------------------------------------------------
 
 inline constexpr int kChartReadoutLines = 8;  // series rows a readout lists; the rest is "+{count}"
@@ -181,8 +198,17 @@ void DrawChartReadout(ImDrawList* drawList, const ImRect& area, ImVec2 anchor, c
 struct ChartReadoutState
 {
     int index = -1;          // the inspected entry (sample, category, slice), -1 none
+    int series = -1;         // a chart that inspects one series at a time: that series, -1 all
     bool keyboard = false;   // set by the keys; the pointer takes over once it moves
 };
+
+// For selftests and tests: the entry the readout of chart `chartId` (its id hashed in its window)
+// inspects, -1 for none or an unknown chart.
+int ChartReadoutIndex(ImGuiID chartId);
+
+// Whether the readout follows the pointer this frame: it is over `area` and either the keys did
+// not move the readout last, or the pointer moved since. Clears state.keyboard then.
+bool ChartPointerReadout(bool hovered, const ImRect& area, ChartReadoutState& state);
 
 // Left and Right (Up and Down too when `vertical`), Home and End on the focused chart `id`: moves
 // state.index within [0, count) and returns true when it moved. The keys are taken from keyboard
@@ -223,12 +249,19 @@ FittedText DrawChartLegendEntry(ImDrawList* drawList, const ImRect& rect, const 
 inline constexpr int kChartLegendTracked = 32;
 ImRect ChartLegendEntryRect(ImGuiID legendId, int index);
 
+// For selftests and tests: the grip rectangle (screen pixels) and item id of edge `handle` (0 low,
+// 1 high) of the ChartRangeBrush `brushId` in its last frame; empty and 0 when unknown.
+ImRect ChartBrushHandleRect(ImGuiID brushId, int handle);
+ImGuiID ChartBrushHandleId(ImGuiID brushId, int handle);
+
 // A passive legend: `count` entries from `entry(data, i, out)` (false skips one) flowed into rows
-// of `width` pixels. Measure returns the height; Draw draws them with the top-left at `origin`.
+// of `width` pixels, or one per row with `column`. Measure returns the height; Draw draws them with
+// the top-left at `origin`; ColumnWidth is the widest entry, at most `maxWidth`.
 using ChartLegendSource = bool (*)(const void* data, int index, ChartLabelText* label, ChartLegendLook* look);
-float MeasureChartLegend(ChartLegendSource source, const void* data, int count, float width);
+float MeasureChartLegend(ChartLegendSource source, const void* data, int count, float width, bool column = false);
 void DrawChartLegend(ImDrawList* drawList, ImVec2 origin, float width, ChartLegendSource source, const void* data,
-                     int count);
+                     int count, bool column = false);
+float ChartLegendColumnWidth(ChartLegendSource source, const void* data, int count, float maxWidth);
 
 // ---- Frame times ------------------------------------------------------------------------------
 

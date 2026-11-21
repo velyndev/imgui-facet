@@ -15,6 +15,7 @@
 #include "facet/widgets/display.h"
 #include "internal/loading.h"
 #include "internal/reserve.h"
+#include "internal/state_storage.h"
 #include "internal/text_util.h"
 
 namespace facet::internal
@@ -302,8 +303,16 @@ Range ChartResolveRange(const ChartAxis& axis, Range data, const ChartRangeRule&
         if (fromZero && before.max == 0.0)
             range.max = 0.0;
     }
-    if (rule.nice)
-        range = NiceRange(range, targetTicks, kind);
+    // Extending the range can make the step of its ticks coarser; extend again until the ends sit
+    // on ticks of the range itself.
+    for (int round = 0; rule.nice && round < kChartTickRounds; ++round)
+    {
+        const Range wider = NiceRange(range, targetTicks, kind);
+        const bool same = wider.min == range.min && wider.max == range.max;
+        range = wider;
+        if (same)
+            break;
+    }
     return range;
 }
 
@@ -479,6 +488,65 @@ void DrawChartLabelsX(ImDrawList* drawList, const ChartAxis& options, const Char
     });
 }
 
+ChartBands LayoutChartBands(const ImRect& bounds, bool yTitle, bool xLabels, bool xTitle, float legendHeight)
+{
+    const Theme& t = T();
+    const float gap = std::round(Px(t.spacing.xs));
+    float tickHeight = 0.0f;
+    {
+        ControlTextScope text(kChartTickStyle);
+        tickHeight = ImGui::GetFontSize();
+    }
+    float titleHeight = 0.0f;
+    {
+        ControlTextScope text(kChartTextStyle);
+        titleHeight = ImGui::GetFontSize();
+    }
+    ChartBands bands;
+    float top = bounds.Min.y;
+    bands.yTitleTop = top;
+    if (yTitle)
+        top += titleHeight + gap;
+    bands.plotTop = std::round(top + tickHeight * 0.5f);
+    float bottom = bounds.Max.y;
+    if (legendHeight > 0.0f)
+    {
+        bottom -= legendHeight;
+        bands.legendTop = bottom;
+        bottom -= std::round(Px(t.spacing.sm));
+    }
+    if (xTitle)
+    {
+        bottom -= titleHeight;
+        bands.xTitleTop = bottom;
+        bottom -= gap;
+    }
+    if (xLabels)
+    {
+        bottom -= tickHeight;
+        bands.xLabelsTop = bottom;
+        bottom -= gap;
+    }
+    else
+    {
+        // The plot keeps half a label line at the bottom too, so the lowest y label is not cut.
+        bottom -= std::round(tickHeight * 0.5f);
+    }
+    bands.plotBottom = std::max(bands.plotTop, std::round(bottom));
+    return bands;
+}
+
+void DrawChartAxisTitle(ImDrawList* drawList, const char* title, float left, float right, float top, bool center,
+                        bool disabled)
+{
+    if (title == nullptr || title[0] == '\0' || right <= left)
+        return;
+    ControlTextScope text(kChartTextStyle);
+    const FittedText shown = FitText(title, nullptr, right - left);
+    const float x = center ? std::round((left + right - shown.width) * 0.5f) : left;
+    drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(x, top), ToU32(ChartTextColor(disabled)), shown.text);
+}
+
 // ---- Readout ----------------------------------------------------------------------------------
 
 void DrawChartReadout(ImDrawList* drawList, const ImRect& area, ImVec2 anchor, const char* title,
@@ -558,6 +626,23 @@ void DrawChartReadout(ImDrawList* drawList, const ImRect& area, ImVec2 anchor, c
     if (more > 0)
         drawList->AddText(font, fontSize, ImVec2(left, rowTop), ToU32(c.labelSecondary), moreText);
     drawList->PopClipRect();
+}
+
+int ChartReadoutIndex(ImGuiID chartId)
+{
+    const void* state = GlobalStateStore().Find(chartId, StateTypeOf<ChartReadoutState>());
+    return state != nullptr ? static_cast<const ChartReadoutState*>(state)->index : -1;
+}
+
+bool ChartPointerReadout(bool hovered, const ImRect& area, ChartReadoutState& state)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (!hovered || !area.Contains(io.MousePos))
+        return false;
+    if (state.keyboard && io.MouseDelta.x == 0.0f && io.MouseDelta.y == 0.0f)
+        return false;
+    state.keyboard = false;
+    return true;
 }
 
 bool ChartReadoutKeys(ImGuiID id, bool focused, int count, bool vertical, ChartReadoutState& state)
@@ -652,7 +737,8 @@ namespace
 
 // Flows the entries of a passive legend into rows; `place(i, rect, label, look)` for each one.
 template <class Place>
-float FlowChartLegend(ImVec2 origin, float width, ChartLegendSource source, const void* data, int count, Place place)
+float FlowChartLegend(ImVec2 origin, float width, bool column, ChartLegendSource source, const void* data, int count,
+                      Place place)
 {
     const ChartLegendMetrics m = GetChartLegendMetrics();
     float x = 0.0f;
@@ -665,7 +751,7 @@ float FlowChartLegend(ImVec2 origin, float width, ChartLegendSource source, cons
         if (!source(data, i, &label, &look))
             continue;
         const float entry = ChartLegendEntryWidth(label, m, width);
-        if (any && x + entry > width)
+        if (any && (column || x + entry > width))
         {
             x = 0.0f;
             y += m.height;
@@ -680,24 +766,41 @@ float FlowChartLegend(ImVec2 origin, float width, ChartLegendSource source, cons
 
 } // namespace
 
-float MeasureChartLegend(ChartLegendSource source, const void* data, int count, float width)
+float MeasureChartLegend(ChartLegendSource source, const void* data, int count, float width, bool column)
 {
     if (source == nullptr || count <= 0)
         return 0.0f;
     ControlTextScope text(kChartTextStyle);
-    return FlowChartLegend(ImVec2(0.0f, 0.0f), width, source, data, count,
+    return FlowChartLegend(ImVec2(0.0f, 0.0f), width, column, source, data, count,
                            [](const ImRect&, const ChartLabelText&, const ChartLegendLook&, const ChartLegendMetrics&) {});
 }
 
 void DrawChartLegend(ImDrawList* drawList, ImVec2 origin, float width, ChartLegendSource source, const void* data,
-                     int count)
+                     int count, bool column)
 {
     if (source == nullptr || count <= 0)
         return;
     ControlTextScope text(kChartTextStyle);
-    FlowChartLegend(origin, width, source, data, count,
+    FlowChartLegend(origin, width, column, source, data, count,
                     [&](const ImRect& rect, const ChartLabelText& label, const ChartLegendLook& look,
                         const ChartLegendMetrics& m) { DrawChartLegendEntry(drawList, rect, label, look, m); });
+}
+
+float ChartLegendColumnWidth(ChartLegendSource source, const void* data, int count, float maxWidth)
+{
+    if (source == nullptr || count <= 0)
+        return 0.0f;
+    ControlTextScope text(kChartTextStyle);
+    const ChartLegendMetrics m = GetChartLegendMetrics();
+    float widest = 0.0f;
+    for (int i = 0; i < count; ++i)
+    {
+        ChartLabelText label;
+        ChartLegendLook look;
+        if (source(data, i, &label, &look))
+            widest = std::max(widest, ChartLegendEntryWidth(label, m, maxWidth));
+    }
+    return widest;
 }
 
 // ---- Data states ------------------------------------------------------------------------------
