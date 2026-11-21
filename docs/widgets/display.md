@@ -448,8 +448,8 @@ the id and in its ini file.
   `labelSecondary`, or `label` while the column sorts, cut with an ellipsis (the whole label on hover
   and keyboard focus) and placed by the column's `align`. `align` places the header only; cells draw
   their own content (`StyledText` with `.align` and `.width = kFill` lines numbers up). Header cells
-  are Tab stops in display order. Hover and press fill the cell inset by `spacing.xs`; the focus ring
-  goes around that fill.
+  are Tab stops in display order when the table sorts or has the column menu. Hover and press fill
+  the cell inset by `spacing.xs`; the focus ring goes around that fill.
 - **Sorting** (`sortable`): a click, Enter or Space on a header sorts by its column and the next one
   turns the direction (Dear ImGui's `TableSetColumnSortDirection`); with `multiSort`, Shift adds the
   column to the sort. A sorted column shows an arrow (up ascending, down descending) and, while more

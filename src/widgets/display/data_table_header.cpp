@@ -3,7 +3,8 @@
 // ImGui's (and are saved in its ini file).
 //
 //   - A header cell is one item (PartBehavior over the cell) in the table's main navigation
-//     layer, a Tab stop in display order. A click, Enter or Space sorts by its column
+//     layer, a Tab stop in display order while it sorts or opens the column menu. A click, Enter
+//     or Space sorts by its column
 //     (TableSetColumnSortDirection with the column's next direction; Shift adds the column with
 //     multiSort). Dragging it sideways past a neighbour moves the column there, as Dear ImGui's
 //     own header does (TableQueueSetColumnDisplayOrder; never across the frozen columns).
@@ -112,14 +113,17 @@ void DataTableHeaderCell(DataTableFrame& frame, int n, const DataTableColumn& de
     const ImRect fill(cell.Min.x + inset, cell.Min.y + inset, std::max(cell.Min.x + inset, cell.Max.x - inset),
                       cell.Max.y - inset);
     const bool sortable = frame.sortable && (column.Flags & ImGuiTableColumnFlags_NoSort) == 0;
-    const bool interactive = sortable || DataTableHasMenu(frame) || frame.reorderable;
+    // A header with a key action (sorting, the menu) is a Tab stop; one that only moves by drag
+    // takes the pointer and gives no keyboard focus that would do nothing.
+    const bool keyed = sortable || DataTableHasMenu(frame);
+    const bool interactive = keyed || frame.reorderable;
 
     // Header cells sit in the table's main navigation layer: Dear ImGui puts the frozen header row
     // in the menu layer, which Tab never reaches.
     window->DC.NavLayerCurrent = static_cast<ImGuiNavLayer>(table->NavLayer);
     ItemOptions options;
-    options.navigable = interactive;
-    options.tabStop = interactive;
+    options.navigable = keyed;
+    options.tabStop = keyed;
     options.hitTarget = false;
     options.allowOverlap = true;  // the resize bands submitted after it take the pointer on the edges
     options.handCursor = interactive;
