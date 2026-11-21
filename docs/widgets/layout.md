@@ -88,8 +88,6 @@ Status: ready.
 
 ### BeginFlow
 
-Status: planned
-
 ```cpp
 void BeginFlow(const char* id, const FlowOptions& options = {});
 [[nodiscard]] bool FlowNext();
@@ -97,7 +95,30 @@ void EndFlow();
 class FlowScope;
 ```
 
-Items of different widths that wrap onto new lines, with a "+N" chip past the line limit.
+Items of different widths that wrap onto new lines, such as chips and tags. The flow is `width`
+units wide (0 fills the available width) and narrows the window's work rect to it.
+
+- `FlowNext()` before each item places the cursor and starts the item; every item is a group, so it
+  may be made of several items. The sizes of the items in the last frame are kept under the id:
+  `BeginFlow` breaks them into lines with the gap between items and between lines, and a line starts
+  one gap below the tallest item of the line above, measured in the same frame. An item the last
+  frame did not know (the first frame, or one added since) goes after the previous item, or on a new
+  line when that one already reached the width; the next frame places it properly. An item wider
+  than the flow gets a line of its own.
+- `align`: Start, Center or End places each line; Stretch spreads the items of every line but the
+  last over the whole width.
+- `maxLines`: from the first item that does not fit, `FlowNext` returns false for every later item;
+  skip them. On the last allowed line an item must leave room for the chip when more items follow
+  (the first item of a line is always shown). `EndFlow` then draws the chip after the last item
+  shown: a neutral `Badge` with `Strings::moreCount` ("+{count}") and the number of skipped items.
+  The chip is not interactive.
+- The item sizes live in a vector under the id that grows with the item count and is not touched
+  otherwise. Sizes measured at another scale are dropped, so a scale change takes one frame to
+  settle.
+- `EndFlow` is always called; the flow is one group, the last item after it. `FlowNext` outside a
+  flow, or inside a container nested in one, is reported and returns false.
+
+Status: ready.
 
 ### BeginSplitView
 

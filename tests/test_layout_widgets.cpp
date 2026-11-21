@@ -1008,3 +1008,158 @@ TEST_CASE("Dependent groups leave every stack balanced, nested, disabled and out
     CHECK_FALSE(facet::BeginDependentGroup("outside", true));
     CHECK(fi::OpenScopeCount() == 0);
 }
+
+// ---- Flow ---------------------------------------------------------------------------------------
+
+namespace
+{
+
+// A flow of `count` fixed-size buttons; records where each landed and which ones FlowNext let in.
+struct FlowUi
+{
+    static constexpr int kMax = 8;
+    int count = 5;
+    float itemWidth = 100.0f;
+    facet::FlowOptions options{.width = 330.0f};
+    ImRect items[kMax];
+    bool shown[kMax] = {};
+    ImRect flow;
+
+    void Ui()
+    {
+        facet::BeginFlow("flow", options);
+        for (int i = 0; i < count; ++i)
+        {
+            shown[i] = facet::FlowNext();
+            if (!shown[i])
+                continue;
+            ImGui::PushID(i);
+            ImGui::Button("##item", ImVec2(itemWidth, 20.0f));
+            items[i] = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            ImGui::PopID();
+        }
+        facet::EndFlow();
+        flow = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    }
+};
+
+} // namespace
+
+TEST_CASE("A flow wraps its items onto new lines with the gap between items and lines")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    FlowUi ui;
+    session.SetUi([&] { ui.Ui(); });
+    session.Frames(3);
+    const float gap = facet::Px(facet::T().spacing.sm);
+    for (int i = 0; i < ui.count; ++i)
+        CHECK(ui.shown[i]);
+    CHECK(ui.items[1].Min.x - ui.items[0].Max.x == doctest::Approx(gap));
+    CHECK(ui.items[2].Min.y == doctest::Approx(ui.items[0].Min.y));
+    // 3 x 100 + 2 gaps fit 330; the fourth wraps.
+    CHECK(ui.items[3].Min.x == doctest::Approx(ui.items[0].Min.x));
+    CHECK(ui.items[3].Min.y == doctest::Approx(ui.items[0].Max.y + gap));
+    CHECK(ui.flow.GetWidth() == doctest::Approx(330.0f));
+    CHECK(ui.flow.Max.y == doctest::Approx(ui.items[4].Max.y));
+}
+
+TEST_CASE("A flow with a line limit counts the items that do not fit in a chip")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    FlowUi ui;
+    ui.options.maxLines = 1;
+    session.SetUi([&] { ui.Ui(); });
+    session.Frames(4);
+    // The third item would fit alone, but not with the chip after it.
+    CHECK(ui.shown[0]);
+    CHECK(ui.shown[1]);
+    CHECK_FALSE(ui.shown[2]);
+    CHECK_FALSE(ui.shown[3]);
+    CHECK_FALSE(ui.shown[4]);
+    // One line, and the chip stays inside the width.
+    CHECK(ui.flow.GetHeight() < 40.0f);
+    CHECK(ui.flow.Max.x <= ui.flow.Min.x + 330.0f + 0.5f);
+    // Room for everything: nothing is hidden.
+    ui.options.maxLines = 0;
+    session.Frames(2);
+    CHECK(ui.shown[4]);
+}
+
+TEST_CASE("A flow places its lines by align and spreads them with Stretch")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    FlowUi ui;
+    ui.count = 2;
+    ui.options.align = facet::LayoutAlign::Center;
+    session.SetUi([&] { ui.Ui(); });
+    session.Frames(3);
+    const float gap = facet::Px(facet::T().spacing.sm);
+    const float used = 200.0f + gap;
+    CHECK(ui.items[0].Min.x - ui.flow.Min.x == doctest::Approx((330.0f - used) * 0.5f));
+    ui.options.align = facet::LayoutAlign::End;
+    session.Frames(2);
+    CHECK(ui.items[1].Max.x == doctest::Approx(ui.flow.Min.x + 330.0f));
+    // Stretch spreads every line but the last.
+    ui.count = 5;
+    ui.options.align = facet::LayoutAlign::Stretch;
+    session.Frames(3);
+    CHECK(ui.items[0].Min.x == doctest::Approx(ui.flow.Min.x));
+    CHECK(ui.items[2].Max.x == doctest::Approx(ui.flow.Min.x + 330.0f));
+    CHECK(ui.items[4].Min.x - ui.items[3].Max.x == doctest::Approx(gap));
+}
+
+TEST_CASE("A flow holds at a width of a few pixels, with no item and with one, at every scale")
+{
+    ScaleGuard scale;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    FlowUi ui;
+    ui.options.width = 3.0f;
+    session.SetUi([&] { CHECK_BALANCED(ui.Ui()); });
+    for (const float uiScale : {0.75f, 1.0f, 2.0f})
+    {
+        CAPTURE(uiScale);
+        facet::SetUiScale(uiScale);
+        ui.count = 3;
+        session.Frames(3);
+        // One item per line, none overlapping.
+        CHECK(ui.items[1].Min.y > ui.items[0].Max.y);
+        CHECK(ui.items[2].Min.y > ui.items[1].Max.y);
+        ui.count = 1;
+        session.Frames(2);
+        CHECK(ui.flow.GetHeight() == doctest::Approx(20.0f));
+        ui.count = 0;
+        session.Frames(2);
+        CHECK(ui.flow.GetHeight() == doctest::Approx(0.0f));
+    }
+}
+
+TEST_CASE("Flows nest, and a stray FlowNext is reported")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    int reported = 0;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::FlowScope outer("outer", {.maxLines = 2});
+            if (facet::FlowNext())
+            {
+                facet::FlowScope inner("inner", {.width = 120.0f});
+                if (facet::FlowNext())
+                    ImGui::TextUnformatted("inner item");
+            }
+            if (facet::FlowNext())
+                ImGui::TextUnformatted("outer item");
+        });
+        const int before = fi::UsageErrorCount();
+        CHECK_FALSE(facet::FlowNext());
+        reported = fi::UsageErrorCount() - before;
+    });
+    session.Frames(2);
+    CHECK(reported == 1);
+}

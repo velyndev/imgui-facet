@@ -41,11 +41,6 @@ void CallLayoutStubs(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
     CHECK_BALANCED({
-        facet::BeginFlow("Flow");
-        CHECK(facet::FlowNext());
-        facet::EndFlow();
-    });
-    CHECK_BALANCED({
         facet::BeginPanels("Panels", v.sizes);
         const bool open = facet::BeginPanel("Panel");
         CHECK(open);

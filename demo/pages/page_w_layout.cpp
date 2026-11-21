@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -53,6 +54,13 @@ constexpr int kGridCells = 7;
 constexpr float kGridCell = 80.0f;
 // The width of the stack column.
 constexpr float kColumnWidth = 280.0f;
+// Flow: placeholder tags of different lengths, and the line limits of the lines control.
+constexpr int kFlowTags = 12;
+const char* const kTags[kFlowTags] = {"Tag",          "A longer tag", "Short",       "Placeholder tag",
+                                      "Another tag",  "Tag 6",        "A tag of several words", "Tag 8",
+                                      "Tag nine",     "Tag 10",       "Last but one", "Last tag"};
+const char* const kFlowLines[] = {"No limit", "One line", "Two lines"};
+const char* const kFlowAligns[] = {"Start", "Center", "End", "Stretch"};
 
 struct LayoutState
 {
@@ -79,6 +87,12 @@ struct LayoutState
     // Grid
     int gridColumns = 0;
     float gridCellX[kGridCells] = {};
+    // Flow
+    int flowLines = 0;
+    int flowAlign = 0;
+    int flowWidth = 100;
+    int flowShown = 0;
+    bool tags[kFlowTags] = {};
     // Split view
     int splitWidth = 100;
     float splitRatio = 0.4f;
@@ -307,14 +321,45 @@ void Separators()
     facet::Separator({.opaque = true});
 }
 
-void Arrange()
+void Flows(facet::demo::PageCtx& ctx, LayoutState& s)
 {
-    SectionHeader("Arrange items");
-    facet::BeginFlow("flow", {.maxLines = 2});
-    for (int item = 0; item < 3; ++item)
-        if (facet::FlowNext())
-            Note("Item %d", item + 1);
+    SectionHeader("Flow");
+    Paragraph("Items of different widths that wrap onto new lines, such as chips and tags. With a line "
+              "limit, the items that do not fit are counted in a chip at the end. The tags are "
+              "placeholders; a click or Space selects one.");
+    facet::BeginSettingsRow("Lines");
+    facet::SegmentedControl("##value", &s.flowLines, kFlowLines);
+    ctx.Probe("layout.flow.lines");
+    facet::EndSettingsRow();
+    facet::BeginSettingsRow("Alignment##flow");
+    facet::SegmentedControl("##value", &s.flowAlign, kFlowAligns);
+    facet::EndSettingsRow();
+    facet::BeginSettingsRow("Width##flow");
+    facet::Slider("##value", &s.flowWidth, kMinSplitShare, 100, {.format = "%d %%"});
+    facet::EndSettingsRow();
+    const facet::LayoutAlign aligns[] = {facet::LayoutAlign::Start, facet::LayoutAlign::Center, facet::LayoutAlign::End,
+                                         facet::LayoutAlign::Stretch};
+    const float width = std::max(1.0f, facet::AvailableWidthUnits() * static_cast<float>(s.flowWidth) / 100.0f);
+    facet::BeginFlow("tags", {.align = aligns[s.flowAlign], .maxLines = s.flowLines, .width = width});
+    s.flowShown = 0;
+    for (int i = 0; i < kFlowTags; ++i)
+    {
+        if (!facet::FlowNext())
+            continue;
+        ++s.flowShown;
+        ImGui::PushID(i);
+        if (facet::Chip(kTags[i], {.selected = s.tags[i]}))
+            s.tags[i] = !s.tags[i];
+        ImGui::PopID();
+        char probe[32];
+        std::snprintf(probe, sizeof(probe), "layout.flow.%d", i);
+        ctx.Probe(probe);
+    }
     facet::EndFlow();
+    int selected = 0;
+    for (const bool tag : s.tags)
+        selected += tag ? 1 : 0;
+    Note("%d of %d tags shown, %d selected.", s.flowShown, kFlowTags, selected);
 }
 
 // Records the divider of the split view that just ended as a probe.
@@ -469,7 +514,7 @@ FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrang
     if (ctx.capture && ctx.captureState == kCaptureArrange)
         ctx.RevealInCapture();
     Separators();
-    Arrange();
+    Flows(ctx, s);
     SplitViews(ctx, s);
     Divide(s);
     Tiles(s);
@@ -494,6 +539,11 @@ FACET_DEMO_SELFTEST("layout")
         s.hiddenToggle = false;
         s.childLevel = 50;
         s.splitVertical = 0.5f;
+        s.flowLines = 0;
+        s.flowAlign = 0;
+        s.flowWidth = 100;
+        for (bool& tag : s.tags)
+            tag = false;
     });
 
     // Settings rows: one column, the label on the control's text line, stacked when narrow.
@@ -584,6 +634,27 @@ FACET_DEMO_SELFTEST("layout")
         return s.gridColumns == 2 && s.gridCellX[1] > s.gridCellX[0] + 1.0f && std::fabs(s.gridCellX[2] - s.gridCellX[0]) < 0.5f;
     });
     test.Do([] { State().gridColumns = 0; });
+
+    // Flow: the tags work by mouse and keyboard; a line limit hides the rest behind the count chip.
+    test.Click("layout.flow.0");
+    test.Expect("a click selects the first tag", [] { return State().tags[0]; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.flow.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space selects the focused second tag", [] { return State().tags[1]; });
+    test.Expect("without a limit every tag shows", [] { return State().flowShown == kFlowTags; });
+    test.Do([] {
+        State().flowLines = 1;
+        State().flowWidth = 50;
+    });
+    test.Wait(3);
+    test.Expect("one line at half the width hides some tags",
+                [] { return State().flowShown > 0 && State().flowShown < kFlowTags; });
+    test.Do([] {
+        State().flowLines = 0;
+        State().flowWidth = 100;
+    });
 
     // Dependent group: off, the content is disabled and Tab skips it; on, it works.
     test.Do([] {
