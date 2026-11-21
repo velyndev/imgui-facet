@@ -1727,3 +1727,18 @@ TEST_CASE("A slow drag from an unselected transfer row carries that row alone, n
     session.Frames(2);
     CHECK(ui.inTarget == std::array<bool, 5>{false, true, false, false, false});
 }
+
+TEST_CASE("A list box shows its chosen row the first time it is drawn")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int index = 5000;
+    session.SetUi([&] {
+        facet::ListBox("Long", &index, 10000, &NumberedOption, nullptr, {.visibleRows = 5});
+        session.Track("long");
+    });
+    session.Frames(3);
+    session.Click(BoxRowCenter(session.ItemRect("long"), 5, 2));
+    CHECK(index > 4990);
+    CHECK(index < 5010);
+}

@@ -150,7 +150,8 @@ A framed, scrolling list with one chosen row, which sits on the sliding selectio
 semibold label. The visible label part is drawn above the frame (a list is taller than a label line),
 cut with an ellipsis when the width is short. The frame has no fill and the boundary hairline, so
 the row fills read on any surface; it is `visibleRows` rows tall (`list.inlineRows` by default) at
-the row height of `size`, also with fewer items. Default width: the available width.
+the row height of `size`, also with fewer items. Default width: the available width. The first time
+the list is shown, the chosen row is scrolled into view.
 
 - **Rows:** the icon, the label (cut with an ellipsis, shown in full as a tooltip on hover and
   keyboard focus) and the detail at the end in labelSecondary. `ChoiceItem::group` adds a header row

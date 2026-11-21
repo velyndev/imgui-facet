@@ -23,6 +23,7 @@ struct ListBoxState
 {
     internal::ListsRows rows;
     int builtCount = -1;
+    bool shown = false;  // the list was drawn before: the chosen row was scrolled into view then
 };
 
 bool ListBoxImpl(const char* label, int* index, const internal::ListsSource& source, const ListBoxOptions& options)
@@ -71,6 +72,9 @@ bool ListBoxImpl(const char* label, int* index, const internal::ListsSource& sou
     view.state = options.state;
     view.emptyText = options.emptyText;
     view.errorText = options.errorText;
+    // The first time the list is shown, the chosen row is scrolled into view.
+    view.revealRow = state.shown ? -1 : choice;
+    state.shown = true;
     bool changed = false;
     if (BeginListView(id, view))
     {
