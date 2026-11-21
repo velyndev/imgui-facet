@@ -783,13 +783,15 @@ FACET_DEMO_SELFTEST("overlays")
                 [] { return State().contextPick == 2 && !State().contextShown; });
     test.Click("overlays.context");
     test.KeyPress(ImGuiKey_Menu);
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
     test.WaitSeconds(0.4f);
-    test.Type("o");
+    test.Type("d");
     test.Wait(2);
     test.KeyPress(ImGuiKey_Enter);
     test.Wait(2);
     test.Expect("typeahead and Enter run a row and close the menu",
-                [] { return State().contextPick == 1 && !State().contextShown; });
+                [] { return State().contextPick == 3 && !State().contextShown; });
     test.ExpectFocused("overlays.context");
 
     // Tooltips: hover and keyboard focus show them, a disabled item never does, an interactive one
