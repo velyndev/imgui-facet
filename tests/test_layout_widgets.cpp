@@ -1653,6 +1653,11 @@ TEST_CASE("An item grid submits only its visible tiles")
     REQUIRE(ui.open);
     CHECK(ui.submitted > 0);
     CHECK(ui.submitted < 200);
+    // A line cut by the bottom edge is handed out too: 300 pixels hold more than three lines.
+    int columns = 1;
+    while (columns < ItemGridUi::kTracked && ui.tiles[columns].Min.y == ui.tiles[0].Min.y)
+        ++columns;
+    CHECK(ui.submitted >= columns * 4);
     // Scrolled to the end, the last tiles are handed out.
     session.Wheel(session.ItemCenter("grid"), -100000.0f);
     session.Frames(30);
