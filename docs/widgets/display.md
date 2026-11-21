@@ -289,7 +289,13 @@ void EndKeyValueList();
 class KeyValueListScope;
 ```
 
-Read-only labelled values aligned with settings rows. Status: planned.
+Read-only labelled values whose columns come from `LayoutLabeledRow`, so keys line up with settings
+rows (`labelWidth` or `layout.labelColumn`) and a narrow row puts the value under its key. Keys in
+Body `labelSecondary`, cut with an ellipsis and shown in full on hover; values in `label` (or the
+tone's text color), wrapped, or cut with an ellipsis and a tooltip without `wrap`. In a `copyable`
+list each value is a Tab stop with a focus ring around its text: a click, Enter or Space copies it,
+`KeyValue` returns true and `Strings::copied` shows above it. Content is always submitted; an End
+without its Begin is reported and does nothing. Status: ready.
 
 ### StatTile
 

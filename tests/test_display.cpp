@@ -1065,6 +1065,65 @@ TEST_CASE("A shortcut hint drops its caps before it cuts its text")
     CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(facet::Px(50.0f)));
 }
 
+// ==== KeyValueList ====
+
+TEST_CASE("Key-value rows line up with the label column, stack when narrow and copy their value")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int copies = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::BeginKeyValueList("details", {.copyable = true});
+        if (facet::KeyValue("Path", "C:/placeholder/path"))
+            ++copies;
+        session.Track("path");
+        if (facet::KeyValue("Size", "Placeholder value"))
+            ++copies;
+        session.Track("size");
+        facet::EndKeyValueList();
+        ImGui::SetNextItemWidth(facet::Px(150.0f));
+        ImGui::BeginChild("narrow", ImVec2(facet::Px(150.0f), facet::Px(200.0f)));
+        facet::KeyValue("Key", "A value that wraps under its key in this narrow column");
+        session.Track("stacked");
+        ImGui::EndChild();
+    });
+    session.Frame();
+    const float line = facet::MeasureText(facet::TextStyle::Body, "").y;
+    CHECK(session.ItemRect("path").GetHeight() == doctest::Approx(std::ceil(line)));
+    CHECK(session.ItemRect("stacked").GetHeight() > line * 2.0f);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(copies == 1);
+    CHECK(session.Clipboard() == "C:/placeholder/path");
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(copies == 2);
+    CHECK(session.Clipboard() == "Placeholder value");
+}
+
+TEST_CASE("Key-value rows of a list that does not copy are not Tab stops")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::KeyValueListScope list("plain");
+        CHECK_FALSE(facet::KeyValue("Key", "Value", {.tone = facet::Tone::Success}));
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
