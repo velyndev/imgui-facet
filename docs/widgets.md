@@ -19,8 +19,10 @@ planned"), returns the neutral result and writes nothing; planned End functions,
 helpers draw nothing and return neutral values. Besides the ready widgets, `ApplyReorderMove`,
 `PassesFilter`, the built-in strings and the edit session queries in `common.h` work, and the
 `BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it. The
-demo gallery has one page per family under Widgets (the inputs family has two: text inputs and
-value inputs). How a widget is built is described in [writing a widget](writing-a-widget.md).
+demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
+inputs), the pickers (color pickers and the other pickers) and the display family (the display
+widgets and the data table). How a widget is built is described in
+[writing a widget](writing-a-widget.md).
 
 | Family | Header | Documentation | What it holds |
 |---|---|---|---|

@@ -83,6 +83,14 @@ cursor, disabled ones the not-allowed cursor.
 | Status bar | 24 high | The small list row height, so status segments line up with small controls |
 | Feedback hold | 1.5 s | A copied check stays long enough to be seen after the pointer moves away, short enough that it does not linger as a stale state |
 | Live pulse | 2 s per pulse, still with reduced motion | Slower than the spinner, so a live dot reads as calm presence and not as work in progress |
+| Dividers and panels | divider band 8, panel header 32 | The divider band is the table resize band, so every drag edge is grabbed the same way; a panel header sits on the regular list row rhythm |
+| Popover arrow and palette | arrow 8 deep, command palette 96 from the top | One spacing step points at the anchor without reaching it; the palette sits where the eye starts reading, clear of a title bar |
+| Flicks and inertia | a release faster than 600 per second is a flick, a released pan keeps its speed for 0.3 s | Fast enough that a slow drag is never read as a flick; the pan comes to rest within a standard duration and a half, so it never drifts on |
+| Tab underline and steps | underline 2, step marker 24, connector 2 | Twice the hairline reads as a mark, not as a separator; a step marker holds one digit at the minimum hit target |
+| Checkerboard | 6 per cell | Small enough that a swatch one control height wide shows two rows, large enough to read as a pattern at scale 1 |
+| Color pickers | color bars 12, hue ring 20, time columns 48 | A bar thinner than the slider knob so the knob overlaps it as on a slider track; the ring wide enough to aim at a hue; a time column holds two digits with padding |
+| Charts | lines 2, markers 6 (the page dot), bars 2 apart, legend swatch 10, donut hole 60 % of the diameter, gauge arc 12, meter segments 2 apart, peak hold 1 s | A 2 line reads at 3:1 contrast where a hairline would vanish; markers and swatches stay smaller than the text beside them; the gauge arc matches the color bars; a peak is held long enough to read its level |
+| Media | grouped avatars overlap by a quarter, playhead 2, drop zone dashes 6 with gaps of 4 | A quarter keeps each face recognisable while the group stays compact; the playhead matches the chart lines; the dashes read as a drop target, not as the dashed outline of a planned placeholder |
 
 ## Colors
 
@@ -106,6 +114,7 @@ cursor, disabled ones the not-allowed cursor.
 | destructiveSubtle, successSubtle, warningSubtle | the status color at 14 % | the status color at 14 % | Enough to tint the surface; the dark accentSubtle strength (24 %) would take labelSecondary below 4.5:1 on the bright dark warning, so the washes keep 14 % in both themes; the tone glyph keeps 3:1 on them |
 | accentTextVisited | accentText with its hue turned 60 degrees, lightness moved to 4.5:1 | the same | A visited link stays a link (same chroma and strength) but differs in hue from an unvisited one |
 | Code tints keyword, string, number | #7A1FA2, #1A6B2B, #9A4A00 | #D7A8FF, #7EE08F, #FFB86B | Three hues far apart that reach 4.5:1 on every surface; comments use labelSecondary, so code never needs a color that is hard to read |
+| checker[0], checker[1] | #FFFFFF, #D1D1D6 | #48484A, #2C2C2E | Two greys of the theme's own surfaces, about 1.5:1 apart: alpha shows on them, and they never compete with the color drawn over them |
 | shadow | black | black | A neutral shadow; its strength comes from the elevation opacity |
 | Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Dark surfaces need more strength for a shadow to show over bgSecondary and bgTertiary |
 | glassTint | #FFFFFF | #1C1C1E | The panel tint matches the theme's base surfaces, so glass reads as a surface |
@@ -215,6 +224,10 @@ Popup host:
   the anchor instead of shrinking further, so it always shows at least two rows.
 - **Sticky side.** A level keeps its side while only its content changes, so a filtered list
   does not jump between above and below.
+- **Toward its window.** A level opened from the page aligned at one end of its anchor turns to
+  the other end when only that keeps it over the window that holds the anchor, so a "more" button
+  at the start of a narrow toolbar opens its menu over the toolbar and not over the navigation
+  beside it.
 - **Scrim.** The host draws the modal scrim from colors.scrim and fades it with the dialog;
   Dear ImGui's own dim is not used, so the dim and the dialog arrive together.
 - **Rows in menus** draw the focus ring inside the row, because the menu padding is narrower
@@ -231,7 +244,9 @@ Scroll core:
   its thickness); the fill[3] track shows only while the bar is wide. The position stays
   visible without taking content width, and the track appears only where the pointer aims.
 - **Edge fades.** A gradient of the surface color over scroll.edgeFade whose strength grows with
-  the content left on that side, so the fade eases in instead of popping.
+  the content left on that side, so the fade eases in instead of popping. A surface pushed by the
+  page stays with the page: an area inside a popup fades into the popup surface, never into a
+  dark band of the page behind it.
 - **Track paging.** A press on the track pages by the visible length less one edge fade, so the
   line at the old edge stays in view.
 - **Wheel gestures** stay with the window they scroll while the pointer rests, so content
@@ -481,6 +496,9 @@ Lists:
 - **Popup list rows** (Dropdown, MultiDropdown, BeginCombo) keep a leading slot: an accentText
   check marks the chosen item, a checkbox in multiple-choice lists, so the choice reads without
   color alone.
+- **A combo list shows at its real height.** The first time a combo opens, before its rows are
+  counted, its list stays hidden one frame longer, so it appears where it stays instead of
+  shrinking toward the field with the rows moving under the pointer.
 - **Group headers** are Footnote labelSecondary rows that take no hover or focus, so they read as
   structure, not as choices.
 - **Filter matches** are label text on a fill[1] wash with the rest of the label in
@@ -583,7 +601,12 @@ The dose caps in Direction apply. The choices behind each effect:
   value, a TextField), so a page reads as one product; a stock control stays only where the page
   shows Facet working with stock Dear ImGui items, and its row label says so.
 - **Mixed sizes on one line.** Controls of different sizes in one row are centered on the
-  tallest one, so their labels sit on one line instead of stepping down from a shared top.
+  tallest one, so their labels sit on one line instead of stepping down from a shared top. The
+  row label is centered on that same line, so it lines up with the controls' text instead of
+  sitting a few pixels above it.
+- **Split family pages.** A family with two distinct groups of widgets shows each group on a page
+  of its own (Text inputs and Value inputs, Color pickers and Other pickers, Display and Data
+  table), so a page stays short enough to scan and each page's note speaks for what it shows.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
   page holds at a large scale in a small window.
 - **Title strip.** The window background with a hairline below it; the title in the headline

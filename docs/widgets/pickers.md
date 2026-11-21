@@ -1,10 +1,11 @@
 # Pickers
 
 Header: `facet/widgets/pickers.h`. The declarations follow [the API conventions](../api-conventions.md);
-the comment above each declaration in the header is the full reference. Every widget here is
-**planned**: the function exists, draws a placeholder of the widget's default size, returns the neutral
-result and writes nothing. Phase 2 implements the widgets and changes their status to ready. See
-[the widget index](../widgets.md).
+the comment above each declaration in the header is the full reference. Each entry below ends with
+the widget's status. A **planned** widget exists as a function that draws a placeholder of the
+widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
+header describes. See [the widget index](../widgets.md). The demo gallery shows the color pickers on
+the page Color pickers and the others on the page Other pickers.
 
 Colors are `ImVec4` in gamma-encoded sRGB with straight alpha everywhere (see `core/color.h`): the
 edited value, swatches, history and the compare color. Without `alpha` the alpha channel is never
@@ -12,7 +13,7 @@ written; without `hdr` channels are clamped to 0 to 1. Fields that open a popove
 Enter, Space or Alt+Down and close on Escape or a click outside. Every widget here returns true on
 the frame it wrote its value.
 
-## Widgets
+## Color pickers
 
 ### ColorWell
 
@@ -85,6 +86,42 @@ Edits a color that is static, pulses, cycles through the hues or sweeps a gradie
 `SampleAnimatedColor` evaluates it at a time. Status: planned (until then `SampleAnimatedColor`
 returns the base color).
 
+### Usage of the color pickers
+
+A color setting with a recent-colors row shared by two pickers. The history is caller data, so it
+can be saved with the other settings.
+
+```cpp
+static ImVec4 tint = facet::T().colors.accent;
+static facet::ColorHistory recent;
+facet::ColorWell("Tint", &tint, {.alpha = true, .showHex = true});
+static const ImVec4 kPresets[] = {first, second, third};
+facet::SwatchPalette("##presets", &tint, kPresets, &recent);
+```
+
+Undo for a picker: the compare swatch shows the color before the current edit, and each finished
+drag pushes one undo step.
+
+```cpp
+static ImVec4 color = start, before = start;
+facet::ColorPicker("Color", &color, {.original = &before});
+if (facet::IsItemEditCommitted())
+{
+    PushUndo(before, color);  // application function
+    before = color;
+}
+```
+
+An overlay element that pulses, evaluated once per frame.
+
+```cpp
+static facet::AnimatedColor marker = {.animation = facet::ColorAnimation::Pulse, .color = base, .second = bright};
+facet::ColorModeEditor("Marker", &marker);
+const ImU32 now = facet::ToU32(facet::SampleAnimatedColor(marker, ImGui::GetTime()));
+```
+
+## Date, time and other pickers
+
 ### DatePicker
 
 ```cpp
@@ -154,39 +191,7 @@ A file browser drawn inside the app, for overlays and hosts that cannot show a s
 the other panels, it does not draw its label beside it but shows it as its tooltip on hover and
 keyboard focus. Status: planned.
 
-## Usage
-
-A color setting with a recent-colors row shared by two pickers. The history is caller data, so it
-can be saved with the other settings.
-
-```cpp
-static ImVec4 tint = facet::T().colors.accent;
-static facet::ColorHistory recent;
-facet::ColorWell("Tint", &tint, {.alpha = true, .showHex = true});
-static const ImVec4 kPresets[] = {first, second, third};
-facet::SwatchPalette("##presets", &tint, kPresets, &recent);
-```
-
-Undo for a picker: the compare swatch shows the color before the current edit, and each finished
-drag pushes one undo step.
-
-```cpp
-static ImVec4 color = start, before = start;
-facet::ColorPicker("Color", &color, {.original = &before});
-if (facet::IsItemEditCommitted())
-{
-    PushUndo(before, color);  // application function
-    before = color;
-}
-```
-
-An overlay element that pulses, evaluated once per frame.
-
-```cpp
-static facet::AnimatedColor marker = {.animation = facet::ColorAnimation::Pulse, .color = base, .second = bright};
-facet::ColorModeEditor("Marker", &marker);
-const ImU32 now = facet::ToU32(facet::SampleAnimatedColor(marker, ImGui::GetTime()));
-```
+### Usage of the other pickers
 
 A date range limited to the past, with one preset.
 

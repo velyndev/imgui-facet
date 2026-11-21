@@ -40,8 +40,8 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
     (`theme.h`); the UI scale with three modes and pixel snapping helpers (`scale.h`). The theme
     also holds the tokens of popups, menus, scrollbars, lists, drag and drop and text fields,
     which the blocks below use, and of the widgets: status fill states and washes, visited
-    links, code tints, dots, ticks, progress tracks, copied feedback, containers, tabs, tables
-    and date pickers.
+    links, code tints, checkerboards, dots, ticks, steps, progress tracks, copied feedback,
+    containers, dividers and panels, tabs, tables, pickers, charts, media, flicks and inertia.
     See `docs/theming.md` and `docs/scaling.md`.
   - Core, layout: width classes of the available width and the column layout of labelled rows
     (`layout.h`) work. See `docs/layout.md`.
@@ -84,7 +84,8 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
   control, text cut with an ellipsis and its tooltip, fill feedback, the field frame, the loading
   spinner and the help and error line, whose errors are collected for `ValidationSummary`), and:
   - the popup host (`popup_host.h`, `popup_place.h`): placement beside an anchor with flip and
-    clamp, nested levels on Dear ImGui's popup stack, Escape and the context menu keys through
+    clamp, an end alignment that turns toward the window holding the anchor, nested levels on Dear
+    ImGui's popup stack, Escape and the context menu keys through
     key ownership, focus return, glass or opaque surfaces, an open motion and a close motion
     that replays the last frame, tooltips with hover intent, and the modal scrim; and the menu
     rows on it (`popup_menu.h`): submenus that open after a rest or by key and stay open while
@@ -171,15 +172,18 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
     - Text field core: plain, narrow, search, password, validated, floating label, limited and
       loading fields, a number field with steppers and drag, a multiline area, a read-only
       field, and the three control sizes.
-  - Widgets: one page per widget family (Buttons, Selection, Sliders, Text inputs and Value
-    inputs, Pickers, Lists, Navigation, Containers, Layout, Overlays, Display, Charts, Media,
-    Composites). Buttons, Selection, Sliders, Text inputs, Value inputs, Lists, Containers and
-    Display show every implemented widget of their family in its variants, sizes and states
+  - Widgets: one page per widget family, and two for the families whose widget groups are built
+    apart (Buttons, Selection, Sliders, Text inputs and Value inputs, Color pickers and Other
+    pickers, Lists, Navigation, Containers, Layout, Overlays, Display and Data table, Charts,
+    Media, Composites). Buttons, Selection, Sliders, Text inputs, Value inputs, Lists, Containers
+    and Display show every implemented widget of their family in its variants, sizes and states
     (read-only, disabled, error, mixed, loading and empty where the widget has them, and narrow
     widths), with capture states that force hover, press, keyboard focus, open popups and drags
     per section, and a selftest that operates each of them by mouse and keyboard and checks the
-    values. The planned widgets on the Sliders and Display pages, and every widget on the pages of
-    the planned families, are placeholders of their declared size that cannot be operated.
+    values. The planned widgets on the Sliders page, and every widget on the pages of the planned
+    families and on the Data table page, are placeholders of their declared size that cannot be
+    operated; the selftests of the Color pickers, Other pickers and Data table pages check that
+    they write nothing.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection

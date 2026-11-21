@@ -18,10 +18,22 @@ implementation. `src/widgets/buttons/button.cpp` (Button) is the model to copy, 
 | Demo page with its selftest | `demo/pages/page_w_<family>.cpp` |
 | Documentation entry | `docs/widgets/<family>.md`; the reason for every new visual choice in `DESIGN.md` |
 
-The inputs family is split in two: the text-like inputs have `text_inputs_frame.cpp`,
-`test_api_inputs_text.cpp`, `test_inputs_text.cpp` and `page_w_inputs_text.cpp`; the number-like
-ones have `value_inputs_frame.cpp`, `test_api_inputs_value.cpp`, `test_inputs_value.cpp` and
-`page_w_inputs_value.cpp`. New source files are picked up by the build without a CMake edit.
+Some families are split into groups that are built apart, each with files of its own. New source
+files are picked up by the build without a CMake edit.
+
+| Group | Frame hook | API tests | Behaviour tests | Demo page (id) |
+|---|---|---|---|---|
+| Text inputs | `inputs/text_inputs_frame.cpp` | `test_api_inputs_text.cpp` | `test_inputs_text.cpp` | `page_w_inputs_text.cpp` (`inputs-text`) |
+| Value inputs | `inputs/value_inputs_frame.cpp` | `test_api_inputs_value.cpp` | `test_inputs_value.cpp` | `page_w_inputs_value.cpp` (`inputs-value`) |
+| Color pickers | `pickers/color_pickers_frame.cpp` | `test_api_pickers_color.cpp` | `test_pickers_color.cpp` | `page_w_pickers_color.cpp` (`pickers-color`) |
+| Date, time and other pickers | `pickers/date_pickers_frame.cpp` | `test_api_pickers_date.cpp` | `test_pickers_date.cpp` | `page_w_pickers_date.cpp` (`pickers-date`) |
+| Display without DataTable | `display/display_frame.cpp` | `test_api_display.cpp` | `test_display.cpp` | `page_w_display.cpp` (`display`) |
+| DataTable | `display/data_table_frame.cpp` | `test_api_data_table.cpp` | `test_data_table.cpp` | `page_w_data_table.cpp` (`data-table`) |
+
+The layout family keeps its behaviour tests in `test_layout_widgets.cpp`, because
+`test_layout.cpp` tests the core layout of `core/layout.h`. The placeholder helpers themselves are
+tested in `test_api_controls.cpp` and `test_api_structure.cpp`; a widget never needs an edit
+there.
 
 ## The structure of a widget file
 
@@ -70,6 +82,10 @@ second one.
 | Frame of a field-like control | `DrawFieldFrame`; text editing through `TextFieldBehavior` (`internal/text_field.h`), numbers through `internal/text_field_number.h` |
 | Icons | `ControlTextScope::IconSize`, `DrawControlIcon`; icons by name, `Icon("chevron-down")` |
 | Loading state | `DrawControlSpinner`; skeletons and the shared loading clock in `internal/loading.h` |
+| Confirmation after a copy | `CopyFeedbackHold`, `CopyFeedbackActive` (`internal/copy_feedback.h`): `motion.feedbackHold` times `motion.scale`, the same for every widget that copies |
+| Check mark of a chosen row (menus, lists, pickers) | `ChoiceCheckColor` (`internal/popup_menu.h`): accentText, labelTertiary when disabled |
+| Key caps of a chord | `KeyCapNames`, `KeyCapLook` (`internal/key_caps.h`) |
+| Checkerboard behind translucent colors and images | `FillCheckerboard` (`core/draw.h`) with `colors.checker` and `metrics.checkerCell` |
 | Help and error text under a control | `PickControlMessage`, `ControlMessageHeight`, `DrawControlMessage` (an error is also recorded for `ValidationSummary`) |
 | Focus ring | `DrawItemFocusRing`, `DrawFocusRing` (`internal/focus.h`) |
 | Motion | `Tween`, `Spring`, `Smooth` (`core/anim.h`) under the widget id with sub keys below `kItemAnimSubBase`; the item behaviour's `hoverAmount`, `pressAmount`, `focusAmount` |
@@ -87,7 +103,13 @@ second one.
 The theme is fixed for widget work: every token a widget of this stage needs exists in
 `include/facet/core/theme.h`, with its reason in `DESIGN.md`. A widget never uses a color or pixel
 literal; a factor that has no token (the share of a spinner stroke) is a named constant with a
-comment.
+comment. In the same way, built-in text comes from a `Strings` member (`widgets/common.h`), and the
+members the widgets of a stage name exist before the stage starts.
+
+A part that a helper above does not cover yet, or a token or string that is missing, is asked
+for, not added: shared headers (`src/internal/`, `include/facet/core/`, `widgets/common.h`) change
+only additively, through the engineer who merges the stage, so two widgets never grow two versions
+of one part.
 
 ## States and keys
 
@@ -138,17 +160,34 @@ TEST_CASE("A focused button activates with Space and Enter and is a Tab stop")
 A test that changes the theme, the accent or the motion settings restores them. Colors are
 checked by counting the draw list vertices of a token color; geometry with `session.ItemRect`.
 
-When a widget stops being a placeholder, take its calls out of the placeholder list in
-`tests/test_api_<family>.cpp` (and lower the call count there), and move any placeholder test that
-used it to a placeholder of the same family that is still planned.
+When a widget stops being a placeholder, take its calls out of the placeholder checks in
+`tests/test_api_<family>.cpp`: the `FACET_CHECK_STUB` list and its call count
+(`support/controls_stub_check.h`), the `CHECK_BALANCED` calls (`support/structure_stub_check.h`)
+or the `Check` calls (`support/content_stub_check.h`), whichever the file uses. A placeholder test
+that used it moves to a placeholder of the same family that is still planned, or is deleted when
+it only checked placeholder behaviour; the checks of the options structs stay. Its behaviour tests
+go into the behaviour file of its group.
 
 ## The demo page
 
 Each family page calls every widget of the family once, grouped into sections
-(`facet::demo::SectionHeader`, `Paragraph`, `LabeledRow`, `Note` in `demo/gallery.h`). A ready
-widget is shown in each variant, size and state its declaration has, and it really works: every
-press changes something the page shows. Content is neutral and honest: no invented people,
-numbers or product names; placeholders are labelled as placeholders.
+(`facet::demo::SectionHeader`, `Paragraph`, `LabeledRow`, `Note`, `NoteBeside` in
+`demo/gallery.h`). A ready widget is shown in each variant, size and state its declaration has,
+and it really works: every press changes something the page shows. Content is neutral and honest:
+no invented people, numbers or product names; placeholders are labelled as placeholders. The page
+settings (a layer that shows or hides, a data state, a value) are Facet controls too; a stock Dear
+ImGui control appears only where the page shows Facet working with stock items, and its row label
+says so.
+
+- A set width goes through `DemoWidth(units)`, which clamps it to the room left in the row, so the
+  page holds at scale 2 in a small window.
+- Controls of different sizes on one line go through `MixedHeightRow`: construct it with the height
+  of the tallest control, call `Item(height)` before each control. Pass the same height to the row
+  label, `LabeledRow(label, lineHeight)`, so the label is centered on that line too.
+  `LastLabeledRowBox()` gives the box the label was centered in, for a selftest check.
+- Wrapping rows of buttons use `ContentRight()` and `SameLineIfFits`.
+- The note under the page header is `PlannedFamilyNote(family)` while any widget on the page is
+  planned and `ReadyFamilyNote(family)` once all of them are ready.
 
 - `ctx.Probe("button.save")` right after a widget records it for the selftest; probe names start
   with the family.
@@ -159,7 +198,12 @@ numbers or product names; placeholders are labelled as placeholders.
 - One `FACET_DEMO_SELFTEST("<page id>")` per page. It resets the page state with `test.Do`, then
   operates every ready widget with the mouse and the keyboard and checks the results
   (`Expect`, `ExpectNear`, `ExpectFocused`, `ExpectVisible`). Its log is the click-through
-  evidence for a widget.
+  evidence for a widget. A page without a script fails `--selftest --page <id>`, so a page of
+  placeholders checks at least that they write nothing.
+- Positions in a script come from probes of the latest frame. A popup row is found from the level
+  rect (`internal::PopupLevelRect`) recorded with `ProbeRect`; before aiming at one, the lists
+  page reveals the field (`test.Reveal`) and waits (`test.WaitSeconds(0.4f)`), so the field is
+  away from the window edge and nothing moves between the probe and the click.
 
 Run `facet_demo --capture <dir> --page <id> --warp --theme both` and look at the images in both
 themes, and `facet_demo --selftest --page <id> --warp --theme both` at `--size 1280x800 --scale 1`
@@ -169,8 +213,14 @@ and at `--size 900x600 --scale 2`.
 
 The entry of a widget on its family page is a `### Name` heading, the declarations in a `cpp`
 block, a short description of what it draws and does (variants, sizes, keys, states, width), and
-as its last sentence its status: `Status: planned.` or `Status: ready.` When a widget becomes
-ready, also update the per-family lists of what is ready in the status section of `README.md` and
-in `docs/widgets.md`. When the last widget of a family becomes ready, the demo family page switches
-its note from `PlannedFamilyNote` to `ReadyFamilyNote` (`demo/gallery.h`). Every visual choice
-that is new gets a one-line reason in `DESIGN.md`.
+as its last sentence its status: `Status: planned.` or `Status: ready.` When the last widget of a
+page becomes ready, the page switches its note from `PlannedFamilyNote` to `ReadyFamilyNote`
+(`demo/gallery.h`).
+
+Three files describe every family at once: the lists of what is ready in the status section of
+`README.md` and in `docs/widgets.md`, and the one-line reason for every new visual choice in
+`DESIGN.md`. Working alone, update them with the widget. When several groups are built at the same
+time, none of them edits these files: each lists its lines (the widgets that became ready, each
+new look with its reason) in its report, and the engineer who merges the work writes them once.
+The same holds for a page shared by two groups (`docs/widgets/inputs.md`, `pickers.md`,
+`display.md`): each group edits only its own entries and its own usage section.

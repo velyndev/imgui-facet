@@ -345,27 +345,6 @@ on color alone. `trend` draws a line over its samples along the bottom of the ti
 Loading shows a skeleton in place of the value, Error the error icon with `Strings::loadFailed`.
 Width: the available width. Not interactive. Status: ready.
 
-### DataTable
-
-```cpp
-[[nodiscard]] bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, int rowCount, ImGuiSelectionBasicStorage* selection, const DataTableOptions& options = {});
-bool DataTableRow(int index);
-void EndDataTable();
-class DataTableScope;
-```
-
-Sortable, resizable table with a sticky header, frozen columns, virtualized rows and selection. Status: planned.
-
-### DataTable cell edit
-
-```cpp
-[[nodiscard]] bool BeginDataTableCellEdit();
-void EndDataTableCellEdit();
-class DataTableCellEditScope;
-```
-
-Edits one cell in place with any editor widget. Status: planned.
-
 ## Usage
 
 ### Data state view
@@ -399,7 +378,80 @@ default: break;
 }
 ```
 
-### Data table with sorting, selection and cell editing
+### Log view over a filtered log
+
+The log stays the caller's; filtering is a getter over the indices that pass the filter.
+
+```cpp
+struct Filtered { const std::vector<facet::LogEntry>* log; const std::vector<int>* shown; };
+Filtered view{&log, &shownIndices};
+facet::LogView("log", static_cast<int>(shownIndices.size()),
+               [](void* user, int index, facet::LogEntry* out) {
+                   const auto* f = static_cast<const Filtered*>(user);
+                   *out = (*f->log)[(*f->shown)[index]];
+                   return true;
+               },
+               &view, {.height = 240.0f});
+```
+
+### Key-value list
+
+```cpp
+facet::BeginKeyValueList("details", {.copyable = true});
+facet::KeyValue("Path", path.c_str());
+facet::KeyValue("Modified", modifiedText);
+facet::EndKeyValueList();
+```
+
+### Marks on a line of text
+
+Badges, count badges, status pills, key caps and inline code are a little taller than the text around
+them and put their text on the baseline of that text: after `ImGui::SameLine` they meet Body text,
+a Facet control's label or a stock widget's text drawn before or after them, at every scale. Status
+dots, spinners and character counters center their mark on the capitals of the line.
+
+```cpp
+facet::StyledText("Connection");
+ImGui::SameLine();
+facet::StatusPill("Online###net", {.tone = facet::Tone::Success, .liveDot = true});
+ImGui::SameLine();
+facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_R);
+```
+
+### Tones
+
+Every tone is drawn with a second cue: an icon, a word or a shape. Text in a tone is readable (4.5:1)
+on the content surfaces (`bg`, `bgSecondary`, `bgTertiary`); on a tone's wash the text is `label`,
+and the tone shows in its icon or dot (3:1). A test (`tests/test_display.cpp`) computes these pairs
+from the theme tokens in both themes.
+
+## Data table
+
+DataTable and its cell editing, the data views of this family with rows and columns. The demo gallery
+shows them on the page Widgets > Data table.
+
+### DataTable
+
+```cpp
+[[nodiscard]] bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, int rowCount, ImGuiSelectionBasicStorage* selection, const DataTableOptions& options = {});
+bool DataTableRow(int index);
+void EndDataTable();
+class DataTableScope;
+```
+
+Sortable, resizable table with a sticky header, frozen columns, virtualized rows and selection. Status: planned.
+
+### DataTable cell edit
+
+```cpp
+[[nodiscard]] bool BeginDataTableCellEdit();
+void EndDataTableCellEdit();
+class DataTableCellEditScope;
+```
+
+Edits one cell in place with any editor widget. Status: planned.
+
+### Usage: sorting, selection and cell editing
 
 The table is a Dear ImGui table: sort specs, column flags and `TableNextColumn` are the stock
 calls. Rows come from `NextVisibleRows`, so only visible rows are submitted.
@@ -450,53 +502,6 @@ if (facet::BeginDataTable("files", columns, rowCount, &selection, {.sortable = t
     facet::EndDataTable();
 }
 ```
-
-### Log view over a filtered log
-
-The log stays the caller's; filtering is a getter over the indices that pass the filter.
-
-```cpp
-struct Filtered { const std::vector<facet::LogEntry>* log; const std::vector<int>* shown; };
-Filtered view{&log, &shownIndices};
-facet::LogView("log", static_cast<int>(shownIndices.size()),
-               [](void* user, int index, facet::LogEntry* out) {
-                   const auto* f = static_cast<const Filtered*>(user);
-                   *out = (*f->log)[(*f->shown)[index]];
-                   return true;
-               },
-               &view, {.height = 240.0f});
-```
-
-### Key-value list
-
-```cpp
-facet::BeginKeyValueList("details", {.copyable = true});
-facet::KeyValue("Path", path.c_str());
-facet::KeyValue("Modified", modifiedText);
-facet::EndKeyValueList();
-```
-
-### Marks on a line of text
-
-Badges, count badges, status pills, key caps and inline code are a little taller than the text around
-them and put their text on the baseline of that text: after `ImGui::SameLine` they meet Body text,
-a Facet control's label or a stock widget's text drawn before or after them, at every scale. Status
-dots, spinners and character counters center their mark on the capitals of the line.
-
-```cpp
-facet::StyledText("Connection");
-ImGui::SameLine();
-facet::StatusPill("Online###net", {.tone = facet::Tone::Success, .liveDot = true});
-ImGui::SameLine();
-facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_R);
-```
-
-### Tones
-
-Every tone is drawn with a second cue: an icon, a word or a shape. Text in a tone is readable (4.5:1)
-on the content surfaces (`bg`, `bgSecondary`, `bgTertiary`); on a tone's wash the text is `label`,
-and the tone shows in its icon or dot (3:1). A test (`tests/test_display.cpp`) computes these pairs
-from the theme tokens in both themes.
 
 ## Planned, not declared yet
 
