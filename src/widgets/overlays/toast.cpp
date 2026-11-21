@@ -10,7 +10,9 @@
 // corner of the display's work area, overlay.toastWidth wide (narrower on a narrow display). Each
 // toast is a window of its own (one per queue slot), drawn after every page and kept in front of the
 // page windows but behind open popups. A toast that leaves keeps its place while it fades, then the
-// others move into the room on a spring, so the stack never jumps.
+// others move into the room on a spring, so the stack never jumps. A watermark strip in the half of
+// the display the stack grows from that crosses the stack's column (OverlayToastAvoidRect) moves
+// the stack past it, so on a narrow display the strip does not cover a toast.
 //
 // A toast: its icon (the tone's icon unless one is given; Neutral has none), the text in Body, the
 // description in Footnote, an optional progress bar (facet::ProgressBar), an optional action button
@@ -64,6 +66,8 @@ constexpr int kToastTextSize = 256;
 constexpr int kToastDescriptionSize = 512;
 constexpr int kToastActionSize = 64;
 constexpr int kToastSpringSub = 1;
+// Corner rects (watermark strips) the stack keeps clear of in one frame; later ones are ignored.
+constexpr int kToastAvoidRects = 8;
 // The share of its width a toast travels while it slides in from the edge.
 constexpr float kToastSlideShare = 0.25f;
 // The share of its width a drag must reach toward the edge to dismiss the toast.
@@ -114,6 +118,9 @@ struct ToastSystem
     bool inFrame = false;               // between the family's NewFrame and EndFrame hooks
     std::uint32_t actionToast = 0;      // the toast whose action button was activated
     std::uint64_t actionFrame = 0;      // the facet frame on which ToastActionPressed reports it
+    // Rects drawn in a corner this frame (watermark strips) that the stack keeps clear of.
+    ImRect avoid[kToastAvoidRects];
+    int avoidCount = 0;
 };
 
 ToastSystem& System()
@@ -463,6 +470,17 @@ void LayOutAndDrawToasts()
     const bool bottom = CornerIsBottom(s.corner);
     const float baseX = right ? viewport->WorkPos.x + viewport->WorkSize.x - margin - width : viewport->WorkPos.x + margin;
     float offset = 0.0f;  // from the corner edge, pixels
+    // A strip in the half of the display the stack grows from, across the stack's column (a
+    // watermark on a narrow display), moves the stack past it, one stack gap away.
+    const float stackEdge = bottom ? viewport->WorkPos.y + viewport->WorkSize.y - margin : viewport->WorkPos.y + margin;
+    const float middleY = viewport->WorkPos.y + viewport->WorkSize.y * 0.5f;
+    for (int i = 0; i < s.avoidCount; ++i)
+    {
+        const ImRect& avoid = s.avoid[i];
+        if (avoid.Max.x <= baseX || avoid.Min.x >= baseX + width || (avoid.GetCenter().y > middleY) != bottom)
+            continue;
+        offset = std::max(offset, bottom ? stackEdge - avoid.Min.y + gapY : avoid.Max.y + gapY - stackEdge);
+    }
     const float toward = right ? 1.0f : -1.0f;
     const ImGuiContext& g = *GImGui;
 
@@ -567,6 +585,14 @@ namespace internal
 void OverlayToastNewFrame()
 {
     System().inFrame = true;
+    System().avoidCount = 0;
+}
+
+void OverlayToastAvoidRect(const ImRect& rect)
+{
+    ToastSystem& s = System();
+    if (s.inFrame && s.avoidCount < kToastAvoidRects)
+        s.avoid[s.avoidCount++] = rect;
 }
 
 void OverlayToastEndFrame()
@@ -587,6 +613,7 @@ void OverlayToastShutdown()
     s.inFrame = false;
     s.actionToast = 0;
     s.actionFrame = 0;
+    s.avoidCount = 0;
     s.corner = s.pendingCorner = ScreenCorner::BottomRight;
 }
 

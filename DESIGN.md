@@ -629,6 +629,8 @@ Overlays:
   the page edge, it slides only when the change count crosses zero.
 - **Watermark.** A level 1 strip with a hairline and Footnote text, readable over any scene and
   quieter than the UI.
+- **Toasts keep clear of the watermark.** Where a watermark strip crosses the toast column in the
+  same half of the display, the stack starts one stack gap past it, so neither hides the other.
 
 Navigation:
 

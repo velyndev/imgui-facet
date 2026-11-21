@@ -130,5 +130,9 @@ void OverlayLoadingResetStack();
 void OverlayToastNewFrame();
 void OverlayToastEndFrame();
 void OverlayToastShutdown();
+// A rect drawn in a corner this frame (a watermark strip): when it lies in the half of the display
+// the stack grows from and crosses the stack's column, the stack starts past it, overlay.toastStackGap
+// away, so neither covers the other. Call between NewFrame and EndFrame; the list starts empty every frame.
+void OverlayToastAvoidRect(const ImRect& rect);
 
 } // namespace facet::internal

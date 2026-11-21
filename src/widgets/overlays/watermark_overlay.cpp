@@ -195,6 +195,7 @@ void WatermarkOverlay(const char* id, std::span<const WatermarkField> fields, co
         DrawWatermarkStrip(ImGui::GetForegroundDrawList(), pos, work.GetWidth(), fields, false, 0.0f);
         const ImRect strip(pos, ImVec2(pos.x + size.x, pos.y + size.y));
         OverlayRecordRects(OverlayPartKey("watermark", stripId), &strip, 1);
+        OverlayToastAvoidRect(strip);
         PopTextStyle();
         return;
     }
@@ -264,6 +265,9 @@ void WatermarkOverlay(const char* id, std::span<const WatermarkField> fields, co
         DrawWatermarkStrip(window->DrawList, window->Pos, work.GetWidth(), fields, false, item.focusAmount);
         const ImRect strip = window->Rect();
         OverlayRecordRects(OverlayPartKey("watermark", stripId), &strip, 1);
+        // While dragged the strip has no corner yet; the stack makes room once it snaps.
+        if (!drag.dragging)
+            OverlayToastAvoidRect(strip);
     }
     ImGui::End();
     PopTextStyle();

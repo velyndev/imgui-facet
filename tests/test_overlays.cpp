@@ -1658,6 +1658,50 @@ TEST_CASE("A watermark strip draws in its corner over everything and lets clicks
     CHECK(presses == 1);
 }
 
+TEST_CASE("The toast stack keeps clear of a watermark strip across its column and ignores one beside it")
+{
+    OverlayMotionGuard motion(true);
+    const facet::WatermarkField fields[] = {{.label = "Field 1", .value = "Placeholder"},
+                                            {.label = "Field 2", .value = "Placeholder"}};
+    for (const bool narrow : {true, false})
+    {
+        CAPTURE(narrow);
+        facet::test::SessionOptions options;
+        options.displaySize = narrow ? ImVec2(400.0f, 500.0f) : ImVec2(1200.0f, 500.0f);
+        facet::test::Session session(options);
+        REQUIRE(session.Ready());
+        facet::ToastId toast;
+        bool show = true;
+        ImGuiID markId = 0;
+        session.SetUi([&] {
+            markId = ImGui::GetID("mark");
+            facet::WatermarkOverlay("mark", fields, {.corner = facet::ScreenCorner::BottomLeft});
+            if (show)
+                toast = facet::ShowToast("Placeholder notification", {.duration = -1.0f});
+            show = false;
+        });
+        session.Frames(3);
+        ImRect mark;
+        ImRect body;
+        REQUIRE(fi::OverlayWatermarkRect(markId, &mark));
+        REQUIRE(fi::OverlayToastRects(toast, &body, nullptr, nullptr));
+        const float gap = facet::Px(facet::T().overlay.toastStackGap);
+        if (narrow)
+        {
+            // The strip crosses the toast's column: the toast sits above it, one stack gap away.
+            REQUIRE(mark.Max.x > body.Min.x);
+            CHECK(body.Max.y == doctest::Approx(mark.Min.y - gap).epsilon(0.003));
+        }
+        else
+        {
+            // Beside the column the strip changes nothing: the toast keeps its corner margin.
+            REQUIRE(mark.Max.x < body.Min.x);
+            const float margin = facet::Px(facet::T().overlay.toastMargin);
+            CHECK(body.Max.y == doctest::Approx(options.displaySize.y - margin));
+        }
+    }
+}
+
 TEST_CASE("A movable watermark drags to another corner while an overlay menu shows")
 {
     facet::test::Session session({.window = false});

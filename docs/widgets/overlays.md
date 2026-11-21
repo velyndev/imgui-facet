@@ -189,8 +189,10 @@ Queued notifications that `facet::EndFrame` draws in a corner of the display, af
   `overlay.toastStackGap` apart and `overlay.toastMargin` from the corner, `overlay.toastWidth` wide
   (narrower on a narrow display); the others wait and show in the order they were queued. A toast
   that leaves keeps its place while it fades, then the others move into the room on a spring, so the
-  stack never jumps. Toasts stay in front of the page windows and behind open popups; under a modal
-  dialog they show but take no input.
+  stack never jumps. A `WatermarkOverlay` strip in the half of the display the stack grows from that
+  crosses the stack's column (on a narrow display) moves the stack past it, one stack gap away.
+  Toasts stay in front of the page windows and behind open popups; under a modal dialog they show
+  but take no input.
 - **A toast:** the tone's icon (`Tone::Success`, `Warning`, `Destructive`, `Accent`; none for `Neutral`)
   or `icon`, the text in Body, `description` in Footnote, an optional progress bar
   (`progressBar`, `progress` or `kIndeterminate`), an optional action button (`actionLabel`) and a close
