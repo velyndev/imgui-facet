@@ -617,6 +617,7 @@ FACET_DEMO_SELFTEST("lists")
         s.searchable = 4999;
         s.writes = 0;
         s.states[0] = 1;
+        s.listBox = 1;  // its row is in view at the list's first scroll position
     });
 
     // Rows of an open list without a filter field: the list padding and the area padding (8 units)
