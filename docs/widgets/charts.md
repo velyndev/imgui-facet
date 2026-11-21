@@ -101,7 +101,24 @@ Status: ready.
 void BarChart(const char* id, std::span<const ChartSeries> series, std::span<const char* const> categories, const BarChartOptions& options = {});
 ```
 
-Grouped or stacked bars per category. Status: planned.
+Bars per category: value i of each visible series belongs to category i, and there are as many
+categories as the longest series has values (at least as many as labels). `Vertical` bars grow
+up from the value axis baseline with the category labels under them; `Horizontal` bars grow to
+the right with the labels in a column before them (at most 40 % of the width).
+
+- **Grouped** (the default): the visible series side by side in each category, `charts.barGap`
+  apart, categories `spacing.sm` apart. **Stacked**: one bar per category, positive values up and
+  negative values down from 0, each segment a bar gap before the next, so neighbouring colors
+  never touch; only the outer end of a stack is rounded.
+- **Value axis:** as on LineChart, from 0, padded and on whole steps; NaN values and getter gaps
+  draw no bar. Category labels are cut with an ellipsis to their slot, and when slots are too
+  narrow only every n-th label shows.
+- **Readout:** one item and one Tab stop. The pointer picks the category under it; Left and Right
+  (Up and Down too when horizontal), Home and End step through the categories. The picked
+  category gets a wash behind its bars and a box with its label and every visible series value.
+- **Legend, states, size:** as on LineChart.
+
+Status: ready.
 
 ### DonutChart
 
