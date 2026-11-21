@@ -533,7 +533,7 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110, "default", "alerts", "prog
     facet::demo::PageHeader("Display",
                             "Text styles, alerts and empty states, progress and loading, badges and status marks, "
                             "key caps, code and log views, key-value lists and stat tiles.");
-    facet::demo::PlannedFamilyNote("display");
+    facet::demo::ReadyFamilyNote("display");
 
     const bool disabled = Is(ctx, kDisabled);
     if (disabled)

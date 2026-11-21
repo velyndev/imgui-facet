@@ -1,7 +1,6 @@
 // Demo page: Layout. One section per widget of facet/widgets/layout.h, with its variants and
 // states, and the selftest at the end of the file. The controls inside the layouts are Facet widgets
-// of the other families; their labels are placeholders, not real settings. Widgets of this family
-// that are still planned draw their placeholder.
+// of the other families; their labels are placeholders, not real settings.
 
 #include <algorithm>
 #include <cmath>
