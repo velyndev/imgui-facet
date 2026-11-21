@@ -77,7 +77,7 @@ constexpr const char* Strings::*kStringMembers[] = {
     &Strings::weekdayFriday, &Strings::weekdaySaturday, &Strings::weekdaySunday,
     &Strings::am,         &Strings::pm,         &Strings::matchCase, &Strings::wholeWord,
     &Strings::aspectLock, &Strings::swap,       &Strings::linkValues, &Strings::increase,
-    &Strings::decrease,   &Strings::jumpToLatest,
+    &Strings::decrease,   &Strings::jumpToLatest, &Strings::invalidValue, &Strings::presets,
 };
 constexpr size_t kStringCount = std::size(kStringMembers);
 static_assert(sizeof(Strings) == kStringCount * sizeof(const char*), "kStringMembers misses a Strings member");
