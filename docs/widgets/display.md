@@ -136,7 +136,12 @@ Loading placeholder lines, blocks or circles with the shared shimmer. Status: pl
 void Badge(const char* text, const BadgeOptions& options = {});
 ```
 
-Small toned label for a real status or category. Status: planned.
+A small label in a box with the element radius, for a real status or category: by default the
+tone's wash with the text in `label`, with `solid` the tone's fill with its readable text color
+(`onAccent`, `onSuccess`, `onWarning`, `onDestructive`). An optional leading icon takes the tone's
+glyph color. The text is Footnote, centered in the badge, and the badge sits on the baseline of the
+Body text around it, so it reads as part of a sentence at every scale (see "Marks on a line of text"
+below). Not interactive. Status: ready.
 
 ### CountBadge
 

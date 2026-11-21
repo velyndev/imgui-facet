@@ -521,6 +521,38 @@ TEST_CASE("A section header's action is the only Tab stop and activates by click
     CHECK(presses == 3);
 }
 
+// ==== Badge ====
+
+TEST_CASE("A badge draws its tone as a wash with label text, or solid with the text on the tone")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    int wash = 0;
+    int washText = 0;
+    int solid = 0;
+    int onSolid = 0;
+    int glyph = 0;
+    session.SetUi([&] {
+        int from = VertexCount();
+        facet::Badge("Synced", {.tone = facet::Tone::Success, .icon = facet::Icon("check")});
+        wash = CountColor(from, facet::ToU32(c.successSubtle));
+        washText = CountColor(from, facet::ToU32(c.label));
+        glyph = CountColor(from, facet::ToU32(c.success));
+        from = VertexCount();
+        facet::Badge("Failed", {.tone = facet::Tone::Destructive, .solid = true});
+        solid = CountColor(from, facet::ToU32(c.destructive));
+        onSolid = CountColor(from, facet::ToU32(c.onDestructive));
+    });
+    session.Frame();
+    CHECK(wash > 0);
+    CHECK(washText > 0);
+    CHECK(glyph > 0);
+    CHECK(solid > 0);
+    CHECK(onSolid > 0);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
