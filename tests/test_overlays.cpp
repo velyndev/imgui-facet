@@ -22,6 +22,7 @@
 #include "internal/popup_menu.h"
 #include "internal/scope_stack.h"
 #include "support/session.h"
+#include "widgets/overlays/overlay_parts.h"
 
 namespace fi = facet::internal;
 
@@ -1633,4 +1634,49 @@ TEST_CASE("The unsaved changes bar shows while there are changes, applies, rever
     session.Seconds(0.4f);
     session.KeyPress(ImGuiKey_Escape);
     CHECK(reverted == 2);
+}
+
+// ---- Watermark overlay ---------------------------------------------------------------------------
+
+TEST_CASE("A watermark strip draws in its corner over everything and lets clicks through")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    const facet::WatermarkField fields[] = {{.label = "Build", .value = "Placeholder"}};
+    session.SetUi([&] {
+        ImGui::SetCursorScreenPos(ImVec2(0.0f, 0.0f));
+        if (ImGui::Button("under", ImVec2(200.0f, 60.0f)))
+            ++presses;
+        session.Track("under");
+        facet::WatermarkOverlay("mark", fields);
+    });
+    session.Frames(2);
+    const ImDrawList* foreground = ImGui::GetForegroundDrawList();
+    CHECK(foreground->VtxBuffer.Size > 0);
+    session.Click(ImVec2(20.0f, 16.0f));
+    CHECK(presses == 1);
+}
+
+TEST_CASE("A movable watermark drags to another corner while an overlay menu shows")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    bool visible = true;
+    ImRect strip;
+    const facet::WatermarkField fields[] = {{.label = "Build", .value = "Placeholder"}};
+    session.SetUi([&] {
+        if (facet::BeginOverlay("menu", &visible))
+            facet::EndOverlay();
+        facet::WatermarkOverlay("mark", fields, {.corner = facet::ScreenCorner::TopLeft, .movable = true});
+        fi::OverlayWatermarkRect(ImGui::GetID("mark"), &strip);
+    });
+    session.Frames(3);
+    REQUIRE(strip.GetWidth() > 0.0f);
+    CHECK(strip.Min.x < 100.0f);
+    CHECK(strip.Min.y < 100.0f);
+    session.Drag({strip.GetCenter(), ImVec2(700.0f, 520.0f)}, 6);
+    session.Frames(2);
+    CHECK(strip.Max.x > 700.0f);
+    CHECK(strip.Max.y > 520.0f);
 }

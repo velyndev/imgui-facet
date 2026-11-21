@@ -6,11 +6,10 @@ the command palette, watermark overlays and the unsaved changes bar, declared in
 the header comments are the full reference. See [the widget index](../widgets.md) for the other
 families.
 
-A widget whose status is planned is declared and callable. Layers open nothing yet: while the caller
-asks for one to be open, it draws one dashed placeholder line with its name in the page flow; layers
-opened by input (context menus, tooltips) and toasts show nothing. Every planned widget returns the
-neutral result (false, None, an invalid id) and never writes a value. Phase 2 implements each widget
-and changes its status to ready.
+Every layer is a level of one popup host, so they share their placement (next to the anchor,
+flipped to the other side where there is no room, then moved into the display), the Escape order,
+the focus that moves in and comes back, the open and close motion (at once under reduced motion),
+the scrim and the surfaces.
 
 How layers open and how results come back:
 
@@ -21,7 +20,8 @@ How layers open and how results come back:
 - Layers opened by input (`BeginContextMenu`, tooltips) open themselves over the last item.
 - Results come back as return values (`DialogResult`, a written index) or from query functions; there
   are no callbacks.
-- Escape closes the topmost layer only, after an active edit was canceled.
+- Escape closes the topmost layer only, after an active edit was canceled: a list opened from a
+  popover closes before the popover, a confirm dialog before the modal it opened over.
 
 ## Widgets
 
@@ -297,13 +297,22 @@ Status: ready.
 
 ### WatermarkOverlay
 
-Status: planned
-
 ```cpp
 void WatermarkOverlay(const char* id, std::span<const WatermarkField> fields, const WatermarkOptions& options = {});
 ```
 
-A strip of name and value fields in a display corner that lets input through.
+A strip of fields in a corner of the display, `overlay.viewportMargin` from the corner of the work
+area, drawn over every window and taking no input, so every click and key reaches what is under it.
+Each field shows its icon and label in labelSecondary and its value in label (Footnote), on the
+elevated surface of level 1 with a hairline, so the text keeps AA contrast over any content; a strip
+wider than the display is cut with an ellipsis.
+
+With `movable`, the strip takes the mouse while an overlay menu shows (`BeginOverlay`): a drag moves it
+and the release snaps it to the corner nearest the pointer; with keyboard focus (Dear ImGui's window
+switching) the arrow keys move it to the next corner that way. The corner is kept under the id and
+saved in the ini file. Outside an overlay menu a movable strip stays where it is.
+
+Status: ready.
 
 ### UnsavedChangesBar
 
@@ -331,11 +340,11 @@ Status: ready.
 
 A popover anchored to the button that opens it. A click on the anchor item does not count as a
 click outside, so the button may toggle the flag: the first click opens the popover and the second
-closes it, instead of the press closing it and the release opening it again.
+closes it.
 
 ```cpp
 static bool filtersOpen = false;
-if (ImGui::Button("Filters"))
+if (facet::Button("Filters"))
     filtersOpen = !filtersOpen;
 if (facet::BeginPopover("filters", &filtersOpen, {.placement = facet::PopoverPlacement::Below}))
 {
@@ -349,7 +358,7 @@ on the deciding frame:
 
 ```cpp
 static bool confirmDelete = false;
-if (ImGui::Button("Delete"))
+if (facet::Button("Delete"))
     confirmDelete = true;
 if (facet::ConfirmDialog("Delete the preset?", &confirmDelete, "The preset cannot be restored.",
                          {.confirmLabel = "Delete", .destructive = true}) == facet::DialogResult::Confirmed)
