@@ -20,6 +20,8 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/keys.h"
+#include "internal/popup_host.h"
+#include "internal/text_field_number.h"
 #include "support/session.h"
 
 namespace
@@ -528,4 +530,128 @@ TEST_CASE("KeybindCapture read-only and disabled never listen or write")
     CHECK(readOnly.primary == ImGuiKey_F1);
     CHECK(disabled.primary == ImGuiKey_F2);
     CHECK(facet::internal::ActiveChordCaptureOwner() == 0);
+}
+
+// ---- UnitInput ---------------------------------------------------------------------------------
+
+namespace
+{
+
+const facet::UnitItem kTimeUnits[] = {{"ms", 0.001}, {"s", 1.0}, {"min", 60.0}};
+
+} // namespace
+
+TEST_CASE("UnitInput shows the base value in the chosen unit and reads a typed suffix")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 0.25;
+    int unit = 0;  // ms
+    Signals signals;
+    session.SetUi([&] {
+        signals.Take(facet::UnitInput("##time", &seconds, &unit, kTimeUnits));
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    ImGuiInputTextState* text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    CHECK(std::string(text->TextA.Data) == "250");
+    session.Type("1.5 s");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(1.5));
+    CHECK(unit == 1);
+    CHECK(signals.commits == 1);
+    // Case does not matter when no unit matches exactly; a plain number is in the shown unit.
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Type("2MIN");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(120.0));
+    CHECK(unit == 2);
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Type("3");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(180.0));
+}
+
+TEST_CASE("UnitInput round-trips its own formatted text and rejects unknown suffixes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double meters = 1234.5;
+    int unit = 1;
+    const facet::UnitItem lengths[] = {{"m", 1.0}, {"km", 1000.0}};
+    session.SetUi([&] {
+        facet::UnitInput("##length", &meters, &unit, lengths, {.format = "%.4f km"});
+        session.Track("field");
+    });
+    session.Frame();
+    // The text the format shows, typed back as it is, gives the same value.
+    char shown[64];
+    facet::internal::FormatNumber(shown, 64, meters / 1000.0, "%.4f km", nullptr, nullptr, false, false);
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Type(shown);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(meters == doctest::Approx(1234.5));
+    CHECK(unit == 1);
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Type("12 parsecs");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(meters == doctest::Approx(1234.5));
+    CHECK(ErrorShown(facet::GetStrings().invalidValue));
+}
+
+TEST_CASE("UnitInput menu switches the unit by mouse and keyboard, converting or keeping the number")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double converted = 2.0;
+    int convertedUnit = 1;
+    double kept = 2.0;
+    int keptUnit = 1;
+    session.SetUi([&] {
+        facet::UnitInput("##converted", &converted, &convertedUnit, kTimeUnits);
+        session.Track("converted");
+        facet::UnitInput("##kept", &kept, &keptUnit, kTimeUnits, {.convert = false});
+        session.Track("kept");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("converted");
+    const ImVec2 button(rect.Max.x - rect.GetHeight(), rect.GetCenter().y);
+    session.Click(button);
+    REQUIRE(GImGui->OpenPopupStack.Size == 1);  // the menu (the level queries need a frame)
+    // The rows follow the units: Down from the first row moves to "s", then "min".
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(convertedUnit == 2);
+    CHECK(converted == 2.0);  // the quantity stays
+    const ImRect keptRect = session.ItemRect("kept");
+    session.Click(ImVec2(keptRect.Max.x - keptRect.GetHeight(), keptRect.GetCenter().y));
+    REQUIRE(GImGui->OpenPopupStack.Size == 1);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Enter);  // the first row: ms
+    session.Frame();
+    CHECK(keptUnit == 0);
+    CHECK(kept == doctest::Approx(0.002));  // the number 2 stays, now in ms
+}
+
+TEST_CASE("UnitInput without a unit index shows the first unit and converts typed suffixes into it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 1.0;
+    const facet::UnitItem units[] = {{"s", 1.0}, {"ms", 0.001}};
+    session.SetUi([&] {
+        facet::UnitInput("##fixed", &seconds, nullptr, units);
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Type("500ms");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(0.5));
 }

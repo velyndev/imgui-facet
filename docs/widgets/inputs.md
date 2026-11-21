@@ -287,8 +287,19 @@ bool UnitInput(const char* label, double* value, int* unit, std::span<const Unit
                const UnitInputOptions& options = {});
 ```
 
-A number in base units shown in a chosen unit, with a unit menu and typed suffixes such as "250ms".
-Status: planned.
+A number field over `*value` in base units, shown in the unit `*unit` names. The unit sits at the
+end of the frame as a menu button (the unit label and a chevron, a Tab stop after the text): a
+click, Enter or Space opens a menu of the units with the shown one checked, and choosing one writes
+`*unit` at once, keeping the quantity (`convert`, the default) or the number (`convert = false`,
+which writes `*value` too, clamped to the range). Typed text is a number in the shown unit, or a
+number with a unit label ("250ms", "1.5 s", "2,5 min"; the label matched exactly, else ignoring
+ASCII case); it writes on Enter, Tab or focus loss and switches the shown unit to the typed one. The
+field also reads back what its own `format` or `formatter` shows, so a format with the unit in it
+("%.1f km") round-trips. Text that is not a number or names no unit writes nothing and shows
+`Strings::invalidValue`. `min` and `max` are base units; `step` and `stepFast` are in the shown
+unit, for Up, Down, Page Up, Page Down and the wheel while typing, as in NumberInput. A null `unit`
+shows the first unit as a suffix without a menu, and typed suffixes are converted into it; an empty
+`units` span shows the plain number. Status: ready.
 
 ### VectorInput
 
