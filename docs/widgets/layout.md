@@ -5,14 +5,14 @@ separators and item grids, declared in `facet/widgets/layout.h`. Every declarati
 [the API conventions](../api-conventions.md); the header comments are the full reference. See
 [the widget index](../widgets.md) for the other families.
 
-A widget whose status is planned is declared and callable: it draws a dashed placeholder with its
-name, shows the content of a container inside it, returns the neutral result and never writes a
-value. Phase 2 implements each widget and changes its status to ready.
+Every widget of this family is ready. The defaults give the 4 unit spacing rhythm without tuning:
+gaps come from the spacing tokens (`Gap::Item` is `spacing.sm`, the window's own item spacing), and
+rows, dividers and headers from the layout tokens.
 
 The responsive decisions of these layouts use the width classes of `facet/core/layout.h`
 (`WidthClass`, `WidthClassOf`, `AvailableWidthUnits`, `AvailableWidthClass`) and
-`LayoutLabeledRow`, which are implemented today. Apps use the same queries for their own narrow
-fallbacks; this family adds no second breakpoint system.
+`LayoutLabeledRow`. Apps use the same queries for their own narrow fallbacks; this family adds no
+second breakpoint system.
 
 When End is called: a Begin that returns `void` always lays out its content and its End is always
 called. A Begin that returns `[[nodiscard]] bool` may skip its content, and its End is called only
@@ -37,7 +37,9 @@ any item works inside, stock or Facet:
   window's work rect to that width, so items that fill the available width stop at its edge.
 - Horizontal: the window switches to Dear ImGui's horizontal layout type (as a menu bar does), so
   each item follows the previous one on the line with the gap between them; the vertical layout
-  comes back at `EndStack`. `width` 0 fits the items.
+  comes back at `EndStack`. `width` 0 fits the items. The layout type holds for everything inside,
+  so content that puts several items one under the other (a settings row, a card) goes into a
+  vertical stack nested in the row.
 - `gap`: `Gap::None` 0, `Tight` `spacing.xs`, `Item` `spacing.sm` (the window's own item spacing),
   `Loose` `spacing.lg`, `Section` `spacing.xxl`. The gap is also the item spacing of stock content
   nested inside an item of the stack, until a nested stack sets its own.
