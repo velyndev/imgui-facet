@@ -812,3 +812,73 @@ TEST_CASE("A drop zone takes payloads of its types, refuses others, and activate
     session.KeyPress(ImGuiKey_Enter);
     CHECK(activations == 3);
 }
+
+// ---- TimelineScrubber --------------------------------------------------------------------------
+
+TEST_CASE("A timeline scrubber moves the playhead by press and keys, and keeps the loop markers apart")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double playhead = 0.0;
+    double loopIn = 2.0;
+    double loopOut = 6.0;
+    double fixed = 3.0;
+    session.SetUi([&] {
+        facet::TimelineScrubber("time", &playhead, &loopIn, &loopOut, 10.0, {.step = 0.5, .width = 400.0f});
+        session.Track("time");
+        facet::TimelineScrubber("fixed", &fixed, 10.0, {.width = 400.0f, .readOnly = true});
+        session.Track("fixed");
+        double none = 0.0;
+        facet::TimelineScrubber("empty", &none, 0.0, {.width = 400.0f});
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("time");
+    const float pad = std::round(facet::Px(facet::T().metrics.sliderKnobSize)) * 0.5f;
+    const auto xOf = [&](double seconds) { return r.Min.x + pad + static_cast<float>(seconds / 10.0) * (r.GetWidth() - pad * 2.0f); };
+    // A press on the ruler moves the playhead there.
+    session.Click(ImVec2(xOf(8.0), r.Min.y + 4.0f));
+    CHECK(playhead == doctest::Approx(8.0).epsilon(0.02));
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(playhead == 0.0);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(playhead == doctest::Approx(0.5));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(playhead == 10.0);
+    // Tab moves to the loop start marker; it stops at the loop end.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(loopIn == doctest::Approx(6.0));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(loopOut == doctest::Approx(6.0));
+    CHECK(loopIn <= loopOut);
+    // Dragging a marker past the other one stops at it.
+    const float bandY = r.Max.y - 4.0f;
+    session.Drag({ImVec2(xOf(6.0), bandY), ImVec2(xOf(1.0), bandY)}, 6);
+    CHECK(loopIn <= loopOut);
+    // Read-only: nothing is written.
+    session.Click(ImVec2(session.ItemRect("fixed").Min.x + 20.0f, session.ItemRect("fixed").Min.y + 4.0f));
+    CHECK(fixed == 3.0);
+}
+
+TEST_CASE("A timeline scrubber zooms around the pointer with the wheel and pans with Shift")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double playhead = 0.0;
+    session.SetUi([&] {
+        facet::TimelineScrubber("time", &playhead, 100.0, {.width = 400.0f});
+        session.Track("time");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("time");
+    const ImVec2 at = At(r, 0.5f, 0.2f);
+    session.MouseMove(at);
+    for (int i = 0; i < 6; ++i)
+        session.Wheel(at, 1.0f);
+    // Zoomed in around the middle: a press a quarter in lands closer to the middle than 25 seconds.
+    session.Click(At(r, 0.25f, 0.2f));
+    CHECK(playhead > 30.0);
+    CHECK(playhead < 50.0);
+}

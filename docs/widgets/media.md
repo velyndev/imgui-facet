@@ -13,9 +13,10 @@ low-level items sized in pixels; the widgets here take design units and `Radius`
 that is still loading shows a skeleton and a failed one a marker with its alt text, so loading
 needs no separate widget.
 
-Every widget here is **planned** except the core items: each one below is declared, compiles and
-can be called; until Phase 2 implements it, a call draws a placeholder of the widget's default
-size and returns the neutral result. Each entry ends with its status.
+Every widget below is implemented; each entry ends with its status. Images are drawn on the pixel
+grid: a box lands on whole pixels, and an image shown at the size of its texture is sampled one
+texel per pixel, so it stays sharp at scale 1. Rounded corners are geometry with the texture mapped
+over them, so nothing of a picture shows past a corner.
 
 ## Widgets
 
@@ -157,7 +158,16 @@ bool TimelineScrubber(const char* label, double* playhead, double duration, cons
 bool TimelineScrubber(const char* label, double* playhead, double* loopIn, double* loopOut, double duration, const TimelineScrubberOptions& options = {});
 ```
 
-Time ruler with a playhead and optional loop markers. Status: planned.
+A ruler with tick labels (minutes and seconds by default, hours from an hour on, tenths or
+hundredths when zoomed in that far; `format` or `formatter` replace them) over a track that shows
+the whole duration, the `buffered` part in a lighter fill and the part before the playhead in the
+accent. A press anywhere moves the playhead there and drags it, and gives it the keyboard focus. The
+playhead and, in the second form, the loop markers are Tab stops: the arrows step by `step` (a
+hundredth of the duration by default; Shift a tenth, Ctrl ten steps), Home and End go to the ends a
+handle may reach; the loop markers never cross and the region between them is tinted. The wheel
+zooms around the pointer and Shift+wheel pans; the view is kept under the id and resets when the
+duration changes. Read-only and a duration of 0 or less show everything and write nothing. A
+focused or hovered handle names itself and its time in the tooltip. Status: ready.
 
 ### DropZone
 
