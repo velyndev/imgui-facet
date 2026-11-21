@@ -57,7 +57,14 @@ shows the failed marker for a null view. Status: ready.
 bool Avatar(const char* label, ImageHandle image, const AvatarOptions& options = {});
 ```
 
-Round picture with an initials fallback, status dot and selection ring. Status: planned.
+A round picture of the control height of `size` (or `diameter` units, made even). The image fills
+the circle (Cover); while it loads, a round skeleton; without a ready image, the initials of the
+visible label part (the first letter of the first and of the last word) in label on `fill[1]`,
+or the user icon when the label has no word. `squircle` gives a continuous-corner square,
+`showStatus` a status dot in the tone's glyph color on the lower right with a ring of the surface
+color, and `selected` an accent ring inside the edge. With `activatable` it is a Tab stop with
+hover and press washes and the focus ring. The name is the tooltip on hover and keyboard focus.
+Status: ready.
 
 ### AvatarGroup
 

@@ -276,3 +276,35 @@ TEST_CASE("A disabled activatable image view is not a Tab stop and returns false
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
+
+// ---- Avatar ------------------------------------------------------------------------------------
+
+TEST_CASE("An avatar takes the control height of its size, even, and activates only when activatable")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int activations = 0;
+    session.SetUi([&] {
+        facet::Avatar("Placeholder name", facet::ImageHandle{});
+        session.Track("plain");
+        facet::Avatar("Large", facet::ImageHandle{}, {.size = facet::ControlSize::Large});
+        session.Track("large");
+        facet::Avatar("Odd", facet::ImageHandle{}, {.diameter = 33.0f});
+        session.Track("odd");
+        if (facet::Avatar("Active", facet::ImageHandle{}, {.activatable = true}))
+            ++activations;
+        session.Track("active");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("plain").GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(session.ItemRect("large").GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Large)));
+    const float odd = session.ItemRect("odd").GetWidth();
+    CHECK(std::fmod(odd, 2.0f) == 0.0f);
+    session.Click(session.ItemCenter("plain"));
+    CHECK(activations == 0);
+    session.Click(session.ItemCenter("active"));
+    CHECK(activations == 1);
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activations == 2);
+}
