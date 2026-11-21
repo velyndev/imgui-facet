@@ -289,11 +289,15 @@ TEST_CASE("Dragging from one checkbox across others paints the first box's new v
     REQUIRE(session.Ready());
     bool values[4] = {false, true, false, false};
     int writes = 0;
+    int editedReports = 0;
     session.SetUi([&] {
         for (int i = 0; i < 4; ++i)
         {
             ImGui::PushID(i);
-            writes += facet::Checkbox("Item", &values[i]) ? 1 : 0;
+            const bool written = facet::Checkbox("Item", &values[i]);
+            writes += written ? 1 : 0;
+            // A painted box is not the active item, yet it reports its edit like any other.
+            editedReports += written && ImGui::IsItemEdited() ? 1 : 0;
             session.Track(i == 0 ? "c0" : i == 1 ? "c1" : i == 2 ? "c2" : "c3");
             ImGui::PopID();
         }
@@ -307,6 +311,7 @@ TEST_CASE("Dragging from one checkbox across others paints the first box's new v
     CHECK(values[2]);
     CHECK_FALSE(values[3]);
     CHECK(writes == 2);  // the first and the third changed; the second was on already
+    CHECK(editedReports == writes);
     // From an on box: paints off, and the release on another box does not flip the first back.
     session.Drag({session.ItemCenter("c2"), session.ItemCenter("c1"), session.ItemCenter("c2")}, 4);
     session.Frame();
