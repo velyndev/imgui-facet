@@ -89,7 +89,6 @@ static_assert(facet::KnobVariant{} == facet::KnobVariant::Arc);
 void CallSliderStubs(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, XYPad("Pad 1", &v.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.grid = true}));
     FACET_CHECK_STUB(false, JoystickPad("Stick 1", &v.point, {.deadzone = 0.1f}));
     FACET_CHECK_STUB(false, ArcRangeSlider("Arc 1", &v.low, &v.high, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f}));
     FACET_CHECK_STUB(false, BoxRangePad("Box 1", &v.boxLow, &v.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f)));
@@ -98,7 +97,7 @@ void CallSliderStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 6;
+constexpr int kSliderStubCalls = 5;
 
 } // namespace
 

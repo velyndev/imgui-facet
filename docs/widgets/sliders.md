@@ -298,7 +298,38 @@ Status: ready.
 bool XYPad(const char* label, ImVec2* value, ImVec2 min, ImVec2 max, const XYPadOptions& options = {});
 ```
 
-A two-dimensional area with one draggable point, a crosshair and optional grid. Status: planned.
+A two-dimensional area with one draggable point: a field frame (the frame of a text field, with its
+hover, read-only, disabled and error looks) `width` by `height` units, the padSize token square by
+default and at most the available width (`kFill` fills), with the slider knob as the point. The
+knob centre travels in the frame inset by half a knob, so it never leaves the frame; a pad smaller
+than two knobs gets a smaller knob. The visible label is not drawn: it is the tooltip on hover and
+keyboard focus. One item and one Tab stop under the label's id.
+
+- **Pointer:** a press on the point grabs it without moving it, a press elsewhere moves it there
+  first. A drag moves both axes, Shift keeps only the axis with the larger travel since the press,
+  Ctrl snaps both to tenths of the range (or ten steps). A drag out of the window and back returns
+  exactly to the values it passed. There is no fine drag, because Shift is the axis lock.
+- **Keys** while focused: Left and Right step x, Up and Down move the point up and down on screen
+  (a hundredth of the range or one step, Shift a tenth of that, Ctrl ten times); Page Up and Down
+  move it up and down by a tenth of the y range; Home and End send x to `min.x` and `max.x`.
+  Escape during a drag or a key press restores both values from the start of the edit. The wheel
+  scrolls the window, also over the pad.
+- **Options:** `step` snaps each axis to `min + n * step` (0 continuous); `grid` draws separator
+  hairlines at every step when there are at most 32 per axis, and at the quarters otherwise;
+  `crosshair` (on by default) draws labelTertiary guide lines through the point and the two
+  values in Footnote at the edges of the frame, moved to the other side when the point comes
+  near, and left out when the pad is too small for both; `format`, `formatter` and
+  `formatterUser` format both readouts; `yDown` puts `min.y` at the top.
+- **States:** disabled draws the disabled tokens, is not a Tab stop and writes nothing; `readOnly`
+  (or a pushed `ImGuiItemFlags_ReadOnly`) keeps the focus and writes nothing; `mixed` hides the
+  point, the guides and the readouts until the first edit (the focus ring goes around the frame);
+  `error` draws the destructive frame and the message under the pad, replacing `helpText`. An axis
+  with `min == max` does not move; with both, and with a null value pointer, the pad is read-only.
+  A value outside the range is drawn at the edge and written only by an edit, which writes the
+  axes it moved.
+- **Not done yet:** typed values (the Ctrl+click and Enter of the other sliders) and the wheel.
+
+Status: ready.
 
 ### JoystickPad
 

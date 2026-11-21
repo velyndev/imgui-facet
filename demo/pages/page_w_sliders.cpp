@@ -99,8 +99,18 @@ struct SlidersUi
     int emptyLow = 2;
     int emptyHigh = 8;
 
-    // The planned widgets below.
+    // XYPad
     ImVec2 point = {0.5f, 0.5f};
+    ImVec2 cell = {2.0f, 5.0f};
+    ImVec2 padFixed = {0.3f, 0.6f};
+    ImVec2 padOff = {0.7f, 0.4f};
+    ImVec2 padLimit = {0.9f, 0.9f};
+    ImVec2 padMixed = {0.5f, 0.5f};
+    bool padMixedSet = false;
+    int pointEdits = 0;    // frames that wrote point
+    int pointCommits = 0;  // finished drags and key presses of point
+
+    // The planned widgets below.
     ImVec2 stick = {0.0f, 0.0f};
     float arcLow = 45.0f;
     float arcHigh = 135.0f;
@@ -118,6 +128,7 @@ enum CaptureState
     kHovered,
     kFocused,
     kDragging,
+    kPads,       // the two-dimensional widgets in use: a pad dragged, a box handle focused
 };
 
 const float kZoomStops[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
@@ -384,9 +395,66 @@ void RangeSection(facet::demo::PageCtx& ctx)
          ui.highInt, ui.spreadLow, ui.spreadHigh, ui.filterLow, ui.filterHigh);
 }
 
+// A row of small pads that wraps in a narrow window.
+constexpr float kSmallPad = 112.0f;
+
+void XYPadSection(facet::demo::PageCtx& ctx)
+{
+    // The state labels repeat those of the sliders above: an id scope of its own keeps them apart.
+    ImGui::PushID("xy");
+    SectionHeader("XYPad");
+    Paragraph("A point on two axes. Drag it, or click to move it there; Shift keeps the axis the drag goes along "
+              "and Ctrl snaps to tenths. The arrows step x and y, Page Up and Down move y by a tenth, Home and End "
+              "send x to its ends, Escape restores the point.");
+    LabeledRow("Continuous");
+    const bool padState = ctx.capture && ctx.captureState == kPads;
+    // Dragging without the hover: a hovered pad would show its label tooltip, which a capture
+    // without a pointer cannot place.
+    if (padState)
+        ctx.ForceNextItemState(ForcedItemState::Dragging);
+    if (facet::XYPad("Position", &ui.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.format = "%.2f", .grid = true}))
+        ++ui.pointEdits;
+    if (facet::IsItemEditCommitted())
+        ++ui.pointCommits;
+    ctx.Probe("xy.position");
+    if (padState)
+        ctx.RevealInCapture(0.2f);
+    LabeledRow("Steps, y down");
+    facet::XYPad("Cell", &ui.cell, ImVec2(0.0f, 0.0f), ImVec2(8.0f, 8.0f),
+                 {.format = "%.0f", .step = {1.0f, 1.0f}, .grid = true, .yDown = true, .width = facet::demo::DemoWidth(160.0f)});
+    ctx.Probe("xy.cell");
+
+    LabeledRow("States");
+    float right = facet::demo::ContentRight();
+    const float small = facet::Px(kSmallPad);
+    facet::XYPad("Read-only", &ui.padFixed, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                 {.format = "%.1f", .width = facet::demo::DemoWidth(kSmallPad), .readOnly = true});
+    ctx.Probe("xy.readOnly");
+    facet::demo::SameLineIfFits(right, small);
+    ImGui::BeginDisabled();
+    facet::XYPad("Disabled", &ui.padOff, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                 {.format = "%.1f", .width = facet::demo::DemoWidth(kSmallPad)});
+    ImGui::EndDisabled();
+    ctx.Probe("xy.disabled");
+    facet::demo::SameLineIfFits(right, small);
+    if (facet::XYPad("Mixed", &ui.padMixed, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                     {.format = "%.1f", .width = facet::demo::DemoWidth(kSmallPad), .mixed = !ui.padMixedSet}))
+        ui.padMixedSet = true;
+    ctx.Probe("xy.mixed");
+    LabeledRow("");
+    facet::XYPad("Limit", &ui.padLimit, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                 {.format = "%.1f", .crosshair = false, .width = facet::demo::DemoWidth(kSmallPad),
+                  .error = ui.padLimit.x + ui.padLimit.y > 1.5f ? "Keep x + y at 1.5 or below" : nullptr,
+                  .helpText = "Move the point toward the lower left"});
+    ctx.Probe("xy.limit");
+    Note("Position %.2f, %.2f: written on %d frames, %d finished edits. Cell %.0f, %.0f.", ui.point.x, ui.point.y,
+         ui.pointEdits, ui.pointCommits, ui.cell.x, ui.cell.y);
+    ImGui::PopID();
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging")
+FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging", "pads")
 {
     facet::demo::PageHeader("Sliders",
                             "Sliders, range sliders, multi-handle sliders, knobs and two-dimensional pads.");
@@ -437,21 +505,23 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
     facet::RangeSliderHistogram("Empty", &ui.emptyLow, &ui.emptyHigh, 0, 10, {}, {.helpText = "No bins: the track alone"});
     ctx.Probe("histogram.empty");
 
-    SectionHeader("More ranges");
-    Paragraph("Every range widget shares one handle model: handles never cross, keep a minimum gap, "
-              "and either stop at each other or push each other.");
-    LabeledRow("Arc range");
-    facet::ArcRangeSlider("##arc", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f});
+    XYPadSection(ctx);
+
+    SectionHeader("BoxRangePad");
+    LabeledRow("Box range");
+    facet::BoxRangePad("##box", &ui.boxLow, &ui.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+
+    SectionHeader("AllocationBar");
     LabeledRow("Shares");
     facet::AllocationBar("##shares", std::span<float>(ui.shares), kSegments, {.minGap = 0.05});
 
-    SectionHeader("Two dimensions");
-    LabeledRow("XY pad");
-    facet::XYPad("##pad", &ui.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.grid = true});
+    SectionHeader("ArcRangeSlider");
+    LabeledRow("Arc range");
+    facet::ArcRangeSlider("##arc", &ui.arcLow, &ui.arcHigh, 0.0f, 360.0f, {.wrap = true, .sweep = 360.0f});
+
+    SectionHeader("JoystickPad");
     LabeledRow("Joystick");
     facet::JoystickPad("##stick", &ui.stick, {.deadzone = 0.1f, .showDeadzone = true});
-    LabeledRow("Box range");
-    facet::BoxRangePad("##box", &ui.boxLow, &ui.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
 }
 
 FACET_DEMO_SELFTEST("sliders")
@@ -753,4 +823,45 @@ FACET_DEMO_SELFTEST("sliders")
     test.MouseDown();
     test.MouseUp();
     test.Expect("the first edit of a mixed range sets it", [] { return ui.mixRangeSet; });
+
+    // XYPad: a drag moves both axes, a click moves the point there, the arrows step both axes,
+    // one Tab stop per pad.
+    test.Do([] { ui.point = {0.5f, 0.5f}; ui.pointCommits = 0; });
+    test.Drag({T::Item("xy.position", 0.5f, 0.5f), T::Item("xy.position", 0.8f, 0.2f)}, 0.3f);
+    test.Expect("a drag up and to the right moves the point on both axes",
+                [] { return ui.point.x > 0.65f && ui.point.y > 0.65f; });
+    test.Expect("the drag was one finished edit", [] { return ui.pointCommits == 1; });
+    test.MouseMove(T::Item("xy.position", 0.2f, 0.8f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click moves the point under the pointer", [] { return ui.point.x < 0.35f && ui.point.y < 0.35f; });
+    test.ExpectFocused("xy.position");
+    test.Do([] { ui.point = {0.5f, 0.5f}; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right steps x one hundredth", [] { return ui.point.x; }, 0.51, 1e-6);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up steps y one hundredth", [] { return ui.point.y; }, 0.51, 1e-6);
+    test.KeyPress(ImGuiKey_PageDown);
+    test.ExpectNear("Page Down moves y a tenth down", [] { return ui.point.y; }, 0.5, 1e-6);
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End sends x to its maximum", [] { return ui.point.x; }, 1.0, 0.0);
+    test.ExpectFocused("xy.position");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("xy.cell");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down on a pad with y down moves to the next cell row", [] { return ui.cell.y; }, 6.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("xy.readOnly");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("xy.mixed");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Expect("the first edit of a mixed pad sets it", [] { return ui.padMixedSet; });
+    test.Drag({T::Item("xy.readOnly", 0.5f, 0.5f), T::Item("xy.readOnly", 0.9f, 0.1f)}, 0.2f);
+    test.ExpectNear("the read-only pad keeps its value", [] { return ui.padFixed.x; }, 0.3, 1e-6);
+    test.Drag({T::Item("xy.disabled", 0.5f, 0.5f), T::Item("xy.disabled", 0.1f, 0.9f)}, 0.2f);
+    test.ExpectNear("the disabled pad keeps its value", [] { return ui.padOff.x; }, 0.7, 1e-6);
+    test.MouseMove(T::Item("xy.limit", 0.15f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click toward the lower left clears the error", [] { return ui.padLimit.x + ui.padLimit.y <= 1.5f; });
 }

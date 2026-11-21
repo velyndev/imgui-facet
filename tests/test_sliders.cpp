@@ -1131,6 +1131,160 @@ TEST_CASE("A focused knob steps with Left and Right like Down and Up and keeps t
     // The arrows never move the focus to the next knob.
     CHECK(ImGui::GetFocusID() == session.ItemId("knob"));
 }
+// ---- XYPad ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// The screen point of fractions (fx, fy) of a pad tracked as `name`, fy from the bottom: the knob
+// centres travel in the frame inset by half a knob.
+ImVec2 PadAt(const facet::test::Session& session, const char* name, double fx, double fy)
+{
+    const ImRect r = session.ItemRect(name);
+    const float half = KnobSize() * 0.5f;
+    const ImRect area(r.Min.x + half, r.Min.y + half, r.Max.x - half, r.Max.y - half);
+    return ImVec2(area.Min.x + static_cast<float>(fx) * area.GetWidth(), area.Max.y - static_cast<float>(fy) * area.GetHeight());
+}
+
+} // namespace
+
+TEST_CASE("An XY pad drags its point on both axes, steps with the arrows and restores with Escape")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 point(0.25f, 0.75f);
+    int changes = 0;
+    int commits = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::XYPad("Position", &point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 200.0f}))
+            ++changes;
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("pad");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("pad").GetWidth() == doctest::Approx(200.0f));
+    CHECK(session.ItemRect("pad").GetHeight() == doctest::Approx(200.0f));
+    // A press on the point grabs it; a drag moves both axes.
+    const ImVec2 at = PadAt(session, "pad", 0.25, 0.75);
+    session.MouseMove(at);
+    session.MouseDown();
+    CHECK(point.x == 0.25f);
+    CHECK(point.y == 0.75f);
+    const float span = session.ItemRect("pad").GetWidth() - KnobSize();
+    session.MouseMove(ImVec2(at.x + span * 0.5f, at.y + span * 0.25f));
+    CHECK(point.x == doctest::Approx(0.75f).epsilon(0.01));
+    CHECK(point.y == doctest::Approx(0.5f).epsilon(0.01));
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(point.x == 0.25f);
+    CHECK(point.y == 0.75f);
+    session.MouseUp();
+    CHECK(commits == 0);
+    // A click elsewhere moves the point there.
+    session.Click(PadAt(session, "pad", 0.6, 0.2));
+    CHECK(point.x == doctest::Approx(0.6f).epsilon(0.01));
+    CHECK(point.y == doctest::Approx(0.2f).epsilon(0.01));
+    CHECK(commits == 1);
+    // One Tab stop; the arrows move both axes, Tab goes on.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("pad"));
+    point = ImVec2(0.5f, 0.5f);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(point.x == doctest::Approx(0.51f));
+    CHECK(point.y == doctest::Approx(0.51f));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Ctrl);
+    CHECK(point.y == doctest::Approx(0.5f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(point.x == 1.0f);
+    session.KeyPress(ImGuiKey_PageDown);
+    CHECK(point.y == doctest::Approx(0.4f));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK(changes > 0);
+}
+
+TEST_CASE("An XY pad snaps to its steps, flips y with yDown, and shows a value out of range clamped")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 grid(2.0f, 2.0f);
+    ImVec2 outside(5.0f, -3.0f);
+    session.SetUi([&] {
+        facet::XYPad("Grid", &grid, ImVec2(0.0f, 0.0f), ImVec2(10.0f, 10.0f),
+                     {.step = {1.0f, 2.0f}, .grid = true, .yDown = true, .width = 200.0f});
+        session.Track("grid");
+        facet::XYPad("Outside", &outside, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f});
+        session.Track("outside");
+    });
+    session.Frame();
+    // yDown: fraction 0 of y is at the top, so a click near the top writes a small y.
+    session.Click(PadAt(session, "grid", 0.33, 0.85));
+    CHECK(grid.x == 3.0f);
+    CHECK(grid.y == 2.0f);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(grid.y == 4.0f);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(grid.x == 4.0f);
+    // Nothing is written until an edit.
+    session.Frames(3);
+    CHECK(outside.x == 5.0f);
+    CHECK(outside.y == -3.0f);
+}
+
+TEST_CASE("An XY pad read-only, disabled or mixed: written only where it may be")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 fixed(0.5f, 0.5f);
+    ImVec2 off(0.5f, 0.5f);
+    ImVec2 mixed(0.5f, 0.5f);
+    ImVec2 line(0.5f, 0.5f);
+    bool mixedSet = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::XYPad("Fixed", &fixed, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f, .readOnly = true});
+        session.Track("fixed");
+        ImGui::BeginDisabled();
+        facet::XYPad("Off", &off, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f});
+        ImGui::EndDisabled();
+        session.Track("off");
+        if (facet::XYPad("Mixed", &mixed, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 100.0f, .mixed = !mixedSet}))
+            mixedSet = true;
+        session.Track("mixed");
+        // A y range of zero: the point moves along x only.
+        facet::XYPad("Line", &line, ImVec2(0.0f, 0.5f), ImVec2(1.0f, 0.5f), {.width = 100.0f});
+        session.Track("line");
+    });
+    session.Frame();
+    session.Drag({session.ItemCenter("fixed"), session.ItemRect("fixed").Max});
+    session.Drag({session.ItemCenter("off"), session.ItemRect("off").Max});
+    CHECK(fixed.x == 0.5f);
+    CHECK(off.x == 0.5f);
+    // The read-only pad is a Tab stop, the disabled one is not.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("fixed"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(fixed.x == 0.5f);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("mixed"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(mixedSet);
+    CHECK(mixed.x == doctest::Approx(0.51f));
+    session.Click(PadAt(session, "line", 0.9, 0.9));
+    CHECK(line.x == doctest::Approx(0.9f).epsilon(0.02));
+    CHECK(line.y == 0.5f);
+}
+
 // ---- RangeSliderHistogram ------------------------------------------------------------------
 
 TEST_CASE("A histogram range stands on its bars and its handles follow the range rules")
