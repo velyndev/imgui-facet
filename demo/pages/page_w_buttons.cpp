@@ -196,7 +196,7 @@ void ButtonSection(facet::demo::PageCtx& ctx)
             Pressed(&ui.upload, "Upload");
         ctx.Probe("button.upload");
         row.Next();
-        ImGui::Checkbox("Loading", &ui.loading);
+        facet::Toggle("Loading", &ui.loading);
         ctx.Probe("button.loadingToggle");
     }
     ctx.RevealInCapture(0.5f);
@@ -527,7 +527,7 @@ FACET_DEMO_SELFTEST("buttons")
 
     // Loading: the button keeps its place and its focus but ignores activation.
     test.Click("button.loadingToggle");
-    test.Expect("the checkbox turns loading on", [] { return ui.loading; });
+    test.Expect("the Loading switch turns loading on", [] { return ui.loading; });
     test.Click("button.upload");
     test.ExpectNear("a loading button does not activate", [] { return ui.upload; }, 1.0, 0.0);
     test.Click("button.loadingToggle");

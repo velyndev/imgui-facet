@@ -282,9 +282,9 @@ void AlertsSection(facet::demo::PageCtx& ctx)
 void ProgressSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Progress and loading");
-    // The stock slider sets the value, so the eased fill can be seen.
+    // The slider sets the value, so the eased fill can be seen.
     LabeledRow("Progress value");
-    ImGui::SliderFloat("##progress value", &ui.progress, 0.0f, 1.0f, "%.2f");
+    facet::Slider("##progress value", &ui.progress, 0.0f, 1.0f, {.format = "%.2f"});
     ctx.Probe("display.progressValue");
     LabeledRow("Progress bar");
     facet::ProgressBar("Example task##bar", ui.progress, {.showPercent = true, .buffer = ui.progress + 0.2f});
@@ -405,15 +405,16 @@ void MarksSection(facet::demo::PageCtx& ctx)
     Note("The F5 cap shows the held look while F5 is down.");
     LabeledRow("Shortcut hint");
     ImGui::BeginGroup();
-    facet::ShortcutHint("Placeholder command", ImGuiMod_Ctrl | ImGuiKey_K, {.width = 320.0f});
-    facet::ShortcutHint("Narrow: the caps give way first", ImGuiMod_Ctrl | ImGuiKey_K, {.width = 140.0f});
+    facet::ShortcutHint("Placeholder command", ImGuiMod_Ctrl | ImGuiKey_K, {.width = DemoWidth(320.0f)});
+    facet::ShortcutHint("Narrow: the caps give way first", ImGuiMod_Ctrl | ImGuiKey_K, {.width = DemoWidth(140.0f)});
     ImGui::EndGroup();
     if (Is(ctx, kMarks))
         ctx.RevealInCapture(0.4f);
     LabeledRow("Character counter");
     ImGui::BeginGroup();
-    ImGui::SetNextItemWidth(facet::Px(220.0f));
-    ImGui::InputText("##counter input", ui.counterText, sizeof(ui.counterText));
+    // No maxLength, so the text can run past the limit and the counters show it.
+    facet::TextField("##counter input", ui.counterText, sizeof(ui.counterText),
+                     {.width = DemoWidth(facet::T().metrics.cardWidth)});
     ctx.Probe("display.counterInput");
     const int length = ImTextCountCharsFromUtf8(ui.counterText, nullptr);
     facet::CharacterCounter(length, 24, {.warnRemaining = 6});
@@ -673,7 +674,7 @@ FACET_DEMO_SELFTEST("display")
     test.Click("display.progress");
     test.ExpectNear("a click on the bar leaves the value", [] { return ui.progress; }, 0.4, 0.0001);
     test.Drag({T::Item("display.progressValue", 0.5f), T::Item("display.progressValue", 1.2f)}, 0.25f);
-    test.ExpectNear("the stock slider sets the value the bar shows", [] { return ui.progress; }, 1.0, 0.0001);
+    test.ExpectNear("the slider sets the value the bar shows", [] { return ui.progress; }, 1.0, 0.0001);
     test.Click("display.progressValue");
     test.KeyPress(ImGuiKey_Tab);
     test.KeyPress(ImGuiKey_Tab);

@@ -578,7 +578,10 @@ The dose caps in Direction apply. The choices behind each effect:
 
 - **Stock controls.** The gallery maps the theme tokens onto the stock Dear ImGui style with
   `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme and
-  the scale.
+  the scale. The pages of ready widget families set their own demos with Facet controls (a
+  Toggle for a layer that shows or hides, a SegmentedControl for a data state, a Slider for a
+  value, a TextField), so a page reads as one product; a stock control stays only where the page
+  shows Facet working with stock Dear ImGui items, and its row label says so.
 - **Mixed sizes on one line.** Controls of different sizes in one row are centered on the
   tallest one, so their labels sit on one line instead of stepping down from a shared top.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a

@@ -1,6 +1,6 @@
 // Demo page: Containers. One section per widget of facet/widgets/containers.h, with its variants and
 // states and the probes of the selftest at the end of the file. The layers (the shell, the overlay
-// menu, the mini window) start closed and a checkbox opens each, so none covers the gallery
+// menu, the mini window) start closed and a switch opens each, so none covers the gallery
 // uninvited; the capture states "shell" and "overlay" show them open. The app frame fills the whole
 // viewport of a host, so the page only describes it; its unit tests and the family doc cover it.
 
@@ -134,15 +134,14 @@ bool Hovered(const facet::demo::PageCtx& ctx)
 void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Shell");
-    Paragraph("The floating shell is a window of its own that a page opens; the checkbox sets its "
+    Paragraph("The floating shell is a window of its own that a page opens; the switch sets its "
               "open flag, and its close button or Escape clears it. Drag the title bar to move it "
               "(it snaps to the display edges) and any edge or corner to resize it; its place and "
               "size are kept in design units.");
     if (ctx.capture)
         s.shellOpen = ctx.captureState == kCaptureShell;
     LabeledRow("Shell");
-    ImGui::Checkbox("##shell", &s.shellOpen);
-    facet::ItemCursor();
+    facet::Toggle("##shell", &s.shellOpen);
     ctx.Probe("containers.shell");
     facet::ShellOptions shell{.icon = facet::Icon("settings"),
                               .initialSize = {300.0f, 220.0f},
@@ -225,7 +224,7 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
          "docs/widgets/containers.md shows the host code.");
 
     SectionHeader("Overlay controller and mini window");
-    Paragraph("An overlay menu as a host would show it over a game: the first checkbox shows or hides "
+    Paragraph("An overlay menu as a host would show it over a game: the first switch shows or hides "
               "the menu (a small shell) with a fade. The mini window shows with the menu; pinned, it "
               "stays while the menu is hidden and then lets input through. A host calls the controller "
               "outside every window; this page calls it from its own code to show it.");
@@ -235,12 +234,10 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
         s.miniPinned = ctx.captureState == kCaptureOverlay;
     }
     LabeledRow("Overlay menu");
-    ImGui::Checkbox("##overlay", &s.overlayVisible);
-    facet::ItemCursor();
+    facet::Toggle("##overlay", &s.overlayVisible);
     ctx.Probe("containers.overlay");
     LabeledRow("Pin the mini window");
-    ImGui::Checkbox("##pinned", &s.miniPinned);
-    facet::ItemCursor();
+    facet::Toggle("##pinned", &s.miniPinned);
     ctx.Probe("containers.mini.pinned");
     if (facet::BeginOverlay("containers.overlay", &s.overlayVisible))
     {
@@ -530,19 +527,24 @@ void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
     SectionHeader("Virtual list");
     Paragraph("Ten thousand placeholder rows; only the visible ones are submitted. Click, Ctrl and "
               "Shift select, the arrows, Page Up and Down, Home and End move, Enter or a double "
-              "click activates. The buttons switch the list's data state.");
+              "click activates. The segmented control above it switches the list's data state.");
     const char* const states[4] = {"Rows", "Loading", "Error", "Empty"};
     const char* const stateProbes[4] = {"containers.virtual.rows", "containers.virtual.loading",
                                         "containers.virtual.error", "containers.virtual.empty"};
-    const float right = facet::demo::ContentRight();
-    for (int i = 0; i < 4; ++i)
+    LabeledRow("Data state");
+    // Equal segments over the row (kFill), so segment i is the i-th quarter of the control.
+    const ImGuiID stateId = ImGui::GetID("##listState");
+    facet::SegmentedControl("##listState", &s.listState, states, {.width = facet::kFill});
     {
-        if (i > 0)
-            facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth(states[i]));
-        if (ImGui::RadioButton(states[i], s.listState == i))
-            s.listState = i;
-        facet::ItemCursor();
-        ctx.Probe(stateProbes[i]);
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const float segment = (max.x - min.x) / 4.0f;
+        for (int i = 0; i < 4; ++i)
+        {
+            const float left = min.x + segment * static_cast<float>(i);
+            facet::demo::ProbeRect(ctx, stateProbes[i], ImHashData(&i, sizeof(i), stateId), ImVec2(left, min.y),
+                                   ImVec2(left + segment, max.y));
+        }
     }
     const facet::DataState data =
         s.listState == 1 ? facet::DataState::Loading : (s.listState == 2 ? facet::DataState::Error : facet::DataState::Ready);
@@ -575,12 +577,11 @@ void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
     else
         Note("Selected rows: %d. No row activated yet.", s.selection.Size);
     SectionHeader("Inspector pane");
-    Paragraph("A details pane at the trailing edge: its close button hides it, the checkbox shows it "
+    Paragraph("A details pane at the trailing edge: its close button hides it, the switch shows it "
               "again, and its leading edge drags its width. In a narrow window it floats over the "
               "main content.");
     LabeledRow("Show the pane");
-    ImGui::Checkbox("##inspector", &s.inspectorVisible);
-    facet::ItemCursor();
+    facet::Toggle("##inspector", &s.inspectorVisible);
     ctx.Probe("containers.inspector.toggle");
     facet::BeginInspectorPane("Inspector###containers.inspector", &s.inspectorVisible, {.height = RegionHeight()});
     Note("Main content of the region (placeholder).");
@@ -656,10 +657,10 @@ FACET_DEMO_SELFTEST("containers")
         s.resetOpen = true;
     });
 
-    // Shell: the checkbox opens and closes it, by mouse and keyboard.
+    // Shell: the switch opens and closes it, by mouse and keyboard.
     test.Expect("the shell starts closed", [] { return !ContainersState{}.shellOpen; });
     test.Click("containers.shell");
-    test.Expect("the checkbox opens the shell", [] { return State().shellOpen; });
+    test.Expect("the switch opens the shell", [] { return State().shellOpen; });
     test.Wait(2);
     test.Click("containers.shell.button");
     test.Expect("a button inside the shell works", [] { return State().shellPresses == 1; });
@@ -795,7 +796,7 @@ FACET_DEMO_SELFTEST("containers")
     test.Reveal("containers.status");
     test.ExpectVisible("containers.status");
 
-    // Overlay: the checkbox shows the menu; the mini window shows with it and pins; pinned and
+    // Overlay: the switch shows the menu; the mini window shows with it and pins; pinned and
     // without the menu it lets input through.
     test.Do([] {
         ContainersState& s = State();
@@ -805,7 +806,7 @@ FACET_DEMO_SELFTEST("containers")
     });
     test.Click("containers.overlay");
     test.WaitSeconds(0.5f);
-    test.Expect("the checkbox shows the overlay menu", [] { return State().overlayVisible; });
+    test.Expect("the switch shows the overlay menu", [] { return State().overlayVisible; });
     test.Click("containers.overlay.button");
     test.Expect("a button in the overlay menu works", [] { return State().menuPresses == 1; });
     test.Expect("the mini window takes input while the menu shows", [] { return State().miniTakesInput; });
@@ -820,11 +821,11 @@ FACET_DEMO_SELFTEST("containers")
     test.ExpectFocused("containers.overlay");
     test.KeyPress(ImGuiKey_Space);
     test.WaitSeconds(0.5f);
-    test.Expect("Space on the checkbox shows the menu again", [] { return State().overlayVisible; });
+    test.Expect("Space on the switch shows the menu again", [] { return State().overlayVisible; });
     // The menu's shell took the keyboard focus as it appeared; the mouse hides the menu again.
     test.Click("containers.overlay");
     test.WaitSeconds(0.5f);
-    test.Expect("the checkbox hides the menu", [] { return !State().overlayVisible; });
+    test.Expect("the switch hides the menu", [] { return !State().overlayVisible; });
     test.Do([] { State().miniPinned = false; });
     test.Wait(2);
 
@@ -920,7 +921,7 @@ FACET_DEMO_SELFTEST("containers")
     });
     test.ExpectVisible("containers.scroll.last");
 
-    // Inspector pane: both parts work; the close button hides it, the checkbox shows it, the edge resizes it.
+    // Inspector pane: both parts work; the close button hides it, the switch shows it, the edge resizes it.
     test.Do([] {
         ContainersState& s = State();
         s.inspectorVisible = true;
@@ -953,7 +954,7 @@ FACET_DEMO_SELFTEST("containers")
     test.Expect("the close button hides the pane", [] { return !State().inspectorVisible; });
     test.Click("containers.inspector.toggle");
     test.WaitSeconds(0.5f);
-    test.Expect("the checkbox shows it again", [] { return State().inspectorVisible; });
+    test.Expect("the switch shows it again", [] { return State().inspectorVisible; });
     test.Click("containers.inspector.button");
     test.KeyPress(ImGuiKey_Tab);
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
