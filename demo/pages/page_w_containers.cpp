@@ -775,7 +775,7 @@ FACET_DEMO_SELFTEST("containers")
     test.Click("containers.virtual.row4");
     test.KeyUp(ImGuiMod_Shift);
     test.Expect("Shift+click selects the range", [] { return State().selection.Size == 3; });
-    test.KeyPress(ImGuiKey_Tab);
+    // The clicked row keeps the keyboard; Tab would leave the list (list_view.h, "Tab").
     test.KeyPress(ImGuiKey_End);
     test.Wait(3);
     test.ExpectVisible("containers.virtual.last");
