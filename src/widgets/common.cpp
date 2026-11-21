@@ -79,6 +79,16 @@ constexpr const char* Strings::*kStringMembers[] = {
     &Strings::aspectLock, &Strings::swap,       &Strings::linkValues, &Strings::increase,
     &Strings::decrease,   &Strings::jumpToLatest, &Strings::invalidValue, &Strings::presets,
     &Strings::selectedCount, &Strings::add,
+    &Strings::moreCount,  &Strings::collapse,   &Strings::expand,    &Strings::recent,
+    &Strings::goToPage,   &Strings::holdToConfirm, &Strings::sortAscending, &Strings::sortDescending,
+    &Strings::columns,    &Strings::original,   &Strings::colorRed,  &Strings::colorGreen,
+    &Strings::colorBlue,  &Strings::colorAlpha, &Strings::colorHue,  &Strings::colorSaturation,
+    &Strings::colorValue, &Strings::colorLightness, &Strings::colorModelRgb, &Strings::colorModelHsv,
+    &Strings::colorModelHsl, &Strings::colorModelHex, &Strings::animationStatic, &Strings::animationPulse,
+    &Strings::animationCycle, &Strings::animationGradient, &Strings::period, &Strings::open,
+    &Strings::save,       &Strings::chooseFolder, &Strings::fileName, &Strings::fileType,
+    &Strings::parentFolder, &Strings::play,     &Strings::pause,     &Strings::loopStart,
+    &Strings::loopEnd,    &Strings::playhead,
 };
 constexpr size_t kStringCount = std::size(kStringMembers);
 static_assert(sizeof(Strings) == kStringCount * sizeof(const char*), "kStringMembers misses a Strings member");

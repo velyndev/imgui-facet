@@ -88,6 +88,16 @@ TEST_CASE("Strings templates: the defaults fill as documented, also after SetStr
     CHECK(std::strcmp(out, "%s 5: 2") == 0);
     CHECK(std::strcmp(facet::GetStrings().jumpToLatest, "Jump to latest") == 0);
     facet::SetStrings(facet::Strings{});
+    // The "+N" chip of the second widget wave, and a member far down the table kept by SetStrings.
+    const TextToken more[] = {{"count", 7}};
+    FormatTokens(out, sizeof(out), facet::GetStrings().moreCount, more);
+    CHECK(std::strcmp(out, "+7") == 0);
+    translated = facet::Strings{};
+    translated.playhead = "Position";
+    facet::SetStrings(translated);
+    CHECK(std::strcmp(facet::GetStrings().playhead, "Position") == 0);
+    CHECK(std::strcmp(facet::GetStrings().loopEnd, "Loop end") == 0);
+    facet::SetStrings(facet::Strings{});
 }
 
 TEST_CASE("Every Strings member named in a header or a doc exists")
