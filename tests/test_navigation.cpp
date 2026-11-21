@@ -500,3 +500,327 @@ TEST_CASE("A collapsible sidebar section toggles on a click and on Left and Righ
     CHECK(shown);
 }
 
+// --- Menus --------------------------------------------------------------------------------------
+
+namespace
+{
+
+struct MenuProbe
+{
+    bool option = false;
+    int radio = 0;
+    int opens = 0;
+    int deletes = 0;
+    int deep = 0;
+    bool fileOpen = false;
+    bool editOpen = false;
+    bool subOpen = false;
+    ImGuiID bar = 0;
+    ImGuiID fileTitle = 0;
+    ImGuiID editTitle = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        fileOpen = editOpen = subOpen = false;
+        bar = ImGui::GetID("bar");
+        if (facet::BeginMenuBar("bar"))
+        {
+            fileTitle = ImGui::GetID("File");
+            if (facet::BeginMenu("File"))
+            {
+                fileOpen = true;
+                if (facet::MenuItem("Open"))
+                    ++opens;
+                session.Track("open");
+                facet::MenuItem("Details");
+                ImGui::BeginDisabled();
+                facet::MenuItem("Duplicate");
+                session.Track("duplicate");
+                ImGui::EndDisabled();
+                if (facet::MenuItem("Delete", {.destructive = true}))
+                    ++deletes;
+                session.Track("delete");
+                if (facet::BeginMenu("More options"))
+                {
+                    subOpen = true;
+                    if (facet::MenuItem("Deep"))
+                        ++deep;
+                    session.Track("deep");
+                    facet::MenuItem("Deeper");
+                    facet::MenuItem("Deepest");
+                    facet::EndMenu();
+                }
+                session.Track("more");
+                facet::MenuItem("Last row");
+                session.Track("last");
+                facet::EndMenu();
+            }
+            editTitle = ImGui::GetID("Edit");
+            if (facet::BeginMenu("Edit"))
+            {
+                editOpen = true;
+                facet::MenuItem("Cut", {.shortcut = ImGuiMod_Ctrl | ImGuiKey_X});
+                facet::MenuCheckItem("Wrap", &option);
+                session.Track("wrap");
+                facet::MenuRadioItem("Small", &radio, 0);
+                facet::MenuRadioItem("Large", &radio, 1);
+                session.Track("large");
+                facet::EndMenu();
+            }
+            facet::EndMenuBar();
+        }
+    }
+
+    ImVec2 Title(int index) const { return NavigationPartRect(bar, index).GetCenter(); }
+};
+
+} // namespace
+
+TEST_CASE("A menu bar title opens its menu, an item activates and closes it, hovering switches menus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frame();
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    CHECK(probe.fileOpen);
+    session.Click(session.ItemCenter("open"));
+    session.Frames(2);
+    CHECK(probe.opens == 1);
+    CHECK_FALSE(probe.fileOpen);
+    // Open File, then move onto Edit: Edit opens in its place.
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    session.MouseMove(probe.Title(1));
+    session.MouseMove(Nudge(probe.Title(1)));
+    session.Seconds(0.3f);
+    CHECK(probe.editOpen);
+    CHECK_FALSE(probe.fileOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.3f);
+    CHECK_FALSE(probe.editOpen);
+}
+
+TEST_CASE("In a bar menu Left and Right switch menus, Escape closes it and the focus returns to the title")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frame();
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    REQUIRE(probe.fileOpen);
+    session.MouseMove(ImVec2(1.0f, 500.0f));
+    session.KeyPress(ImGuiKey_DownArrow);  // the focus is in the menu
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Seconds(0.3f);
+    CHECK(probe.editOpen);
+    CHECK_FALSE(probe.fileOpen);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Seconds(0.3f);
+    CHECK(probe.fileOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.3f);
+    CHECK_FALSE(probe.fileOpen);
+    CHECK(ImGui::GetFocusID() == probe.fileTitle);
+    // Right on a title moves to the next title; Down opens its menu.
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ImGui::GetFocusID() == probe.editTitle);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.Seconds(0.3f);
+    CHECK(probe.editOpen);
+}
+
+TEST_CASE("A submenu opens on Right and closes on Left, and the aim test keeps it open on the way there")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frame();
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    REQUIRE(probe.fileOpen);
+    // The pointer rests on the submenu row: it opens.
+    session.MouseMove(session.ItemCenter("more"));
+    session.MouseMove(Nudge(session.ItemCenter("more")));
+    session.Seconds(0.5f);
+    REQUIRE(probe.subOpen);
+    // On its way toward the submenu across the next row, for longer than the submenu delay, the
+    // submenu stays open: the pointer aims at it.
+    const ImRect deep = session.ItemRect("deep");
+    const ImVec2 from = session.ItemCenter("more");
+    const ImVec2 last = session.ItemCenter("last");
+    const ImVec2 toward(from.x + (deep.Min.x - from.x) * 0.7f, last.y);
+    constexpr int kSteps = 24;
+    for (int i = 1; i <= kSteps; ++i)
+    {
+        const float f = static_cast<float>(i) / static_cast<float>(kSteps);
+        session.MouseMove(ImVec2(from.x + (toward.x - from.x) * f, from.y + (toward.y - from.y) * f));
+    }
+    CHECK(probe.subOpen);
+    session.MouseMove(session.ItemCenter("deep"));
+    session.Seconds(0.1f);
+    session.Click(session.ItemCenter("deep"));
+    session.Frames(2);
+    CHECK(probe.deep == 1);
+    CHECK_FALSE(probe.fileOpen);  // the whole chain closed
+    // Resting on another row of the menu, away from the submenu, closes it.
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    session.MouseMove(session.ItemCenter("more"));
+    session.MouseMove(Nudge(session.ItemCenter("more")));
+    session.Seconds(0.5f);
+    REQUIRE(probe.subOpen);
+    session.MouseMove(session.ItemCenter("open"));
+    session.MouseMove(Nudge(session.ItemCenter("open")));
+    session.Seconds(0.5f);
+    CHECK_FALSE(probe.subOpen);
+    // Keyboard: Right on the submenu row opens it, Left closes it again.
+    session.MouseMove(ImVec2(1.0f, 500.0f));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.Seconds(0.3f);
+    REQUIRE(probe.fileOpen);
+    for (int i = 0; i < 3; ++i)
+        session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Seconds(0.3f);
+    CHECK(probe.subOpen);
+    CHECK(probe.fileOpen);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Seconds(0.3f);
+    CHECK_FALSE(probe.subOpen);
+    CHECK(probe.fileOpen);
+}
+
+TEST_CASE("Typing in a menu moves the focus to the next row that starts with the text, past disabled rows")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frame();
+    session.Click(probe.Title(0));
+    session.Seconds(0.3f);
+    REQUIRE(probe.fileOpen);
+    session.MouseMove(ImVec2(1.0f, 500.0f));
+    // "Details" comes first; typing d again skips the disabled "Duplicate" and lands on "Delete".
+    session.Type("d");
+    session.Frames(2);
+    session.Type("d");
+    session.Frames(2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("delete"));
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(probe.deletes == 1);
+    CHECK_FALSE(probe.fileOpen);
+}
+
+TEST_CASE("Check and radio items write their values; a command item triggers its shortcut")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    const facet::ShortcutId command = facet::RegisterShortcut("test.nav.command", ImGuiMod_Ctrl | ImGuiKey_K);
+    int fired = 0;
+    bool inline_ = false;
+    session.SetUi([&] {
+        probe.Draw(session);
+        if (facet::ShortcutPressed(command))
+            ++fired;
+        // A row outside any menu draws inline and activates.
+        inline_ = facet::MenuItem("Inline", {.command = command}) || inline_;
+        session.Track("inline");
+    });
+    session.Frame();
+    session.Click(probe.Title(1));
+    session.Seconds(0.3f);
+    session.Click(session.ItemCenter("wrap"));
+    CHECK(probe.option);
+    session.Click(probe.Title(1));
+    session.Seconds(0.3f);
+    session.Click(session.ItemCenter("large"));
+    CHECK(probe.radio == 1);
+    // The command row triggers its shortcut; the chord runs it with every menu closed as well.
+    session.Click(session.ItemCenter("inline"));
+    session.Frames(2);
+    CHECK(inline_);
+    CHECK(fired == 1);
+    session.KeyPress(ImGuiKey_K | ImGuiMod_Ctrl);
+    session.Frames(2);
+    CHECK(fired == 2);
+    facet::UnregisterShortcut(command);
+}
+
+TEST_CASE("Menus that do not fit the bar move into its more menu, whose rows open them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool editOpen = false;
+    int cuts = 0;
+    ImGuiID bar = 0;
+    float width = 0.0f;
+    session.SetUi([&] {
+        bar = ImGui::GetID("bar");
+        editOpen = false;
+        if (facet::BeginMenuBar("bar", {.width = width}))
+        {
+            if (facet::BeginMenu("File"))
+            {
+                facet::MenuItem("Open");
+                facet::EndMenu();
+            }
+            if (facet::BeginMenu("Edit"))
+            {
+                editOpen = true;
+                if (facet::MenuItem("Cut"))
+                    ++cuts;
+                session.Track("cut");
+                facet::EndMenu();
+            }
+            facet::EndMenuBar();
+        }
+    });
+    session.Frames(2);
+    CHECK(NavigationPartRect(bar, 1).GetWidth() > 0.0f);
+    width = (NavigationPartRect(bar, 0).GetWidth() + facet::ControlHeight(facet::ControlSize::Regular)) / facet::Px(1.0f) +
+            facet::T().spacing.xs * 2.0f;
+    session.Frames(3);
+    CHECK(NavigationPartRect(bar, 1).GetWidth() == 0.0f);
+    const ImRect more = NavigationPartRect(bar, facet::internal::kNavigationPartMore);
+    REQUIRE(more.GetWidth() > 0.0f);
+    session.Click(more.GetCenter());
+    session.Seconds(0.3f);
+    const ImRect row = NavigationPartRect(bar, facet::internal::NavigationMenuRowPart(1));
+    REQUIRE(row.GetWidth() > 0.0f);
+    session.Click(row.GetCenter());
+    session.Seconds(0.3f);
+    CHECK(editOpen);
+    session.Click(session.ItemCenter("cut"));
+    session.Frames(2);
+    CHECK(cuts == 1);
+}
+
+TEST_CASE("Alt alone moves the focus to the first title of the menu bar")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuProbe probe;
+    session.SetUi([&] {
+        ImGui::Button("content");
+        session.Track("content");
+        probe.Draw(session);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("content"));
+    session.KeyPress(ImGuiKey_LeftAlt);
+    session.Frame();
+    CHECK(ImGui::GetFocusID() == probe.fileTitle);
+    CHECK(facet::internal::KeyboardModality());
+}
+
