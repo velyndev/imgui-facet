@@ -150,7 +150,20 @@ Status: ready.
 void Gauge(const char* label, double value, double min, double max, const GaugeOptions& options = {});
 ```
 
-Radial gauge with zones and a readout. Status: planned.
+A track along `metrics.dialSweep` degrees of a circle, open at the bottom (`Arc`), or along its
+upper half (`HalfCircle`), `charts.gaugeWidth` wide. `zones` are drawn as a thin band along the
+outer edge in their tone; the filled arc runs from `min` to the value in the tone of the zone the
+value is in (else the accent), or with `needle` a needle in the label color points at it. The
+value moves with the quick spring (at once with reduced motion).
+
+- **Readout:** the value in `format` or `formatter` (default "%.0f") in the middle, the visible
+  label part under it in labelSecondary, cut with an ellipsis and shown whole as a tooltip on hover.
+- **Out of range:** the fill stops at the end and a dot in the label color marks that end; the
+  readout shows the value as it is. `min > max` is swapped; `min == max` draws the readout alone.
+- **Not interactive:** one item, not a Tab stop. Disabled: the disabled colors.
+- **Size:** `diameter` 0 is `metrics.chartHeight`, at most the available width.
+
+Status: ready.
 
 ### LevelMeter
 
