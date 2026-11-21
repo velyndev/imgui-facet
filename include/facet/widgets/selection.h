@@ -4,10 +4,8 @@
 // cycle selectors, option cards and the key bind mode selector.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is being implemented: the entry of each widget in
-// docs/widgets/selection.md ends with its status. A widget whose status is planned draws a
-// placeholder of the widget's default size, returns false and writes nothing; its queries report
-// that nothing happened (false or -1).
+// with other families. Every widget of the family is implemented; its entry in
+// docs/widgets/selection.md describes what it does and ends with its status.
 //
 // Common to every widget here:
 //   - The bool result is true on the frame the widget wrote its value or selection.
@@ -22,8 +20,8 @@
 //   - The visible label part is drawn by shape (docs/api-conventions.md, rule 6): in front of
 //     one-line controls inside their width (SegmentedControl, CycleSelector,
 //     KeybindModeSelector), above groups that wrap into rows (CheckboxGroup, RadioGroup,
-//     ChipGroup, OptionCardGroup), after the mark for Toggle and Checkbox. "##name" hides it,
-//     as in settings rows.
+//     ChipGroup, OptionCardGroup), after the mark for Checkbox, and in front of the switch for
+//     Toggle. "##name" hides it, as in settings rows.
 
 #include <span>
 

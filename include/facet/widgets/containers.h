@@ -5,9 +5,9 @@
 // lists, mini windows and the inspector pane.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families, and docs/widgets/containers.md has usage examples. The family is being
-// implemented: the entry of each widget in docs/widgets/containers.md ends with its status, and
-// a widget whose status is planned draws a placeholder and returns the neutral result.
+// with other families, and docs/widgets/containers.md has usage examples. Every widget of the
+// family is implemented; its entry in docs/widgets/containers.md describes what it does and ends
+// with its status.
 //
 // When End is called (rule 8): a Begin that returns void always lays out its content, and its
 // End is always called. A Begin that returns [[nodiscard]] bool may skip its content (closed,

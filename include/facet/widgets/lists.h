@@ -4,9 +4,9 @@
 // reorderable lists, tree views, checkbox trees, transfer lists and searchable checklists.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families, and docs/widgets/lists.md has usage examples. The family is being
-// implemented: the entry of each widget in docs/widgets/lists.md ends with its status, and a
-// widget whose status is planned draws a placeholder and returns the neutral result.
+// with other families, and docs/widgets/lists.md has usage examples. Every widget of the family
+// is implemented; its entry in docs/widgets/lists.md describes what it does and ends with its
+// status.
 //
 // Two kinds of multiple choice use two kinds of storage:
 //   - A selection (highlighted rows that the next command acts on) lives in a caller-owned

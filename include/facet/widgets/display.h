@@ -6,9 +6,10 @@
 // tiles and data tables.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is being implemented: the entry of each widget in
-// docs/widgets/display.md ends with its status, and a widget whose status is planned draws a
-// placeholder of its default size and returns the neutral result.
+// with other families. Every widget of the family is implemented except DataTable and its cell
+// editing, which are planned: the entry of each widget in docs/widgets/display.md ends with its
+// status, and a widget whose status is planned draws a placeholder of its default size and
+// returns the neutral result.
 //
 // Lengths are design units (Px() is applied inside). Strings are UTF-8 and read only during
 // the call. Every function is for the thread that runs the Dear ImGui frame (context.h).
@@ -168,7 +169,7 @@ struct DataStateViewOptions
 // while Loading, the error state with an optional retry button, the empty state (Ready with a
 // count of 0) and the caller's content. Returns true when the content must be submitted
 // (Ready and count > 0); then call EndDataStateView. Returns false while it draws a state
-// itself; then do not call EndDataStateView. The id keys the crossfade between states and the
+// itself; then do not call EndDataStateView. The id keys the fade-in of a newly shown state and the
 // remembered height, which keeps the layout from jumping when the state changes.
 [[nodiscard]] bool BeginDataStateView(const char* id, DataState state, int count,
                                       const DataStateViewOptions& options = {});
@@ -472,7 +473,7 @@ struct StatTileOptions
     double delta = std::numeric_limits<double>::quiet_NaN();  // change shown as a chip; NaN hides it
     const char* deltaFormat = nullptr;     // printf for the delta; null: "%+.1f"
     bool invertDelta = false;              // a negative delta is the good direction (latency, errors)
-    std::span<const float> trend = {};     // a sparkline behind the value; empty for none
+    std::span<const float> trend = {};     // a trend line along the bottom of the tile; empty for none
     DataState state = DataState::Ready;    // Loading shows a skeleton, Error the error token
     float width = 0.0f;                    // units; 0 fills the available width
 };

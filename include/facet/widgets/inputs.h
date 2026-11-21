@@ -4,10 +4,8 @@
 // unit and vector fields, masked and special-purpose fields, key bind capture and ratings.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is being implemented: the entry of each widget in
-// docs/widgets/inputs.md ends with its status. A widget whose status is planned draws a
-// placeholder of the widget's default size, returns false and writes nothing; its queries report
-// that nothing happened (false or -1).
+// with other families. Every widget of the family is implemented; its entry in
+// docs/widgets/inputs.md describes what it does and ends with its status.
 //
 // Common to every widget here:
 //   - Text editing, IME, undo, selection and the clipboard are Dear ImGui's own (InputTextEx in

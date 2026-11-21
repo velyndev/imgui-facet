@@ -4,7 +4,8 @@
 // knobs and two-dimensional pads.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The family is being implemented: the entry of each widget in
+// with other families. XYPad, JoystickPad, ArcRangeSlider, BoxRangePad and AllocationBar are
+// planned; every other widget is implemented. The entry of each widget in
 // docs/widgets/sliders.md ends with its status. A widget whose status is planned draws a
 // placeholder of the widget's default size, returns false and writes nothing; its queries report
 // that nothing happened (-1).
