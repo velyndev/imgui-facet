@@ -1,9 +1,9 @@
 // ColorModeEditor and SampleAnimatedColor. The editor is made of public widgets: a SegmentedControl
 // for the animation (Strings::animationStatic and the others), a ColorWell for the base color, a
-// second ColorWell for Pulse and Gradient, a DragNumber for the period in seconds (Strings::period)
-// for every animation but Static, and a live preview swatch drawn with SampleAnimatedColor. The
-// first row carries the label in front; the second row starts under the first row's control and
-// wraps its items onto further lines when the width is too small.
+// second ColorWell for Pulse and Gradient, a DragNumber for the period in seconds (Strings::period,
+// the value followed by Strings::seconds) for every animation but Static, and a live preview swatch
+// drawn with SampleAnimatedColor. The first row carries the label in front; the second row starts
+// under the first row's control and wraps its items onto further lines when the width is too small.
 
 #include "facet/widgets/pickers.h"
 
@@ -37,7 +37,7 @@ constexpr double kDegrees = 360.0;
 // The shortest period the editor writes, in seconds: faster cycles flicker.
 constexpr double kColorModeMinPeriod = 0.1;
 // The period field: the slowest period a drag reaches, and the width of the field in control
-// heights, enough for "10.00" and the label.
+// heights, enough for "10.00"; the label and the unit (Strings::seconds) are added to it.
 constexpr double kColorModeMaxPeriod = 60.0;
 constexpr float kColorModePeriodInControls = 4.0f;
 constexpr int kColorAnimationCount = 4;
@@ -179,12 +179,24 @@ bool ColorModeEditor(const char* label, AnimatedColor* animated, const ColorMode
     }
     if (edited.animation != ColorAnimation::Static)
     {
-        const float fieldWidth = std::min(std::round(m.height * kColorModePeriodInControls + ImGui::CalcTextSize(s.period).x),
+        const float textWidth = ImGui::CalcTextSize(s.period).x + ImGui::CalcTextSize(" ").x +
+                                ImGui::CalcTextSize(s.seconds).x;
+        const float fieldWidth = std::min(std::round(m.height * kColorModePeriodInControls + textWidth),
                                           std::max(1.0f, right - left));
         place(fieldWidth);
         ImGui::SetNextItemWidth(fieldWidth);
         DragNumberOptions period;
-        period.format = "%.2f";
+        // The value, then the unit; a % in a translated unit is doubled so it stays text.
+        char periodFormat[48];
+        int at = std::snprintf(periodFormat, sizeof(periodFormat), "%%.2f ");
+        for (const char* u = s.seconds; *u != '\0' && at < static_cast<int>(sizeof(periodFormat)) - 2; ++u)
+        {
+            if (*u == '%')
+                periodFormat[at++] = '%';
+            periodFormat[at++] = *u;
+        }
+        periodFormat[at] = '\0';
+        period.format = periodFormat;
         period.min = kColorModeMinPeriod;
         period.max = kColorModeMaxPeriod;
         period.readOnly = readOnly;

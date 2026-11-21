@@ -37,13 +37,6 @@ constexpr float kFrameDefaultTarget = 1.0f / 60.0f;
 // The graph's top is at least this many targets, and the slowest frame shown with this headroom.
 constexpr float kFrameTopTargets = 2.0f;
 constexpr float kFrameHeadroom = 1.1f;
-// Unit and statistic names of the readout. They are not in the Strings table yet.
-constexpr const char* kFrameRateUnit = "fps";
-constexpr const char* kFrameTimeUnit = "ms";
-constexpr const char* kFrameMin = "min";
-constexpr const char* kFrameAverage = "avg";
-constexpr const char* kFrameMax = "max";
-
 struct FrameStats
 {
     int first = 0;     // the oldest sample shown
@@ -104,6 +97,7 @@ void FrameTimeGraphImpl(const char* id, const SeriesView& view, const FrameTimeG
     const float target = o.target > 0.0f && std::isfinite(o.target) ? o.target : kFrameDefaultTarget;
     const ImU32 primary = ToU32(disabled ? c.labelTertiary : c.label);
     const ImU32 secondary = ToU32(disabled ? c.labelTertiary : c.labelSecondary);
+    const Strings& words = GetStrings();
 
     // The frames per second: Headline, at the start (compact: beside the graph, else above it).
     char rate[32] = {};
@@ -120,7 +114,7 @@ void FrameTimeGraphImpl(const char* id, const SeriesView& view, const FrameTimeG
         internal::ControlTextScope text(TextStyle::Headline);
         // Room for a three-digit rate, so the graph does not move as the rate changes.
         char widest[32];
-        std::snprintf(widest, sizeof(widest), "000 %s", kFrameRateUnit);
+        std::snprintf(widest, sizeof(widest), "000 %s", words.framesPerSecond);
         rateWidth = std::min(ImGui::CalcTextSize(widest).x, width * 0.5f);
         graph = ImRect(bounds.Min.x + rateWidth + gap, bounds.Min.y, bounds.Max.x, bounds.Max.y);
     }
@@ -134,9 +128,9 @@ void FrameTimeGraphImpl(const char* id, const SeriesView& view, const FrameTimeG
 
     if (stats.average > 0.0f)
     {
-        std::snprintf(rate, sizeof(rate), "%.0f %s", 1.0 / stats.average, kFrameRateUnit);
-        std::snprintf(times, sizeof(times), "%s %.1f   %s %.1f   %s %.1f %s", kFrameMin, stats.min * 1000.0f, kFrameAverage,
-                      stats.average * 1000.0f, kFrameMax, stats.max * 1000.0f, kFrameTimeUnit);
+        std::snprintf(rate, sizeof(rate), "%.0f %s", 1.0 / stats.average, words.framesPerSecond);
+        std::snprintf(times, sizeof(times), "%s %.1f   %s %.1f   %s %.1f %s", words.minimum, stats.min * 1000.0f,
+                      words.average, stats.average * 1000.0f, words.maximum, stats.max * 1000.0f, words.milliseconds);
     }
     {
         internal::ControlTextScope text(TextStyle::Headline);

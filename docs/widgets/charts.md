@@ -209,8 +209,8 @@ seconds, oldest first.
   and reach above the line, so they stand out without color too. The graph's top is twice the
   target or the slowest frame shown.
 - **Not interactive:** one item, not a Tab stop. It reads the samples in place: no allocation.
-- **Text:** the words of the readout ("fps", "min", "avg", "max", "ms") are fixed English text for
-  now; they are not in the `Strings` table yet.
+- **Text:** the words of the readout are built-in strings (`Strings::framesPerSecond`, `minimum`,
+  `average`, `maximum` and `milliseconds`), so `SetStrings` translates them.
 - **Size:** `width` 0 fills, `height` 0 is `metrics.chartHeight` (compact: two control heights).
 
 Status: ready.

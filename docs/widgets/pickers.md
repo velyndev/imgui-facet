@@ -149,8 +149,9 @@ the second row wraps when the width is too small. Each is a Tab stop. `SampleAni
 color at a time: Pulse eases from `color` to `second` and back (a cosine over the period), Gradient
 sweeps evenly there and back, both blended in OKLab; Cycle turns the OKLCH hue of `color` once per
 period and keeps its lightness and chroma. While facet::ReduceMotion() is true, for Static and for
-a period that is not above 0 it returns `color`. The period field shows no unit text yet: a
-built-in string for seconds does not exist. Status: ready.
+a period that is not above 0 it returns `color`. The period field shows its value with
+Strings::seconds after it. Status: ready.
+
 ### Usage of the color pickers
 
 A color setting with a recent-colors row shared by two pickers. The history is caller data, so it

@@ -696,3 +696,42 @@ TEST_CASE("ColorModeEditor switches the animation by keys and shows the fields i
     CHECK(animated.period > 2.0f);
     CHECK(session.ItemRect("editor").GetHeight() >= staticHeight);
 }
+
+TEST_CASE("ColorModeEditor makes room in its period field for the unit of Strings::seconds")
+{
+    // The width of the focused period field with `unit` as the seconds string.
+    const auto fieldWidth = [](const char* unit) {
+        facet::Strings strings;
+        strings.seconds = unit;
+        facet::SetStrings(strings);
+        float width = 0.0f;
+        {
+            facet::test::Session session;
+            REQUIRE(session.Ready());
+            facet::AnimatedColor animated{facet::ColorAnimation::Pulse, ImVec4(0.2f, 0.4f, 0.8f, 1.0f), ImVec4(1, 1, 1, 1),
+                                          2.0f};
+            ImGuiID editor = 0;
+            session.SetUi([&] {
+                ImGui::Button("before");
+                session.Track("before");
+                editor = ImGui::GetID("Mode");
+                (void)facet::ColorModeEditor("Mode", &animated);
+            });
+            session.Frame();
+            session.Click(session.ItemCenter("before"));
+            // As in the test above: two presses reach the animation, then the two wells, then the period.
+            for (int i = 0; i < 5; ++i)
+                session.KeyPress(ImGuiKey_Tab);
+            char period[64];
+            std::snprintf(period, sizeof(period), "%s##period", facet::GetStrings().period);
+            REQUIRE(ImGui::GetFocusID() == PartId(editor, period));
+            width = GImGui->NavWindow->NavRectRel[0].GetWidth();
+        }
+        facet::SetStrings(facet::Strings{});
+        return width;
+    };
+    const float shortUnit = fieldWidth("s");
+    const float longUnit = fieldWidth("seconds%");
+    CHECK(shortUnit > 0.0f);
+    CHECK(longUnit > shortUnit);
+}

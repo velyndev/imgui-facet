@@ -335,6 +335,12 @@ struct Strings
     const char* loopStart = "Loop start";   // TimelineScrubber handles (since 0.1)
     const char* loopEnd = "Loop end";       // (since 0.1)
     const char* playhead = "Playhead";      // (since 0.1)
+    const char* seconds = "s";              // unit after a time in seconds: the ColorModeEditor period (since 0.1)
+    const char* milliseconds = "ms";        // unit after a time in milliseconds: FrameTimeGraph (since 0.1)
+    const char* framesPerSecond = "fps";    // unit after a frame rate: FrameTimeGraph (since 0.1)
+    const char* minimum = "min";            // FrameTimeGraph statistics, short (since 0.1)
+    const char* average = "avg";            // (since 0.1)
+    const char* maximum = "max";            // (since 0.1)
 };
 
 // Replaces the table. Every string is copied; a null member keeps the English default.

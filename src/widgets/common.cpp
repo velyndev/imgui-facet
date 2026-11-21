@@ -88,7 +88,8 @@ constexpr const char* Strings::*kStringMembers[] = {
     &Strings::animationCycle, &Strings::animationGradient, &Strings::period, &Strings::open,
     &Strings::save,       &Strings::chooseFolder, &Strings::fileName, &Strings::fileType,
     &Strings::parentFolder, &Strings::play,     &Strings::pause,     &Strings::loopStart,
-    &Strings::loopEnd,    &Strings::playhead,
+    &Strings::loopEnd,    &Strings::playhead,   &Strings::seconds,   &Strings::milliseconds,
+    &Strings::framesPerSecond, &Strings::minimum, &Strings::average, &Strings::maximum,
 };
 constexpr size_t kStringCount = std::size(kStringMembers);
 static_assert(sizeof(Strings) == kStringCount * sizeof(const char*), "kStringMembers misses a Strings member");
