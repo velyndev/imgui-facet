@@ -213,10 +213,9 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
         };
         wide("CharacterCounter", [] { CharacterCounter(1, 0); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0, {.ring = true}); });
-        wide("InlineCode", [] { InlineCode("a"); });
     });
     session.Frame();
-    CHECK(checked == 3);
+    CHECK(checked == 2);
 }
 
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")

@@ -261,7 +261,12 @@ Text length against a limit, warning near it and destructive over it. Status: pl
 bool InlineCode(const char* label, const InlineCodeOptions& options = {});
 ```
 
-Inline code in a tinted box, optionally copied on activation. Status: planned.
+Code or an identifier (the visible label part) in a box with the faint control fill and the element
+radius, sitting on the text baseline of the line like a badge. The face is the UI font: Facet has no
+monospace face yet. With `copyOnActivate` it is a Tab stop: a click, Enter or Space copies the
+visible text (without the `"##"` part) through `ImGui::SetClipboardText`, returns true and shows a
+check and `Strings::copied` above it for `motion.feedbackHold`; hover and press step the fill. Without
+it the item is not a Tab stop. Status: ready.
 
 ### CodeView
 
@@ -441,6 +446,21 @@ facet::BeginKeyValueList("details", {.copyable = true});
 facet::KeyValue("Path", path.c_str());
 facet::KeyValue("Modified", modifiedText);
 facet::EndKeyValueList();
+```
+
+### Marks on a line of text
+
+Badges, count badges, status pills, key caps and inline code are a little taller than the text around
+them and put their text on the baseline of that text: after `ImGui::SameLine` they meet Body text,
+a Facet control's label or a stock widget's text drawn before or after them, at every scale. Status
+dots, spinners and character counters center their mark on the capitals of the line.
+
+```cpp
+facet::StyledText("Connection");
+ImGui::SameLine();
+facet::StatusPill("Online###net", {.tone = facet::Tone::Success, .liveDot = true});
+ImGui::SameLine();
+facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_R);
 ```
 
 ### Tones

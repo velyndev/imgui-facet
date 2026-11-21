@@ -521,6 +521,68 @@ TEST_CASE("A section header's action is the only Tab stop and activates by click
     CHECK(presses == 3);
 }
 
+// ==== Baselines ====
+
+TEST_CASE("Inline marks sit on the baseline of the text and controls around them at every scale")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    for (const float scale : {0.75f, 1.0f, 2.0f})
+    {
+        CAPTURE(scale);
+        facet::SetUiScale(scale);
+        float textBaseline = 0.0f;
+        float badgeBaseline = 0.0f;
+        float pillBaseline = 0.0f;
+        float codeBaseline = 0.0f;
+        float capBaseline = 0.0f;
+        float countBaseline = 0.0f;
+        float afterButtonText = 0.0f;
+        float afterButtonBadge = 0.0f;
+        session.SetUi([&] {
+            const facet::internal::DisplayMarkMetrics m = facet::internal::DisplayMarkLook(facet::ControlSize::Regular);
+            const float inBox = facet::internal::DisplayMarkBaseline(m);
+            facet::PushTextStyle(facet::TextStyle::Body);
+            ImGui::TextUnformatted("Body");
+            facet::PopTextStyle();
+            textBaseline = BodyBaseline(ImGui::GetItemRectMin().y);
+            ImGui::SameLine();
+            facet::Badge("Badge");
+            badgeBaseline = ImGui::GetItemRectMin().y + inBox;
+            ImGui::SameLine();
+            facet::StatusPill("Pill");
+            pillBaseline = ImGui::GetItemRectMin().y + inBox;
+            ImGui::SameLine();
+            facet::InlineCode("code");
+            codeBaseline = ImGui::GetItemRectMin().y + inBox;
+            ImGui::SameLine();
+            facet::KeyCap(ImGuiMod_Ctrl | ImGuiKey_S);
+            capBaseline = ImGui::GetItemRectMin().y + inBox;
+            ImGui::SameLine();
+            facet::CountBadge(4);
+            countBaseline = ImGui::GetItemRectMin().y + inBox;
+            // After a control: the mark meets the control's label.
+            facet::Button("Save");
+            ImGui::SameLine();
+            facet::Badge("Badge##2");
+            afterButtonBadge = ImGui::GetItemRectMin().y + inBox;
+            ImGui::SameLine();
+            facet::PushTextStyle(facet::TextStyle::Body);
+            ImGui::TextUnformatted("Body");
+            facet::PopTextStyle();
+            afterButtonText = BodyBaseline(ImGui::GetItemRectMin().y);
+        });
+        session.Frames(2);
+        CHECK(std::fabs(badgeBaseline - textBaseline) <= 1.0f);
+        CHECK(std::fabs(pillBaseline - textBaseline) <= 1.0f);
+        CHECK(std::fabs(codeBaseline - textBaseline) <= 1.0f);
+        CHECK(std::fabs(capBaseline - textBaseline) <= 1.0f);
+        CHECK(std::fabs(countBaseline - textBaseline) <= 1.0f);
+        CHECK(std::fabs(afterButtonBadge - afterButtonText) <= 1.0f);
+    }
+}
+
 // ==== Badge ====
 
 TEST_CASE("A badge draws its tone as a wash with label text, or solid with the text on the tone")
@@ -1162,6 +1224,35 @@ TEST_CASE("A stat tile colors its delta by direction and shows the loading and e
     CHECK(inverted > 0);
     CHECK(error > 0);
     CHECK(session.ItemRect("trend").GetHeight() > session.ItemRect("plain").GetHeight());
+}
+
+// ==== InlineCode ====
+
+TEST_CASE("Inline code copies its text on activation and is a Tab stop only when it copies")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int copies = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::InlineCode("plain_name");
+        if (facet::InlineCode("value_name##copy", {.copyOnActivate = true}))
+            ++copies;
+        session.Track("code");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("code"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(copies == 1);
+    CHECK(session.Clipboard() == "value_name");  // without the id part
+    session.SetClipboard("");
+    session.Click(session.ItemCenter("code"));
+    CHECK(copies == 2);
+    CHECK(session.Clipboard() == "value_name");
 }
 
 // ==== Contrast ====
