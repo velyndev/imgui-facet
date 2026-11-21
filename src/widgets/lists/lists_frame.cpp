@@ -1,7 +1,7 @@
-// Per-frame work of the lists family (lists.h): the stacks of the Begin / End pairs of the family
-// (combos, tree views) are reset at facet::EndFrame and at Shutdown, so a Begin whose End was never
-// called (facet::EndFrame reports it by name through the scope stack) does not leak into the next
-// frame.
+// Per-frame work of the lists family (lists.h): the stack of open combos is reset at facet::EndFrame
+// and at Shutdown, so a BeginCombo whose EndCombo was never called (facet::EndFrame reports it by
+// name through the scope stack) does not leak into the next frame. The tree view keeps no stack of
+// its own: the list core resets its trees.
 
 #include "internal/subsystem.h"
 #include "widgets/lists/list_parts.h"

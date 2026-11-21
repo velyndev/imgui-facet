@@ -366,11 +366,44 @@ void ChecklistSection(facet::demo::PageCtx& ctx, ListsState& s)
                                 .error = "Choose at least one entry"});
 }
 
-void ChooseSeveral(ListsState& s)
+void TransferSection(facet::demo::PageCtx& ctx, ListsState& s)
 {
     SectionHeader("Transfer list");
-    facet::TransferList("transfer", s.transfer, kOptions,
-                        {.sourceTitle = "Available", .targetTitle = "Chosen", .visibleRows = 4});
+    Paragraph("Two lists with their own filter and selection. Add and Remove move the selected rows; a double click "
+              "or Enter moves them too, and rows can be dragged from one list into the other. In a narrow width the "
+              "lists stack.");
+    if (facet::TransferList("transfer", s.transfer, kOptions,
+                            {.sourceTitle = "Available", .targetTitle = "Chosen", .visibleRows = 4}))
+        ++s.writes;
+    ctx.Probe("lists.transfer");
+    {
+        // The two frames, wherever they are laid out, so the selftest finds the rows of each list.
+        ImRect source;
+        ImRect target;
+        const ImGuiID id = ImGui::GetID("transfer");
+        if (facet::internal::ListsTransferFrames(id, &source, &target))
+        {
+            facet::demo::ProbeRect(ctx, "lists.transfer.source", ImHashStr("source", 0, id), source.Min, source.Max);
+            facet::demo::ProbeRect(ctx, "lists.transfer.target", ImHashStr("target", 0, id), target.Min, target.Max);
+            // Both frames together: revealing it centers the place where the lists meet.
+            ImRect both = source;
+            both.Add(target);
+            facet::demo::ProbeRect(ctx, "lists.transfer.frames", ImHashStr("frames", 0, id), both.Min, both.Max);
+        }
+    }
+    int chosen = 0;
+    for (const bool in : s.transfer)
+        chosen += in ? 1 : 0;
+    Note("Chosen entries: %d of %d.", chosen, static_cast<int>(std::size(kOptions)));
+    Columns columns;
+    facet::TransferList("transfernarrow", s.transfer, kOptions,
+                        {.sourceTitle = "Available", .targetTitle = "Chosen", .searchable = false, .visibleRows = 2,
+                         .width = std::min(columns.width / facet::Px(1.0f), 300.0f)});
+    columns.Next();
+    facet::TransferList("transferloading", s.transfer, kOptions,
+                        {.searchable = false, .visibleRows = 2, .state = facet::DataState::Loading,
+                         .width = columns.width / facet::Px(1.0f)});
+    columns.End();
 }
 
 void ReorderSection(facet::demo::PageCtx& ctx, ListsState& s)
@@ -541,7 +574,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     ReorderSection(ctx, s);
     CheckboxTreeSection(ctx, s);
     ChecklistSection(ctx, s);
-    ChooseSeveral(s);
+    TransferSection(ctx, s);
 }
 
 FACET_DEMO_SELFTEST("lists")
@@ -846,4 +879,38 @@ FACET_DEMO_SELFTEST("lists")
     test.ExpectNear("select all checks the entries that match the filter", [] { return CountChecked(State().checklist); },
                     3.0, 0.0);
     test.Expect("one of them is Option 999", [] { return State().checklist[998]; });
+
+    // TransferList: four rows a side in each frame (side by side, or stacked in a narrow width).
+    test.Do([] { std::fill(std::begin(State().transfer), std::end(State().transfer), false); });
+    const auto transferRow = [](int side, int row) {
+        return T::Item(side == 0 ? "lists.transfer.source" : "lists.transfer.target", 0.5f, 0.0f)
+            .Offset(0.0f, 4.0f + 32.0f * (static_cast<float>(row) + 0.5f));
+    };
+    test.Reveal("lists.transfer");
+    // Source rows: Option 1, Option 2, Option 3, Option 4 (disabled), Option 5.
+    test.MouseMove(transferRow(0, 1));
+    test.MouseDown();
+    test.MouseUp();
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a double click moves Option 2 to the chosen list", [] { return State().transfer[1]; });
+    test.MouseMove(transferRow(0, 0));
+    test.MouseDown();
+    test.MouseUp();
+    test.KeyPress(ImGuiKey_Tab);  // to Add
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Tab to Add and Enter move the selected Option 1", [] { return State().transfer[0]; });
+    test.Reveal("lists.transfer.frames");  // the drag resolves its points at its start
+    // Dropped on the last row of the source list, the place nearest to the target list in both layouts.
+    // Each point is resolved when the pointer gets there, as the page may scroll while the lists stack.
+    test.MouseMove(transferRow(1, 0));
+    test.MouseDown();
+    test.MouseMove(transferRow(1, 1));
+    test.MouseMove(transferRow(0, 3));
+    test.Wait(10);
+    test.MouseUp();
+    test.Wait(2);
+    test.Wait(2);
+    test.Expect("dragging Option 1 back returns it alone",
+                [] { return !State().transfer[0] && State().transfer[1]; });
 }

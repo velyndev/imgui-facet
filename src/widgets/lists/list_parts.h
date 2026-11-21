@@ -265,6 +265,11 @@ inline bool ListsFlag(std::span<const bool> flags, int index)
 // after an Escape the popup host handles itself.
 void ListsCloseByKey(ImGuiID level);
 
+// The frames of the source and target lists of TransferList `id` (the widget id: ImGui::GetID of its
+// id string) in its last call, screen pixels; false before the first call. For demo selftests,
+// which click rows wherever the lists are laid out (side by side or stacked).
+bool ListsTransferFrames(ImGuiID id, ImRect* source, ImRect* target);
+
 // The frame hooks of the family (lists_frame.cpp): reset the stacks of open Begin / End pairs.
 void ListsComboEndFrame();
 

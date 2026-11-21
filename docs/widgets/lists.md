@@ -326,8 +326,6 @@ Status: ready.
 
 ### TransferList
 
-Status: planned
-
 ```cpp
 bool TransferList(const char* id, std::span<bool> inTarget, std::span<const ChoiceItem> items,
                   const TransferListOptions& options = {});
@@ -335,7 +333,34 @@ bool TransferList(const char* id, std::span<bool> inTarget, std::span<const char
                   const TransferListOptions& options = {});
 ```
 
-Two filterable lists with move buttons and drag between them; they stack in a Compact width.
+Two lists with move buttons between them: items whose `inTarget` entry is false are in the source
+list, the others in the target list. Default width: the available width; the lists sit side by side
+with the buttons between them, and stack (source, a row of buttons, target) in a Compact width.
+
+- **Each list:** the title above it (`sourceTitle`, `targetTitle`), a filter field when
+  `searchable` (fuzzy matched, the matched letters highlighted), and the frame of SelectableList
+  with `visibleRows` rows and its multiple selection (click, Ctrl and Shift click, Shift with the
+  arrows, Ctrl+A, Escape). There is no box selection: a drag that starts on a row carries the row.
+  The selection and filter text of both lists are kept under the id.
+- **Moving:** Add (`Strings::add`) moves the selected rows of the source list, Remove
+  (`Strings::remove`) those of the target list; each button is disabled while its list has no
+  selection. A double click or Enter on a row moves the selected rows of its list (the row alone
+  when it is not selected), and rows dragged into the other list move there (with the selection
+  when the dragged row is selected; the drag preview shows the count). Moved rows leave the
+  selection. The buttons are `facet::Button` with arrow icons.
+- **Keys:** Tab goes through the source filter, the source list, Add, Remove, the target filter and
+  the target list.
+- **Entries:** disabled items never move; missing entries count as false (the item is in the source
+  list) and are never written.
+- **States:** read-only (nothing moves, the buttons are disabled), disabled; while `state` is
+  Loading or Error both lists show that state and nothing moves; a list without rows shows
+  `emptyText`, or `Strings::noResults` while its filter matches nothing.
+- **Result:** true on the frame entries of `inTarget` were written.
+
+The rows of both lists are built from the items every frame (the overloads take spans), so a list of
+a few thousand items stays fluid, but very long lists belong in a virtualized view.
+
+Status: ready.
 
 ### SearchableChecklist
 

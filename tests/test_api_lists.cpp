@@ -1,7 +1,7 @@
 // The public API of the lists family (facet/widgets/lists.h): every options struct follows the
-// conventions, every widget that is still a placeholder is safe to call inside a real frame
-// (stacks balanced, no value written, the neutral result), and ApplyReorderMove works. Behaviour
-// tests of implemented widgets go into tests/test_lists.cpp.
+// conventions, every widget is safe to call inside a real frame (stacks balanced, no value written
+// without input, the neutral result), and ApplyReorderMove works. Behaviour tests are in
+// tests/test_lists.cpp.
 
 #include <array>
 #include <iterator>
@@ -53,30 +53,66 @@ static_assert(HasFieldMessages<facet::ListBoxOptions>());
 static_assert(HasFieldMessages<facet::SelectableListOptions>());
 static_assert(HasFieldMessages<facet::SearchableChecklistOptions>());
 
-// Calls every placeholder of lists.h once, checking balance and the neutral result.
-void CallListStubs(Values& v)
+// Calls every widget of lists.h once without input, checking that the stacks are left as they were
+// and that nothing is written.
+void CallListWidgets(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
     const std::span<bool> checked(v.checked);
     const std::span<facet::CheckState> states(v.states);
 
+    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown", &v.index, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown labels", &v.index, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::Dropdown("Dropdown getter", &v.index, 3, &Getter, nullptr)));
+    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi", checked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::MultiDropdown("Multi labels", checked, kLabels)));
+    CHECK_BALANCED(if (facet::BeginCombo("Combo", "Option 1")) {
+        FAIL("BeginCombo opened without input");
+        facet::EndCombo();
+    });
+    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List", &v.index, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List labels", &v.index, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ListBox("List getter", &v.index, 3, &Getter, nullptr)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable", &selection, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable labels", &selection, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SelectableList("Selectable getter", &selection, 3, &Getter, nullptr)));
+    CHECK_BALANCED(CHECK(facet::SelectableListActivatedRow() == -1));
+    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder", &v.move, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::ReorderableList("Reorder labels", &v.move, kLabels)));
+    CHECK_BALANCED({
+        if (facet::BeginTreeView("Tree", &selection))
+        {
+            if (facet::BeginTreeNode("Node", {.defaultOpen = true}))
+            {
+                CHECK_FALSE(facet::TreeLeaf("Leaf"));
+                facet::EndTreeNode();
+            }
+            CHECK_FALSE(facet::TreeLeaf("Leaf"));
+            facet::EndTreeView();
+        }
+    });
+    CHECK_BALANCED(CHECK_FALSE(facet::TreeViewSelectionChanged()));
+    CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist", checked, kItems)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist labels", checked, kLabels)));
+    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist getter", checked, 3, &Getter, nullptr)));
     CHECK(selection.Size == 0);
 }
 
 } // namespace
 
-TEST_CASE("Every lists placeholder is safe to call, also disabled, and returns the neutral result")
+TEST_CASE("Every lists widget leaves the stacks as it found them and writes nothing without input, also disabled")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     const int errorsBefore = facet::internal::UsageErrorCount();
     Values v;
     session.SetUi([&] {
-        CallListStubs(v);
+        CallListWidgets(v);
         ImGui::BeginDisabled();
-        CallListStubs(v);
+        CallListWidgets(v);
         ImGui::EndDisabled();
     });
     session.Frames(2);
@@ -85,7 +121,7 @@ TEST_CASE("Every lists placeholder is safe to call, also disabled, and returns t
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
-TEST_CASE("Lists placeholders outside a frame draw nothing and return the neutral result")
+TEST_CASE("Lists widgets outside a frame draw nothing and return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -123,7 +159,7 @@ TEST_CASE("A reorderable list takes one row per item or one row for its state")
     CHECK_FALSE(move.IsValid());
 }
 
-TEST_CASE("Lists placeholders end only what began and stay closed where their arguments hide the content")
+TEST_CASE("Lists Begin calls end only what began and stay closed where their arguments hide the content")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

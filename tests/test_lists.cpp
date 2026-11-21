@@ -1577,3 +1577,153 @@ TEST_CASE("A checklist with checkedFirst lists the checked items first and never
     session.Click(row(3));  // Date: no entry
     CHECK(checked == std::array<bool, 3>{true, false, true});
 }
+
+// ---- TransferList ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// A transfer list over kFruit, four rows a side, without filter fields; rows of each side counted
+// from the bottom of its frame (the widget has no message line).
+struct TransferUi
+{
+    std::array<bool, 5> inTarget = {};
+    facet::TransferListOptions options = {.searchable = false, .visibleRows = 4};
+    int writes = 0;
+
+    void Ui(facet::test::Session& session)
+    {
+        if (facet::TransferList("transfer", inTarget, kFruit, options))
+            ++writes;
+        session.Track("transfer");
+    }
+
+    static ImVec2 Row(const facet::test::Session& session, int side, int row)
+    {
+        const ImRect rect = session.ItemRect("transfer");
+        const ImVec2 at = BoxRowCenter(rect, 4, row);
+        return ImVec2(rect.Min.x + rect.GetWidth() * (side == 0 ? 0.2f : 0.8f), at.y);
+    }
+
+    // The Add (0) and Remove (1) buttons, stacked in the middle of the widget.
+    static ImVec2 Button(const facet::test::Session& session, int which)
+    {
+        const ImRect rect = session.ItemRect("transfer");
+        const float frameTop = BoxRowCenter(rect, 4, 0).y - fi::ListRowHeight(facet::ControlSize::Regular) * 0.5f -
+                               fi::FocusRingOutset();
+        const float middle = (frameTop + rect.Max.y) * 0.5f;
+        const float height = facet::ControlHeight(facet::ControlSize::Regular);
+        return ImVec2(rect.GetCenter().x, which == 0 ? middle - height * 0.5f - facet::Px(6.0f) : middle + height * 0.5f);
+    }
+};
+
+} // namespace
+
+TEST_CASE("A transfer list moves the selected rows with Add and Remove")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TransferUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    // Source rows: Apple, Banana, Cherry (disabled), Date.
+    session.Click(TransferUi::Row(session, 0, 0));
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Click(TransferUi::Row(session, 0, 3));
+    session.KeyUp(ImGuiMod_Ctrl);
+    session.Click(TransferUi::Button(session, 0));
+    CHECK(ui.inTarget == std::array<bool, 5>{true, false, false, true, false});
+    CHECK(ui.writes == 1);
+    // Target rows: Apple, Date. Remove takes Date back.
+    session.Click(TransferUi::Row(session, 1, 1));
+    session.Click(TransferUi::Button(session, 1));
+    CHECK(ui.inTarget == std::array<bool, 5>{true, false, false, false, false});
+}
+
+TEST_CASE("A double click or Enter moves a row across, and a drag carries it to the other list")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TransferUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.DoubleClick(TransferUi::Row(session, 0, 1));  // Banana
+    CHECK(ui.inTarget == std::array<bool, 5>{false, true, false, false, false});
+    session.Click(TransferUi::Row(session, 0, 0));  // Apple; source rows: Apple, Cherry, Date, Elderberry
+    session.KeyPress(ImGuiKey_DownArrow);           // Cherry is skipped: Date
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.inTarget == std::array<bool, 5>{false, true, false, true, false});
+    session.Drag({TransferUi::Row(session, 0, 0), TransferUi::Row(session, 0, 2), TransferUi::Row(session, 1, 2)}, 6);
+    session.Frames(2);
+    CHECK(ui.inTarget == std::array<bool, 5>{true, true, false, true, false});
+    // And back: target rows Apple, Banana, Date; Banana is dragged into the source list.
+    session.Drag({TransferUi::Row(session, 1, 1), TransferUi::Row(session, 1, 2), TransferUi::Row(session, 0, 1)}, 6);
+    session.Frames(2);
+    CHECK(ui.inTarget == std::array<bool, 5>{true, false, false, true, false});
+}
+
+TEST_CASE("A read-only transfer list or one whose items are loading moves nothing; missing entries stay")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TransferUi ui;
+    ui.options.readOnly = true;
+    std::array<bool, 2> shortFlags = {};
+    session.SetUi([&] {
+        ui.Ui(session);
+        facet::TransferList("short", shortFlags, kFruit, {.searchable = false, .visibleRows = 5});
+        session.Track("short");
+    });
+    session.Frames(2);
+    session.DoubleClick(TransferUi::Row(session, 0, 0));
+    session.Click(TransferUi::Row(session, 0, 1));
+    session.Click(TransferUi::Button(session, 0));
+    CHECK(ui.inTarget == std::array<bool, 5>{});
+    ui.options.readOnly = false;
+    ui.options.state = facet::DataState::Loading;
+    session.Frames(2);
+    session.DoubleClick(TransferUi::Row(session, 0, 0));
+    CHECK(ui.inTarget == std::array<bool, 5>{});
+    // Elderberry has no entry in the short flags: a double click leaves it where it is.
+    const ImRect rect = session.ItemRect("short");
+    session.DoubleClick(ImVec2(rect.Min.x + rect.GetWidth() * 0.2f, BoxRowCenter(rect, 5, 4).y));
+    CHECK(shortFlags == std::array<bool, 2>{});
+}
+
+TEST_CASE("Tab from a transfer list reaches Add, and a row dragged back after that returns")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TransferUi ui;
+    ui.options.searchable = true;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(TransferUi::Row(session, 0, 0));  // Apple
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.inTarget == std::array<bool, 5>{true, false, false, false, false});
+    session.Drag({TransferUi::Row(session, 1, 0), TransferUi::Row(session, 1, 1), TransferUi::Row(session, 0, 1)}, 6);
+    session.Frames(2);
+    CHECK(ui.inTarget == std::array<bool, 5>{false, false, false, false, false});
+}
+
+TEST_CASE("A slow drag from an unselected transfer row carries that row alone, not a box selection")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TransferUi ui;
+    ui.options.searchable = true;
+    ui.options.sourceTitle = "Available";
+    ui.options.targetTitle = "Chosen";
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.DoubleClick(TransferUi::Row(session, 0, 1));
+    CHECK(ui.inTarget == std::array<bool, 5>{false, true, false, false, false});
+    session.Click(TransferUi::Row(session, 0, 0));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.inTarget == std::array<bool, 5>{true, true, false, false, false});
+    session.DragAndHold({TransferUi::Row(session, 1, 0), TransferUi::Row(session, 1, 1), TransferUi::Row(session, 0, 1)}, 15, 12);
+    session.Frames(2);
+    CHECK(ui.inTarget == std::array<bool, 5>{false, true, false, false, false});
+}
