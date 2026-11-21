@@ -205,12 +205,9 @@ struct ValueDragOptions
     double clampHigh = std::numeric_limits<double>::infinity();
     // The arrows across the track step too, Right and Up toward max, Left and Down toward min,
     // and are taken from keyboard navigation while focused: for a control with no direction of
-    // its own on screen, such as a knob. Off: those arrows keep moving the focus.
+    // its own on screen, such as a knob or a round dial. The gamepad's directions across the
+    // track step the same way. Off: those arrows keep moving the focus. (since 0.1)
     bool crossArrows = false;
-    // The arrows across the track (and the gamepad's) step as well while focused: Right and Up
-    // increase, Left and Down decrease. For controls without a direction of their own, such as a
-    // round dial; they no longer move the focus to a neighbour. (since 0.1)
-    bool bothAxes = false;
 };
 
 // Speed factor of a delta mode drag or step with Ctrl held (coarser), and of Page Up and Down.

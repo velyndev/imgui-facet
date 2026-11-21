@@ -517,31 +517,6 @@ TEST_CASE("Value drag: keys step while focused, one edit session per press")
     CHECK(slider.value == 0.0);
 }
 
-TEST_CASE("Value drag: with bothAxes the arrows across the track step too, one session per press")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    TestSlider slider;
-    slider.options.bothAxes = true;
-    Install(session, slider);
-    session.Click(TestSlider::At(session, 0.5));
-    REQUIRE(ImGui::GetFocusID() == session.ItemId("slider"));
-    const int commits = slider.commits;
-    session.KeyPress(ImGuiKey_UpArrow);
-    CHECK(slider.value == doctest::Approx(0.51));
-    session.KeyPress(ImGuiKey_DownArrow);
-    session.KeyPress(ImGuiKey_DownArrow);
-    CHECK(slider.value == doctest::Approx(0.49));
-    session.KeyPress(ImGuiKey_RightArrow);
-    CHECK(slider.value == doctest::Approx(0.5));
-    CHECK(slider.commits == commits + 4);
-    CHECK(ImGui::GetFocusID() == session.ItemId("slider"));
-    // A held cross-axis key keeps its session and Escape restores the value from its start.
-    session.KeyDown(ImGuiKey_UpArrow);
-    session.KeyPress(ImGuiKey_Escape);
-    session.KeyUp(ImGuiKey_UpArrow);
-    CHECK(slider.value == doctest::Approx(0.5));
-}
 TEST_CASE("Value drag: a held key repeats by time, independent of the frame rate")
 {
     double results[2] = {};
@@ -929,10 +904,17 @@ TEST_CASE("Value drag: crossArrows steps with the arrows across the track as wel
     session.KeyPress(ImGuiKey_RightArrow);
     CHECK(slider.value == doctest::Approx(0.5));
     CHECK(slider.commits == commits + 4);
+    CHECK(ImGui::GetFocusID() == session.ItemId("slider"));
     // Held across the track, one session with its repeats.
     session.HoldKey(ImGuiKey_UpArrow, 1.0f);
     CHECK(slider.value > 0.55);
     CHECK(slider.commits == commits + 5);
+    // A held cross-axis key keeps its session and Escape restores the value from its start.
+    const double held = slider.value;
+    session.KeyDown(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Escape);
+    session.KeyUp(ImGuiKey_UpArrow);
+    CHECK(slider.value == doctest::Approx(held));
 }
 
 // ---- Two axes ---------------------------------------------------------------------------------

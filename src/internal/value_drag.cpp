@@ -634,7 +634,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     const ImGuiKey incKey = vertical ? ImGuiKey_UpArrow : ImGuiKey_RightArrow;
     const ImGuiKey decPad = vertical ? ImGuiKey_GamepadDpadDown : ImGuiKey_GamepadDpadLeft;
     const ImGuiKey incPad = vertical ? ImGuiKey_GamepadDpadUp : ImGuiKey_GamepadDpadRight;
-    // With crossArrows or bothAxes, the arrows across the track as well: Right and Up increase.
+    // With crossArrows, the arrows across the track as well: Right and Up increase.
     const ImGuiKey crossDecKey = vertical ? ImGuiKey_LeftArrow : ImGuiKey_DownArrow;
     const ImGuiKey crossIncKey = vertical ? ImGuiKey_RightArrow : ImGuiKey_UpArrow;
     const ImGuiKey crossDecPad = vertical ? ImGuiKey_GamepadDpadLeft : ImGuiKey_GamepadDpadDown;
@@ -642,8 +642,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
     const ImGuiKey allStepKeys[] = {decKey, incKey, decPad, incPad, ImGuiKey_PageUp, ImGuiKey_PageDown,
                                     ImGuiKey_Home, ImGuiKey_End, crossDecKey, crossIncKey, crossDecPad, crossIncPad};
     constexpr size_t kTrackStepKeys = 8;
-    const bool crossKeys = options.crossArrows || options.bothAxes;
-    const std::span<const ImGuiKey> stepKeys(allStepKeys, crossKeys ? std::size(allStepKeys) : kTrackStepKeys);
+    const std::span<const ImGuiKey> stepKeys(allStepKeys, options.crossArrows ? std::size(allStepKeys) : kTrackStepKeys);
 
     // A key session lasts while one of its keys is held.
     if (session.id == id && session.keyboard)
@@ -667,7 +666,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         const StepSize size = io.KeyCtrl ? StepSize::Coarse : (io.KeyShift ? StepSize::Fine : StepSize::Normal);
         int inc = PressCount(incKey, id) + PressCount(incPad, id);
         int dec = PressCount(decKey, id) + PressCount(decPad, id);
-        if (crossKeys)
+        if (options.crossArrows)
         {
             inc += PressCount(crossIncKey, id) + PressCount(crossIncPad, id);
             dec += PressCount(crossDecKey, id) + PressCount(crossDecPad, id);

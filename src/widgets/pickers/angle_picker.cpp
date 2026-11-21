@@ -166,7 +166,7 @@ bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& op
         drag.speed = 1.0;
         // Shift steps a tenth of keyStep in delta mode: ten snaps make that one snap.
         drag.keyStep = g.IO.KeyShift ? snap / kFineDragFactor : 1.0;
-        drag.bothAxes = true;
+        drag.crossArrows = true;
         drag.grabRadius = -1.0f;
         drag.readOnly = readOnly;
         double value = current;
