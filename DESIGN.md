@@ -221,8 +221,9 @@ Popup host:
   than the ring.
 - **Menu shortcuts** sit right-aligned at the row's end in labelSecondary, so the labels stay
   the first thing read and every shortcut lines up in one column.
-- **Menu leading slot.** An icon (labelSecondary) or a check mark (label) sits in a slot that every
-  row of the level keeps once one row uses it, so the labels start in one line.
+- **Menu leading slot.** An icon (labelSecondary) or a check mark sits in a slot that every row of
+  the level keeps once one row uses it, so the labels start in one line. The check is accentText,
+  the same as in list rows, because it marks the current choice and the accent is for selection.
 
 Scroll core:
 

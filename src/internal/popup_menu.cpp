@@ -44,6 +44,12 @@ bool InFrame()
 
 } // namespace
 
+ImU32 ChoiceCheckColor(bool disabled)
+{
+    const Colors& c = T().colors;
+    return ToU32(disabled ? c.labelTertiary : c.accentText);
+}
+
 void MenuLevelBegin(ImGuiID level)
 {
     if (!InFrame() || level == 0)
@@ -164,7 +170,7 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
         const float iconY = row.rect.Min.y + (height - iconSize) * 0.5f;
         float x = row.rect.Min.x + padding;
         if (desc.checked)
-            DrawIcon(drawList, Icon("check"), ImVec2(x, iconY), iconSize, text);
+            DrawIcon(drawList, Icon("check"), ImVec2(x, iconY), iconSize, ChoiceCheckColor(row.disabled));
         else if (desc.icon.IsValid())
             DrawIcon(drawList, desc.icon, ImVec2(x, iconY), iconSize, secondary);
         x += slotWidth;

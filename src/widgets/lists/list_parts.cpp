@@ -14,6 +14,7 @@
 #include "facet/core/theme.h"
 #include "internal/control.h"
 #include "internal/focus.h"
+#include "internal/popup_menu.h"
 #include "internal/selection_pill.h"
 #include "internal/state_storage.h"
 #include "internal/text_field.h"
@@ -326,7 +327,7 @@ bool DrawListsRowContent(const ImRect& content, const ItemState& item, const Cho
     if (look.checkSlot)
     {
         if (look.selected)
-            DrawControlIcon(drawList, Icon("check"), x, centerY, glyph, ToU32(disabled ? c.labelTertiary : c.accentText));
+            DrawControlIcon(drawList, Icon("check"), x, centerY, glyph, ChoiceCheckColor(disabled));
         x += glyph + gap;
     }
     if (look.checkbox)

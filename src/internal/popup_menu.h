@@ -35,7 +35,8 @@
 //     while the row's submenu is open, an optional leading icon or check mark in a slot every row
 //     of the level keeps once one row uses it, the label, the shortcut text right-aligned in
 //     labelSecondary overlay.menuShortcutGap after the label, a chevron-right for a submenu, and
-//     the focus ring inside the row (the level padding is narrower than the ring). Disabled rows
+//     the focus ring inside the row (the level padding is narrower than the ring). The check mark
+//     takes ChoiceCheckColor, the icon labelSecondary. Disabled rows
 //     draw in labelTertiary and do nothing.
 //   - Captures: a forced Open state (ForceNextItemState, item.h) on a row with a submenu shows the
 //     submenu open for that frame (ForcePopupLevelOpen).
@@ -75,5 +76,10 @@ void MenuLevelBegin(ImGuiID level);
 // One row of the menu level `level` (the id passed to BeginPopupLevel). `label` is hashed on the
 // id stack and drawn up to "##". With desc.submenu, submit that level right after this call.
 MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc = {});
+
+// The color of the check mark of a chosen row, shared by menu rows and the rows of list popups
+// and list boxes, so the current choice reads the same everywhere: accentText (the accent marks
+// selection), labelTertiary while disabled.
+ImU32 ChoiceCheckColor(bool disabled);
 
 } // namespace facet::internal

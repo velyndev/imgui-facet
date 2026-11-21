@@ -145,3 +145,46 @@ TEST_CASE("Menu rows: the level is wide enough for the label, the gap and the sh
     // Rows fill the level, so the shortcut column lines up at the end of every row.
     CHECK(session.ItemRect("Cut").GetWidth() == doctest::Approx(session.ItemRect("Paste").GetWidth()));
 }
+
+TEST_CASE("Menu rows: the check of a chosen row takes the shared choice color")
+{
+    MenuMotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImU32 check = fi::ChoiceCheckColor(false);
+    REQUIRE(check == facet::ToU32(facet::T().colors.accentText));
+    CHECK(fi::ChoiceCheckColor(true) == facet::ToU32(facet::T().colors.labelTertiary));
+    int checkedVertices = -1;
+    int plainVertices = -1;
+    bool open = false;
+    session.SetUi([&] {
+        if (ImGui::Button("open"))
+            fi::OpenPopupLevel(kMenuLevel, {.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax())});
+        session.Track("open");
+        if (fi::BeginPopupLevel(kMenuLevel))
+        {
+            fi::MenuLevelBegin(kMenuLevel);
+            const ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const auto count = [&](int from) {
+                int n = 0;
+                for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+                    n += drawList->VtxBuffer[i].col == check ? 1 : 0;
+                return n;
+            };
+            int from = drawList->VtxBuffer.Size;
+            (void)fi::MenuRow(kMenuLevel, "Chosen", {.checked = true});
+            checkedVertices = count(from);
+            from = drawList->VtxBuffer.Size;
+            (void)fi::MenuRow(kMenuLevel, "Other");
+            plainVertices = count(from);
+            fi::EndPopupLevel();
+        }
+        open = fi::IsPopupLevelOpen(kMenuLevel);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("open"));
+    session.Frames(10);
+    REQUIRE(open);
+    CHECK(checkedVertices > 0);
+    CHECK(plainVertices == 0);
+}
