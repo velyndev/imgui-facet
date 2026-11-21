@@ -2005,3 +2005,15 @@ TEST_CASE("PathField shows a long path shortened in the middle while it does not
     CHECK(idleVertices > 0);
     CHECK(idleVertices != activeVertices);
 }
+TEST_CASE("A narrow TagInput keeps its chips and text inside its width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags = {"A tag far longer than the narrow field it sits in", "b"};
+    session.SetUi([&] {
+        facet::TagInput("##tags", &tags, {.width = 80.0f});
+        session.Track("tags");
+    });
+    session.Frames(3);
+    CHECK(session.ItemRect("tags").GetWidth() == doctest::Approx(facet::Px(80.0f)));
+}

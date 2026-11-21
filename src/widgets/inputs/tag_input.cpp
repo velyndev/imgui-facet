@@ -273,6 +273,14 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
             x = 0.0f;
         }
         ImGui::SetCursorScreenPos(ImVec2(frame.Min.x + padX + x, rowTop(row)));
+        // A chip wider than the frame is cut to it (the chip shortens its label); its own width is
+        // kept, so it grows back when the frame does.
+        const bool constrained = state.chipWidths[i] > contentWidth;
+        if (constrained)
+            ImGui::SetNextItemWidth(contentWidth);
+        // Whatever width the chip takes, it never draws or reaches past the frame.
+        const ImVec2 maxBefore = window->DC.CursorMaxPos;
+        ImGui::PushClipRect(frame.Min, frame.Max, true);
         ImGui::PushID(i);
         if (Chip(shownTags[static_cast<std::size_t>(i)].c_str(),
                  {.selected = i == state.selected, .removable = removable, .size = chipSize}))
@@ -280,8 +288,10 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
         if (ChipRemovePressed())
             removeIndex = i;
         ImGui::PopID();
+        ImGui::PopClipRect();
+        window->DC.CursorMaxPos.x = std::max(maxBefore.x, std::min(window->DC.CursorMaxPos.x, frame.Max.x));
         const float measured = ImGui::GetItemRectSize().x;
-        if (measured > 0.0f)
+        if (measured > 0.0f && !constrained)
             state.chipWidths[i] = measured;
         x += width + gap;
     }
