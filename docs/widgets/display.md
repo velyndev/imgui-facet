@@ -241,7 +241,11 @@ void ShortcutHint(const char* text, ImGuiKeyChord chord, const ShortcutHintOptio
 void ShortcutHint(const char* text, ShortcutId shortcut, const ShortcutHintOptions& options = {});
 ```
 
-Muted text with key caps at the end of the row. Status: planned.
+A text in `labelSecondary` at the start of its width (the available width by default) and the chord
+as key caps at the end, on one baseline. When the width cannot hold both, the caps are left out
+first; then the text is cut with an ellipsis and shows in full on hover. The `ShortcutId` form draws
+the registered shortcut's current primary chord, and the text alone for an invalid or unknown id or a
+shortcut without a chord. Not interactive. Status: ready.
 
 ### CharacterCounter
 

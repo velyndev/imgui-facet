@@ -1028,6 +1028,43 @@ TEST_CASE("A live key cap shows the held look while its chord is down")
     CHECK(held == 0);
 }
 
+// ==== ShortcutHint ====
+
+TEST_CASE("A shortcut hint drops its caps before it cuts its text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const ImU32 boundary = facet::ToU32(facet::ControlBoundaryColor(facet::T().colors));
+    int wideCaps = 0;
+    int narrowCaps = 0;
+    float available = 0.0f;
+    const facet::ShortcutId shortcut = facet::RegisterShortcut("test.display.hint", ImGuiMod_Ctrl | ImGuiKey_K);
+    int registeredCaps = 0;
+    session.SetUi([&] {
+        available = ImGui::GetContentRegionAvail().x;
+        int from = VertexCount();
+        facet::ShortcutHint("Search", ImGuiMod_Ctrl | ImGuiKey_K);
+        wideCaps = CountColor(from, boundary);
+        session.Track("wide");
+        from = VertexCount();
+        facet::ShortcutHint("Search", ImGuiMod_Ctrl | ImGuiKey_K, {.width = 50.0f});
+        narrowCaps = CountColor(from, boundary);
+        session.Track("narrow");
+        from = VertexCount();
+        facet::ShortcutHint("Search", shortcut);
+        registeredCaps = CountColor(from, boundary);
+        facet::ShortcutHint("Unknown", facet::ShortcutId{});
+    });
+    session.Frame();
+    facet::UnregisterShortcut(shortcut);
+    CHECK(session.ItemRect("wide").GetWidth() == doctest::Approx(available));
+    CHECK(wideCaps > 0);
+    CHECK(narrowCaps == 0);
+    CHECK(registeredCaps > 0);
+    CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(facet::Px(50.0f)));
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
