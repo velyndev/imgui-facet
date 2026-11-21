@@ -72,6 +72,24 @@ ImRect DisplayMinusMargin()
     return ImRect(margin, margin, size.x - margin, size.y - margin);
 }
 
+const ImGuiWindow* ToastWindow(int slot)
+{
+    char name[32];
+    std::snprintf(name, sizeof(name), "##FacetToast%02d", slot);
+    return ImGui::FindWindowByName(name);
+}
+
+int ActiveToastWindows()
+{
+    int count = 0;
+    for (int i = 0; i < 16; ++i)
+    {
+        const ImGuiWindow* window = ToastWindow(i);
+        count += window != nullptr && window->Active ? 1 : 0;
+    }
+    return count;
+}
+
 } // namespace
 
 // ---- Popup host additions ----------------------------------------------------------------------
@@ -1055,4 +1073,266 @@ TEST_CASE("A hold to confirm dialog confirms only after the button was held long
     session.Frames(2);
     CHECK(confirmed == 1);
     CHECK_FALSE(open);
+}
+
+// ---- Toasts --------------------------------------------------------------------------------------
+
+TEST_CASE("ShowToast queues inside a frame only, and the queries follow the toast")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    CHECK_FALSE(facet::ShowToast("outside a frame").IsValid());
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Saved", {.tone = facet::Tone::Success, .duration = -1.0f});
+        show = false;
+    });
+    session.Frame();
+    REQUIRE(toast.IsValid());
+    CHECK(facet::IsToastVisible(toast));
+    session.Frames(2);
+    CHECK(ActiveToastWindows() == 1);
+    facet::DismissToast(toast);
+    CHECK_FALSE(facet::IsToastVisible(toast));
+    session.Seconds(0.5f);
+    CHECK(ActiveToastWindows() == 0);
+}
+
+TEST_CASE("At most toastMaxCount toasts show; the rest wait and show in queue order as others leave")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toasts[5];
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+        {
+            char text[16];
+            for (int i = 0; i < 5; ++i)
+            {
+                std::snprintf(text, sizeof(text), "Toast %d", i);
+                toasts[i] = facet::ShowToast(text, {.duration = -1.0f});
+            }
+        }
+        show = false;
+    });
+    session.Frames(3);
+    const int max = facet::T().overlay.toastMaxCount;
+    CHECK(ActiveToastWindows() == max);
+    for (const facet::ToastId& toast : toasts)
+        CHECK(facet::IsToastVisible(toast));
+    // The oldest leaves first; then the first waiting one (the fourth queued) shows.
+    facet::DismissToast(toasts[0]);
+    session.Seconds(0.5f);
+    CHECK(ActiveToastWindows() == max);
+    CHECK_FALSE(facet::IsToastVisible(toasts[0]));
+    // The windows show toasts 1, 2 and 3 (the newest queued, 4, still waits).
+    CHECK(facet::IsToastVisible(toasts[4]));
+}
+
+TEST_CASE("A full toast queue drops its oldest toast")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::ToastId first;
+    facet::ToastId last;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+        {
+            first = facet::ShowToast("first", {.duration = -1.0f});
+            for (int i = 0; i < 16; ++i)
+                last = facet::ShowToast("more", {.duration = -1.0f});
+        }
+        show = false;
+    });
+    session.Frame();
+    CHECK_FALSE(facet::IsToastVisible(first));
+    CHECK(facet::IsToastVisible(last));
+}
+
+TEST_CASE("A toast's timer pauses while the pointer is over it and runs again when it leaves")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Copied", {.duration = 1.0f});
+        show = false;
+    });
+    session.Frames(3);
+    const ImGuiWindow* window = ToastWindow(0);
+    REQUIRE(window != nullptr);
+    session.MouseMove(ImVec2(window->Pos.x + window->Size.x * 0.3f, window->Pos.y + window->Size.y * 0.5f));
+    session.Seconds(2.0f);
+    CHECK(facet::IsToastVisible(toast));
+    session.MouseMove(kAway);
+    session.Seconds(1.3f);
+    CHECK_FALSE(facet::IsToastVisible(toast));
+}
+
+TEST_CASE("Ctrl+Tab reaches a toast; its timer pauses while it has focus and Escape dismisses it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        ImGui::Button("page");
+        session.Track("page");
+        if (show)
+            toast = facet::ShowToast("Exported", {.actionLabel = "Open", .duration = 1.0f});
+        show = false;
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("page"));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Ctrl);
+    session.Frames(2);
+    const ImGuiContext& g = *ImGui::GetCurrentContext();
+    REQUIRE(g.NavWindow != nullptr);
+    CHECK(std::string(g.NavWindow->RootWindow->Name).rfind("##FacetToast", 0) == 0);
+    session.Seconds(1.5f);
+    CHECK(facet::IsToastVisible(toast));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(facet::IsToastVisible(toast));
+}
+
+TEST_CASE("A toast's action reports on the next frame once, and the toast leaves")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toast;
+    bool show = true;
+    int reported = 0;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Item deleted", {.actionLabel = "Undo", .duration = -1.0f});
+        show = false;
+        reported += facet::ToastActionPressed(toast) ? 1 : 0;
+    });
+    session.Seconds(0.5f);
+    const ImGuiWindow* window = ToastWindow(0);
+    REQUIRE(window != nullptr);
+    // Click where the action sits: left of the close button at the end of the first line.
+    const float side = facet::ControlHeight(facet::ControlSize::Small);
+    const float padding = facet::Px(facet::T().spacing.md);
+    const ImVec2 close(window->Pos.x + window->Size.x - padding - side * 0.5f, window->Pos.y + padding + side * 0.5f);
+    session.Click(ImVec2(close.x - side - facet::Px(facet::T().spacing.sm) - 4.0f, close.y));
+    session.Frames(3);
+    CHECK(reported == 1);
+    CHECK_FALSE(facet::IsToastVisible(toast));
+}
+
+TEST_CASE("When a toast leaves, the others move into its room without a jump")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toasts[2];
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+        {
+            toasts[0] = facet::ShowToast("Older", {.duration = -1.0f});
+            toasts[1] = facet::ShowToast("Newer", {.duration = -1.0f});
+        }
+        show = false;
+    });
+    session.Seconds(0.5f);
+    // The older toast sits above the newer one (bottom corner): dismissing the newer moves the older down.
+    const ImGuiWindow* older = ToastWindow(0);
+    REQUIRE(older != nullptr);
+    const float before = older->Pos.y;
+    facet::DismissToast(toasts[1]);
+    float last = before;
+    float largestStep = 0.0f;
+    for (int i = 0; i < 40; ++i)
+    {
+        session.Frame();
+        largestStep = std::max(largestStep, std::fabs(older->Pos.y - last));
+        last = older->Pos.y;
+    }
+    CHECK(last > before + 10.0f);
+    CHECK(largestStep < (last - before) * 0.5f);
+}
+
+TEST_CASE("Under reduced motion a toast appears, moves and leaves at once")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion(true);
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Now", {.duration = -1.0f});
+        show = false;
+    });
+    session.Frames(2);
+    CHECK(ActiveToastWindows() == 1);
+    facet::DismissToast(toast);
+    session.Frames(2);
+    CHECK(ActiveToastWindows() == 0);
+}
+
+TEST_CASE("A toast dragged toward the edge past half its width is dismissed; a short drag springs back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Swipe me", {.description = "A line under the text", .duration = -1.0f});
+        show = false;
+    });
+    session.Seconds(0.5f);
+    const ImGuiWindow* window = ToastWindow(0);
+    REQUIRE(window != nullptr);
+    const ImVec2 start(window->Pos.x + facet::Px(30.0f), window->Pos.y + window->Size.y - facet::Px(8.0f));
+    const float x0 = window->Pos.x;
+    session.Drag({start, ImVec2(start.x + 20.0f, start.y)}, 12);
+    session.Seconds(0.5f);
+    CHECK(facet::IsToastVisible(toast));
+    CHECK(window->Pos.x == doctest::Approx(x0).epsilon(0.01));
+    session.Drag({start, ImVec2(start.x + window->Size.x * 0.7f, start.y)}, 12);
+    session.Frames(2);
+    CHECK_FALSE(facet::IsToastVisible(toast));
+}
+
+TEST_CASE("UpdateToast replaces the text and restarts the timer; SetToastCorner moves the stack")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    facet::ToastId toast;
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            toast = facet::ShowToast("Exporting", {.duration = 0.6f, .progressBar = true, .progress = 0.0f});
+        show = false;
+    });
+    session.Seconds(0.4f);
+    facet::UpdateToast(toast, "Exporting", {.duration = 0.6f, .progressBar = true, .progress = 0.5f});
+    session.Seconds(0.4f);
+    CHECK(facet::IsToastVisible(toast));
+    facet::SetToastCorner(facet::ScreenCorner::TopLeft);
+    session.Frames(2);
+    const ImGuiWindow* window = ToastWindow(0);
+    REQUIRE(window != nullptr);
+    CHECK(window->Pos.x < 100.0f);
+    facet::SetToastCorner(facet::ScreenCorner::BottomRight);
+    session.Seconds(0.6f);
+    CHECK_FALSE(facet::IsToastVisible(toast));
 }

@@ -171,8 +171,6 @@ Status: ready.
 
 ### ShowToast
 
-Status: planned
-
 ```cpp
 ToastId ShowToast(const char* text, const ToastOptions& options = {});
 void UpdateToast(ToastId toast, const char* text, const ToastOptions& options = {});
@@ -182,8 +180,39 @@ void DismissToast(ToastId toast);
 void SetToastCorner(ScreenCorner corner);
 ```
 
-Queued notifications with tones, one action, progress, auto-dismiss, hover pause and swipe dismiss,
-drawn by `facet::EndFrame`.
+Queued notifications that `facet::EndFrame` draws in a corner of the display, after every page.
+
+- **Queue:** 16 entries; the texts are copied (text up to 255 bytes, description 511, action label 63),
+  so nothing is allocated and the caller's strings need to live only during the call. When the queue
+  is full, the oldest toast is dropped at once. `ShowToast` outside a frame returns an invalid id.
+- **Stack:** `overlay.toastMaxCount` toasts show at a time, newest nearest the corner,
+  `overlay.toastStackGap` apart and `overlay.toastMargin` from the corner, `overlay.toastWidth` wide
+  (narrower on a narrow display); the others wait and show in the order they were queued. A toast
+  that leaves keeps its place while it fades, then the others move into the room on a spring, so the
+  stack never jumps. Toasts stay in front of the page windows and behind open popups; under a modal
+  dialog they show but take no input.
+- **A toast:** the tone's icon (`Tone::Success`, `Warning`, `Destructive`, `Accent`; none for `Neutral`)
+  or `icon`, the text in Body, `description` in Footnote, an optional progress bar
+  (`progressBar`, `progress` or `kIndeterminate`), an optional action button (`actionLabel`) and a close
+  button named `Strings::close`.
+- **Timer:** `duration` seconds (0 for `overlay.toastDuration`; below 0 until dismissed), times
+  `motion.scale`. It runs only while the toast shows, and pauses while the pointer is over it, while
+  it has keyboard focus and while it is dragged. `UpdateToast` replaces the text and options of a
+  waiting or shown toast and restarts its timer.
+- **Dismissing:** the close button, Escape while the toast has focus, `DismissToast`, the timer, or a
+  horizontal drag toward the near display edge past half the toast's width (or faster than
+  `drag.flickSpeed`); a shorter drag springs back. The action button dismisses the toast too, and
+  `ToastActionPressed` is true for it on the next frame.
+- **Keyboard:** toast windows take part in Dear ImGui's window switching (Ctrl+Tab with
+  `ImGuiConfigFlags_NavEnableKeyboard`): the newest toast is the first window it reaches, with the
+  focus on its first button; Tab moves between its buttons. When a focused toast goes, the focus
+  returns to the window under it.
+- `IsToastVisible` is true from `ShowToast` until the toast is dismissed, also while it still waits in
+  the queue. `SetToastCorner` applies from the next frame.
+- **Motion:** a toast fades and slides in from the edge over `motion.popupOpen` and fades out over
+  `motion.popupClose`; under reduced motion it appears, moves and leaves at once.
+
+Status: ready.
 
 ### BeginDrawer
 
