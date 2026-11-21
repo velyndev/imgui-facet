@@ -271,6 +271,16 @@ int ListJumpToEnd(const ListJumpDesc& desc, bool end, bool* changed);
 // also when the row is not submitted this frame, as navigation would, and shows the focus ring.
 void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImRect& rect);
 
+// The tab stop of the view and the tree ("Tab" at the top of this file) for a container that runs
+// its rows through the row block inside a selection scope of its own (ItemGrid). Call it in the
+// surrounding focus scope before BeginListSelection, every frame, with `listId` the list's id and
+// `rect` (screen pixels) the list's visible area in `window`. While no row has the focus
+// (`rowFocused` false) it submits the tab stop and returns true on the frame Tab, Shift+Tab or an
+// arrow key landed on it: move the focus on to the row Tab lands on (ListFocusRow). While a row has
+// the focus it owns Tab, and a press hands the focus to the item after (with Shift, before) the list
+// in the next frame, as from any other item; it then returns false. (since 0.1)
+bool ListTabStop(ImGuiWindow* window, ImGuiID listId, const ImRect& rect, bool rowFocused);
+
 // ---- Trees ----------------------------------------------------------------------------------------
 
 struct ListTreeDesc
