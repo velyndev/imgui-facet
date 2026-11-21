@@ -307,7 +307,22 @@ bool MaskedInput(const char* label, char* buffer, std::size_t bufferSize, const 
                  const MaskedInputOptions& options = {});
 ```
 
-A field constrained by a mask of digit, letter and literal slots. Status: planned.
+A TextField whose text follows `mask`: "9" takes an ASCII digit, "A" a letter (ASCII, or any
+non-ASCII character), "*" any printable character, "\" makes the next mask character a literal,
+and every other character is a literal. The field edits the formatted text, kept under the id:
+after every edit, typed or pasted, the text is rebuilt from the slot characters, so a character
+its slot does not take is dropped, characters past the last slot are dropped, a literal appears as
+soon as a slot character follows it, and the caret stays behind the same slot. Deleting a literal
+changes nothing; Backspace after it removes the slot character before it on the next press. The
+rest of the mask is drawn after the text in labelSecondary as a hint, each empty slot as the first
+character of `placeholder` ("_" by default); it is left out when it would not fit, and while the
+mixed placeholder shows.
+
+`*text` gets the slot characters only, or the formatted text (literals up to the last filled
+slot) with `keepLiterals`; text the caller sets is read through the mask the same way. Writes per
+keystroke and returns true when the text changed. Escape restores the text from activation. A
+null or empty mask makes it a plain TextField. Width, sizes, `readOnly`, `mixed`, the error and help
+line, disabled and the buffer form are as for TextField. Status: ready.
 
 ### PinCodeInput
 

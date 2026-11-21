@@ -129,6 +129,9 @@ struct TextInputsUi
     std::string nameReadOnly = "Read-only sample name";
     std::string nameNarrow = "A sample name longer than its width";
     std::string masked;
+    std::string maskedLiterals;
+    std::string maskedError;
+    std::string maskedReadOnly = "12345678";
     std::string pin;
     std::string path;
 
@@ -431,8 +434,6 @@ void PlannedSections(facet::demo::PageCtx&)
 
 
     SectionHeader("Formatted fields");
-    LabeledRow("Masked");
-    facet::MaskedInput("##masked", &ui.masked, "9999-9999", {.placeholder = "0"});
     LabeledRow("Code");
     facet::PinCodeInput("##pin", &ui.pin, {.groupSize = 3});
     LabeledRow("Path");
@@ -562,6 +563,36 @@ void InlineRenameSection(facet::demo::PageCtx& ctx)
     LabeledRow("Narrow");
     facet::InlineRename("renameNarrow", &ui.nameNarrow, nullptr, {.width = 120.0f});
     Note("Names written: %d. Current: \"%s\".", ui.renames, ui.name.c_str());
+}
+
+void MaskedInputSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("MaskedInput");
+    Paragraph("Text that follows a mask: 9 takes a digit, A a letter, * any character, and every other character is "
+              "a literal the field adds by itself. The rest of the mask shows after the text.");
+
+    LabeledRow("Digits");
+    facet::MaskedInput("##masked", &ui.masked, "9999-9999", {.placeholder = "0", .helpText = "Mask 9999-9999"});
+    ProbeFrame(ctx, "inputs.masked");
+
+    LabeledRow("With literals");
+    facet::MaskedInput("##maskedLiterals", &ui.maskedLiterals, "AA-999-*",
+                       {.keepLiterals = true, .helpText = "Mask AA-999-*; the text keeps the dashes"});
+    ProbeFrame(ctx, "inputs.masked.literals");
+
+    LabeledRow("Error");
+    const bool incomplete = !ui.maskedError.empty() && ui.maskedError.size() < 4;
+    facet::MaskedInput("##maskedError", &ui.maskedError, "99:99",
+                       {.error = incomplete ? "Fill in all four digits" : nullptr});
+
+    LabeledRow("Read-only");
+    facet::MaskedInput("##maskedReadOnly", &ui.maskedReadOnly, "9999-9999", {.readOnly = true});
+
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::MaskedInput("##maskedDisabled", &ui.maskedReadOnly, "9999-9999");
+    ImGui::EndDisabled();
+    Note("Digits field: \"%s\". Literals field: \"%s\".", ui.masked.c_str(), ui.maskedLiterals.c_str());
 }
 
 void TagInputSection(facet::demo::PageCtx& ctx)
@@ -694,6 +725,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     TagInputSection(ctx);
     FilterFieldSection(ctx);
     InlineRenameSection(ctx);
+    MaskedInputSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -1032,4 +1064,19 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.Type("dropped");
     test.KeyPress(ImGuiKey_Escape);
     test.ExpectText("Escape drops the copy", [] { return ui.name; }, "Renamed");
+
+    // MaskedInput: typed digits, a dropped letter, the literals, a paste.
+    test.Click("inputs.masked");
+    test.Type("12");
+    test.Type("x");
+    test.Type("345");
+    test.ExpectText("the digits field keeps only the digits", [] { return ui.masked; }, "12345");
+    test.KeyPress(ImGuiKey_Backspace);
+    test.ExpectText("Backspace removes the last digit", [] { return ui.masked; }, "1234");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.masked.literals");
+    test.SetClipboard("ab123z");
+    test.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    test.ExpectText("a paste fills the slots and keeps the literals", [] { return ui.maskedLiterals; }, "ab-123-z");
+    test.KeyPress(ImGuiKey_Enter);
 }

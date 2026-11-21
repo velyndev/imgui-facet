@@ -1823,3 +1823,64 @@ TEST_CASE("A read-only InlineRename never starts an edit")
     session.Type("x");
     CHECK(name == "fixed");
 }
+// ---- MaskedInput -------------------------------------------------------------------------------
+
+TEST_CASE("MaskedInput keeps the slot characters, drops what a slot does not take and adds literals")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string raw;
+    std::string formatted;
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::MaskedInput("##raw", &raw, "9999-9999") ? 1 : 0;
+        session.Track("raw");
+        facet::MaskedInput("##formatted", &formatted, "9999-9999", {.keepLiterals = true});
+        session.Track("formatted");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("raw"));
+    for (const char* key : {"1", "2", "a", "3", "4", "5", "6", "7", "8", "9"})
+        session.Type(key);
+    CHECK(raw == "12345678");  // the letter and the ninth digit were dropped
+    CHECK(writes == 8);
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(raw == "1234567");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Click(session.ItemCenter("formatted"));
+    session.SetClipboard("12-34 5678 99");
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(formatted == "1234-5678");
+}
+
+TEST_CASE("MaskedInput takes escaped literals, letters and any character, and shows the caller's text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string code = "ab12";
+    std::string plain;
+    session.SetUi([&] {
+        facet::MaskedInput("##code", &code, "\\9AA-*9", {.keepLiterals = true});
+        session.Track("code");
+        facet::MaskedInput("##plain", &plain, nullptr);
+        session.Track("plain");
+    });
+    session.Frame();
+    // The caller's text is read through the mask: the literal 9 first, then the slots.
+    session.Click(session.ItemCenter("code"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(code == "ab12");  // nothing was edited
+    session.Click(session.ItemCenter("code"));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Type("x");
+    session.Type("y");
+    session.Type("#");
+    session.Type("7");
+    CHECK(code == "9xy-#7");
+    session.KeyPress(ImGuiKey_Enter);
+    // Without a mask it is a plain field.
+    session.Click(session.ItemCenter("plain"));
+    session.Type("any text");
+    CHECK(plain == "any text");
+}
