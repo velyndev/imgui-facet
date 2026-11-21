@@ -1001,3 +1001,140 @@ TEST_CASE("SizeInput: swap exchanges the values; a preset writes both; values st
     session.KeyPress(ImGuiKey_Enter);
     CHECK(size.x == 4096.0f);
 }
+
+// ---- DurationInput -----------------------------------------------------------------------------
+
+TEST_CASE("DurationInput types units, colon text and plain seconds, and rejects garbage")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 90.0;
+    Signals signals;
+    session.SetUi([&] {
+        signals.Take(facet::DurationInput("##d", &seconds));
+        session.Track("field");
+    });
+    session.Frame();
+    const ImVec2 at = TextPoint(session.ItemRect("field"));
+    session.Click(at);
+    session.Frame();
+    ImGuiInputTextState* text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    CHECK(std::string(text->TextA.Data) == "00:01:30");  // the shown text, all selected
+    session.Type("1h2m3s");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == 3723.0);
+    CHECK(signals.writes == 1);
+    CHECK(signals.commits == 1);
+    const struct
+    {
+        const char* typed;
+        double expected;
+    } cases[] = {{"1m30", 90.0}, {"01:02:03", 3723.0}, {"2:05", 125.0}, {"2,5 min", 150.0}, {"45", 45.0}, {"0:00:01.5", 1.5}};
+    for (const auto& entry : cases)
+    {
+        CAPTURE(entry.typed);
+        session.Click(at);
+        session.Frame();
+        session.Type(entry.typed);
+        session.KeyPress(ImGuiKey_Enter);
+        CHECK(seconds == doctest::Approx(entry.expected));
+    }
+    session.Click(at);
+    session.Frame();
+    session.Type("soon");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(seconds == doctest::Approx(1.5));
+    CHECK(ErrorShown(facet::GetStrings().invalidValue));
+}
+
+TEST_CASE("DurationInput round-trips what it shows, with hours off and milliseconds on")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 3725.25;
+    std::string shown;
+    session.SetUi([&] {
+        facet::DurationInput("##d", &seconds, {.showHours = false, .showMilliseconds = true, .min = -10000.0});
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Frame();
+    ImGuiInputTextState* text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    shown = text->TextA.Data;
+    CHECK(shown == "62:05.250");
+    session.KeyPress(ImGuiKey_Enter);  // unchanged text: nothing written
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Frame();
+    session.Type(shown.c_str());
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(3725.25));
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.Frame();
+    session.Type("-1:30");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == doctest::Approx(-90.0));
+}
+
+TEST_CASE("DurationInput: Left and Right pick the segment, Up and Down step it with the carry")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 59.0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::DurationInput("##d", &seconds);
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("field"));
+    session.KeyPress(ImGuiKey_UpArrow);  // seconds, carried into the minutes
+    CHECK(seconds == 60.0);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(seconds == 120.0);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_DownArrow);  // hours, clamped at the minimum of 0
+    CHECK(seconds == 0.0);
+    // Enter types; Escape leaves the text without writing.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    session.Type("5");
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK(seconds == 0.0);
+    // A typed digit on the focused field starts typing with it.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Type("7");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(seconds == 7.0);
+}
+
+TEST_CASE("DurationInput: a vertical drag on a segment moves it in whole units")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double seconds = 90.0;
+    float minutesX = 0.0f;
+    session.SetUi([&] {
+        facet::DurationInput("##d", &seconds);
+        session.Track("field");
+        facet::PushTextStyle(facet::ControlTextStyle(facet::ControlSize::Regular));
+        minutesX = ImGui::GetItemRectMin().x + facet::Px(facet::T().field.padding) + ImGui::CalcTextSize("00:0").x;
+        facet::PopTextStyle();
+    });
+    session.Frame();
+    const float y = session.ItemRect("field").GetCenter().y;
+    const float travel = facet::Px(facet::T().spacing.sm) * 3.0f;
+    session.Drag({ImVec2(minutesX, y), ImVec2(minutesX, y - travel)}, 6);
+    CHECK(seconds == doctest::Approx(90.0 + 3.0 * 60.0));
+}

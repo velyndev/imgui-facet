@@ -411,8 +411,21 @@ Status: ready.
 bool DurationInput(const char* label, double* seconds, const DurationInputOptions& options = {});
 ```
 
-A segmented hours, minutes, seconds (and milliseconds) field over a number of seconds.
-Status: planned.
+A field over `*seconds` that shows "hh:mm:ss" (`showHours = false`: "mm:ss" with the minutes
+counting on past 59; `showMilliseconds` adds ".mmm"; a negative value starts with "-"), digits in
+`label` and the separators in `labelSecondary`. The field is one Tab stop. While it is focused,
+Left and Right pick a segment, shown with `accentSubtle` behind it once the keyboard is in use (the
+seconds at first), and Up and Down step that segment by one of its units with the carry into the
+next one, because the edit is on the total (59 seconds and Up is 1:00); Page Up and Down and Ctrl
+step ten units, the wheel steps while focused. A vertical drag on a segment (the up-down resize
+cursor shows) moves that segment in whole units, upward to more. Steps and drags write at once.
+Enter, Space, a click without a drag or a typed digit open the text: the shown text all selected
+(or the typed digit), and the text is read on Enter, Tab or focus loss: "01:30:00", "1:30" (two
+parts are minutes and seconds), "0:00:01.5", "1h2m3s", "1m30" (a number after a unit is in the next
+smaller unit), "2,5 min", "250ms" or a plain number of seconds ("90"). What the field shows always
+reads back. Text that is not a duration writes nothing and shows `Strings::invalidValue`; Escape
+leaves the text without writing. Values are clamped to `min` and `max`; the default `min` of 0
+keeps durations positive. Status: ready.
 
 ### PathField
 
