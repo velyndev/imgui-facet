@@ -6,21 +6,22 @@ inspector pane, declared in `facet/widgets/containers.h`. Every declaration foll
 [the API conventions](../api-conventions.md); the header comments are the full reference. See
 [the widget index](../widgets.md) for the other families.
 
-A widget whose status is planned is declared and callable: it draws a dashed placeholder with its
-name, returns the neutral result and never writes a value. Containers whose content sits in the page
-show that content inside the placeholder; layers (the shell, the mini window) open nothing and show
-one placeholder line while the caller asks for them. A widget whose status is ready works as its
-header describes.
+Each entry below ends with the widget's status. A **planned** widget is declared and callable: it
+draws a dashed placeholder with its name, returns the neutral result and never writes a value.
+Containers whose content sits in the page show that content inside the placeholder; layers (the
+shell, the mini window) open nothing and show one placeholder line while the caller asks for them.
+A **ready** widget works as its header describes.
 
 When End is called: a Begin that returns `void` always lays out its content and its End is always
 called. A Begin that returns `[[nodiscard]] bool` may skip its content, and its End is called only
-after true. Every pair has a scope class with the same rule.
+after true. Every pair has a scope class with the same rule. Every ready container leaves Dear
+ImGui's id, group, clip rect, item flag and window stacks as it found them on every path (open,
+closed, collapsed, clipped away, disabled, nested in itself, called outside a frame), and an End
+without its Begin is reported by name and changes nothing.
 
 ## Widgets
 
 ### BeginShell
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginShell(const char* label, bool* open, const ShellOptions& options = {});
@@ -31,11 +32,9 @@ class ShellScope;
 A floating, resizable menu window: title bar as drag region, edge and corner resize, minimum and
 maximum size, snapping to display edges, size and position kept in design units and clamped back
 into the display after a resolution or scale change. Like `ImGui::Begin` it makes a top-level
-window, so a page may open one from its own code.
+window, so a page may open one from its own code. Status: planned.
 
 ### BeginAppFrame
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginAppFrame(const char* id, const AppFrameOptions& options = {});
@@ -51,10 +50,9 @@ bool LoadAppFramePlacement(const char* id, FramePlacement* placement);
 The root surface of a borderless desktop app that fills the host viewport, with the hit test, size
 limits and placement storage the host window needs to stay resizable and snappable. The host calls
 it outside every window, so the widget gallery shows it only through the example below.
+Status: planned.
 
 ### BeginTitleBar
-
-Status: planned
 
 ```cpp
 void BeginTitleBar(const char* label, const TitleBarOptions& options = {});
@@ -64,11 +62,9 @@ class TitleBarScope;
 ```
 
 A title row with icon, detail text, the caller's trailing items and optional window buttons; its free
-area is the drag region.
+area is the drag region. Status: planned.
 
 ### BeginOverlay (overlay controller)
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginOverlay(const char* id, bool* visible, const OverlayOptions& options = {});
@@ -82,10 +78,9 @@ int GetOverlayInputRegions(std::span<ScreenRegion> regions);
 
 Shows and hides an overlay menu with a fade and a toggle key, and tells the host which screen
 regions take input. Called by the host outside every window, like the mini window below.
+Status: planned.
 
 ### BeginMiniWindow
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginMiniWindow(const char* label, bool* pinned, const MiniWindowOptions& options = {});
@@ -94,11 +89,9 @@ class MiniWindowScope;
 ```
 
 A compact panel that stays visible while pinned and lets input through while the overlay menu is
-hidden.
+hidden. Status: planned.
 
 ### BeginToolbar
-
-Status: planned
 
 ```cpp
 void BeginToolbar(const char* id, const ToolbarOptions& options = {});
@@ -110,10 +103,9 @@ class ToolbarScope;
 ```
 
 A row of tool buttons whose lowest-priority buttons move into a "more" menu when it is narrow.
+Status: planned.
 
 ### BeginStatusBar
-
-Status: planned
 
 ```cpp
 void BeginStatusBar(const char* id, const StatusBarOptions& options = {});
@@ -122,11 +114,9 @@ void StatusItem(const char* text, const StatusItemOptions& options = {});
 class StatusBarScope;
 ```
 
-A bottom strip of toned status segments that hide by priority when narrow.
+A bottom strip of toned status segments that hide by priority when narrow. Status: planned.
 
 ### BeginAccordion
-
-Status: planned
 
 ```cpp
 void BeginAccordion(const char* id, const AccordionOptions& options = {});
@@ -137,11 +127,32 @@ class AccordionScope;
 class AccordionSectionScope;
 ```
 
-Sections that open and close with an animated height, one or several at a time.
+A stack of sections. Each section is a header row (a chevron, the optional `icon`, the title in
+Headline and the optional `detail` at the end in labelSecondary) over content that opens and closes
+with an animated height; a hairline separates the sections.
+
+- **Opening.** A click, Enter or Space on a header toggles its section. `defaultOpen` sets the state
+  the first time a section appears; `ImGui::SetNextItemOpen` before `BeginAccordionSection` opens or
+  closes it (`ImGuiCond_Always` every time, the other conditions only while nothing is known yet).
+  With `singleOpen`, opening a section closes the others. The open states are kept under the
+  section ids, which are scoped by the accordion id, and saved in the Dear ImGui ini file.
+- **Motion.** The height eases over `motion.durationStandard`. While it moves, the content is clipped
+  at the animated height and a closing section takes no keyboard focus; once a section is open and
+  settled nothing is clipped, so focus rings show whole. With reduced motion a section opens and
+  closes at once. The scroll position of the window around it is not touched.
+- **Keys.** Tab reaches every header and the content of open sections. On a focused header, Up and
+  Down move to the previous or next header and Home and End to the first and last, skipping the
+  content in between.
+- **Layout.** The accordion fills the available width unless `width` is set; the content of a
+  section is indented to line up with its title. A title that does not fit ends in an ellipsis and
+  shows in full as a tooltip on hover and keyboard focus; the detail text gives way first.
+- **States.** Inside `ImGui::BeginDisabled` the headers draw in labelTertiary and do not toggle.
+
+`BeginAccordionSection` returns true while its section is open or animating closed; call
+`EndAccordionSection` only then. A section outside an accordion works on its own (no hairline, no
+header keys). Status: ready.
 
 ### BeginDisclosure
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginDisclosure(const char* label, bool* open, const DisclosureOptions& options = {});
@@ -149,11 +160,22 @@ void EndDisclosure();
 class DisclosureScope;
 ```
 
-An inline toggle that reveals content below it, as a row or as a link.
+An inline toggle that reveals the content below it with the same animated height as an accordion
+section (clipped only while it moves, no focus inside while it closes, at once with reduced motion).
+
+- **Styles.** `Row` (the default) is a full-width row with a chevron and the label; its content is
+  indented to line up with the label. `Link` is accent text with a chevron, as wide as its content,
+  underlined on hover; its content starts at the link's edge.
+- **Summary.** `summary` is drawn after the label in labelSecondary while the disclosure is closed.
+- **State.** `open` is the caller's flag and is written on every toggle; with a null `open` the
+  state is kept under the id (`defaultOpen` the first time) and saved in the ini file.
+- **Keys.** A click, Enter or Space toggles it; it is a Tab stop with the focus ring after keyboard
+  input. A cut label shows in full as a tooltip on hover and keyboard focus.
+- **States.** Inside `ImGui::BeginDisabled` it draws in labelTertiary and does not toggle.
+
+Status: ready.
 
 ### BeginCard
-
-Status: planned
 
 ```cpp
 void BeginCard(const char* label, const CardOptions& options = {});
@@ -161,11 +183,16 @@ void EndCard();
 class CardScope;
 ```
 
-A grouped surface whose visible label part is its title (`"##id"` for none), not interactive.
+A grouped surface in bgSecondary with the card radius, not interactive. The visible label part is a
+header line in Headline with the optional `icon` before it (`"##id"` for a card without one); a
+title that does not fit ends in an ellipsis and shows in full as a tooltip on hover. The content sits
+inside `spacing.lg` padding, and items that fill the available width stop at the inner edge. The
+card fills the available width unless `width` is set; `height` is a minimum, the card grows with its
+content. Its content is always submitted and `EndCard` is always called; after it the card is the
+last item. Ids are not scoped by the card. Scroll areas inside a card fade into its surface color.
+Inside `ImGui::BeginDisabled` the title draws in labelTertiary. Status: ready.
 
 ### BeginGroupBox
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginGroupBox(const char* label, const GroupBoxOptions& options = {});
@@ -173,11 +200,19 @@ void EndGroupBox();
 class GroupBoxScope;
 ```
 
-A titled, bordered region that groups controls and can collapse.
+A titled region that groups controls: the title in Headline with the optional `icon`, the optional
+`description` under it in Footnote and labelSecondary (wrapped), then the controls inside a separator
+hairline with the card radius and `spacing.md` padding. It fills the available width unless `width`
+is set; items that fill the available width stop at the inner edge.
+
+With `collapsible` the title row becomes a toggle (chevron, Enter, Space or a click; a Tab stop with
+the focus ring) that opens and closes the bordered region with the animated height of the accordion,
+and the open state is kept under the id (`defaultOpen` the first time) and saved in the ini file.
+`BeginGroupBox` returns false while it is collapsed; call `EndGroupBox` only after true. To disable
+every control in the box, wrap it in `ImGui::BeginDisabled`: the title and description then draw in
+labelTertiary. After `EndGroupBox` the whole box is the last item. Status: ready.
 
 ### BeginScrollArea
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginScrollArea(const char* id, const ScrollAreaOptions& options = {});
@@ -185,11 +220,21 @@ void EndScrollArea();
 class ScrollAreaScope;
 ```
 
-A scrolling region with an overlay scrollbar, smooth wheel scrolling and edge fades.
+A scrolling region on the scroll core: a Dear ImGui child window whose overlay scrollbar is thin at
+rest, wider while the pointer is over it, and fades out a moment after the last scroll; the wheel
+scrolls smoothly, and with `edgeFades` the content fades into the surface behind the area (bg, or
+the card's color inside a card) where more of it continues past an edge. `horizontal` adds sideways
+scrolling. The width fills the available width unless `width` is set; `height` 0 fills the available
+height, a negative value leaves that many units free below the area.
+
+Keyboard navigation crosses into the area and scrolls it to the focused item; with the focus inside,
+Page Up and Page Down move it by a page and Home and End to the ends. `ImGui::SetScrollHereY` and
+the other stock scroll calls work inside. The bars are mouse affordances and take no focus.
+`BeginScrollArea` returns false while the area is out of sight (from its second frame on, because a
+new child window lays out its items once to measure them), and then closes its child window itself;
+call `EndScrollArea` only after true. The content keeps ids under the area. Status: ready.
 
 ### BeginVirtualList
-
-Status: planned
 
 ```cpp
 [[nodiscard]] bool BeginVirtualList(const char* id, int rowCount, ImGuiSelectionBasicStorage* selection,
@@ -200,11 +245,9 @@ void SetNextVirtualListScrollTo(int row);
 class VirtualListScope;
 ```
 
-A list of many equal rows with arbitrary content that submits only the visible rows.
+A list of many equal rows with arbitrary content that submits only the visible rows. Status: planned.
 
 ### BeginInspectorPane
-
-Status: planned
 
 ```cpp
 void BeginInspectorPane(const char* label, bool* visible, const InspectorPaneOptions& options = {});
@@ -214,6 +257,7 @@ class InspectorPaneScope;
 ```
 
 A details pane at the trailing edge of a region that becomes a drawer in a Compact width.
+Status: planned.
 
 ## Usage examples
 

@@ -105,36 +105,6 @@ void CallContainerStubs(Values& v)
         facet::EndStatusBar();
     });
     CHECK_BALANCED({
-        facet::BeginAccordion("Accordion");
-        if (facet::BeginAccordionSection("Section"))
-        {
-            FAIL("BeginAccordionSection opened");
-            facet::EndAccordionSection();
-        }
-        facet::EndAccordion();
-    });
-    CHECK_BALANCED(if (facet::BeginDisclosure("Disclosure", &v.open)) {
-        FAIL("BeginDisclosure opened");
-        facet::EndDisclosure();
-    });
-    CHECK_BALANCED({
-        facet::BeginCard("Title##card");
-        ImGui::TextUnformatted("child");
-        facet::EndCard();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginGroupBox("Group");
-        CHECK(open);
-        if (open)
-            facet::EndGroupBox();
-    });
-    CHECK_BALANCED({
-        const bool open = facet::BeginScrollArea("Scroll");
-        CHECK(open);
-        if (open)
-            facet::EndScrollArea();
-    });
-    CHECK_BALANCED({
         const bool open = facet::BeginVirtualList("Virtual", 100, &selection);
         CHECK(open);
         if (open)
@@ -184,33 +154,11 @@ TEST_CASE("Containers placeholders outside a frame draw nothing and return the n
     REQUIRE(session.Ready());
     session.Frame();
     const int before = facet::internal::UsageErrorCount();
-    CHECK_FALSE(facet::BeginScrollArea("outside"));
-    facet::BeginCard("outside");
-    facet::EndCard();
+    CHECK_FALSE(facet::BeginOverlay("outside", nullptr));
+    facet::BeginToolbar("outside");
+    facet::EndToolbar();
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK(facet::internal::UsageErrorCount() == before);
-}
-
-TEST_CASE("The card placeholder frames its content inside the available width")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    float available = 0.0f;
-    session.SetUi([&] {
-        available = ImGui::GetContentRegionAvail().x;
-        facet::BeginCard("card");
-        ImGui::Button("inside", ImVec2(-FLT_MIN, 0.0f));
-        session.Track("inside");
-        facet::EndCard();
-        session.Track("card");
-    });
-    session.Frame();
-    const ImRect card = session.ItemRect("card");
-    const ImRect button = session.ItemRect("inside");
-    CHECK(card.GetWidth() == doctest::Approx(available));
-    CHECK(button.Min.x > card.Min.x);
-    CHECK(button.Max.x < card.Max.x);
-    CHECK(button.Max.y < card.Max.y);
 }
 
 TEST_CASE("Containers placeholders end only what began")
@@ -220,15 +168,12 @@ TEST_CASE("Containers placeholders end only what began")
     Values v;
     int reported = 0;
     session.SetUi([&] {
-        CHECK_BALANCED({ facet::CardScope card("card"); });
-        CHECK_BALANCED({
-            facet::ScrollAreaScope area("area");
-            CHECK(static_cast<bool>(area));
-        });
+        CHECK_BALANCED({ facet::ToolbarScope toolbar("toolbar"); });
+        CHECK_BALANCED({ facet::StatusBarScope status("status"); });
         // An End without its Begin is reported and changes no stack.
         const int before = facet::internal::UsageErrorCount();
         const Snapshot start = Snapshot::Take(v);
-        facet::EndCard();
+        facet::EndToolbar();
         facet::EndShell();
         Snapshot end = Snapshot::Take(v);
         reported = facet::internal::UsageErrorCount() - before;
@@ -258,7 +203,6 @@ TEST_CASE("Containers placeholders return false where their own arguments hide t
         });
         CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Hidden overlay", &hidden)));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Overlay without a flag", nullptr)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginGroupBox("Closed group box", {.collapsible = true, .defaultOpen = false})));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Loading list", 10, nullptr, {.state = facet::DataState::Loading})));
         CHECK_BALANCED(CHECK_FALSE(facet::BeginVirtualList("Empty list", 0, nullptr)));
         CHECK(hidden == false);
