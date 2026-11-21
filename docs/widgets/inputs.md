@@ -293,7 +293,24 @@ dialog. Status: planned.
 bool CopyField(const char* label, const char* text, const CopyFieldOptions& options = {});
 ```
 
-A read-only value with a copy button, optionally masked. Status: planned.
+A read-only TextField showing `text` (read during the call; the field shows it in place and copies
+nothing per frame). The text can be focused, selected with the mouse and the keys, and copied as in
+any field; it is never written. A copy button sits in the trailing slot inside the frame: a Tab
+stop after the text, activated by a click, Space or Enter. It copies the whole text through
+`ImGui::SetClipboardText` and shows the check icon, with `Strings::copied` as its tooltip, for
+`motion.feedbackHold` seconds. Ctrl+C (or Ctrl+Insert) in the field with nothing selected copies the
+whole text the same way; with a selection it copies the selection as a stock field does and does not
+count as a copy of the field. Returns true on the frame the text was copied.
+
+`masked` shows dots and adds a reveal button (eye, a Tab stop) before the copy button; the text
+goes back to dots when the focus leaves the field and its buttons, and the copy button and Ctrl+C
+still copy the real text. `multiline` wraps the text and makes the frame as tall as the wrapped
+lines (it follows the text one frame later); a masked field stays on one line. `loading` draws a
+skeleton bar in place of the text and turns the buttons off. A null or empty `text` shows an empty
+field whose buttons are off. The label sits in front, the width fills the row by default, and the
+sizes, the error and help line and the disabled state are those of TextField. The copy button is
+the text field core's slot button, not `CopyButton` from `buttons.h`, so it lines up with the
+other buttons inside fields. Status: ready.
 
 ### KeybindCapture
 

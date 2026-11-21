@@ -63,11 +63,10 @@ void CallTextInputStubs(Values& v)
     FACET_CHECK_STUB(false, PathField("Path 1", &v.text));
     FACET_CHECK_STUB(false, PathField("Path 2", buffer, bufferSize, {.browseButton = false}));
     CHECK_FALSE(PathFieldBrowsePressed());
-    FACET_CHECK_STUB(false, CopyField("Copy field 1", "Sample", {.masked = true}));
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 12;
+constexpr int kTextInputStubCalls = 11;
 
 } // namespace
 

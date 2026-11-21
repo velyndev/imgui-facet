@@ -43,6 +43,9 @@ enum CaptureState
 
 constexpr const char* kSample = "Sample text";
 constexpr const char* kSampleLong = "A longer sample line that runs past the end of the field";
+constexpr const char* kSampleLongCopy =
+    "A longer sample value that wraps over several lines in a multi-line copy field, so the whole of it stays "
+    "visible and can be selected line by line or copied at once with the button at the end.";
 
 // Edit sessions of one field, counted from the item queries after its call.
 struct Sessions
@@ -112,6 +115,9 @@ struct TextInputsUi
     std::string masked;
     std::string pin;
     std::string path;
+
+    // CopyField
+    int copies = 0;
 
     // FieldValidation and ValidationSummary
     std::string validName;
@@ -423,9 +429,55 @@ void PlannedSections(facet::demo::PageCtx&)
     facet::PinCodeInput("##pin", &ui.pin, {.groupSize = 3});
     LabeledRow("Path");
     facet::PathField("##path", &ui.path, {.placeholder = "Placeholder path"});
-    LabeledRow("Copy field");
-    facet::CopyField("##copy", "Sample text");
 
+}
+
+// Records the slot button `index` (0 the rightmost) of the field just drawn at the Regular size,
+// as the text field core places it, under `name` with id `id`.
+void ProbeSlotButton(facet::demo::PageCtx& ctx, const char* name, ImGuiID id, int index)
+{
+    const float gap = facet::Px(facet::T().spacing.xs);
+    const float side = facet::ControlHeight(facet::ControlSize::Regular) - 2.0f * gap;
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const float right = ImGui::GetItemRectMax().x - gap - (side + gap) * static_cast<float>(index);
+    const float centerY = min.y + facet::ControlHeight(facet::ControlSize::Regular) * 0.5f;
+    facet::demo::ProbeRect(ctx, name, id, ImVec2(right - side, centerY - side * 0.5f), ImVec2(right, centerY + side * 0.5f));
+}
+
+void CopyFieldSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("CopyField");
+    Paragraph("A value to select and copy. The button copies the whole value and shows a check for a moment; Ctrl+C "
+              "with nothing selected does the same.");
+
+    LabeledRow("Plain");
+    if (ctx.capture && ctx.captureState == kHovered)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 1);
+    const ImGuiID copyId = ImGui::GetID("##copy");
+    if (facet::CopyField("##copy", "Sample text to copy"))
+        ++ui.copies;
+    ProbeFrame(ctx, "inputs.copy");
+    ProbeSlotButton(ctx, "inputs.copy.button", ImGui::GetIDWithSeed("copy", nullptr, copyId), 0);
+
+    LabeledRow("Masked");
+    if (facet::CopyField("Key##copyMasked", "Placeholder secret value",
+                         {.masked = true, .helpText = "The copy is the real text, the field shows dots"}))
+        ++ui.copies;
+    ProbeFrame(ctx, "inputs.copy.masked");
+
+    LabeledRow("Several lines");
+    if (facet::CopyField("##copyLines", kSampleLongCopy, {.multiline = true}))
+        ++ui.copies;
+
+    LabeledRow("Loading");
+    facet::CopyField("##copyLoading", "Sample text to copy", {.loading = true});
+
+    LabeledRow("Error");
+    facet::CopyField("##copyError", "Sample text to copy", {.error = "Placeholder error: the value is out of date"});
+
+    LabeledRow("Narrow");
+    facet::CopyField("A label longer than its share##copyNarrow", kSampleLong, {.width = 160.0f});
+    Note("Copies: %d.", ui.copies);
 }
 
 // Records the rows of the ValidationSummary just drawn as "inputs.summary.<row>", where the
@@ -516,6 +568,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     TextAreaSection(ctx);
     AutocompleteSection(ctx);
     ValidationSection(ctx);
+    CopyFieldSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -740,7 +793,8 @@ FACET_DEMO_SELFTEST("inputs-text")
     // ValidationSummary and FieldValidation: from a fresh page the name and the port have errors.
     test.Do([] { ui = {}; });
     test.Wait(3);
-    test.ExpectVisible("inputs.summary");
+    test.ExpectNear("the summary lists the name, the port and the CopyField error example",
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 3.0, 0.0);
     test.Click("inputs.summary.0");
     test.Wait(2);
     test.ExpectFocused("inputs.valid.name");
@@ -750,16 +804,35 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectNear("the click counts as one activation", [] { return ui.summaryActivations; }, 1.0, 0.0);
     test.KeyPress(ImGuiKey_Enter);
     test.Wait(2);
-    // The name is fixed, so the port is the first row now; Shift+Tab from the name reaches it.
+    // The name is fixed, so two rows are left: the port and the error example of CopyField further
+    // down. Shift+Tab from the name reaches the last row.
     test.Click("inputs.valid.name");
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("inputs.summary.0");
+    test.ExpectFocused("inputs.summary.1");
     test.KeyPress(ImGuiKey_Enter);
     test.ExpectNear("Enter on a summary row activates it", [] { return ui.summaryActivations; }, 2.0, 0.0);
     test.Do([] { ui.validPort = 80; });
     test.Wait(3);
-    test.Expect("the summary is gone once no field shows an error",
-                [] { return facet::internal::PreviousFrameFieldErrors().empty(); });
+    test.ExpectNear("a field back in range leaves the summary",
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 1.0, 0.0);
     test.Click("inputs.stock");
     test.Expect("the stock checkbox under a message turns on", [] { return ui.stockCheck; });
+
+    // CopyField: the button by mouse and by keyboard, Ctrl+C, the masked value.
+    test.SetClipboard("unchanged");
+    test.Click("inputs.copy.button");
+    test.ExpectClipboard("the copy button copies the whole value", "Sample text to copy");
+    test.ExpectNear("and reports one copy", [] { return ui.copies; }, 1.0, 0.0);
+    test.SetClipboard("unchanged");
+    test.Click("inputs.copy");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.copy.button");
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectClipboard("Space on the focused copy button copies", "Sample text to copy");
+    test.SetClipboard("unchanged");
+    test.Click("inputs.copy.masked");
+    test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    test.ExpectClipboard("Ctrl+C in the masked field copies the real value", "Placeholder secret value");
+    test.ExpectNear("three copies in all", [] { return ui.copies; }, 3.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
 }

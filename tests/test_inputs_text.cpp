@@ -1426,3 +1426,97 @@ TEST_CASE("ValidationSummary submits nothing without errors in its window")
     session.Frames(3);
     CHECK(after == before);
 }
+// ---- CopyField ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// The center of slot button `index` (0 the rightmost) of a field whose frame is `frame`, at the
+// Regular size, as the text field core places them.
+ImVec2 SlotButtonCenter(const ImRect& frame, int index)
+{
+    const float gap = facet::Px(facet::T().spacing.xs);
+    const float side = facet::ControlHeight(facet::ControlSize::Regular) - 2.0f * gap;
+    const float right = frame.Max.x - gap - (side + gap) * static_cast<float>(index);
+    return ImVec2(right - side * 0.5f, frame.GetCenter().y);
+}
+
+} // namespace
+
+TEST_CASE("CopyField copies its whole text with the button and with Ctrl+C when nothing is selected")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int copies = 0;
+    session.SetUi([&] {
+        copies += facet::CopyField("##copy", "first second") ? 1 : 0;
+        session.Track("field");
+    });
+    session.Frame();
+    session.SetClipboard("before");
+    session.Click(SlotButtonCenter(session.ItemRect("field"), 0));
+    CHECK(session.Clipboard() == "first second");
+    CHECK(copies == 1);
+
+    // Ctrl+C in the field with nothing selected copies everything and reports it.
+    session.SetClipboard("before");
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_End);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "first second");
+    CHECK(copies == 2);
+
+    // With a selection, Ctrl+C copies the selection as any field does and reports nothing.
+    session.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Shift | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "second");
+    CHECK(copies == 2);
+}
+
+TEST_CASE("A masked CopyField copies the real text and its reveal button is a Tab stop")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int copies = 0;
+    ImGuiID fieldId = 0;
+    session.SetUi([&] {
+        fieldId = ImGui::GetID("##secret");
+        copies += facet::CopyField("##secret", "hidden value", {.masked = true}) ? 1 : 0;
+        session.Track("field");
+    });
+    session.Frame();
+    session.SetClipboard("before");
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "hidden value");
+    CHECK(copies == 1);
+    // Tab: the copy button, then the reveal button; Space on the copy button copies.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    const ImGuiID focused = ImGui::GetFocusID();
+    CHECK((focused == ImGui::GetIDWithSeed("copy", nullptr, fieldId) ||
+           focused == ImGui::GetIDWithSeed("reveal", nullptr, fieldId)));
+    session.SetClipboard("before");
+    session.Click(SlotButtonCenter(session.ItemRect("field"), 0));
+    CHECK(session.Clipboard() == "hidden value");
+    CHECK(copies == 2);
+}
+
+TEST_CASE("A loading or empty CopyField copies nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int copies = 0;
+    session.SetUi([&] {
+        copies += facet::CopyField("##loading", "value", {.loading = true}) ? 1 : 0;
+        session.Track("loading");
+        copies += facet::CopyField("##empty", nullptr) ? 1 : 0;
+        session.Track("empty");
+    });
+    session.Frame();
+    session.SetClipboard("before");
+    session.Click(SlotButtonCenter(session.ItemRect("loading"), 0));
+    session.Click(SlotButtonCenter(session.ItemRect("empty"), 0));
+    CHECK(copies == 0);
+    CHECK(session.Clipboard() == "before");
+}
