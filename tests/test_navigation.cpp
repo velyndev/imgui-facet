@@ -1005,3 +1005,73 @@ TEST_CASE("A horizontal step indicator turns vertical in a Compact width")
     CHECK(NavigationPartRect(steps, 1).Min.y > NavigationPartRect(steps, 0).Max.y);
 }
 
+TEST_CASE("A wizard steps forward and back, skips disabled steps, holds while a step fails, and finishes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kSteps[] = {{"One"}, {.label = "Two", .disabled = true}, {"Three"}};
+    int step = 0;
+    bool valid = true;
+    facet::WizardAction last = facet::WizardAction::None;
+    ImGuiID wizard = 0;
+    session.SetUi([&] {
+        wizard = ImGui::GetID("wizard");
+        facet::BeginWizard("wizard", &step, kSteps);
+        ImGui::TextUnformatted("content");
+        const facet::WizardAction action = facet::WizardFooter({.canAdvance = valid, .cancelButton = true});
+        if (action != facet::WizardAction::None)
+            last = action;
+        facet::EndWizard();
+    });
+    session.Frame();
+    const auto click = [&](int part) { session.Click(Center(NavigationPartRect(wizard, part))); };
+    click(facet::internal::kNavigationPartBack);
+    CHECK(step == 0);  // Back is disabled on the first step
+    click(facet::internal::kNavigationPartAdvance);
+    CHECK(step == 2);  // the disabled step is skipped
+    CHECK(last == facet::WizardAction::Next);
+    valid = false;
+    session.Frame();
+    last = facet::WizardAction::None;
+    click(facet::internal::kNavigationPartAdvance);
+    CHECK(last == facet::WizardAction::None);  // Finish is disabled while the step fails
+    valid = true;
+    session.Frame();
+    click(facet::internal::kNavigationPartAdvance);
+    CHECK(last == facet::WizardAction::Finish);
+    CHECK(step == 2);
+    click(facet::internal::kNavigationPartBack);
+    CHECK(step == 0);
+    CHECK(last == facet::WizardAction::Back);
+    click(facet::internal::kNavigationPartCancel);
+    CHECK(last == facet::WizardAction::Cancel);
+}
+
+TEST_CASE("Wizard content slides in when the step changes and stands still with reduced motion")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    static const char* const kSteps[] = {"One", "Two"};
+    int step = 0;
+    session.SetUi([&] {
+        facet::BeginWizard("wizard", &step, kSteps, {.stepIndicator = false});
+        ImGui::Button("content");
+        session.Track("content");
+        facet::EndWizard();
+    });
+    session.Frame();
+    const float rest = session.ItemRect("content").Min.x;
+    step = 1;
+    session.Frames(2);
+    CHECK(session.ItemRect("content").Min.x > rest + 1.0f);
+    session.Seconds(1.0f);
+    CHECK(session.ItemRect("content").Min.x == doctest::Approx(rest));
+    facet::Theme reduced = facet::T();
+    reduced.motion.reduceMotion = true;
+    facet::SetTheme(reduced, false);
+    step = 0;
+    session.Frame();
+    CHECK(session.ItemRect("content").Min.x == doctest::Approx(rest));
+}
+
