@@ -279,7 +279,19 @@ it the item is not a Tab stop. Status: ready.
 bool CodeView(const char* id, std::string_view code, const CodeViewOptions& options = {});
 ```
 
-Read-only code block with line numbers, light syntax tint and copy. Status: planned.
+A read-only code block on the grouped surface (`bgSecondary` with a hairline) with a line number
+gutter that stays in place while the code scrolls sideways, and a light tint: keywords, strings and
+numbers in the `code*` tokens, comments in `labelSecondary` (C++ with the preprocessor and block
+comments across lines, JSON, INI; Plain draws everything in `label`). `highlightLines` get the
+`accentSubtle` background. Long lines scroll sideways, or wrap with `wrap`. The height fits up to 20
+lines and then scrolls (or `height`). Without wrapping only the visible lines are drawn; the line
+table is built again only when the text changes. The view is one Tab stop with a focus ring: while it
+has keyboard focus (also after a click in it) the arrows, Page Up and Down, Home and End scroll it and
+Ctrl+C copies the whole text, showing `Strings::copied`. With `copyButton` a `CopyButton` sits in the
+top-right corner. Returns true on the frame the text was copied. Not yet: a monospace face (tabs
+advance four space widths of the UI font, so columns line up only roughly), selecting part of the
+text, and more than 16 wrapped segments of one line (the rest of such a line is not drawn).
+Status: ready.
 
 ### LogView
 

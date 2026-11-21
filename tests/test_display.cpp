@@ -22,6 +22,7 @@
 #include "internal/popup_host.h"
 #include "internal/text_util.h"
 #include "support/session.h"
+#include "widgets/display/code_tint.h"
 #include "widgets/display/display_look.h"
 
 namespace
@@ -1400,6 +1401,93 @@ TEST_CASE("Ctrl+C in a log copies the selected lines in log order")
     session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
     session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
     CHECK(session.Clipboard() == "00:01.500  core  First entry\n01:02.000  Second entry\n");
+}
+
+// ==== CodeView ====
+
+TEST_CASE("The code tint finds comments, strings, numbers and keywords")
+{
+    using facet::internal::CodeTintKind;
+    const auto kinds = [](facet::CodeLanguage language, const char* line, bool* block) {
+        std::string out;
+        const char* end = line + std::strlen(line);
+        const char* p = line;
+        while (p < end)
+        {
+            const facet::internal::CodeTintRun run = facet::internal::NextCodeTintRun(language, line, &p, end, block);
+            const char mark = run.kind == CodeTintKind::Keyword ? 'k'
+                            : run.kind == CodeTintKind::String  ? 's'
+                            : run.kind == CodeTintKind::Number  ? 'n'
+                            : run.kind == CodeTintKind::Comment ? 'c'
+                                                                : '.';
+            out.append(static_cast<std::size_t>(run.end - run.begin), mark);
+        }
+        return out;
+    };
+    bool block = false;
+    CHECK(kinds(facet::CodeLanguage::Cpp, "int x = 42; // note", &block) == "kkk.....nn..ccccccc");
+    CHECK(kinds(facet::CodeLanguage::Cpp, "auto s = \"a\\\"b\";", &block) == "kkkk.....ssssss.");
+    CHECK(kinds(facet::CodeLanguage::Cpp, "x /* open", &block) == "..ccccccc");
+    CHECK(block);
+    CHECK(kinds(facet::CodeLanguage::Cpp, "still */ int", &block) == "cccccccc.kkk");
+    CHECK_FALSE(block);
+    CHECK(kinds(facet::CodeLanguage::Cpp, "#include <a>", &block) == "kkkkkkkkkkkk");
+    CHECK(kinds(facet::CodeLanguage::Json, "\"key\": \"v\", 1, true", &block) == ".......sss..n..kkkk");
+    CHECK(kinds(facet::CodeLanguage::Ini, "[section]", &block) == "kkkkkkkkk");
+    CHECK(kinds(facet::CodeLanguage::Ini, "key = 10", &block) == "......nn");
+    CHECK(kinds(facet::CodeLanguage::Ini, "; comment", &block) == "ccccccccc");
+    CHECK(kinds(facet::CodeLanguage::Plain, "int 42", &block) == "......");
+}
+
+TEST_CASE("A focused code view scrolls with the keys and copies its whole text with Ctrl+C")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    DisplayGuard::ReduceMotion(true);
+    std::string code;
+    for (int i = 0; i < 60; ++i)
+        code += "int value" + std::to_string(i) + " = " + std::to_string(i) + ";\n";
+    int copies = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::CodeView("code", code, {.language = facet::CodeLanguage::Cpp, .copyButton = false}))
+            ++copies;
+        session.Track("code");
+        facet::CodeView("short", "a\nb\nc", {.wrap = true});
+        session.Track("short");
+    });
+    session.Frame();
+    const float line = std::round(facet::MeasureText(facet::TextStyle::Body, "").y);
+    const float pad = facet::Px(facet::T().spacing.sm);
+    CHECK(session.ItemRect("code").GetHeight() == doctest::Approx(std::round(line * 20.0f + pad * 2.0f)));
+    CHECK(session.ItemRect("short").GetHeight() == doctest::Approx(std::round(line * 3.0f + pad * 2.0f)));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("code"));
+    ImGuiWindow* area = nullptr;
+    for (ImGuiWindow* window : GImGui->Windows)
+        if ((window->Flags & ImGuiWindowFlags_ChildWindow) != 0 && window->ParentWindow != nullptr &&
+            std::strstr(window->Name, "test/") == window->Name && window->ContentSize.y > line * 50.0f)
+            area = window;
+    REQUIRE(area != nullptr);
+    CHECK(area->Scroll.y == 0.0f);
+    session.KeyPress(ImGuiKey_PageDown);
+    session.Frames(2);
+    CHECK(area->Scroll.y > line * 5.0f);
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(2);
+    CHECK(area->Scroll.y == doctest::Approx(area->ScrollMax.y));
+    session.KeyPress(ImGuiKey_Home);
+    session.Frames(2);
+    CHECK(area->Scroll.y == 0.0f);
+    // The keys did not move the focus away from the view.
+    CHECK(ImGui::GetFocusID() == session.ItemId("code"));
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(copies == 1);
+    CHECK(session.Clipboard() == code);
 }
 
 // ==== Contrast ====
