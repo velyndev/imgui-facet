@@ -62,9 +62,6 @@ void CallListStubs(Values& v)
 
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist", checked, kItems)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist labels", checked, kLabels)));
-    CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist getter", checked, 3, &Getter, nullptr)));
     CHECK(selection.Size == 0);
 }
 

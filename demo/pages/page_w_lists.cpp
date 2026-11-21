@@ -94,6 +94,7 @@ struct ListsState
     // The planned widgets below.
     int combo = 0;
     bool checklist[kChecklistCount] = {};
+    bool checklistFirst[5] = {false, false, true, false, false};
     bool transfer[5] = {false, true, false, false, false};
     facet::CheckState checkTree[7] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
                                       facet::CheckState::Off, facet::CheckState::Off, facet::CheckState::Off,
@@ -344,13 +345,30 @@ void ComboSection(facet::demo::PageCtx& ctx, ListsState& s)
     Note("Combo choice: %s.", OptionName(s.combo));
 }
 
+void ChecklistSection(facet::demo::PageCtx& ctx, ListsState& s)
+{
+    SectionHeader("Searchable checklist");
+    Paragraph("A checklist for long lists: the filter field narrows the rows with the fuzzy matcher, the first row "
+              "checks or clears every shown entry, and the label line counts the checked entries.");
+    Columns columns;
+    if (facet::SearchableChecklist("Generated entries", s.checklist, kChecklistCount, &NumberedOption, nullptr,
+                                   {.visibleRows = 5, .width = columns.width / facet::Px(1.0f)}))
+        ++s.writes;
+    ctx.Probe("lists.checklist");
+    columns.Next();
+    facet::SearchableChecklist("Checked first", s.checklistFirst, kOptions,
+                               {.checkedFirst = true, .visibleRows = 5, .width = columns.width / facet::Px(1.0f),
+                                .helpText = "Checked entries move up while the pointer is elsewhere"});
+    columns.End();
+    LabeledRow("Failed");
+    facet::SearchableChecklist("##checklistfailed", s.checklistFirst, kOptions,
+                               {.visibleRows = 2, .state = facet::DataState::Error, .width = 320.0f,
+                                .error = "Choose at least one entry"});
+}
+
 void ChooseSeveral(ListsState& s)
 {
-    SectionHeader("Choose several values");
-    Paragraph("A checklist over a thousand generated entries with a filter field, and a transfer "
-              "list that moves entries between two lists.");
-    facet::SearchableChecklist("Checklist", s.checklist, kChecklistCount, &NumberedOption, nullptr,
-                               {.visibleRows = 4});
+    SectionHeader("Transfer list");
     facet::TransferList("transfer", s.transfer, kOptions,
                         {.sourceTitle = "Available", .targetTitle = "Chosen", .visibleRows = 4});
 }
@@ -522,6 +540,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     TreeViewSection(ctx, s);
     ReorderSection(ctx, s);
     CheckboxTreeSection(ctx, s);
+    ChecklistSection(ctx, s);
     ChooseSeveral(s);
 }
 
@@ -807,4 +826,24 @@ FACET_DEMO_SELFTEST("lists")
     test.Expect("Space on Group 2 checks all of it", [] {
         return State().checkTree[3] == facet::CheckState::On && State().checkTree[6] == facet::CheckState::On;
     });
+
+    // SearchableChecklist over 1000 generated entries. Rows: Select all, Option 1, Option 2, ...
+    test.Do([] { std::fill(std::begin(State().checklist), std::end(State().checklist), false); });
+    test.Reveal("lists.checklist");
+    test.MouseMove(boxRow("lists.checklist", 1));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click checks Option 1", [] { return State().checklist[0]; });
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Down and Space check Option 2", [] { return State().checklist[1]; });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);  // back to the filter field
+    test.Type("999");
+    test.Wait(2);
+    test.MouseMove(boxRow("lists.checklist", 0));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("select all checks the entries that match the filter", [] { return CountChecked(State().checklist); },
+                    3.0, 0.0);
+    test.Expect("one of them is Option 999", [] { return State().checklist[998]; });
 }

@@ -339,8 +339,6 @@ Two filterable lists with move buttons and drag between them; they stack in a Co
 
 ### SearchableChecklist
 
-Status: planned
-
 ```cpp
 bool SearchableChecklist(const char* label, std::span<bool> checked, std::span<const ChoiceItem> items,
                          const SearchableChecklistOptions& options = {});
@@ -350,7 +348,32 @@ bool SearchableChecklist(const char* label, std::span<bool> checked, int itemCou
                          void* user, const SearchableChecklistOptions& options = {});
 ```
 
-An inline checklist for long lists with a filter field, a select-all row and a count of checked items.
+An inline checklist for long lists. From top to bottom: the label line with
+`Strings::selectedCount` at its end, a filter field (search icon, clear button, `placeholder` or
+`Strings::search`), and the frame of ListBox with `visibleRows` rows. Default width: the available
+width.
+
+- **Rows:** a checkbox per item, the icon, the label (the letters the filter matches are
+  highlighted) and the detail. One row per item; `ChoiceItem::group` is not shown here.
+- **Filter:** fuzzy matched on the visible label, best first; without a match the frame shows
+  `emptyText` or `Strings::noResults`. The filter text is kept under the id.
+- **Select-all row** (`selectAllRow`, on by default): checks every shown enabled item, or clears
+  them when all were checked; its checkbox shows On, Off or Mixed for the shown items.
+- **checkedFirst:** checked items are listed before the others. The order is rebuilt while the
+  pointer is off the list and the list does not have the keyboard, so a row does not move away
+  under a click.
+- **Keys:** the filter field and the list are two Tab stops; in the list the arrows, Page Up and
+  Down, Home and End move, typing jumps to a matching label, and Space, Enter or a click toggles
+  the focused row.
+- **Long lists:** the rows are virtualized. The getter overload reads every item when the filter or
+  the item count changes, and otherwise only the rows shown; an unfiltered span list follows its
+  items every frame.
+- **Entries:** missing entries of `checked` show as unchecked and are never written.
+- **States:** read-only (the filter works, nothing toggles), disabled, `error`, `helpText`; while
+  `state` is Loading or Error the frame shows the loading row or `errorText`.
+- **Result:** true on the frame an entry was written.
+
+Status: ready.
 
 ## Usage examples
 

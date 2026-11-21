@@ -473,6 +473,25 @@ void DrawListsSelectAllRow(const ListRowState& row, CheckState state, bool readO
     DrawListsRowContent(row.content, row.item, entry, look, size);
 }
 
+CheckState ListsSelectAllState(const ListsSource& source, const ListsRows& rows, std::span<const bool> checked)
+{
+    return SelectAllState(source, rows, checked);
+}
+
+bool ListsApplySelectAll(const ListsSource& source, const ListsRows& rows, std::span<bool> checked, bool value)
+{
+    return ApplySelectAll(source, rows, checked, value);
+}
+
+int ListsCheckedCount(std::span<const bool> checked, int itemCount)
+{
+    const int limit = std::min(static_cast<int>(checked.size()), itemCount);
+    int count = 0;
+    for (int i = 0; i < limit; ++i)
+        count += checked[static_cast<std::size_t>(i)] ? 1 : 0;
+    return count;
+}
+
 // ---- The field of a popup list ------------------------------------------------------------------
 
 ImGuiID ListsLevelId(ImGuiID fieldId)

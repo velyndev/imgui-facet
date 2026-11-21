@@ -1506,3 +1506,74 @@ TEST_CASE("A checkbox tree in a data state or read-only writes nothing")
     CHECK_FALSE(changed);
     CHECK(states == States{kOff, kOff, kOff, kOff, kOff, kOff});
 }
+
+// ---- SearchableChecklist --------------------------------------------------------------------------
+
+TEST_CASE("A searchable checklist toggles rows, filters them and selects all shown rows")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {};
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::SearchableChecklist("Fruit", checked, kFruit, {.visibleRows = 6}))
+            ++writes;
+        session.Track("fruit");
+    });
+    session.Frames(2);
+    const auto row = [&](int i) { return BoxRowCenter(session.ItemRect("fruit"), 6, i); };
+    // Rows: Select all, Apple, Banana, Cherry (disabled), Date, Elderberry.
+    session.Click(row(2));
+    CHECK(checked == std::array<bool, 5>{false, true, false, false, false});
+    session.Click(row(3));  // disabled
+    CHECK(checked == std::array<bool, 5>{false, true, false, false, false});
+    session.Click(row(0));  // Mixed: checks every enabled item
+    CHECK(checked == std::array<bool, 5>{true, true, false, true, true});
+    session.Click(row(0));  // On: clears them
+    CHECK(checked == std::array<bool, 5>{false, false, false, false, false});
+    CHECK(writes == 3);
+}
+
+TEST_CASE("Typing in the filter of a checklist narrows the rows; Tab and Space toggle from the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 5> checked = {};
+    session.SetUi([&] {
+        facet::SearchableChecklist("Fruit", checked, kFruit, {.visibleRows = 6});
+        session.Track("fruit");
+    });
+    session.Frames(2);
+    const ImRect rect = session.ItemRect("fruit");
+    // The filter field sits between the label line and the frame.
+    const ImVec2 filter(rect.GetCenter().x, BoxRowCenter(rect, 6, 0).y - fi::ListRowHeight(facet::ControlSize::Regular));
+    session.Click(filter);
+    session.Type("date");
+    session.Frame();
+    session.Click(BoxRowCenter(rect, 6, 1));  // Select all, Date
+    CHECK(checked == std::array<bool, 5>{false, false, false, true, false});
+    session.Click(BoxRowCenter(rect, 6, 0));  // select all of the one match clears it
+    CHECK(checked == std::array<bool, 5>{false, false, false, false, false});
+    // Keyboard: Down moves to Date, Space toggles it.
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(checked == std::array<bool, 5>{false, false, false, true, false});
+}
+
+TEST_CASE("A checklist with checkedFirst lists the checked items first and never writes missing entries")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<bool, 3> checked = {false, false, true};  // Cherry checked; Date and Elderberry have no entry
+    session.SetUi([&] {
+        facet::SearchableChecklist("Fruit", checked, kFruit, {.selectAllRow = false, .checkedFirst = true, .visibleRows = 5});
+        session.Track("fruit");
+    });
+    session.Frames(2);
+    const auto row = [&](int i) { return BoxRowCenter(session.ItemRect("fruit"), 5, i); };
+    // Rows: Cherry (checked, disabled), Apple, Banana, Date, Elderberry.
+    session.Click(row(1));
+    CHECK(checked == std::array<bool, 3>{true, false, true});
+    session.Click(row(3));  // Date: no entry
+    CHECK(checked == std::array<bool, 3>{true, false, true});
+}

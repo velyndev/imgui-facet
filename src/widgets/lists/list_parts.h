@@ -130,6 +130,13 @@ void DrawListsCheckbox(ImDrawList* drawList, const ImRect& box, CheckState state
 
 // The select-all row of a multi-select list: the checkbox showing `state` and Strings::selectAll.
 void DrawListsSelectAllRow(const ListRowState& row, CheckState state, bool readOnly, ControlSize size);
+// What the select-all row shows: On when every shown enabled item is checked, Off when none is,
+// Mixed otherwise (missing entries count as unchecked).
+CheckState ListsSelectAllState(const ListsSource& source, const ListsRows& rows, std::span<const bool> checked);
+// Checks (`value` true) or clears every shown enabled item that has an entry; returns whether one changed.
+bool ListsApplySelectAll(const ListsSource& source, const ListsRows& rows, std::span<bool> checked, bool value);
+// Checked entries among the items (entries beyond the items are not counted).
+int ListsCheckedCount(std::span<const bool> checked, int itemCount);
 
 // ---- The field of a popup list -----------------------------------------------------------------
 
