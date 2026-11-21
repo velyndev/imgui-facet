@@ -66,7 +66,7 @@ public:
     // `visible` is not empty) and returns the width of what shows, with gaps and the button. A
     // separator shows only between two visible items; of several separators between the same
     // two items the last one shows, and none shows at the start or the end of the row.
-    float Resolve(int hidden, float gap, float buttonWidth, std::span<bool> visible) const
+    float Resolve(int hidden, float gap, float buttonWidth, std::span<bool> visible, bool button = true) const
     {
         hidden = std::clamp(hidden, 0, itemCount_);
         float width = 0.0f;
@@ -99,7 +99,7 @@ public:
         }
         if (shown > 1)
             width += gap * static_cast<float>(shown - 1);
-        if (hidden > 0)
+        if (hidden > 0 && button)
             width += buttonWidth + (shown > 0 ? gap : 0.0f);
         return width;
     }
@@ -126,8 +126,11 @@ float OverflowRequiredWidth(std::span<const OverflowItem> items, int hidden, flo
     return ranked.Resolve(hidden, std::max(0.0f, gap), std::max(0.0f, buttonWidth), {});
 }
 
-OverflowResult FitOverflow(std::span<const OverflowItem> items, float available, float gap, float buttonWidth,
-                           float hysteresis, OverflowState* state, std::span<bool> visible)
+namespace
+{
+
+OverflowResult FitOverflowRow(std::span<const OverflowItem> items, float available, float gap, float buttonWidth,
+                              bool button, float hysteresis, OverflowState* state, std::span<bool> visible)
 {
     gap = std::max(0.0f, gap);
     buttonWidth = std::max(0.0f, buttonWidth);
@@ -157,7 +160,7 @@ OverflowResult FitOverflow(std::span<const OverflowItem> items, float available,
     // Every comparison uses the width of the resolved row (separators included only where they
     // show), so hiding a whole group also gives back the room of its separator.
     const auto fits = [&](int hidden, float spare) {
-        return ranked.Resolve(hidden, gap, buttonWidth, {}) + spare <= available + kFitTolerance;
+        return ranked.Resolve(hidden, gap, buttonWidth, {}, button) + spare <= available + kFitTolerance;
     };
 
     // The fewest hidden items that fit. Hiding the first item adds the button, so hidden = 0 is
@@ -200,9 +203,23 @@ OverflowResult FitOverflow(std::span<const OverflowItem> items, float available,
     }
 
     result.hiddenCount = hidden;
-    result.showButton = hidden > 0;
-    result.usedWidth = ranked.Resolve(hidden, gap, buttonWidth, visible);
+    result.showButton = button && hidden > 0;
+    result.usedWidth = ranked.Resolve(hidden, gap, buttonWidth, visible, button);
     return result;
+}
+
+} // namespace
+
+OverflowResult FitOverflow(std::span<const OverflowItem> items, float available, float gap, float buttonWidth,
+                           float hysteresis, OverflowState* state, std::span<bool> visible)
+{
+    return FitOverflowRow(items, available, gap, buttonWidth, true, hysteresis, state, visible);
+}
+
+OverflowResult FitOverflowWithoutButton(std::span<const OverflowItem> items, float available, float gap,
+                                        float hysteresis, OverflowState* state, std::span<bool> visible)
+{
+    return FitOverflowRow(items, available, gap, 0.0f, false, hysteresis, state, visible);
 }
 
 } // namespace facet::internal

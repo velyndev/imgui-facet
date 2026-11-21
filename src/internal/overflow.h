@@ -78,6 +78,11 @@ struct OverflowResult
 OverflowResult FitOverflow(std::span<const OverflowItem> items, float available, float gap, float buttonWidth,
                            float hysteresis, OverflowState* state, std::span<bool> visible);
 
+// The same for a row whose hidden items are simply left out (a status bar): no button and no gap
+// are reserved when an item hides, and showButton stays false.
+OverflowResult FitOverflowWithoutButton(std::span<const OverflowItem> items, float available, float gap,
+                                        float hysteresis, OverflowState* state, std::span<bool> visible);
+
 // The width a row needs with the `hidden` lowest-ranked items moved into the overflow list,
 // including the button when hidden > 0. Exposed for tests and for widgets that size a
 // container to its content.
