@@ -12,6 +12,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "internal/control.h"
+#include "internal/copy_feedback.h"
 #include "internal/key_caps.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
@@ -310,8 +311,7 @@ ImGuiID CopiedLevel(ImGuiID id)
 
 void StartDisplayCopiedFeedback(ImGuiID id, const ImRect& anchor)
 {
-    const Motion& motion = T().motion;
-    GetState<DisplayCopiedState>(id).until = ImGui::GetTime() + motion.feedbackHold * std::max(motion.scale, 0.0f);
+    GetState<DisplayCopiedState>(id).until = ImGui::GetTime() + CopyFeedbackHold();
     OpenPopupLevel(CopiedLevel(id), {.rect = anchor, .side = PopupSide::Above, .align = PopupAlign::Center},
                    {.kind = PopupKind::Tooltip, .takeFocus = false});
 }

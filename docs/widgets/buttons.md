@@ -80,7 +80,7 @@ bool CopyButton(const char* label, const char* text, const CopyButtonOptions& op
 A button that copies `text` (UTF-8, read during the call) to the clipboard through
 `ImGui::SetClipboardText` when activated; returns true on the frame it copied.
 
-- **Confirmation.** For `motion.feedbackHold` (1.5 s) after a copy it shows the check icon instead
+- **Confirmation.** For `motion.feedbackHold` (1.5 s, times `motion.scale`) after a copy it shows the check icon instead
   of the copy icon, in the success color on the Secondary and Plain variants, and `Strings::copied`
   instead of its name. The width always holds both the name and `Strings::copied`, so the
   confirmation moves nothing next to it. The time of the last copy is kept under its id.

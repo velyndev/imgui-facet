@@ -16,6 +16,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "internal/control.h"
+#include "internal/copy_feedback.h"
 #include "internal/item.h"
 #include "internal/loading.h"
 #include "internal/state_storage.h"
@@ -119,7 +120,7 @@ bool CopyField(const char* label, const char* text, const CopyFieldOptions& opti
     state.focused = focusedNow;
     slot.revealed = options.masked && state.revealed;
     const double now = ImGui::GetTime();
-    slot.copiedLook = state.copiedAt >= 0.0 && now - state.copiedAt < static_cast<double>(T().motion.feedbackHold);
+    slot.copiedLook = internal::CopyFeedbackActive(state.copiedAt);
 
     bool copied = false;
     if (hasText && !options.loading && !disabled && CopyFieldCopyKeyWithoutSelection(id))

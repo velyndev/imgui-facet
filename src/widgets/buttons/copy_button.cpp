@@ -15,6 +15,7 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "internal/control.h"
+#include "internal/copy_feedback.h"
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/popup_host.h"
@@ -74,7 +75,7 @@ bool CopyButton(const char* label, const char* text, const CopyButtonOptions& op
     internal::ApplyNextItemData(next);
     const internal::ItemState item = internal::ItemBehavior(id, ImVec2(width, m.height), itemOptions);
 
-    // Copy, and remember when, so the confirmation shows for motion.feedbackHold seconds.
+    // Copy, and remember when, so the confirmation shows for CopyFeedbackHold() seconds.
     const bool copied = item.pressed && text != nullptr && item.forced == internal::ForcedItemState::None;
     const double now = ImGui::GetTime();
     bool confirming = false;
@@ -86,7 +87,7 @@ bool CopyButton(const char* label, const char* text, const CopyButtonOptions& op
             ImGui::SetClipboardText(text);
             state.copiedAt = now;
         }
-        confirming = state.copiedAt >= 0.0 && now - state.copiedAt < static_cast<double>(t.motion.feedbackHold);
+        confirming = internal::CopyFeedbackActive(state.copiedAt);
     }
     if (item.forced != internal::ForcedItemState::None && internal::Has(item.forced, internal::ForcedItemState::Pressed))
         confirming = true;  // captures show the confirmation with the pressed look

@@ -468,7 +468,7 @@ nothing per frame). The text can be focused, selected with the mouse and the key
 any field; it is never written. A copy button sits in the trailing slot inside the frame: a Tab
 stop after the text, activated by a click, Space or Enter. It copies the whole text through
 `ImGui::SetClipboardText` and shows the check icon, with `Strings::copied` as its tooltip, for
-`motion.feedbackHold` seconds. Ctrl+C (or Ctrl+Insert) in the field with nothing selected copies the
+`motion.feedbackHold` seconds (times `motion.scale`). Ctrl+C (or Ctrl+Insert) in the field with nothing selected copies the
 whole text the same way; with a selection it copies the selection as a stock field does and does not
 count as a copy of the field. Returns true on the frame the text was copied.
 

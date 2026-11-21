@@ -126,7 +126,7 @@ void DrawDisplayCaps(ImDrawList* drawList, ImVec2 pos, float baseline, ImGuiKeyC
 // ---- Copy feedback ----------------------------------------------------------------------------
 
 // Starts the "copied" feedback of item `id`: Strings::copied in a tooltip level above `anchor`
-// for motion.feedbackHold.
+// for CopyFeedbackHold() (internal/copy_feedback.h).
 void StartDisplayCopiedFeedback(ImGuiID id, const ImRect& anchor);
 // Call every frame after the item: shows the feedback while it lasts. Returns true while shown.
 bool DisplayCopiedFeedback(ImGuiID id, const ImRect& anchor);

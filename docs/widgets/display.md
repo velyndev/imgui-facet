@@ -270,7 +270,7 @@ Code or an identifier (the visible label part) in a box with the faint control f
 radius, sitting on the text baseline of the line like a badge. The face is the UI font: Facet has no
 monospace face yet. With `copyOnActivate` it is a Tab stop: a click, Enter or Space copies the
 visible text (without the `"##"` part) through `ImGui::SetClipboardText`, returns true and shows a
-check and `Strings::copied` above it for `motion.feedbackHold`; hover and press step the fill. Without
+check and `Strings::copied` above it for `motion.feedbackHold` times `motion.scale`; hover and press step the fill. Without
 it the item is not a Tab stop. Status: ready.
 
 ### CodeView

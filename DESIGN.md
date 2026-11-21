@@ -390,6 +390,10 @@ Buttons and selection:
   and Backspace remove.
 - **CopyButton.** The confirmation check is in the success color on the neutral variants, because
   it reports success; the width holds both texts, so nothing moves while it confirms.
+- **Copy confirmations** have two looks on one timing (feedbackHold times motion.scale): a control
+  that copies (CopyButton, CopyField) swaps its own icon for the check in place, because it already
+  has room for it; copied text without such room (InlineCode, KeyValueList, CodeView on Ctrl+C)
+  shows the check and Strings::copied in a tooltip level above it, so the text never moves.
 - **Link.** A hairline underline only under the pointer or the keyboard focus marks the link
   without underlining every link at rest; a visited link uses accentTextVisited.
 - **CycleSelector** takes the text field frame, because it shows a value. Its chevrons are

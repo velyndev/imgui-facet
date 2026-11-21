@@ -565,6 +565,32 @@ TEST_CASE("A copy button writes the clipboard and confirms without moving anythi
     CHECK(icon.GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
 }
 
+TEST_CASE("A copy button holds its confirmation for feedbackHold times motion.scale")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::Theme theme = facet::Theme::Light();
+    theme.motion.scale = 2.0f;
+    facet::SetTheme(theme, false);
+    const ImU32 success = facet::ToU32(facet::T().colors.success);
+    int successVertices = 0;
+    session.SetUi([&] {
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::CopyButton("Copy the address", "placeholder text");
+        successVertices = CountColor(from, success);
+        session.Track("copy");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("copy"));
+    // Past the unscaled hold, still inside the scaled one: confirming.
+    session.Seconds(facet::T().motion.feedbackHold + 0.2f);
+    CHECK(successVertices > 0);
+    // Past the scaled hold: the name again.
+    session.Seconds(facet::T().motion.feedbackHold + 0.2f);
+    CHECK(successVertices == 0);
+}
+
 TEST_CASE("A copy button without text is disabled and copies nothing")
 {
     facet::test::Session session;
