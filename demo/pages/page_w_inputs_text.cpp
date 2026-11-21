@@ -169,6 +169,18 @@ void ProbeFrame(facet::demo::PageCtx& ctx, const char* name, facet::ControlSize 
     facet::demo::ProbeRect(ctx, name, ImGui::GetItemID(), min, ImVec2(max.x, min.y + facet::ControlHeight(size)));
 }
 
+// Records the end of the text part of the TagInput just drawn (Regular size, no message line):
+// the text part always ends the last row, at least spacing.xxxl wide, inside the field padding.
+void ProbeTagText(facet::demo::PageCtx& ctx, const char* name)
+{
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const facet::internal::ControlMetrics m = facet::internal::GetControlMetrics(facet::ControlSize::Regular);
+    const float right = max.x - m.fieldPadding;
+    const float left = std::max(min.x + m.fieldPadding, right - facet::Px(facet::T().spacing.xxxl));
+    facet::demo::ProbeRect(ctx, name, ImGui::GetItemID(), ImVec2(left, max.y - m.height), ImVec2(right, max.y));
+}
+
 // Records the first `count` rows of the open completion list of field `fieldId` as
 // "<prefix>.<row>", where the text inputs place them: list rows inside the level's padding.
 void ProbeCompletionRows(facet::demo::PageCtx& ctx, ImGuiID fieldId, const char* prefix, int count)
@@ -674,6 +686,7 @@ void TagInputSection(facet::demo::PageCtx& ctx)
         ctx.ForceNextItemState(ForcedItemState::Focused);
     facet::TagInput("##tags", &ui.tags, {.placeholder = "Type and press Enter", .suggestions = kOptions});
     ProbeFrame(ctx, "inputs.tags");
+    ProbeTagText(ctx, "inputs.tags.text");
     if (ctx.capture && ctx.captureState == kFormatted)
         ctx.RevealInCapture(0.15f);
 
@@ -1062,11 +1075,8 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.KeyPress(ImGuiKey_Escape);
 
     // TagInput: Enter and a comma add, a suggestion by keyboard, Backspace selects and removes.
-    // The first click scrolls the field into view, the second lands in its text part at the end.
-    test.Click("inputs.tags");
-    test.MouseMove(T::Item("inputs.tags", 1.0f, 0.5f).Offset(-12.0f, 0.0f));
-    test.MouseDown();
-    test.MouseUp();
+    // The click lands in the text part at the end of the last row, wherever the chips put it.
+    test.Click("inputs.tags.text");
     test.Type("Sample tag");
     test.KeyPress(ImGuiKey_Enter);
     test.Wait(2);
