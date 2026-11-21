@@ -8,6 +8,7 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <span>
 #include <string>
@@ -1137,4 +1138,85 @@ TEST_CASE("DurationInput: a vertical drag on a segment moves it in whole units")
     const float travel = facet::Px(facet::T().spacing.sm) * 3.0f;
     session.Drag({ImVec2(minutesX, y), ImVec2(minutesX, y - travel)}, 6);
     CHECK(seconds == doctest::Approx(90.0 + 3.0 * 60.0));
+}
+
+// ---- HexInput ----------------------------------------------------------------------------------
+
+TEST_CASE("HexInput overtypes digits, keeps its width and writes on Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::uint32_t value = 0xDEADBEEFu;
+    Signals signals;
+    session.SetUi([&] {
+        signals.Take(facet::HexInput("##hex", &value, {.prefix = true, .groupBytes = true}));
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    ImGuiInputTextState* text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    CHECK(std::string(text->TextA.Data) == "DEADBEEF");  // the digits alone while typing
+    session.KeyPress(ImGuiKey_Home);
+    session.Type("12");
+    CHECK(std::string(text->TextA.Data) == "12ADBEEF");
+    CHECK(value == 0xDEADBEEFu);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(value == 0x12ADBEEFu);
+    CHECK(signals.writes == 1);
+    CHECK(signals.commits == 1);
+    // Deleting turns digits into zeros; the width stays.
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("f");  // the field's case
+    text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    CHECK(std::string(text->TextA.Data) == "F0000000");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(value == 0xF0000000u);
+}
+
+TEST_CASE("HexInput: Up and Down change the digit after the caret at once; Escape takes them back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::uint64_t value = 0x0FFFFFFFFFFFFFFFull;
+    session.SetUi([&] {
+        facet::HexInput("##hex", &value);
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    session.KeyPress(ImGuiKey_End);
+    session.KeyPress(ImGuiKey_LeftArrow);  // before the last digit
+    session.KeyPress(ImGuiKey_UpArrow);    // F + 1 carries through every digit
+    CHECK(value == 0x1000000000000000ull);
+    session.KeyPress(ImGuiKey_Home);
+    session.KeyPress(ImGuiKey_DownArrow);  // 1 - 1 at the top digit
+    CHECK(value == 0ull);
+    session.KeyPress(ImGuiKey_DownArrow);  // wraps within the 16 digits
+    CHECK(value == 0xF000000000000000ull);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK(value == 0x0FFFFFFFFFFFFFFFull);
+}
+
+TEST_CASE("HexInput with fewer digits masks the value and lowercase shows a to f")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::uint32_t value = 0xABu;
+    session.SetUi([&] {
+        facet::HexInput("##hex", &value, {.digits = 4, .uppercase = false});
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(TextPoint(session.ItemRect("field")));
+    ImGuiInputTextState* text = ImGui::GetInputTextState(session.ItemId("field"));
+    REQUIRE(text != nullptr);
+    CHECK(std::string(text->TextA.Data) == "00ab");
+    session.KeyPress(ImGuiKey_Home);
+    session.Type("C1");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(value == 0xC1ABu);
 }

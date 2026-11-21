@@ -351,7 +351,16 @@ bool HexInput(const char* label, std::uint32_t* value, const HexInputOptions& op
 bool HexInput(const char* label, std::uint64_t* value, const HexInputOptions& options = {});
 ```
 
-A fixed-width hexadecimal field in overtype mode. Status: planned.
+A hexadecimal field of `digits` digits (default 8 for `std::uint32_t`, 16 for `std::uint64_t`; a
+value that needs more shows them all) in overtype mode, built on the text field core because the
+number core's double cannot hold 64 bits exactly. While it is not typing it shows the digits with
+"0x" in front (`prefix`) and a gap after every two (`groupBytes`); while typing the text is the
+digits alone. Only hex digits can be typed, in the field's case (`uppercase`); a typed digit
+replaces the one after the caret and the text keeps its width, deleted digits become zeros, so
+selecting everything and typing "F" gives "F0000000". Up and Down change the digit after the caret
+by one with the carry, wrapping within the field's digits, and write at once. Typed digits write on
+Enter, Tab or focus loss, masked to the field's digits. Escape restores the value from the start of
+the edit, steps included. Status: ready.
 
 ### MaskedInput
 
