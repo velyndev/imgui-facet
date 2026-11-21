@@ -14,8 +14,8 @@
 // and can be focused, but write nothing and return false.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. Every widget here is declared and planned: its body draws a
-// placeholder until Phase 2 implements it (docs/widgets/charts.md lists the status of each).
+// with other families. The entry of each widget in docs/widgets/charts.md ends with its status;
+// a widget whose status is planned draws a placeholder.
 // Lengths are design units. Every function is for the thread that runs the Dear ImGui frame.
 
 #include <span>

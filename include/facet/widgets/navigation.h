@@ -4,9 +4,9 @@
 // wizards, step indicators and the shortcut sheet.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families, and docs/widgets/navigation.md has usage examples. The family is
-// planned: its widgets are declared here and draw a placeholder until Phase 2 implements them
-// (docs/widgets.md). Shortcuts themselves are registered and routed in core/input.h; menu items
+// with other families, and docs/widgets/navigation.md has usage examples. The entry of each
+// widget there ends with its status; a widget whose status is planned draws a placeholder.
+// Shortcuts themselves are registered and routed in core/input.h; menu items
 // and the shortcut sheet show them.
 //
 // When End is called (rule 8): a Begin that returns void always lays out its content, and its

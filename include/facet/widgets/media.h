@@ -16,8 +16,8 @@
 // on keyboard focus. A settings row gives them a visible label.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. Every widget here is declared and planned: its body draws a
-// placeholder until Phase 2 implements it (docs/widgets/media.md lists the status of each).
+// with other families. The entry of each widget in docs/widgets/media.md ends with its status;
+// a widget whose status is planned draws a placeholder.
 // Every function is for the thread that runs the Dear ImGui frame.
 
 #include <cstdint>

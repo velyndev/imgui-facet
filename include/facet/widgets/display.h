@@ -6,10 +6,9 @@
 // tiles and data tables.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. Every widget of the family is implemented except DataTable and its cell
-// editing, which are planned: the entry of each widget in docs/widgets/display.md ends with its
-// status, and a widget whose status is planned draws a placeholder of its default size and
-// returns the neutral result.
+// with other families. The entry of each widget in docs/widgets/display.md ends with its status;
+// a widget whose status is planned draws a placeholder of its default size and returns the
+// neutral result.
 //
 // Lengths are design units (Px() is applied inside). Strings are UTF-8 and read only during
 // the call. Every function is for the thread that runs the Dear ImGui frame (context.h).
