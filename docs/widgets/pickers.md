@@ -303,7 +303,26 @@ scroll positions. Status: ready.
 bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& options = {});
 ```
 
-A dial with a needle and a degrees field over an angle in radians. Status: planned.
+A round dial with a needle over an angle in radians, counter-clockwise from the right, with a
+degrees field beside it (`field`, a NumberInput without steppers that shows the degrees and the
+degree sign). The label is drawn in front; the dial is `diameter` units across, or two control
+heights of `size`; the default width fits the label, the dial and the field, at most the available
+width. In a narrower width the field shrinks first and is left out below one and a half control
+heights; in a width narrower than the label and the dial, the dial shrinks.
+
+The pointer sets the needle: a press points it at the pointer, a drag follows it in whole degrees
+(Shift snaps to multiples of `snapDegrees`), and Escape during the drag restores the angle from the
+press. While the dial has keyboard focus, the arrows of both axes turn it by one degree (Right and
+Up counter-clockwise), Shift by `snapDegrees`, Ctrl and Page Up and Down by ten steps, and the wheel
+over the focused dial turns it too; each press is an edit session of the value drag core. The angle
+wraps: it is written as 0 to 360 degrees, or -180 to 180 with `signedRange`. Typed degrees are
+written on Enter, Tab or focus loss and clamped to that range. The dial draws a face with four
+quarter ticks, the needle in the accent color (labelSecondary when read-only, labelTertiary when
+disabled) and the round focus ring; `error` turns its outline destructive and shows the message.
+
+`readOnly` (or a null pointer) shows the angle and focuses but never writes. `mixed` hides the
+needle and empties the field until an edit. Captures: a forced state for part -1 or 0 goes to the
+dial, for part 1 to the field. Status: ready.
 
 ### IconPicker
 

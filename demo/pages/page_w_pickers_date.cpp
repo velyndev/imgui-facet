@@ -6,6 +6,7 @@
 // (page_w_pickers_color.cpp). Sample values are neutral: fixed dates and times, built-in icons,
 // "Option n" entries.
 
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -36,6 +37,7 @@ enum CaptureState
     kDateFocused,
     kRangeOpen,
     kTimeOpen,
+    kAngleFocused,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -63,6 +65,8 @@ struct OtherPickersUi
     facet::TimeOfDay timeSeconds = {.hour = 8, .minute = 30, .second = 15};
     facet::TimeOfDay timeInline = {.hour = 9, .minute = 30};
     float angle = 0.0f;
+    float angleSigned = -1.5707964f;
+    float angleLarge = 0.7853982f;
     facet::Icon icon = facet::Icon("star");
     int thumbnail = 0;
     std::string path;
@@ -259,10 +263,54 @@ void TimeSection(facet::demo::PageCtx& ctx)
     }());
 }
 
+// Records the dial of the AnglePicker submitted last (one without a visible label, so the dial
+// starts at the left of the widget) as probe `name`.
+void ProbeDial(facet::demo::PageCtx& ctx, const char* name, float diameterUnits = 0.0f)
+{
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const float diameter = diameterUnits > 0.0f ? std::round(facet::Px(diameterUnits))
+                                                : std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f);
+    facet::demo::ProbeRect(ctx, name, ImGui::GetItemID(), min, ImVec2(min.x + diameter, min.y + diameter));
+}
+
+void AngleSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("AnglePicker");
+    Paragraph("A dial with a needle over an angle, counter-clockwise from the right. Dragging points the needle at "
+              "the pointer (Shift snaps to 15 degrees); the arrows turn it by a degree, Shift by the snap. The field "
+              "beside it takes typed degrees.");
+    LabeledRow("Angle", std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f));
+    if (ctx.capture && ctx.captureState == kAngleFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::AnglePicker("##angle", &ui.angle);
+    ctx.Probe("pickers.angle");
+    ProbeDial(ctx, "pickers.angle.dial");
+    if (ctx.capture && ctx.captureState == kAngleFocused)
+        ctx.RevealInCapture(0.4f);
+    LabeledRow("Signed", std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f));
+    facet::AnglePicker("##signed", &ui.angleSigned, {.signedRange = true, .helpText = "From -180 to 180 degrees"});
+    ctx.Probe("pickers.angle.signed");
+    LabeledRow("Large dial", std::round(facet::Px(96.0f)));
+    facet::AnglePicker("##large", &ui.angleLarge, {.field = false, .diameter = 96.0f});
+    ProbeDial(ctx, "pickers.angle.large", 96.0f);
+    float fixed = 2.0f;
+    LabeledRow("Small", facet::ControlHeight(facet::ControlSize::Small) * 2.0f);
+    facet::AnglePicker("##small", &fixed, {.size = facet::ControlSize::Small});
+    LabeledRow("Disabled", std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f));
+    ImGui::BeginDisabled();
+    facet::AnglePicker("##disabled", &fixed);
+    ImGui::EndDisabled();
+    LabeledRow("Read-only", std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f));
+    facet::AnglePicker("##readonly", &fixed, {.readOnly = true});
+    LabeledRow("Error", std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f));
+    facet::AnglePicker("##error", &fixed, {.error = "Pick an angle below 90 degrees"});
+    Note("Angle: %.1f degrees.", ui.angle * 180.0f / 3.14159265f);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
-                "time-open")
+                "time-open", "angle-focused")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
@@ -273,10 +321,9 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
     RangeSection(ctx);
     TimeSection(ctx);
 
+    AngleSection(ctx);
+
     SectionHeader("Other pickers");
-    LabeledRow("Angle");
-    facet::AnglePicker("##angle", &ui.angle);
-    ctx.Probe("pickers.angle");
     LabeledRow("Icon");
     facet::IconPicker("##icon", &ui.icon, kIcons);
     LabeledRow("Thumbnails");
@@ -405,8 +452,31 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("A on a 12-hour clock moves the time before noon", [] { return ui.time12.hour == 6 && ui.time12.minute == 45; });
 
+    // AnglePicker: a press points the needle, the arrows turn it, the field takes typed degrees.
+    using T = facet::demo::Target;
+    const auto degrees = [](float radians) { return static_cast<double>(radians) * 180.0 / 3.14159265358979; };
+    test.Reveal("pickers.angle");
+    test.WaitSeconds(0.4f);
+    test.MouseMove(T::Item("pickers.angle.dial", 0.5f, 0.02f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("a press at the top of the dial points to 90 degrees", [degrees] { return degrees(ui.angle); }, 90.0, 0.01);
+    test.Drag({T::Item("pickers.angle.dial", 0.5f, 0.02f), T::Item("pickers.angle.dial", 0.02f, 0.5f)}, 0.3f);
+    test.ExpectNear("a drag to the left edge points to 180 degrees", [degrees] { return degrees(ui.angle); }, 180.0, 0.01);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up turns one degree counter-clockwise", [degrees] { return degrees(ui.angle); }, 181.0, 0.01);
+    test.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    test.ExpectNear("Shift+Left turns back by the snap", [degrees] { return degrees(ui.angle); }, 166.0, 0.01);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("30");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("the degrees field writes typed degrees", [degrees] { return degrees(ui.angle); }, 30.0, 0.01);
+    test.MouseMove(T::Item("pickers.angle.large", 0.98f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
+    test.ExpectNear("the large dial points at the pointer", [degrees] { return degrees(ui.angleLarge); }, 0.0, 0.01);
+
     // The planned pickers are placeholders: clicks and keys write nothing.
-    test.Click("pickers.angle");
-    test.KeyPress(ImGuiKey_RightArrow);
-    test.ExpectNear("the angle placeholder writes nothing", [] { return ui.angle; }, 0.0, 0.0);
+
 }

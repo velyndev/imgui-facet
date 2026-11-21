@@ -771,3 +771,119 @@ TEST_CASE("The time columns write at once and Enter closes them with the focus b
     CHECK(ImGui::GetFocusID() == session.ItemId("time"));
     CHECK(writes == 2);
 }
+// ---- AnglePicker --------------------------------------------------------------------------------
+
+namespace
+{
+
+constexpr float kPi = 3.14159265358979f;
+
+float Degrees(float radians)
+{
+    return radians * 180.0f / kPi;
+}
+
+// The dial of an AnglePicker without a visible label: a square at the left of the widget, two
+// control heights across.
+ImRect AngleDial(const facet::test::Session& session, const char* name)
+{
+    const ImRect widget = session.ItemRect(name);
+    const float diameter = std::round(facet::ControlHeight(facet::ControlSize::Inherit) * 2.0f);
+    return ImRect(widget.Min, ImVec2(widget.Min.x + diameter, widget.Min.y + diameter));
+}
+
+} // namespace
+
+TEST_CASE("The angle dial turns with the arrows of both axes, Shift by the snap, and wraps")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float radians = 359.0f * kPi / 180.0f;
+    float signedRadians = kPi;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::AnglePicker("##angle", &radians, {.snapDegrees = 15.0f}))
+            ++writes;
+        session.Track("angle");
+        facet::AnglePicker("##signed", &signedRadians, {.signedRange = true, .field = false});
+        session.Track("signed");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("angle"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(Degrees(radians) == doctest::Approx(0.0f).epsilon(0.001));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(Degrees(radians) == doctest::Approx(1.0f).epsilon(0.001));
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(Degrees(radians) == doctest::Approx(359.0f).epsilon(0.001));
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Shift);
+    CHECK(Degrees(radians) == doctest::Approx(14.0f).epsilon(0.001));
+    CHECK(writes == 5);
+    CHECK(ImGui::GetFocusID() == session.ItemId("angle"));
+
+    // A signed range writes -180 to 180: one degree past 180 is -179.
+    session.Click(AngleDial(session, "signed").GetCenter());
+    const float before = signedRadians;
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(Degrees(signedRadians) == doctest::Approx(-179.0f).epsilon(0.001));
+    CHECK(before == kPi);
+}
+
+TEST_CASE("The angle dial points its needle at the pointer, and Escape during a drag restores it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float radians = 1.0f;
+    session.SetUi([&] {
+        facet::AnglePicker("##angle", &radians, {.field = false});
+        session.Track("angle");
+    });
+    session.Frame();
+    const ImRect dial = AngleDial(session, "angle");
+    // A press at the right edge points to 0 degrees, a drag to the top to 90.
+    session.Click(ImVec2(dial.Max.x - 2.0f, dial.GetCenter().y));
+    CHECK(Degrees(radians) == doctest::Approx(0.0f).epsilon(0.001));
+    session.Drag({ImVec2(dial.Max.x - 2.0f, dial.GetCenter().y), ImVec2(dial.GetCenter().x, dial.Min.y - 20.0f)}, 4);
+    CHECK(Degrees(radians) == doctest::Approx(90.0f).epsilon(0.001));
+    // Left of the center is 180; Escape before the release restores the angle from the press.
+    session.MouseMove(ImVec2(dial.Min.x + 2.0f, dial.GetCenter().y));
+    session.MouseDown();
+    session.MouseMove(ImVec2(dial.GetCenter().x, dial.Max.y + 20.0f));
+    CHECK(Degrees(radians) == doctest::Approx(270.0f).epsilon(0.001));
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    CHECK(Degrees(radians) == doctest::Approx(90.0f).epsilon(0.001));
+}
+
+TEST_CASE("The degrees field writes a typed angle, and a read-only angle picker writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float radians = 0.0f;
+    float fixed = 0.5f;
+    session.SetUi([&] {
+        facet::AnglePicker("##angle", &radians);
+        session.Track("angle");
+        facet::AnglePicker("##fixed", &fixed, {.readOnly = true});
+        session.Track("fixed");
+    });
+    session.Frame();
+    const ImRect widget = session.ItemRect("angle");
+    const ImRect dial = AngleDial(session, "angle");
+    session.Click(ImVec2((dial.Max.x + widget.Max.x) * 0.5f, dial.GetCenter().y));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("45");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(Degrees(radians) == doctest::Approx(45.0f).epsilon(0.001));
+
+    const ImRect fixedDial = AngleDial(session, "fixed");
+    session.Click(ImVec2(fixedDial.Min.x + 2.0f, fixedDial.GetCenter().y));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(fixed == 0.5f);
+}
