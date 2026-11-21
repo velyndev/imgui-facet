@@ -10,24 +10,26 @@ the reason for each are listed in `DESIGN.md`.
 
 | Group | Holds |
 |---|---|
-| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states (visited links included), status colors with their solid fill states and translucent washes, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`), the scrollbar thumbs and the code view tints |
+| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states (visited links included), status colors with their solid fill states and translucent washes, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`), the scrollbar thumbs, the code view tints and the two checkerboard cells |
 | `spacing` | The 4 px grid: `xs` 4 to `xxxl` 32 |
 | `radii` | `element`, `control`, `card`, `popover`, `window`, and where continuous corners start |
-| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots), status and page dots, slider ticks, the segment inset, progress tracks per control size and the icon of an empty state |
+| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots), status and page dots, slider ticks, the segment inset, progress tracks per control size, the icon of an empty state, step markers and their connectors, and the checkerboard cell |
 | `type` | Size and weight of every `TextStyle` |
 | `motion` | Springs, durations, loading periods, the popup open and close motion, how long copied feedback stays, the live dot pulse, a global `scale` and `reduceMotion` |
 | `elevation` | Three shadow levels (their surfaces are in `colors`) |
 | `glass` | Backdrop blur settings |
-| `layout` | Width class breakpoints and the labelled row columns |
-| `overlay` | Popup placement, menus and their shortcut gap, tooltip timing, toasts, dialog, drawer and command palette sizes |
+| `layout` | Width class breakpoints, the labelled row columns, the divider band of split views and panels, the panel header |
+| `overlay` | Popup placement, menus and their shortcut gap, tooltip timing, toasts, dialog, drawer and command palette sizes, the popover arrow, the command palette's distance from the top |
 | `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths, the status bar height |
 | `scroll` | Overlay scrollbar widths, inset, minimum thumb, hide delay, wheel distance, edge fade |
 | `list` | Row heights per control size, tree indent, default visible rows, typeahead timeout |
-| `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target |
+| `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target, the flick speed and the inertia of a released pan |
 | `field` | Text field padding and caret width |
-| `tabs` | Narrowest and widest tab of a tab bar |
+| `tabs` | Narrowest and widest tab of a tab bar, the underline of the selected tab |
 | `table` | Data table header height, narrowest column, column resize band |
-| `picker` | Day cell of the date pickers |
+| `picker` | Day cell of the date pickers, the color bars and hue ring of the color pickers, the time picker columns |
+| `charts` | Series line width, point markers, the gap between bars, legend swatches, the donut hole, the gauge arc, level meter segments and peak hold |
+| `media` | The overlap of grouped avatars, the timeline playhead, the dashes of a drop zone outline |
 
 Lengths are design units. Widgets convert them with `facet::Px()` (see `docs/scaling.md`).
 
@@ -63,6 +65,14 @@ tokens. The widgets are planned; the table fixes which token each one takes.
 | `ProgressBarOptions::size` (track thickness), `SecureFieldOptions::strength` (the meter) | `metrics.progressHeightSmall`, `progressHeight`, `progressHeightLarge`; the meter takes the small one |
 | `EmptyStateOptions::icon` (not compact), `StatusDot`, `CycleSelectorOptions::pageDots` | `metrics.emptyIconSize`, `metrics.statusDotSize`, `metrics.pageDotSize` |
 | `CopyButton`, `CopyField`, `InlineCode` (how long Strings::copied shows), `StatusDotOptions::pulse` | `motion.feedbackHold`, `motion.pulsePeriod` |
+| `SplitViewOptions`, `PanelsOptions` (the divider), `PanelOptions::collapsible` (header and collapsed strip) | `layout.dividerBand`, `layout.panelHeaderHeight` |
+| `PopoverOptions::arrow`, `CommandPalette` (its place) | `overlay.arrowSize`, `overlay.commandPaletteTop` |
+| `DrawerOptions::dismissible` and toasts (a flick closes them), `Carousel` (a flick pages), `ImageViewer` (a released pan) | `drag.flickSpeed`, `drag.inertiaTime` |
+| `TabStyle::Underline`, `StepIndicator` | `tabs.underlineHeight`, `metrics.stepMarkerSize` and `metrics.stepConnectorWidth` |
+| `ColorWell` and alpha tracks, `ImageViewerOptions::checkerboard` | `colors.checker`, `metrics.checkerCell` |
+| `ColorChannelSlider` and the bars of `ColorPicker`, `ColorPickerMode::Wheel`, `TimePicker` columns | `picker.colorBarHeight`, `picker.hueRingWidth`, `picker.timeColumnWidth` |
+| Series lines and `markers`, `BarChart` bars, `Legend` entries, `DonutChart` (not `pie`), `Gauge`, `LevelMeterOptions::segments` and `peakHold` | `charts.lineWidth`, `charts.markerSize`, `charts.barGap`, `charts.legendSwatch`, `charts.donutHole`, `charts.gaugeWidth`, `charts.meterSegmentGap`, `charts.peakHold` |
+| `AvatarGroup`, `TimelineScrubber`, `DropZone` | `media.avatarOverlap`, `media.playheadWidth`, `media.dashLength` and `media.dashGap` |
 
 ## Switching
 
@@ -170,6 +180,8 @@ The unit tests check, for both presets:
   palette color reach 3:1 on every surface as drawn (8 bits per channel).
 - `facet::ControlBoundaryColor()` reaches 3:1 on the content surfaces, for control outlines.
 - `scrollThumb` and `scrollThumbHover` reach 3:1 on every surface.
+- The two `checker` cells differ by 1.3:1 to 2:1, so alpha shows without competing with the color
+  over them, and both stay light in the light preset and dark in the dark one.
 
 A custom theme with other surface colors should call `theme.ApplyAccent(theme.colors.accent)`
 after changing them, because `accentText`, `focusRing` and the chart palette depend on the

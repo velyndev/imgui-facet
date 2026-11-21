@@ -251,6 +251,8 @@ Colors MixColors(const Colors& a, const Colors& b, float t)
     out.codeKeyword = Mix(a.codeKeyword, b.codeKeyword, t);
     out.codeString = Mix(a.codeString, b.codeString, t);
     out.codeNumber = Mix(a.codeNumber, b.codeNumber, t);
+    for (int i = 0; i < 2; ++i)
+        out.checker[i] = Mix(a.checker[i], b.checker[i], t);
     return out;
 }
 
@@ -280,6 +282,8 @@ OverlayTokens MixOverlay(const OverlayTokens& a, const OverlayTokens& b, float t
     out.drawerHeight = Lerp(a.drawerHeight, b.drawerHeight, t);
     out.commandPaletteWidth = Lerp(a.commandPaletteWidth, b.commandPaletteWidth, t);
     out.menuShortcutGap = Lerp(a.menuShortcutGap, b.menuShortcutGap, t);
+    out.arrowSize = Lerp(a.arrowSize, b.arrowSize, t);
+    out.commandPaletteTop = Lerp(a.commandPaletteTop, b.commandPaletteTop, t);
     return out;
 }
 
@@ -332,6 +336,8 @@ DragTokens MixDrag(const DragTokens& a, const DragTokens& b, float t)
     out.autoScrollZone = Lerp(a.autoScrollZone, b.autoScrollZone, t);
     out.autoScrollSpeed = Lerp(a.autoScrollSpeed, b.autoScrollSpeed, t);
     out.hoverOpenDelay = Lerp(a.hoverOpenDelay, b.hoverOpenDelay, t);
+    out.flickSpeed = Lerp(a.flickSpeed, b.flickSpeed, t);
+    out.inertiaTime = Lerp(a.inertiaTime, b.inertiaTime, t);
     return out;
 }
 
@@ -348,6 +354,7 @@ TabTokens MixTabs(const TabTokens& a, const TabTokens& b, float t)
     TabTokens out;
     out.minWidth = Lerp(a.minWidth, b.minWidth, t);
     out.maxWidth = Lerp(a.maxWidth, b.maxWidth, t);
+    out.underlineHeight = Lerp(a.underlineHeight, b.underlineHeight, t);
     return out;
 }
 
@@ -364,6 +371,33 @@ PickerTokens MixPicker(const PickerTokens& a, const PickerTokens& b, float t)
 {
     PickerTokens out;
     out.dayCell = Lerp(a.dayCell, b.dayCell, t);
+    out.colorBarHeight = Lerp(a.colorBarHeight, b.colorBarHeight, t);
+    out.hueRingWidth = Lerp(a.hueRingWidth, b.hueRingWidth, t);
+    out.timeColumnWidth = Lerp(a.timeColumnWidth, b.timeColumnWidth, t);
+    return out;
+}
+
+ChartTokens MixCharts(const ChartTokens& a, const ChartTokens& b, float t)
+{
+    ChartTokens out;
+    out.lineWidth = Lerp(a.lineWidth, b.lineWidth, t);
+    out.markerSize = Lerp(a.markerSize, b.markerSize, t);
+    out.barGap = Lerp(a.barGap, b.barGap, t);
+    out.legendSwatch = Lerp(a.legendSwatch, b.legendSwatch, t);
+    out.donutHole = Lerp(a.donutHole, b.donutHole, t);
+    out.gaugeWidth = Lerp(a.gaugeWidth, b.gaugeWidth, t);
+    out.meterSegmentGap = Lerp(a.meterSegmentGap, b.meterSegmentGap, t);
+    out.peakHold = Lerp(a.peakHold, b.peakHold, t);
+    return out;
+}
+
+MediaTokens MixMedia(const MediaTokens& a, const MediaTokens& b, float t)
+{
+    MediaTokens out;
+    out.avatarOverlap = Lerp(a.avatarOverlap, b.avatarOverlap, t);
+    out.playheadWidth = Lerp(a.playheadWidth, b.playheadWidth, t);
+    out.dashLength = Lerp(a.dashLength, b.dashLength, t);
+    out.dashGap = Lerp(a.dashGap, b.dashGap, t);
     return out;
 }
 
@@ -615,6 +649,8 @@ Theme Theme::Light()
     c.codeKeyword = Rgb(0x7A1FA2);
     c.codeString = Rgb(0x1A6B2B);
     c.codeNumber = Rgb(0x9A4A00);
+    c.checker[0] = Rgb(0xFFFFFF);
+    c.checker[1] = Rgb(0xD1D1D6);
     SetElevation(theme.elevation, 0.10f, 0.12f, 0.18f);
     theme.ApplyAccent(kLightAccent);
     return theme;
@@ -654,6 +690,8 @@ Theme Theme::Dark()
     c.codeKeyword = Rgb(0xD7A8FF);
     c.codeString = Rgb(0x7EE08F);
     c.codeNumber = Rgb(0xFFB86B);
+    c.checker[0] = Rgb(0x48484A);
+    c.checker[1] = Rgb(0x2C2C2E);
     SetElevation(theme.elevation, 0.36f, 0.44f, 0.56f);
     theme.ApplyAccent(kDarkAccent);
     return theme;
@@ -737,6 +775,9 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     m.progressHeight = Lerp(ma.progressHeight, mb.progressHeight, t);
     m.progressHeightLarge = Lerp(ma.progressHeightLarge, mb.progressHeightLarge, t);
     m.emptyIconSize = Lerp(ma.emptyIconSize, mb.emptyIconSize, t);
+    m.stepMarkerSize = Lerp(ma.stepMarkerSize, mb.stepMarkerSize, t);
+    m.stepConnectorWidth = Lerp(ma.stepConnectorWidth, mb.stepConnectorWidth, t);
+    m.checkerCell = Lerp(ma.checkerCell, mb.checkerCell, t);
 
     for (int i = 0; i < kTextStyleCount; ++i)
         out.type.styles[i].size = Lerp(a.type.styles[i].size, b.type.styles[i].size, t);
@@ -773,6 +814,8 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.layout.expandedFrom = Lerp(a.layout.expandedFrom, b.layout.expandedFrom, t);
     out.layout.labelColumn = Lerp(a.layout.labelColumn, b.layout.labelColumn, t);
     out.layout.minRowControl = Lerp(a.layout.minRowControl, b.layout.minRowControl, t);
+    out.layout.dividerBand = Lerp(a.layout.dividerBand, b.layout.dividerBand, t);
+    out.layout.panelHeaderHeight = Lerp(a.layout.panelHeaderHeight, b.layout.panelHeaderHeight, t);
 
     out.overlay = MixOverlay(a.overlay, b.overlay, t);
     out.containers = MixContainers(a.containers, b.containers, t);
@@ -783,6 +826,8 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.tabs = MixTabs(a.tabs, b.tabs, t);
     out.table = MixTable(a.table, b.table, t);
     out.picker = MixPicker(a.picker, b.picker, t);
+    out.charts = MixCharts(a.charts, b.charts, t);
+    out.media = MixMedia(a.media, b.media, t);
     return out;
 }
 

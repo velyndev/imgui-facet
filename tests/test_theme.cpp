@@ -35,7 +35,8 @@ bool SameColors(const facet::Colors& a, const facet::Colors& b)
            SameColor(a.destructiveSubtle, b.destructiveSubtle) && SameColor(a.successSubtle, b.successSubtle) &&
            SameColor(a.warningSubtle, b.warningSubtle) && SameColor(a.accentTextVisited, b.accentTextVisited) &&
            SameColor(a.codeKeyword, b.codeKeyword) && SameColor(a.codeString, b.codeString) &&
-           SameColor(a.codeNumber, b.codeNumber);
+           SameColor(a.codeNumber, b.codeNumber) && SameColor(a.checker[0], b.checker[0]) &&
+           SameColor(a.checker[1], b.checker[1]);
     return same && SameColor(a.scrollThumb, b.scrollThumb) && SameColor(a.scrollThumbHover, b.scrollThumbHover);
 }
 
@@ -45,7 +46,7 @@ std::vector<ImVec4*> WidgetColorTokens(facet::Theme& t)
     facet::Colors& c = t.colors;
     return {&c.destructiveHover, &c.destructivePressed, &c.onDestructive, &c.onSuccess, &c.onWarning,
             &c.destructiveSubtle, &c.successSubtle, &c.warningSubtle, &c.accentTextVisited,
-            &c.codeKeyword, &c.codeString, &c.codeNumber};
+            &c.codeKeyword, &c.codeString, &c.codeNumber, &c.checker[0], &c.checker[1]};
 }
 
 // Every length and time token of the groups for popups, containers, scrolling, lists, drag and
@@ -76,7 +77,14 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
             &t.motion.popupOpen, &t.motion.popupClose, &t.motion.popupScaleFrom,
             &m.statusDotSize, &m.pageDotSize, &m.sliderTickSize, &m.segmentInset, &m.progressHeightSmall,
             &m.progressHeight, &m.progressHeightLarge, &m.emptyIconSize, &c.statusBarHeight,
-            &t.motion.feedbackHold, &t.motion.pulsePeriod};
+            &t.motion.feedbackHold, &t.motion.pulsePeriod,
+            // The tokens of the second widget wave.
+            &m.stepMarkerSize, &m.stepConnectorWidth, &m.checkerCell, &t.layout.dividerBand,
+            &t.layout.panelHeaderHeight, &o.arrowSize, &o.commandPaletteTop, &d.flickSpeed, &d.inertiaTime,
+            &t.tabs.underlineHeight, &t.picker.colorBarHeight, &t.picker.hueRingWidth, &t.picker.timeColumnWidth,
+            &t.charts.lineWidth, &t.charts.markerSize, &t.charts.barGap, &t.charts.legendSwatch,
+            &t.charts.donutHole, &t.charts.gaugeWidth, &t.charts.meterSegmentGap, &t.charts.peakHold,
+            &t.media.avatarOverlap, &t.media.playheadWidth, &t.media.dashLength, &t.media.dashGap};
 }
 
 // Restores the global theme state after a test changes it.
@@ -287,6 +295,61 @@ TEST_CASE("The tokens of the first widgets hold their documented starting values
         CHECK(c.warningSubtle.w == doctest::Approx(0.14f));
         CHECK(c.destructiveSubtle.w <= c.accentSubtle.w);
         CHECK(c.destructiveSubtle.x == doctest::Approx(c.destructive.x));
+    }
+}
+
+TEST_CASE("The tokens of the second widget wave hold their documented starting values in both presets")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Metrics& m = theme.metrics;
+        CHECK(m.stepMarkerSize == 24.0f);
+        CHECK(m.stepMarkerSize >= m.minHitTarget);  // a done step can be activated
+        CHECK(m.stepConnectorWidth == 2.0f);
+        CHECK(m.checkerCell == 6.0f);
+        CHECK(theme.layout.dividerBand == theme.table.resizeBand);
+        CHECK(theme.layout.panelHeaderHeight == theme.list.rowHeight);
+        CHECK(theme.overlay.arrowSize == theme.spacing.sm);
+        CHECK(theme.overlay.commandPaletteTop == theme.spacing.xxxl * 3.0f);
+        CHECK(theme.drag.flickSpeed == 600.0f);
+        CHECK(theme.drag.inertiaTime == doctest::Approx(0.3f));
+        CHECK(theme.tabs.underlineHeight == m.stepConnectorWidth);
+        CHECK(theme.picker.colorBarHeight == 12.0f);
+        CHECK(theme.picker.colorBarHeight < m.sliderKnobSize);  // the knob still overlaps the bar
+        CHECK(theme.picker.hueRingWidth == 20.0f);
+        CHECK(theme.picker.timeColumnWidth == 48.0f);
+        const facet::ChartTokens& c = theme.charts;
+        CHECK(c.lineWidth == 2.0f);
+        CHECK(c.markerSize == m.pageDotSize);
+        CHECK(c.barGap == 2.0f);
+        CHECK(c.legendSwatch == 10.0f);
+        CHECK(c.donutHole == doctest::Approx(0.6f));
+        CHECK(c.gaugeWidth == theme.picker.colorBarHeight);
+        CHECK(c.meterSegmentGap == 2.0f);
+        CHECK(c.peakHold == doctest::Approx(1.0f));
+        CHECK(theme.media.avatarOverlap == doctest::Approx(0.25f));
+        CHECK(theme.media.playheadWidth == c.lineWidth);
+        CHECK(theme.media.dashLength == 6.0f);
+        CHECK(theme.media.dashGap == theme.spacing.xs);
+    }
+}
+
+TEST_CASE("The checkerboard cells differ in both presets and stay in the range of the theme's surfaces")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        CHECK(c.checker[0].w == 1.0f);
+        CHECK(c.checker[1].w == 1.0f);
+        // The cells are told apart, so alpha shows, but they never compete with the color on them.
+        const float between = facet::ContrastRatio(c.checker[0], c.checker[1]);
+        CHECK(between >= 1.3f);
+        CHECK(between <= 2.0f);
+        // A light grey pair in light, a dark one in dark: both cells on the theme's side of mid grey.
+        for (const ImVec4& cell : c.checker)
+            CHECK((facet::RelativeLuminance(cell) > 0.18f) == !theme.dark);
     }
 }
 

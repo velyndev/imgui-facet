@@ -140,6 +140,10 @@ struct Colors
     ImVec4 codeKeyword;
     ImVec4 codeString;
     ImVec4 codeNumber;
+    // The two cells of the checkerboard behind translucent colors and transparent pixels (color
+    // wells, alpha tracks, the image viewer), opaque, a light and a darker grey of the theme. They
+    // only show alpha, so they need no contrast with anything. (since 0.1)
+    ImVec4 checker[2];
 
     // The surface of elevation level 1 to 3; the level is clamped into that range.
     const ImVec4& ElevatedSurface(int level) const
@@ -218,6 +222,11 @@ struct Metrics
     float progressHeight = 6.0f;      // progress track of ControlSize::Regular
     float progressHeightLarge = 8.0f; // progress track of ControlSize::Large
     float emptyIconSize = 32.0f;      // the icon above an empty or error state (not compact)
+
+    // Steps and checkerboards (since 0.1).
+    float stepMarkerSize = 24.0f;     // the numbered circle of a step indicator step
+    float stepConnectorWidth = 2.0f;  // the line between two steps of a step indicator
+    float checkerCell = 6.0f;         // side of one checkerboard cell (colors.checker)
 };
 
 struct TextStyleSpec
@@ -312,6 +321,8 @@ struct LayoutTokens
     float expandedFrom = 720.0f;   // widths from here up are WidthClass::Expanded
     float labelColumn = 112.0f;    // label column of labelled rows, the gap to the control included
     float minRowControl = 128.0f;  // narrowest control kept beside its label; narrower rows stack
+    float dividerBand = 8.0f;      // band around a split view or panels divider that drags it (since 0.1)
+    float panelHeaderHeight = 32.0f;  // header row of a panel, and the strip of a collapsed one (since 0.1)
 };
 
 // Floating layers: popups, menus, tooltips, toasts, dialogs and drawers. Lengths in design units,
@@ -335,6 +346,8 @@ struct OverlayTokens
     float drawerHeight = 280.0f;     // drawers that slide in from the top or bottom edge
     float commandPaletteWidth = 560.0f;
     float menuShortcutGap = 24.0f;   // between a menu row's label and its shortcut text (since 0.1)
+    float arrowSize = 8.0f;          // how far a popover's arrow reaches toward its anchor; its base is twice that (since 0.1)
+    float commandPaletteTop = 96.0f; // between the top of the display and the command palette (since 0.1)
 };
 
 // Desktop surfaces: the floating shell, the app frame, sidebars and side panes. Design units.
@@ -384,6 +397,11 @@ struct DragTokens
     float autoScrollZone = 32.0f;      // band inside a scroll area's edge where a drag scrolls it
     float autoScrollSpeed = 800.0f;    // units per second at the very edge, less further in
     float hoverOpenDelay = 0.6f;       // a drag resting this long on a closed node, tab or group opens it
+    // Flicks and inertia (since 0.1): a release faster than flickSpeed (units per second) toward an
+    // edge dismisses a drawer or toast and pages a carousel; a released pan keeps its speed and
+    // loses it exponentially with this time constant (seconds; jumps to rest with reduced motion).
+    float flickSpeed = 600.0f;
+    float inertiaTime = 0.3f;
 };
 
 // Text fields (the text field core). Design units.
@@ -398,6 +416,7 @@ struct TabTokens
 {
     float minWidth = 64.0f;            // narrowest tab, also what the overflow measurement keeps per tab
     float maxWidth = 240.0f;           // widest tab; a longer label is cut with an ellipsis
+    float underlineHeight = 2.0f;      // the accent line under the selected tab of TabStyle::Underline (since 0.1)
 };
 
 // Data tables. Design units.
@@ -408,10 +427,35 @@ struct TableTokens
     float resizeBand = 8.0f;           // width of the band on a column edge that resizes it
 };
 
-// Date and time pickers. Design units.
+// Color, date and time pickers. Design units.
 struct PickerTokens
 {
     float dayCell = 32.0f;             // one day of the calendar grid, square
+    float colorBarHeight = 12.0f;      // the hue and alpha bars and the track of a color channel slider (since 0.1)
+    float hueRingWidth = 20.0f;        // the hue ring of ColorPickerMode::Wheel (since 0.1)
+    float timeColumnWidth = 48.0f;     // one scrolling column (hours, minutes, seconds) of a time picker (since 0.1)
+};
+
+// Charts, gauges and meters (since 0.1). Lengths in design units, times in seconds.
+struct ChartTokens
+{
+    float lineWidth = 2.0f;            // series lines and the needle of a gauge
+    float markerSize = 6.0f;           // a dot on a point (markers, min and max, the crosshair readout)
+    float barGap = 2.0f;               // between the bars of one category; categories keep spacing.sm
+    float legendSwatch = 10.0f;        // the color square of a legend entry
+    float donutHole = 0.6f;            // the hole of a donut chart as a share of its diameter
+    float gaugeWidth = 12.0f;          // the arc of a gauge
+    float meterSegmentGap = 2.0f;      // between the segments of a segmented level meter
+    float peakHold = 1.0f;             // a level meter's peak mark stays this long, then falls (times motion.scale)
+};
+
+// Avatars, timelines and drop zones (since 0.1). Lengths in design units.
+struct MediaTokens
+{
+    float avatarOverlap = 0.25f;       // how much of its diameter an avatar of a group hides under the next one
+    float playheadWidth = 2.0f;        // the playhead line of a timeline scrubber
+    float dashLength = 6.0f;           // the dashes of a drop zone outline
+    float dashGap = 4.0f;              // the gaps between them
 };
 
 struct Theme
@@ -435,6 +479,8 @@ struct Theme
     TabTokens tabs;      // (since 0.1)
     TableTokens table;   // (since 0.1)
     PickerTokens picker; // (since 0.1)
+    ChartTokens charts;  // (since 0.1)
+    MediaTokens media;   // (since 0.1)
 
     static Theme Light();
     static Theme Dark();
