@@ -406,3 +406,82 @@ TEST_CASE("ColorInputs in the hex model writes the typed digits and keeps unchan
     CHECK(color.y == 0.4f);
     CHECK(color.z == 1.0f);
 }
+
+// ---- SwatchPalette --------------------------------------------------------------------------------
+
+TEST_CASE("SwatchPalette picks by click and by keys in two dimensions, and records the history")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const ImVec4 kSwatches[] = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}, {1, 1, 0, 1}, {0, 1, 1, 1}, {1, 0, 1, 1}};
+    ImVec4 color(0.5f, 0.5f, 0.5f, 0.25f);
+    facet::ColorHistory history;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        (void)facet::SwatchPalette("Palette", &color, std::span<const ImVec4>(kSwatches), &history, {.columns = 3});
+        session.Track("palette");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("palette");
+    const float side = facet::ControlHeight(facet::ControlSize::Inherit);
+    // The second swatch of the first row.
+    session.Click(ImVec2(r.Min.x + side * 1.5f + facet::Px(4.0f), r.Min.y + side * 0.5f));
+    CHECK(color.y == 1.0f);
+    CHECK(color.x == 0.0f);
+    CHECK(color.w == 0.25f);  // without alpha, the alpha stays
+    CHECK(history.count == 1);
+    // The history row now sits above the grid. Keys: Down from the history goes to the grid.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("palette"));
+    session.KeyPress(ImGuiKey_Home);
+    session.KeyPress(ImGuiKey_DownArrow);  // grid row 1, column 1
+    session.KeyPress(ImGuiKey_DownArrow);  // grid row 2, column 1
+    session.KeyPress(ImGuiKey_RightArrow); // the fifth swatch
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(color.x == 0.0f);
+    CHECK(color.y == 1.0f);
+    CHECK(color.z == 1.0f);
+    CHECK(history.count == 2);
+    CHECK(Same(history.colors[0], ImVec4(0, 1, 1, 0.25f)));
+}
+
+TEST_CASE("The editable SwatchPalette adds, removes and moves swatches in the caller's storage")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::array<ImVec4, 3> storage = {ImVec4(1, 0, 0, 1), ImVec4(0, 1, 0, 1), ImVec4()};
+    int count = 2;
+    ImVec4 color(0.0f, 0.0f, 1.0f, 1.0f);
+    std::vector<ImVec4> vector = {ImVec4(1, 0, 0, 1)};
+    session.SetUi([&] {
+        (void)facet::SwatchPalette("Palette", &color, std::span<ImVec4>(storage), &count, nullptr, {.columns = 4});
+        session.Track("palette");
+        (void)facet::SwatchPalette("Vector", &color, &vector, nullptr, {.columns = 4});
+        session.Track("vector");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("palette");
+    const float side = facet::ControlHeight(facet::ControlSize::Inherit);
+    const float step = side + facet::Px(4.0f);
+    // The + cell is third: it adds the color.
+    session.Click(ImVec2(r.Min.x + step * 2.0f + side * 0.5f, r.GetCenter().y));
+    CHECK(count == 3);
+    CHECK(Same(storage[2], color));
+    // Full: no + cell any more, so a click there picks nothing new.
+    session.Click(ImVec2(r.Min.x + step * 3.0f + side * 0.5f, r.GetCenter().y));
+    CHECK(count == 3);
+    // Alt+Left moves the focused swatch, Delete removes it.
+    session.Click(ImVec2(r.Min.x + step * 2.0f + side * 0.5f, r.GetCenter().y));
+    session.KeyPress(ImGuiKey_LeftArrow | ImGuiMod_Alt);
+    CHECK(Same(storage[1], color));
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(count == 2);
+    CHECK(Same(storage[1], ImVec4(0, 1, 0, 1)));
+    // The vector form grows.
+    const ImRect v = session.ItemRect("vector");
+    session.Click(ImVec2(v.Min.x + step + side * 0.5f, v.GetCenter().y));
+    CHECK(vector.size() == 2);
+}
