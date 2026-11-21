@@ -220,8 +220,23 @@ bool InlineRename(const char* id, char* buffer, std::size_t bufferSize, bool* ed
                   const InlineRenameOptions& options = {});
 ```
 
-Text that becomes a field on double click or F2 and writes once on Enter or focus loss.
-Status: planned.
+While idle, the text as one item in the control text style with spacing.sm on each side: as wide as
+the text by default (or `width` units, then cut with an ellipsis and shown in full on hover and
+keyboard focus), a hover fill, the focus ring after keyboard input, and a Tab stop. A double click
+(`startOnDoubleClick`), F2 while it has the focus (`startOnF2`), or the caller setting `*editing`
+to true opens a text field on the text field core in its place, filling the row (or `width` units),
+with the keyboard and the whole name selected; `selectStem` selects the name up to its last '.'
+instead (a leading dot, as in ".config", counts as part of the name). The field opens one frame
+after the double click or F2.
+
+The edit works on a copy kept under the id: typing never changes `*text`. Enter, Tab or a click
+elsewhere ends the edit and writes the copy to `*text` once if it differs (the function returns
+true on that frame); Escape drops the copy. `*editing` (or the flag kept under the id when it is
+null) is true while the field is open and goes back to false when the edit ends; the caller
+setting it to false drops the copy. `maxLength` limits the copy; the buffer form never reads past
+`bufferSize` and writes the copy cut to fit. `error` draws the error line under the text or the
+field. `readOnly`, a null `text`, an empty buffer and `ImGui::BeginDisabled` never start an edit.
+Status: ready.
 
 ### NumberInput
 

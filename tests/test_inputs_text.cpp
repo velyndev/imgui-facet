@@ -1726,3 +1726,100 @@ TEST_CASE("FilterField empties the query on the first Escape and a read-only one
     CHECK(fixed == "fixed");
     CHECK_FALSE(settings.wholeWord);
 }
+// ---- InlineRename ------------------------------------------------------------------------------
+
+TEST_CASE("InlineRename edits a copy on double click and writes it once on Enter")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string name = "first";
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::InlineRename("name", &name, nullptr) ? 1 : 0;
+        session.Track("name");
+    });
+    session.Frame();
+    session.DoubleClick(session.ItemCenter("name"));
+    session.Frames(3);
+    session.Type("second");  // the whole name was selected
+    CHECK(name == "first");  // the shown name does not change while typing
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(name == "second");
+    CHECK(writes == 1);
+    session.Frames(2);
+    CHECK(writes == 1);
+}
+
+TEST_CASE("InlineRename drops the copy on Escape and commits on focus loss")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string name = "first";
+    bool editing = false;
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::InlineRename("name", &name, &editing) ? 1 : 0;
+        session.Track("name");
+        ImGui::Button("elsewhere");
+        session.Track("elsewhere");
+    });
+    session.Frame();
+    editing = true;  // the caller starts the edit, as from a context menu
+    session.Frames(3);
+    session.Type("dropped");
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(name == "first");
+    CHECK_FALSE(editing);
+    CHECK(writes == 0);
+    editing = true;
+    session.Frames(3);
+    session.Type("kept");
+    session.Click(session.ItemCenter("elsewhere"));
+    CHECK(name == "kept");
+    CHECK_FALSE(editing);
+    CHECK(writes == 1);
+}
+
+TEST_CASE("InlineRename starts on F2 and can select the name without its extension")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string name = "report.txt";
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::InlineRename("name", &name, nullptr, {.selectStem = true});
+        session.Track("name");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("name"));
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(3);
+    session.Type("summary");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(name == "summary.txt");
+}
+
+TEST_CASE("A read-only InlineRename never starts an edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string name = "fixed";
+    bool editing = false;
+    session.SetUi([&] {
+        facet::InlineRename("name", &name, &editing, {.readOnly = true});
+        session.Track("name");
+    });
+    session.Frame();
+    session.DoubleClick(session.ItemCenter("name"));
+    session.Frames(3);
+    CHECK_FALSE(editing);
+    editing = true;
+    session.Frames(2);
+    CHECK_FALSE(editing);
+    session.Type("x");
+    CHECK(name == "fixed");
+}

@@ -39,7 +39,8 @@ enum CaptureState
     kFilled,
     kOpen,
     kSuggestions,
-    kFormatted,  // the TagInput section and the formatted fields after it
+    kFormatted,  // the TagInput and FilterField sections
+    kLater,      // InlineRename and the sections after it
 };
 
 constexpr const char* kSample = "Sample text";
@@ -120,6 +121,13 @@ struct TextInputsUi
     std::vector<std::string> tagsReadOnly = {"Sample tag 1", "Sample tag 2"};
     std::string name = "Option 1";
     bool renaming = false;
+    int renames = 0;
+    std::string fileName = "sample-file.txt";
+    std::string fileName2 = "second-sample-file.txt";
+    bool renamingFile = false;
+    std::string nameError = "Sample name";
+    std::string nameReadOnly = "Read-only sample name";
+    std::string nameNarrow = "A sample name longer than its width";
     std::string masked;
     std::string pin;
     std::string path;
@@ -420,9 +428,6 @@ void AutocompleteSection(facet::demo::PageCtx& ctx)
 
 void PlannedSections(facet::demo::PageCtx&)
 {
-    SectionHeader("Other text fields");
-    LabeledRow("Rename in place");
-    facet::InlineRename("##rename", &ui.name, &ui.renaming);
 
 
     SectionHeader("Formatted fields");
@@ -520,6 +525,43 @@ void FilterFieldSection(facet::demo::PageCtx& ctx)
 
     LabeledRow("Read-only");
     facet::FilterField("##filterReadOnly", &ui.filterReadOnly, &ui.filterSettings, {.readOnly = true});
+}
+
+void InlineRenameSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("InlineRename");
+    Paragraph("A name that turns into a field in place: double click it, or focus it and press F2. The edit works on a "
+              "copy: Enter or a click elsewhere writes it once, Escape drops it.");
+
+    LabeledRow("Double click or F2");
+    if (ctx.capture && ctx.captureState == kLater)
+        ctx.ForceNextItemState(ForcedItemState::Hovered);
+    if (facet::InlineRename("rename", &ui.name, &ui.renaming))
+        ++ui.renames;
+    ctx.Probe("inputs.rename");
+    if (ctx.capture && ctx.captureState == kLater)
+        ctx.RevealInCapture(0.15f);
+
+    LabeledRow("Name and extension");
+    facet::InlineRename("renameFile", &ui.fileName, nullptr, {.selectStem = true});
+    ctx.Probe("inputs.rename.file");
+    LabeledRow("");
+    if (facet::Button("Rename the file", {.size = facet::ControlSize::Small}))
+        ui.renamingFile = true;
+    LabeledRow("");
+    facet::InlineRename("renameFromButton", &ui.fileName2, &ui.renamingFile, {.selectStem = true, .width = 240.0f});
+    ctx.Probe("inputs.rename.button");
+
+    LabeledRow("Error");
+    facet::InlineRename("renameError", &ui.nameError, nullptr,
+                        {.error = ui.nameError.empty() ? "A name cannot be empty" : nullptr});
+
+    LabeledRow("Read-only");
+    facet::InlineRename("renameReadOnly", &ui.nameReadOnly, nullptr, {.readOnly = true});
+
+    LabeledRow("Narrow");
+    facet::InlineRename("renameNarrow", &ui.nameNarrow, nullptr, {.width = 120.0f});
+    Note("Names written: %d. Current: \"%s\".", ui.renames, ui.name.c_str());
 }
 
 void TagInputSection(facet::demo::PageCtx& ctx)
@@ -629,7 +671,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions", "formatted")
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions", "formatted", "later")
 {
     if (ctx.capture)
     {
@@ -651,6 +693,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     CopyFieldSection(ctx);
     TagInputSection(ctx);
     FilterFieldSection(ctx);
+    InlineRenameSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -964,4 +1007,29 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.KeyPress(ImGuiKey_Escape);
     test.ExpectText("Escape empties the query", [] { return ui.filter; }, "");
     test.KeyPress(ImGuiKey_Escape);
+
+    // InlineRename: double click, F2, the stem, Escape.
+    test.DoubleClick("inputs.rename");
+    test.Wait(3);
+    test.Type("Renamed");
+    test.ExpectText("typing changes the copy, not the name", [] { return ui.name; }, "Option 1");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("Enter writes the new name", [] { return ui.name; }, "Renamed");
+    test.ExpectNear("once", [] { return ui.renames; }, 1.0, 0.0);
+    test.Wait(2);
+    // The edit started with the pointer, so the first Tab shows the focus on the name, the second moves.
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.rename.file");
+    test.KeyPress(ImGuiKey_F2);
+    test.Wait(3);
+    test.Type("renamed-file");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("F2 selects the name without its extension", [] { return ui.fileName; }, "renamed-file.txt");
+    test.Wait(2);
+    test.DoubleClick("inputs.rename");
+    test.Wait(3);
+    test.Type("dropped");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape drops the copy", [] { return ui.name; }, "Renamed");
 }
