@@ -5,11 +5,13 @@
 // page of their own (page_w_pickers_color.cpp). Sample values are neutral: fixed dates and times,
 // built-in icons, "Option n" entries, and the root of drive C for the file browser.
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 
 #include <imgui.h>
 
@@ -463,6 +465,21 @@ std::string MakeSampleTree()
     return std::string(reinterpret_cast<const char*>(text.data()), text.size());
 }
 
+// The browser reads folders on a worker thread in real time, while a selftest renders frames as
+// fast as it can, so frame time alone does not say the read is done (a Debug build reads slower
+// than its frames run). This waits for the worker, at most a few seconds, then renders frames for
+// the browser to take the result.
+void WaitForFileBrowser(facet::demo::SelftestScript& test)
+{
+    test.Wait(1);  // the request goes out in the frame after the input or the reset
+    test.Do([] {
+        const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (facet::internal::FileBrowserBusy(ui.browserId) && std::chrono::steady_clock::now() < end)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    });
+    test.Wait(2);
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
@@ -685,6 +702,7 @@ FACET_DEMO_SELFTEST("pickers-date")
         ++ui.browserEpoch;
     });
     test.WaitSeconds(0.6f);
+    WaitForFileBrowser(test);
     test.Reveal("pickers.files");
     test.WaitSeconds(0.4f);
     test.Expect("the sample tree lists the folder and the picture", [] {
@@ -697,6 +715,7 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.KeyPress(ImGuiKey_Home);  // the keyboard takes over: the focus goes to the folder row
     test.KeyPress(ImGuiKey_Enter);
     test.WaitSeconds(0.6f);
+    WaitForFileBrowser(test);
     test.Expect("Enter on the folder opens it (the type filter leaves it empty)", [] {
         facet::internal::FileBrowserView view;
         return facet::internal::FileBrowserViewOf(ui.browserId, &view) && view.state == 0 && view.rows == 0 &&
@@ -706,6 +725,7 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.MouseDown();
     test.MouseUp();
     test.WaitSeconds(0.6f);
+    WaitForFileBrowser(test);
     test.Expect("the parent folder button goes back", [] {
         facet::internal::FileBrowserView view;
         return facet::internal::FileBrowserViewOf(ui.browserId, &view) && view.folder == ui.sampleRoot;
