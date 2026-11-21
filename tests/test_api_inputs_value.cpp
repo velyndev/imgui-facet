@@ -54,19 +54,19 @@ void CallReadyValueInputs(Values& v)
     FACET_CHECK_STUB(false, KeybindCapture("Keybind 1", &v.bind, {.showMode = true, .showAlternate = true}));
     FACET_CHECK_STUB(false, UnitInput("Unit 1", &v.real, &v.unit, kUnits));
     FACET_CHECK_STUB(false, UnitInput("Unit 2", &v.real, nullptr, kUnits));
+    FACET_CHECK_STUB(false, VectorInput("Vector 1", std::span<float>(v.vector), {.linkToggle = true}));
+    FACET_CHECK_STUB(false, VectorInput("Vector 3", &v.point));
+    FACET_CHECK_STUB(false, VectorInput("Vector 4", &v.color));
+    FACET_CHECK_STUB(false, VectorInput("Vector 2", std::span<int>(v.vectorInt)));
 }
 
 // Number of FACET_CHECK_STUB calls in CallReadyValueInputs.
-constexpr int kReadyValueInputCalls = 9;
+constexpr int kReadyValueInputCalls = 13;
 
 // Every placeholder of these widgets once, with the overloads, as an app would call it.
 void CallValueInputStubs(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, VectorInput("Vector 1", std::span<float>(v.vector), {.linkToggle = true}));
-    FACET_CHECK_STUB(false, VectorInput("Vector 3", &v.point));
-    FACET_CHECK_STUB(false, VectorInput("Vector 4", &v.color));
-    FACET_CHECK_STUB(false, VectorInput("Vector 2", std::span<int>(v.vectorInt)));
     FACET_CHECK_STUB(false, SizeInput("Size 1", &v.size));
     FACET_CHECK_STUB(false, SizeInput("Size 2", &v.sizeX, &v.sizeY, {.swapButton = true}));
     FACET_CHECK_STUB(false, HexInput("Hex 1", &v.hex32, {.prefix = true}));
@@ -77,7 +77,7 @@ void CallValueInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallValueInputStubs.
-constexpr int kValueInputStubCalls = 11;
+constexpr int kValueInputStubCalls = 7;
 
 } // namespace
 

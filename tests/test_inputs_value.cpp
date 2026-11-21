@@ -9,6 +9,7 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <span>
 #include <string>
 
 #include <doctest/doctest.h>
@@ -654,4 +655,142 @@ TEST_CASE("UnitInput without a unit index shows the first unit and converts type
     session.Type("500ms");
     session.KeyPress(ImGuiKey_Enter);
     CHECK(seconds == doctest::Approx(0.5));
+}
+
+// ---- VectorInput -------------------------------------------------------------------------------
+
+namespace
+{
+
+// The rect of field `index` of a side-by-side VectorInput without a label spanning `widget`.
+ImRect VectorField(const ImRect& widget, int index, int count)
+{
+    const float gap = std::round(facet::Px(facet::T().spacing.sm));
+    const float width = std::floor((widget.GetWidth() - gap * static_cast<float>(count - 1)) / static_cast<float>(count));
+    const float x = widget.Min.x + static_cast<float>(index) * (width + gap);
+    return ImRect(x, widget.Min.y, x + width, widget.Min.y + facet::ControlHeight(facet::ControlSize::Regular));
+}
+
+} // namespace
+
+TEST_CASE("VectorInput: each component is a Tab stop in order and an edit writes one component once")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float v[3] = {1.0f, 2.0f, 3.0f};
+    Signals signals;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        signals.Take(facet::VectorInput("##v", std::span<float>(v), {.linkToggle = true}));
+        session.Track("vector");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    ImGuiID focus[5] = {};
+    for (ImGuiID& f : focus)
+    {
+        session.KeyPress(ImGuiKey_Tab);
+        f = ImGui::GetFocusID();
+    }
+    // X, Y, Z, the link button, then the next item.
+    CHECK(focus[0] != focus[1]);
+    CHECK(focus[1] != focus[2]);
+    CHECK(focus[2] != focus[3]);
+    CHECK(focus[4] == session.ItemId("after"));
+    // Typing into Y writes Y alone, with one write and one commit.
+    const ImRect rect = session.ItemRect("vector");
+    session.Click(VectorField(rect, 1, 3).GetCenter());
+    session.Frame();
+    session.Type("7");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(v[0] == 1.0f);
+    CHECK(v[1] == 7.0f);
+    CHECK(v[2] == 3.0f);
+    CHECK(signals.writes == 1);
+    CHECK(signals.commits == 1);
+}
+
+TEST_CASE("VectorInput: the axis label drags its component; the link scales every component alike")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int v[3] = {2, 4, 6};
+    Signals signals;
+    session.SetUi([&] {
+        signals.Take(facet::VectorInput("##v", std::span<int>(v), {.speed = 1.0, .linkToggle = true}));
+        session.Track("vector");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("vector");
+    const ImRect x = VectorField(rect, 0, 3);
+    const ImVec2 axis(x.Min.x + facet::Px(4.0f), x.GetCenter().y);
+    session.Drag({axis, ImVec2(axis.x + 10.0f * facet::Px(1.0f), axis.y)}, 6);
+    CHECK(v[0] == 12);
+    CHECK(v[1] == 4);
+    // The link button sits at the end of the last field.
+    const ImRect z = VectorField(rect, 2, 3);
+    session.Click(ImVec2(z.Max.x - z.GetHeight() * 0.5f, z.GetCenter().y));
+    const int writesBefore = signals.writes;
+    session.Click(x.GetCenter());
+    session.Frame();
+    session.Type("24");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(v[0] == 24);
+    CHECK(v[1] == 8);
+    CHECK(v[2] == 12);
+    CHECK(signals.writes == writesBefore + 1);
+}
+
+TEST_CASE("VectorInput stacks its fields when narrow, shows more than four read-only, and takes ImVec2")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float wide[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    ImVec2 point(0.5f, 0.25f);
+    float narrowHeight = 0.0f;
+    session.SetUi([&] {
+        facet::VectorInput("##narrow", &point, {.width = 80.0f});
+        narrowHeight = ImGui::GetItemRectSize().y;
+        session.Track("narrow");
+        facet::VectorInput("##wide", std::span<float>(wide));
+        session.Track("wide");
+    });
+    session.Frame();
+    CHECK(narrowHeight > facet::ControlHeight(facet::ControlSize::Regular) * 1.5f);
+    // The second field sits under the first: type into it.
+    const ImRect rect = session.ItemRect("narrow");
+    session.Click(ImVec2(rect.GetCenter().x, rect.Max.y - facet::ControlHeight(facet::ControlSize::Regular) * 0.5f));
+    session.Frame();
+    session.Type("2");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(point.x == 0.5f);
+    CHECK(point.y == 2.0f);
+    const ImRect wideRect = session.ItemRect("wide");
+    session.Click(VectorField(wideRect, 0, 4).GetCenter());
+    session.Type("9");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(wide[0] == 1.0f);
+}
+
+TEST_CASE("VectorInput normalize keeps a float vector at length 1 after an edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 v(1.0f, 0.0f, 0.0f, 0.0f);
+    session.SetUi([&] {
+        facet::VectorInput("##n", &v, {.normalize = true});
+        session.Track("vector");
+    });
+    session.Frame();
+    session.Click(VectorField(session.ItemRect("vector"), 1, 4).GetCenter());
+    session.Frame();
+    session.Type("1");
+    session.KeyPress(ImGuiKey_Enter);
+    const float length = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+    CHECK(length == doctest::Approx(1.0f));
+    CHECK(v.x == doctest::Approx(v.y));
 }

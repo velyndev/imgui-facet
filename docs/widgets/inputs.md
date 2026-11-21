@@ -310,8 +310,18 @@ bool VectorInput(const char* label, ImVec2* value, const VectorInputOptions& opt
 bool VectorInput(const char* label, ImVec4* value, const VectorInputOptions& options = {});
 ```
 
-One to four drag fields side by side with axis labels and an optional proportional lock.
-Status: planned.
+One to four drag fields (as DragNumber) side by side after the label, sharing the width with
+`spacing.sm` between them; each has its axis label in front as a drag handle (`axisLabels`, else X,
+Y, Z, W) and is a Tab stop, in order. When a field would get narrower than
+`metrics.numberFieldWidth`, the fields stack under each other at the full width. An edit writes
+its component (and returns true once); with `linkToggle` a link button (`Strings::linkValues`, a Tab
+stop after the last field) locks the vector, and while locked an edit scales every component by
+the same factor, measured from the values at the start of the edit so a long drag does not drift
+(a component that started at 0 scales nothing). `normalize` rescales a float vector to length 1
+after an edit. More than four components show the first four read-only. `speed` 0 moves an int one
+per unit and spreads a finite float range over the field; Left and Right step a hundredth of a
+finite range (0.1 for an open one, 1 for int). `error` outlines every field and shows its message
+once under them. The link state is kept under the id. Status: ready.
 
 ### SizeInput
 
