@@ -1269,6 +1269,8 @@ struct ListDetailUi
     void Ui(facet::test::Session& session)
     {
         InRegion("region", width, [&] {
+            ImGui::Button("before list");
+            session.Track("before list");
             facet::BeginListDetail("messages", &detailOpen, {.height = 240.0f});
             list = facet::BeginListPane();
             if (list)
@@ -1346,10 +1348,10 @@ TEST_CASE("Opening a compact detail by keyboard moves the focus to its back butt
     ui.width = facet::Px(facet::T().layout.regularFrom * 0.75f);
     session.SetUi([&] { ui.Ui(session); });
     session.Frames(2);
-    session.Click(session.ItemCenter("entry"));
-    ui.detailOpen = false;
-    session.Frames(2);
-    session.KeyPress(ImGuiKey_Tab);  // shows the focus on the entry
+    session.Click(session.ItemCenter("before list"));
+    session.KeyPress(ImGuiKey_Tab);  // shows the focus on the button
+    session.KeyPress(ImGuiKey_Tab);  // into the list
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("entry"));
     session.KeyPress(ImGuiKey_Enter);
     REQUIRE(ui.detailOpen);
     session.Frames(3);
