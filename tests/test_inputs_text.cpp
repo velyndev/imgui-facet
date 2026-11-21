@@ -17,6 +17,8 @@
 #include <facet/facet.h>
 
 #include "internal/control.h"
+#include "internal/focus.h"
+#include "internal/item.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/text_field.h"
@@ -2035,4 +2037,35 @@ TEST_CASE("A narrow TagInput keeps the text beside one short chip until the type
     session.Frames(3);
     CHECK(session.ItemRect("tags").GetHeight() > row * 1.5f);
     REQUIRE(tags.size() == 1);
+}
+
+TEST_CASE("A forced focused state draws the TagInput focus ring around the field, not a chip")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImU32 ring = facet::ToU32(facet::internal::FocusRingColor());
+    std::vector<std::string> tags = {"Option 1"};
+    float ringMinX = FLT_MAX;
+    float ringMaxX = -FLT_MAX;
+    session.SetUi([&] {
+        facet::internal::ForceNextItemState(facet::internal::ForcedItemState::Focused);
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        facet::TagInput("##tags", &tags, {.width = 300.0f});
+        session.Track("tags");
+        ringMinX = FLT_MAX;
+        ringMaxX = -FLT_MAX;
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+        {
+            if (drawList->VtxBuffer[i].col != ring)
+                continue;
+            ringMinX = std::min(ringMinX, drawList->VtxBuffer[i].pos.x);
+            ringMaxX = std::max(ringMaxX, drawList->VtxBuffer[i].pos.x);
+        }
+    });
+    session.Frames(10);
+    const ImRect frame = session.ItemRect("tags");
+    REQUIRE(ringMaxX > ringMinX);
+    CHECK(ringMinX <= frame.Min.x + 1.0f);
+    CHECK(ringMaxX >= frame.Max.x - 1.0f);
 }

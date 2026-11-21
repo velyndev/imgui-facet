@@ -205,6 +205,10 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
     const ImGuiID id = window->GetID(label);
     TagInputState& state = internal::GetState<TagInputState>(id);
     const internal::NextItemData next = internal::TakeNextItemData();
+    // A capture's forced state belongs to the field, not to the first chip: taken here, before
+    // the chips run the item behaviour, and handed to the text part below.
+    const internal::ForcedItemRequest forced = internal::TakeForcedItemState();
+    const bool forcedFocus = forced.part < 0 && Has(forced.state, internal::ForcedItemState::Focused);
     const bool disabled = (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
     const bool readOnly = options.readOnly || tags == nullptr || (next.itemFlags & ImGuiItemFlags_ReadOnly) != 0;
     const int count = static_cast<int>(shownTags.size());
@@ -261,10 +265,11 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
     ImGui::BeginGroup();
     ImDrawList* drawList = window->DrawList;
     const bool hovered = !disabled && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(frame.Min, frame.Max);
-    const float hoverAmount = Tween(ImGui::GetIDWithSeed("frame", nullptr, id), 0, hovered ? 1.0f : 0.0f,
+    const bool forcedHover = !disabled && forced.part < 0 && Has(forced.state, internal::ForcedItemState::Hovered);
+    const float hoverAmount = Tween(ImGui::GetIDWithSeed("frame", nullptr, id), 0, (hovered || forcedHover) ? 1.0f : 0.0f,
                                     t.motion.durationFast);
     internal::DrawFieldFrame(drawList, frame,
-                             {.hoverAmount = hoverAmount, .active = state.active, .disabled = disabled,
+                             {.hoverAmount = hoverAmount, .active = state.active || forcedFocus, .disabled = disabled,
                               .readOnly = readOnly, .error = options.error != nullptr && options.error[0] != '\0'});
     if (front.text != nullptr)
         internal::DrawFrontLabel(drawList, front, ImVec2(origin.x, CenteredTextY(frame.Min.y, metrics.height)),
@@ -332,6 +337,8 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
     params.readOnly = readOnly || full;
     const float textRowCenter = rowTop(row) + chipHeight * 0.5f;
     ImGui::SetCursorScreenPos(ImVec2(frame.Min.x + padX + x, std::round(textRowCenter - metrics.height * 0.5f)));
+    if (forced.state != internal::ForcedItemState::None)
+        internal::ForceNextItemState(forced.state, forced.part);
     const internal::TextFieldResult field = internal::TextFieldBehavior(label, &state.text, params);
     state.active = field.active;
 
@@ -455,7 +462,6 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
     if (hovered && !readOnly && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && g.HoveredId == 0 && !field.active)
         internal::TextFieldRequestFocus(id, internal::TextFieldFocus::End);
 
-    const bool forcedFocus = Has(field.forced, internal::ForcedItemState::Focused);
     if (((g.NavId == id && internal::KeyboardModality()) || forcedFocus) && !disabled)
         internal::DrawFocusRing(drawList, frame, metrics.radius);
 
