@@ -1,7 +1,9 @@
-// The public API of the pickers family (facet/widgets/pickers.h) while its widgets are planned:
-// every options struct follows the conventions, and every function is safe to call, submits one
-// placeholder item that cannot be operated, leaves the Dear ImGui stacks as it found them, returns
-// the neutral result and writes nothing.
+// The public API of the date, time and other pickers (DatePicker, DateRangePicker, TimePicker,
+// AnglePicker, IconPicker, ThumbnailPicker and FileBrowser in facet/widgets/pickers.h) while they
+// are planned: every options struct follows the conventions, and every function is safe to call,
+// submits one placeholder item that cannot be operated, leaves the Dear ImGui stacks as it found
+// them, returns the neutral result and writes nothing. The color pickers have their own file
+// (tests/test_api_pickers_color.cpp).
 
 #include <span>
 #include <string>
@@ -22,13 +24,6 @@ namespace
 using facet::test::OptionsFollowConventions;
 using namespace facet::test::controls;
 
-static_assert(OptionsFollowConventions<facet::ColorWellOptions>());
-static_assert(OptionsFollowConventions<facet::ColorPickerOptions>());
-static_assert(OptionsFollowConventions<facet::ColorInputsOptions>());
-static_assert(OptionsFollowConventions<facet::SwatchPaletteOptions>());
-static_assert(OptionsFollowConventions<facet::SatValSquareOptions>());
-static_assert(OptionsFollowConventions<facet::ColorChannelSliderOptions>());
-static_assert(OptionsFollowConventions<facet::ColorModeEditorOptions>());
 static_assert(OptionsFollowConventions<facet::DatePickerOptions>());
 static_assert(OptionsFollowConventions<facet::DateRangePickerOptions>());
 static_assert(OptionsFollowConventions<facet::TimePickerOptions>());
@@ -38,30 +33,16 @@ static_assert(OptionsFollowConventions<facet::ThumbnailPickerOptions>());
 static_assert(OptionsFollowConventions<facet::FileBrowserOptions>());
 
 // The zero member of every choice enum is the default (rule 12).
-static_assert(facet::ColorPickerMode{} == facet::ColorPickerMode::Square);
-static_assert(facet::ColorModel{} == facet::ColorModel::Rgb);
-static_assert(facet::ColorChannel{} == facet::ColorChannel::Hue);
-static_assert(facet::ColorAnimation{} == facet::ColorAnimation::Static);
 static_assert(facet::Weekday{} == facet::Weekday::Monday);
 static_assert(facet::DatePrecision{} == facet::DatePrecision::Day);
 static_assert(facet::FileBrowserMode{} == facet::FileBrowserMode::Open);
 
-// Every function of the family once, with the overloads, as an app would call it.
-void CallPickerStubs(Values& v)
+// Every function of this group once, with the overloads, as an app would call it.
+void CallDatePickerStubs(Values& v)
 {
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, ColorWell("Well 1", &v.color, {.alpha = true, .showHex = true}));
-    FACET_CHECK_STUB(false, ColorPicker("Picker 1", &v.color, {.original = &v.color, .swatches = kSwatches}));
-    FACET_CHECK_STUB(false, ColorInputs("Inputs 1", &v.color, {.model = ColorModel::Hsv}));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 1", &v.color, std::span(kSwatches), &v.history));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 2", &v.color, &v.swatches, nullptr));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 3", &v.color, std::span<ImVec4>(v.swatchStorage), &v.swatchCount, nullptr));
-    FACET_CHECK_STUB(false, SatValSquare("Square 1", &v.color));
-    FACET_CHECK_STUB(false, ColorChannelSlider("Channel 1", &v.color, {.channel = ColorChannel::Alpha}));
-    FACET_CHECK_STUB(false, ColorModeEditor("Mode editor 1", &v.animated));
-    CHECK(SampleAnimatedColor(v.animated, 1.0).x == v.animated.color.x);
     FACET_CHECK_STUB(false, DatePicker("Date 1", &v.date, {.inlineCalendar = true}));
     FACET_CHECK_STUB(false, DateRangePicker("Dates 1", &v.start, &v.end));
     FACET_CHECK_STUB(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
@@ -75,23 +56,24 @@ void CallPickerStubs(Values& v)
     FACET_CHECK_STUB(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
 }
 
-// Number of FACET_CHECK_STUB calls in CallPickerStubs.
-constexpr int kPickerStubCalls = 19;
+// Number of FACET_CHECK_STUB calls in CallDatePickerStubs.
+constexpr int kDatePickerStubCalls = 10;
 
 } // namespace
 
-TEST_CASE("Every pickers stub returns the neutral result, writes nothing and keeps the stacks")
+TEST_CASE("Every date, time and other picker stub returns the neutral result, writes nothing and keeps the stacks")
 {
-    FACET_CHECK_FAMILY_STUBS(CallPickerStubs, kPickerStubCalls);
+    FACET_CHECK_FAMILY_STUBS(CallDatePickerStubs, kDatePickerStubCalls);
 }
 
-TEST_CASE("Pickers stubs called outside a frame return the neutral result")
+TEST_CASE("Date and other picker stubs called outside a frame return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     Values values;
     const std::string pristine = Describe(values);
-    CHECK_FALSE(facet::ColorPicker("Picker 1", &values.color));
+    CHECK_FALSE(facet::DatePicker("Date 1", &values.date));
+    CHECK_FALSE(facet::FileBrowser("Browser 1", &values.text));
     CHECK(Describe(values) == pristine);
 }
 

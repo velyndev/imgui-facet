@@ -2,7 +2,8 @@
 // rule, the caption position, and the tooltip of a shortened caption. The API of each controls
 // family is tested in its own file (tests/test_api_buttons.cpp, test_api_selection.cpp,
 // test_api_sliders.cpp, test_api_inputs_text.cpp, test_api_inputs_value.cpp,
-// test_api_pickers.cpp), so these tests call the helpers directly and do not depend on any
+// test_api_pickers_color.cpp, test_api_pickers_date.cpp), so these tests call the helpers
+// directly and do not depend on any
 // widget still being a placeholder.
 
 #include <algorithm>

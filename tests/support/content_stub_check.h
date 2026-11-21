@@ -101,6 +101,14 @@ void RunFrame(Session& session, int* runs, Calls&& calls)
     session.Frame();
 }
 
+// Entries that can change order carry a stable id (rule 2 of the conventions).
+template <class T>
+concept HasEntryId = requires { requires std::is_same_v<decltype(T::id), ImGuiID>; };
+
+// Every widget that writes a value, a selection or item members has readOnly (rule 7).
+template <class T>
+concept HasReadOnly = requires { requires std::is_same_v<decltype(T::readOnly), bool>; };
+
 // Views of caller data have the data block of rule 7 (state, emptyText, errorText) in that
 // order, before the common block.
 template <class T>

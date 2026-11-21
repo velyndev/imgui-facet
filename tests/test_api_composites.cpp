@@ -1,9 +1,10 @@
-// The declared API of the content families that are still grouped (DataTable of display.h,
-// charts, media, composites) while their widgets are placeholders: every function is called once
-// inside a real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each call the id, window, group and
-// Facet scope stacks must be as before, a widget must have submitted one item of non-zero size
-// with the id of its label, the neutral result must come back and no value argument may have
-// changed. Every options struct is checked against the conventions at compile time.
+// The declared API of the composites family (facet/widgets/composites.h) while its widgets are
+// placeholders: every function is called once inside a real Dear ImGui frame, in a window and
+// again inside ImGui::BeginDisabled. After each call the id, window, group and Facet scope stacks
+// must be as before, a widget must have submitted one item of non-zero size with the id of its
+// label, the neutral result must come back and no value argument may have changed. Every options
+// struct is checked against the conventions at compile time. DataTable, charts and media have
+// files of their own (tests/test_api_data_table.cpp, test_api_charts.cpp, test_api_media.cpp).
 
 #include <cmath>
 #include <cstddef>
@@ -30,22 +31,14 @@ namespace
 using facet::test::OptionsFollowConventions;
 using namespace facet::test::content;
 
-static_assert(OptionsFollowConventions<facet::DataTableOptions>());
-
 TEST_CASE("Values that mean none default to NaN, outside every value range")
 {
-    // -1 would be a valid x or time for a range or clock that includes it.
+    // -1 would be a valid x for a range that includes it.
     CHECK(std::isnan(facet::CurveEditorOptions{}.marker));
-    CHECK(std::isnan(facet::TimelineScrubberOptions{}.buffered));
 }
 
 // Entries that can change order carry a stable id (rule 2 of the conventions).
-template <class T>
-concept HasEntryId = requires { requires std::is_same_v<decltype(T::id), ImGuiID>; };
 static_assert(!HasEntryId<facet::LogEntry>);  // the check itself works
-static_assert(HasEntryId<facet::LegendItem>);
-static_assert(HasEntryId<facet::AvatarItem>);
-static_assert(HasEntryId<facet::ImageItem>);
 static_assert(HasEntryId<facet::FilterChip>);
 static_assert(HasEntryId<facet::KeybindListItem>);
 static_assert(HasEntryId<facet::PresetItem>);
@@ -53,31 +46,14 @@ static_assert(HasEntryId<facet::InventoryItem>);
 static_assert(HasEntryId<facet::LayerItem>);
 
 // Views of caller data have the data block of rule 7 (HasDataBlock in support/content_stub_check.h).
-static_assert(HasDataBlock<facet::DataTableOptions>());
-static_assert(HasDataBlock<facet::LineChartOptions>());
-static_assert(HasDataBlock<facet::BarChartOptions>());
-static_assert(HasDataBlock<facet::DonutChartOptions>());
-static_assert(HasDataBlock<facet::ThumbnailStripOptions>());
-static_assert(HasDataBlock<facet::CarouselOptions>());
 static_assert(HasDataBlock<facet::ConsoleViewOptions>());
 static_assert(HasDataBlock<facet::KeybindListOptions>());
 static_assert(HasDataBlock<facet::PresetListOptions>());
 static_assert(HasDataBlock<facet::InventoryGridOptions>());
 static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
 static_assert(HasDataBlock<facet::LayerListOptions>());
-static_assert(!HasDataBlock<facet::SparklineOptions>());  // the check itself works
-static_assert(offsetof(facet::DonutChartOptions, diameter) < offsetof(facet::DonutChartOptions, state));
 
 // Every widget that writes a value, a selection or item members has readOnly (rule 7).
-template <class T>
-concept HasReadOnly = requires { requires std::is_same_v<decltype(T::readOnly), bool>; };
-static_assert(!HasReadOnly<facet::GaugeOptions>);  // the check itself works
-static_assert(HasReadOnly<facet::DataTableOptions>);
-static_assert(HasReadOnly<facet::LegendOptions>);
-static_assert(HasReadOnly<facet::ChartRangeBrushOptions>);
-static_assert(HasReadOnly<facet::ThumbnailStripOptions>);
-static_assert(HasReadOnly<facet::ImageCompareOptions>);
-static_assert(HasReadOnly<facet::TimelineScrubberOptions>);
 static_assert(HasReadOnly<facet::CurveEditorOptions>);
 static_assert(HasReadOnly<facet::BezierEditorOptions>);
 static_assert(HasReadOnly<facet::GradientEditorOptions>);
@@ -92,36 +68,6 @@ static_assert(HasReadOnly<facet::LayerListOptions>);
 static_assert(HasReadOnly<facet::ThemeModeControlOptions>);
 static_assert(HasReadOnly<facet::AccentPickerOptions>);
 static_assert(HasReadOnly<facet::UiScaleControlOptions>);
-
-// Chart x values are doubles like ChartPoint, ChartAxis and the range brush: a float near
-// 1.7e9 seconds steps by 128 s.
-static_assert(std::is_same_v<decltype(facet::ChartSeries::x), std::span<const double>>);
-// Range bounds are double across the chart family (Gauge, LevelMeter, ChartRangeBrush).
-static_assert(std::is_same_v<decltype(&facet::LevelMeter), void (*)(const char*, std::span<const float>, double,
-                                                                    double, const facet::LevelMeterOptions&)>);
-
-// One alignment enum for styled text and table columns (StyledText: tests/test_api_display.cpp).
-static_assert(std::is_same_v<decltype(facet::DataTableColumn::align), facet::Align>);
-
-static_assert(OptionsFollowConventions<facet::SparklineOptions>());
-static_assert(OptionsFollowConventions<facet::LineChartOptions>());
-static_assert(OptionsFollowConventions<facet::BarChartOptions>());
-static_assert(OptionsFollowConventions<facet::DonutChartOptions>());
-static_assert(OptionsFollowConventions<facet::GaugeOptions>());
-static_assert(OptionsFollowConventions<facet::LevelMeterOptions>());
-static_assert(OptionsFollowConventions<facet::FrameTimeGraphOptions>());
-static_assert(OptionsFollowConventions<facet::LegendOptions>());
-static_assert(OptionsFollowConventions<facet::ChartRangeBrushOptions>());
-
-static_assert(OptionsFollowConventions<facet::ImageViewOptions>());
-static_assert(OptionsFollowConventions<facet::AvatarOptions>());
-static_assert(OptionsFollowConventions<facet::AvatarGroupOptions>());
-static_assert(OptionsFollowConventions<facet::ThumbnailStripOptions>());
-static_assert(OptionsFollowConventions<facet::CarouselOptions>());
-static_assert(OptionsFollowConventions<facet::ImageViewerOptions>());
-static_assert(OptionsFollowConventions<facet::ImageCompareOptions>());
-static_assert(OptionsFollowConventions<facet::TimelineScrubberOptions>());
-static_assert(OptionsFollowConventions<facet::DropZoneOptions>());
 
 static_assert(OptionsFollowConventions<facet::CurveEditorOptions>());
 static_assert(OptionsFollowConventions<facet::BezierEditorOptions>());
@@ -151,138 +97,6 @@ static_assert(OptionsFollowConventions<facet::AccentPickerOptions>());
 static_assert(OptionsFollowConventions<facet::UiScaleControlOptions>());
 static_assert(OptionsFollowConventions<facet::DragSourceOptions>());
 static_assert(OptionsFollowConventions<facet::AcceptDropOptions>());
-
-void DataTableCalls()
-{
-    using namespace facet;
-    static const DataTableColumn columns[] = {{"Name"}, {"Size", 80.0f, Align::End}};
-    ImGuiSelectionBasicStorage selection;
-    selection.SetItemSelected(1, true);
-    // Ready with rows: a real Dear ImGui table is open between Begin and End, so the caller's
-    // rows and cells work; it is closed again by End.
-    Check("BeginDataTable, Ready", Expect::NoItem, nullptr, [&] {
-        ImGuiTable* const outer = ImGui::GetCurrentTable();
-        const bool open = BeginDataTable("table", columns, 10, &selection, {.sortable = true, .frozenColumns = 1});
-        CHECK(open);
-        if (open)
-        {
-            CHECK(ImGui::GetCurrentTable() != outer);
-            CHECK(ImGui::TableGetColumnCount() == 2);
-            CHECK_FALSE(DataTableRow(0));
-            CHECK(ImGui::TableNextColumn());
-            ImGui::TextUnformatted("cell");
-            CHECK_FALSE(BeginDataTableCellEdit());
-            CHECK(ImGui::TableNextColumn());
-            EndDataTable();
-        }
-        CHECK(ImGui::GetCurrentTable() == outer);
-    });
-    for (const DataState state : {DataState::Loading, DataState::Error})
-        Check("BeginDataTable, Loading or Error", Expect::Item, "table",
-              [&] { CHECK_FALSE(BeginDataTable("table", columns, 10, &selection, {.state = state, .height = 120.0f})); });
-    Check("BeginDataTable, empty", Expect::Item, "table",
-          [&] { CHECK_FALSE(BeginDataTable("table", columns, 0, &selection, {.height = 120.0f})); });
-    CHECK(selection.Size == 1);
-    CHECK(selection.Contains(1));
-    // Outside a table the row call does nothing and the cell edit never opens.
-    Check("DataTableRow outside a table", Expect::NoItem, nullptr, [] { CHECK_FALSE(DataTableRow(0)); });
-    Check("BeginDataTableCellEdit", Expect::NoItem, nullptr, [] { CHECK_FALSE(BeginDataTableCellEdit()); });
-}
-
-void ChartCalls()
-{
-    using namespace facet;
-    static const float values[] = {1.0f, 3.0f, 2.0f};
-    static const ChartSeries series[] = {{.label = "Series 1", .values = values}};
-    static const char* const categories[] = {"Category 1", "Category 2", "Category 3"};
-    static const DonutSlice slices[] = {{"Slice 1", 2.0}, {"Slice 2", 1.0}};
-    static const GaugeZone zones[] = {{0.8, 1.0, Tone::Destructive}};
-    const ChartGetter getter = [](void*, int index, ChartPoint* out) {
-        out->x = index;
-        out->y = values[index];
-        return true;
-    };
-
-    Check("Sparkline", Expect::Item, "Trend", [] { Sparkline("Trend", values, {.bars = true}); });
-    Check("Sparkline, getter", Expect::Item, "Trend 2", [&] { Sparkline("Trend 2", 3, getter, nullptr); });
-    Check("LineChart", Expect::Item, "line", [] { LineChart("line", series, {.yAxis = {.min = 0.0, .max = 4.0}}); });
-    Check("BarChart", Expect::Item, "bars", [] { BarChart("bars", series, categories, {.stacked = true}); });
-    Check("DonutChart", Expect::Item, "donut", [] { DonutChart("donut", slices, {.pie = true}); });
-    Check("Gauge", Expect::Item, "Gauge", [] { Gauge("Gauge", 0.5, 0.0, 1.0, {.zones = zones}); });
-    Check("LevelMeter", Expect::Item, "Meter", [] { LevelMeter("Meter", values, 0.0f, 4.0f); });
-    Check("LevelMeter, vertical", Expect::Item, "Meter 2",
-          [] { LevelMeter("Meter 2", values, 0.0f, 4.0f, {.orientation = Orientation::Vertical}); });
-    Check("FrameTimeGraph", Expect::Item, "frames", [] { FrameTimeGraph("frames"); });
-    Check("FrameTimeGraph, samples", Expect::Item, "frames 2", [] { FrameTimeGraph("frames 2", values, {.compact = true}); });
-
-    LegendItem legend[] = {{"Series 1"}, {"Series 2", 0, true}};
-    const Snapshot legendBefore(legend);
-    Check("Legend", Expect::Item, "legend", [&] { CHECK_FALSE(Legend("legend", legend)); });
-    CHECK(legendBefore.Unchanged());
-
-    double low = 1.0;
-    double high = 2.0;
-    Check("ChartRangeBrush", Expect::Item, "Range", [&] {
-        CHECK_FALSE(ChartRangeBrush("Range", &low, &high, 0.0, 3.0, series, {.minGap = 0.5}));
-    });
-    CHECK(low == 1.0);
-    CHECK(high == 2.0);
-}
-
-void MediaCalls()
-{
-    using namespace facet;
-    const ImageHandle none;
-    static const AvatarItem avatars[] = {{"Name 1"}, {"Name 2"}};
-    static const ImageItem images[] = {{"Image 1"}, {"Image 2"}};
-    static const char* const types[] = {"test.payload"};
-
-    Check("ImageView", Expect::Item, "Image", [&] { CHECK_FALSE(ImageView("Image", none, {.activatable = true})); });
-    Check("ImageView, sized", Expect::Item, "Image 2",
-          [&] { CHECK_FALSE(ImageView("Image 2", none, {.width = 64.0f, .height = 32.0f})); });
-    Check("ImageView, texture", Expect::Item, "Texture", [] {
-        CHECK_FALSE(ImageView("Texture", static_cast<ID3D11ShaderResourceView*>(nullptr)));
-    });
-    Check("ImageView, retry", Expect::Item, "Image 3",
-          [&] { CHECK_FALSE(ImageView("Image 3", none, {.activatable = true, .retryLabel = "Retry"})); });
-    Check("ImageViewRetryPressed", Expect::NoItem, nullptr, [] { CHECK_FALSE(ImageViewRetryPressed()); });
-    Check("Avatar", Expect::Item, "Name", [&] { CHECK_FALSE(Avatar("Name", none, {.activatable = true})); });
-    Check("AvatarGroup", Expect::Item, "Group", [] { CHECK_FALSE(AvatarGroup("Group", avatars, {.maxVisible = 1})); });
-
-    int selected = 1;
-    Check("ThumbnailStrip", Expect::Item, "Strip", [&] { CHECK_FALSE(ThumbnailStrip("Strip", &selected, images)); });
-    Check("ThumbnailStrip, getter", Expect::Item, "Strip 2", [&] {
-        CHECK_FALSE(ThumbnailStrip("Strip 2", &selected, 2, [](void*, int index, ImageItem* out) {
-            *out = images[index];
-            return true;
-        }, nullptr));
-    });
-    Check("Carousel", Expect::Item, "Slides", [&] { CHECK_FALSE(Carousel("Slides", &selected, images, {.loop = true})); });
-    CHECK(selected == 1);
-
-    ImageViewerState view{.zoom = 2.0f, .center = ImVec2(3.0f, 4.0f)};
-    const Snapshot viewBefore(view);
-    Check("ImageViewer", Expect::Item, "Viewer", [&] { CHECK_FALSE(ImageViewer("Viewer", none, &view, {.height = 100.0f})); });
-    CHECK(viewBefore.Unchanged());
-
-    float split = 0.25f;
-    Check("ImageCompare", Expect::Item, "Compare", [&] { CHECK_FALSE(ImageCompare("Compare", &split, none, none)); });
-    CHECK(split == 0.25f);
-
-    double playhead = 1.0;
-    double loopIn = 0.5;
-    double loopOut = 2.0;
-    Check("TimelineScrubber", Expect::Item, "Time", [&] { CHECK_FALSE(TimelineScrubber("Time", &playhead, 5.0)); });
-    Check("TimelineScrubber, loop", Expect::Item, "Time 2",
-          [&] { CHECK_FALSE(TimelineScrubber("Time 2", &playhead, &loopIn, &loopOut, 5.0)); });
-    CHECK(playhead == 1.0);
-    CHECK(loopIn == 0.5);
-    CHECK(loopOut == 2.0);
-
-    Check("DropZone", Expect::Item, "Drop", [] { CHECK(DropZone("Drop", types) == DropZoneAction::None); });
-    Check("DropZonePayload", Expect::NoItem, nullptr, [] { CHECK(DropZonePayload() == nullptr); });
-}
-
 void EditorCalls()
 {
     using namespace facet;
@@ -535,36 +349,6 @@ void CompositeCalls()
 
 } // namespace
 
-TEST_CASE("The data table stub keeps every stack and opens a plain table for the caller's cells")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int runs = 0;
-    RunFrame(session, &runs, &DataTableCalls);
-    CHECK(runs == 1);
-    CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
-TEST_CASE("The chart stubs submit one item each, return the neutral result and keep every stack")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int runs = 0;
-    RunFrame(session, &runs, &ChartCalls);
-    CHECK(runs == 1);
-    CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
-TEST_CASE("The media stubs submit one item each, return the neutral result and keep every stack")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int runs = 0;
-    RunFrame(session, &runs, &MediaCalls);
-    CHECK(runs == 1);
-    CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
 TEST_CASE("The composite stubs submit one item each, return the neutral result and keep every stack")
 {
     facet::test::Session session;
@@ -575,44 +359,10 @@ TEST_CASE("The composite stubs submit one item each, return the neutral result a
     CHECK(facet::internal::OpenScopeCount() == 0);
 }
 
-TEST_CASE("A column sizing flag set by the caller replaces the one its width implies")
-{
-    // Dear ImGui accepts one sizing flag per column (an assertion in debug builds), so a caller
-    // flag must not be combined with the policy that `width` implies.
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        static const DataTableColumn columns[] = {
-            {.label = "Fixed", .flags = ImGuiTableColumnFlags_WidthFixed},
-            {.label = "Stretch", .width = 80.0f, .flags = ImGuiTableColumnFlags_WidthStretch},
-            {.label = "Auto"},
-            {.label = "Sized", .width = 40.0f},
-        };
-        const ImGuiTableColumnFlags expected[] = {ImGuiTableColumnFlags_WidthFixed, ImGuiTableColumnFlags_WidthStretch,
-                                                  ImGuiTableColumnFlags_WidthStretch, ImGuiTableColumnFlags_WidthFixed};
-        const bool open = BeginDataTable("sizing", columns, 1, nullptr);
-        CHECK(open);
-        if (!open)
-            return;
-        const ImGuiTable* table = ImGui::GetCurrentTable();
-        for (int i = 0; i < 4; ++i)
-        {
-            INFO("column " << i);
-            CHECK((table->Columns[i].Flags & ImGuiTableColumnFlags_WidthMask_) == expected[i]);
-            ++checked;
-        }
-        EndDataTable();
-    });
-    session.Frame();
-    CHECK(checked == 4);
-}
-
-TEST_CASE("Stubs follow kFill and widths relative to the available width")
+TEST_CASE("Composite stubs follow kFill and widths relative to the available width")
 {
     // Rule 6: kFill is the available width, any other negative width the available width minus
-    // that many units, for card, dialog, image and vertical meter stubs too.
+    // that many units, for card and dialog stubs too.
     facet::test::Session session;
     REQUIRE(session.Ready());
     int checked = 0;
@@ -625,15 +375,10 @@ TEST_CASE("Stubs follow kFill and widths relative to the available width")
             CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
             ++checked;
         };
-        static const float channels[] = {0.5f};
         for (const float units : {kFill, -10.0f})
         {
             fills("InventoryDetailCard", units, [](float w) { InventoryDetailCard("Item", ImageHandle{}, {.width = w}); });
             fills("MediaCard", units, [](float w) { MediaCard("Card", ImageHandle{}, {.width = w}); });
-            fills("ImageView", units, [](float w) { ImageView("Image", ImageHandle{}, {.width = w}); });
-            fills("LevelMeter", units, [](float w) {
-                LevelMeter("Meter", channels, 0.0, 1.0, {.orientation = Orientation::Vertical, .width = w});
-            });
             fills("Onboarding", units, [](float w) {
                 bool open = true;
                 int step = 0;
@@ -643,10 +388,10 @@ TEST_CASE("Stubs follow kFill and widths relative to the available width")
         }
     });
     session.Frame();
-    CHECK(checked == 10);
+    CHECK(checked == 6);
 }
 
-TEST_CASE("Content-sized stubs are wide enough to name the widget and say planned")
+TEST_CASE("Content-sized composite stubs are wide enough to name the widget and say planned")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -661,14 +406,10 @@ TEST_CASE("Content-sized stubs are wide enough to name the widget and say planne
             CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
             ++checked;
         };
-        static const AvatarItem avatars[] = {{"Name 1"}};
         const InventoryItem item{"Item"};
         ThemeMode mode = ThemeMode::Light;
         ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
         CanvasElementState element;
-        wide("ImageView", [] { ImageView("A", ImageHandle{}); });
-        wide("Avatar", [] { Avatar("A", ImageHandle{}); });
-        wide("AvatarGroup", [] { AvatarGroup("A", avatars); });
         wide("InventoryTile", [&] { InventoryTile("tile", item); });
         wide("InventorySlot", [&] { InventorySlot("A", item); });
         wide("UserChip", [] { UserChip("A", ImageHandle{}, {.compact = true}); });
@@ -679,10 +420,10 @@ TEST_CASE("Content-sized stubs are wide enough to name the widget and say planne
         EndPreviewCanvas();
     });
     session.Frame();
-    CHECK(checked == 9);
+    CHECK(checked == 6);
 }
 
-TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack")
+TEST_CASE("A composite End without its Begin is reported and changes no Dear ImGui stack")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -690,12 +431,10 @@ TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack"
     session.SetUi([&] {
         const Stacks before = CurrentStacks();
         const int errors = facet::internal::UsageErrorCount();
-        facet::EndDataTable();
         facet::EndPropertyRow();
         facet::EndPropertyGrid();
         facet::EndDragSource();
         facet::EndDropTarget();
-        facet::EndDataTableCellEdit();
         facet::EndPropertyCategory();
         facet::EndSettingsSearch();
         facet::EndPreviewCanvas();
@@ -706,5 +445,5 @@ TEST_CASE("An End without its Begin is reported and changes no Dear ImGui stack"
         CHECK(after == before);
     });
     session.Frame();
-    CHECK(reported == 10);
+    CHECK(reported == 8);
 }

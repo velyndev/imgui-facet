@@ -90,7 +90,7 @@ TEST_CASE("A planned widget is one item of control height that is not a Tab stop
     CHECK_FALSE(ImGui::IsAnyItemActive());
 }
 
-TEST_CASE("Placeholders of every widget group take kFill, negative widths and readOnly the same way")
+TEST_CASE("Widgets of every group take kFill, negative widths and readOnly the same way, placeholders or not")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -128,11 +128,11 @@ TEST_CASE("Placeholders of every widget group take kFill, negative widths and re
         CHECK(session.ItemRect(fill).GetWidth() == doctest::Approx(available));
         CHECK(session.ItemRect(less).GetWidth() == doctest::Approx(available - facet::Px(40.0f)));
     }
-    // Neither a writable nor a read-only placeholder writes its value.
-    session.Click(session.ItemCenter("controls.fill"));
+    // A read-only widget never writes its value, whether it is a placeholder or implemented; that
+    // a placeholder writes nothing at all is checked per family in tests/test_api_<family>.cpp.
     session.Click(session.ItemCenter("controls.readOnly"));
-    CHECK(value.x == 0.25f);
     CHECK(readOnlyValue.x == 0.75f);
+    CHECK(value.x == 0.25f);
 }
 
 TEST_CASE("PlannedWidth follows the width precedence of the API conventions")

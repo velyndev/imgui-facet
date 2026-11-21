@@ -1,5 +1,5 @@
 // The public API of the display family (facet/widgets/display.h) without DataTable, which
-// tests/test_api_content.cpp covers: every options struct follows the conventions, and every
+// tests/test_api_data_table.cpp covers: every options struct follows the conventions, and every
 // function is called once inside a real Dear ImGui frame, in a window and again inside
 // ImGui::BeginDisabled. After each call the stacks must be as before, a widget must have
 // submitted one item of non-zero size with the id of its label, the neutral result must come back
