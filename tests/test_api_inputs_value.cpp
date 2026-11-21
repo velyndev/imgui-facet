@@ -40,8 +40,9 @@ static_assert(HasFormatMembers<facet::UnitInputOptions>());
 static_assert(HasFormatMembers<facet::VectorInputOptions>());
 static_assert(HasFormatMembers<facet::SizeInputOptions>());
 
-// Every placeholder of these widgets once, with the overloads, as an app would call it.
-void CallValueInputStubs(Values& v)
+// Every ready widget once, with the overloads, as an app would call it. A frame without input
+// gives the same result as a placeholder: false, one item, the stacks kept, nothing written.
+void CallReadyValueInputs(Values& v)
 {
     using namespace facet;
     FACET_CHECK_STUB(false, NumberInput("Number 1", &v.integer));
@@ -50,6 +51,15 @@ void CallValueInputStubs(Values& v)
     FACET_CHECK_STUB(false, DragNumber("Drag 1", &v.integer));
     FACET_CHECK_STUB(false, DragNumber("Drag 2", &v.number, {.speed = 0.01}));
     FACET_CHECK_STUB(false, DragNumber("Drag 3", &v.real, {.wrap = true}));
+}
+
+// Number of FACET_CHECK_STUB calls in CallReadyValueInputs.
+constexpr int kReadyValueInputCalls = 6;
+
+// Every placeholder of these widgets once, with the overloads, as an app would call it.
+void CallValueInputStubs(Values& v)
+{
+    using namespace facet;
     FACET_CHECK_STUB(false, UnitInput("Unit 1", &v.real, &v.unit, kUnits));
     FACET_CHECK_STUB(false, VectorInput("Vector 1", std::span<float>(v.vector), {.linkToggle = true}));
     FACET_CHECK_STUB(false, VectorInput("Vector 3", &v.point));
@@ -66,9 +76,14 @@ void CallValueInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallValueInputStubs.
-constexpr int kValueInputStubCalls = 19;
+constexpr int kValueInputStubCalls = 13;
 
 } // namespace
+
+TEST_CASE("Every ready value input without input returns false, writes nothing and keeps the stacks")
+{
+    FACET_CHECK_FAMILY_STUBS(CallReadyValueInputs, kReadyValueInputCalls);
+}
 
 TEST_CASE("Every value input placeholder returns the neutral result, writes nothing and keeps the stacks")
 {

@@ -246,7 +246,19 @@ bool NumberInput(const char* label, float* value, const NumberInputOptions& opti
 bool NumberInput(const char* label, double* value, const NumberInputOptions& options = {});
 ```
 
-A number field with steppers, limits and a unit suffix. Status: planned.
+A number field with a unit suffix inside the frame and - and + steppers at its end (hidden with
+`step = 0`; not Tab stops, held they repeat). The field takes the available width with its label in
+front. Typed text is written on Enter, Tab or focus loss and clamped to `min` and `max`; the int
+overload also stays inside the int range and the float one inside the float range, so a typed
+"99999999999" or a step past the end never overflows. The text accepts a sign, a dot or a single
+comma as the decimal separator ("2,5") and, for float and double, an exponent ("1e-3"). Text that is
+not a number (empty, "-", "1e") writes nothing; a committed text that cannot be read shows
+`Strings::invalidValue` as the error until the field is activated again. While the field has the
+keyboard, Up and Down step by `step` (Shift a tenth of it for float and double, Ctrl and Page Up or
+Down by `stepFast`) and so does the mouse wheel over it, unless the area under the pointer is still
+scrolling; an unfocused field leaves the wheel to the page. Escape restores the value from the start
+of the edit. `mixed` shows an empty field with `Strings::mixed` until a value is written. Sizes,
+read-only, disabled, error and help text come from the text field core. Status: ready.
 
 ### DragNumber
 
@@ -256,7 +268,16 @@ bool DragNumber(const char* label, float* value, const DragNumberOptions& option
 bool DragNumber(const char* label, double* value, const DragNumberOptions& options = {});
 ```
 
-A number that changes when dragged sideways; a click types a value. Status: planned.
+A number field that changes when it or its label is dragged sideways, after the pointer moved
+`drag.startThreshold`; the left-right resize cursor shows over both. The value follows the pointer
+travel since the press, so dragging back to the start ends exactly on the start value. `speed` 0
+spreads a finite range over the field width (an open int range moves 1 per unit, an open float
+range one keyboard step per `spacing.xs`); Shift drags a tenth as far, Ctrl ten times. With
+`scale = Logarithmic` over a finite range above zero, equal travel multiplies the value by equal
+factors. While focused, Left and Right step by a hundredth of a finite range (an open range: ten
+units of travel; int: whole numbers), Ctrl ten steps. A click without travel, Enter or Space types a
+value, which writes on Enter, Tab or focus loss, as in NumberInput. `wrap` makes a finite range go
+on from the other end. Escape restores the value from the start of the edit. Status: ready.
 
 ### UnitInput
 
