@@ -1163,3 +1163,229 @@ TEST_CASE("Flows nest, and a stray FlowNext is reported")
     session.Frames(2);
     CHECK(reported == 1);
 }
+
+// ---- ListDetail ---------------------------------------------------------------------------------
+
+TEST_CASE("A list-detail shows one pane in a Compact width and both otherwise")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    struct Shown
+    {
+        bool list = false;
+        bool detail = false;
+    };
+    Shown compactList;
+    Shown compactDetail;
+    Shown regular;
+    const auto run = [](const char* id, bool detailOpen) {
+        Shown shown;
+        facet::BeginListDetail(id, &detailOpen, {.height = facet::T().metrics.controlHeightLarge});
+        shown.list = facet::BeginListPane();
+        if (shown.list)
+            facet::EndListPane();
+        shown.detail = facet::BeginDetailPane();
+        if (shown.detail)
+            facet::EndDetailPane();
+        facet::EndListDetail();
+        return shown;
+    };
+    session.SetUi([&] {
+        const facet::Theme& theme = facet::T();
+        const float height = facet::Px(theme.metrics.controlHeightLarge * 4.0f);
+        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
+        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
+        compactList = run("list", false);
+        compactDetail = run("detail", true);
+        ImGui::EndChild();
+        ImGui::BeginChild("regular", ImVec2(facet::Px(theme.layout.regularFrom + 40.0f), height));
+        CHECK(facet::AvailableWidthClass() != facet::WidthClass::Compact);
+        regular = run("both", true);
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(compactList.list);
+    CHECK_FALSE(compactList.detail);
+    CHECK_FALSE(compactDetail.list);
+    CHECK(compactDetail.detail);
+    CHECK(regular.list);
+    CHECK(regular.detail);
+}
+
+TEST_CASE("An outer list-detail keeps its state past a nested one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool outerList = false;
+    bool innerDetail = false;
+    bool outerDetail = true;
+    session.SetUi([&] {
+        const facet::Theme& theme = facet::T();
+        const float height = facet::Px(theme.metrics.controlHeightLarge * 8.0f);
+        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
+        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
+        CHECK_BALANCED({
+            bool outerOpen = false;
+            bool innerOpen = true;
+            facet::BeginListDetail("outer", &outerOpen);
+            outerList = facet::BeginListPane();
+            if (outerList)
+            {
+                facet::BeginListDetail("inner", &innerOpen);
+                if (facet::BeginListPane())
+                    facet::EndListPane();
+                innerDetail = facet::BeginDetailPane();
+                if (innerDetail)
+                    facet::EndDetailPane();
+                facet::EndListDetail();
+                facet::EndListPane();
+            }
+            outerDetail = facet::BeginDetailPane();
+            if (outerDetail)
+                facet::EndDetailPane();
+            facet::EndListDetail();
+        });
+        ImGui::EndChild();
+    });
+    session.Frame();
+    CHECK(outerList);
+    CHECK(innerDetail);
+    CHECK_FALSE(outerDetail);
+}
+
+namespace
+{
+
+// A list-detail in a region `width` pixels wide: an entry button in the list opens the detail.
+struct ListDetailUi
+{
+    float width = 600.0f;
+    bool detailOpen = false;
+    int detailPresses = 0;
+    bool list = false;
+    bool detail = false;
+
+    void Ui(facet::test::Session& session)
+    {
+        InRegion("region", width, [&] {
+            facet::BeginListDetail("messages", &detailOpen, {.height = 240.0f});
+            list = facet::BeginListPane();
+            if (list)
+            {
+                if (ImGui::Button("entry", ImVec2(-FLT_MIN, 0.0f)))
+                    detailOpen = true;
+                session.Track("entry");
+                facet::EndListPane();
+            }
+            detail = facet::BeginDetailPane();
+            if (detail)
+            {
+                session.Track("back");  // the back button in a Compact width, else the pane's first item
+                if (ImGui::Button("detail button"))
+                    ++detailPresses;
+                session.Track("detail");
+                facet::EndDetailPane();
+            }
+            facet::EndListDetail();
+            session.Track("view");
+        });
+    }
+};
+
+} // namespace
+
+TEST_CASE("A list-detail puts the list beside the detail with its list width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ListDetailUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    REQUIRE(ui.list);
+    REQUIRE(ui.detail);
+    const facet::Theme& theme = facet::T();
+    const ImRect view = session.ItemRect("view");
+    CHECK(view.GetWidth() == doctest::Approx(600.0f));
+    CHECK(view.GetHeight() == doctest::Approx(240.0f));
+    const float listWidth = facet::Px(theme.layout.labelColumn + theme.layout.minRowControl);
+    CHECK(session.ItemRect("entry").Max.x <= view.Min.x + listWidth);
+    CHECK(session.ItemRect("detail").Min.x >= view.Min.x + listWidth + facet::Px(theme.layout.dividerBand));
+    CHECK(session.ItemRect("detail").Min.y == doctest::Approx(session.ItemRect("entry").Min.y));
+}
+
+TEST_CASE("A compact list-detail opens the detail with a back button that writes the flag")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ListDetailUi ui;
+    ui.width = facet::Px(facet::T().layout.regularFrom * 0.75f);
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    REQUIRE(ui.list);
+    REQUIRE_FALSE(ui.detail);
+    session.Click(session.ItemCenter("entry"));
+    REQUIRE(ui.detailOpen);
+    session.Frames(2);
+    CHECK_FALSE(ui.list);
+    CHECK(ui.detail);
+    // The back button sits above the content and writes the flag.
+    const ImRect back = session.ItemRect("back");
+    CHECK(session.ItemRect("detail").Min.y > back.Min.y);
+    session.Click(back.GetCenter());
+    CHECK_FALSE(ui.detailOpen);
+    session.Frames(2);
+    CHECK(ui.list);
+}
+
+TEST_CASE("Opening a compact detail by keyboard moves the focus to its back button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ListDetailUi ui;
+    ui.width = facet::Px(facet::T().layout.regularFrom * 0.75f);
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("entry"));
+    ui.detailOpen = false;
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Tab);  // shows the focus on the entry
+    session.KeyPress(ImGuiKey_Enter);
+    REQUIRE(ui.detailOpen);
+    session.Frames(3);
+    CHECK(ImGui::GetFocusID() == session.ItemId("back"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(ui.detailOpen);
+}
+
+TEST_CASE("List-details leave every stack balanced, disabled, with a null flag and outside a frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    const int errorsBefore = fi::UsageErrorCount();
+    session.SetUi([&] {
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::ListDetailScope view("disabled", &v.closed, {.height = 100.0f});
+            if (facet::ListPaneScope list; list)
+                ImGui::Button("item");
+            if (facet::DetailPaneScope detail; detail)
+                ImGui::Button("detail");
+        });
+        ImGui::EndDisabled();
+        CHECK_BALANCED({
+            facet::BeginListDetail("null", nullptr, {.height = 100.0f});
+            if (facet::BeginListPane())
+                facet::EndListPane();
+            facet::EndListDetail();
+        });
+    });
+    session.Frames(2);
+    CHECK(fi::UsageErrorCount() == errorsBefore);
+    CHECK(fi::OpenScopeCount() == 0);
+    facet::BeginListDetail("outside", &v.closed);
+    CHECK_FALSE(facet::BeginListPane());
+    facet::EndListDetail();
+    CHECK(fi::OpenScopeCount() == 0);
+}

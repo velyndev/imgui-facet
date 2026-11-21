@@ -49,14 +49,6 @@ void CallLayoutStubs(Values& v)
         facet::EndPanels();
     });
     CHECK_BALANCED({
-        facet::BeginListDetail("ListDetail", &v.closed);
-        if (facet::BeginListPane())
-            facet::EndListPane();
-        if (facet::BeginDetailPane())
-            facet::EndDetailPane();
-        facet::EndListDetail();
-    });
-    CHECK_BALANCED({
         const bool open = facet::BeginItemGrid("Items", 50, &selection);
         CHECK(open);
         if (open)
@@ -152,92 +144,4 @@ TEST_CASE("A layout End without its Begin is reported and changes no stack")
     });
     session.Frame();
     CHECK(reported == 2);
-}
-
-TEST_CASE("A list-detail placeholder shows one pane in a Compact width and both otherwise")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    struct Shown
-    {
-        bool list = false;
-        bool detail = false;
-    };
-    Shown compactList;
-    Shown compactDetail;
-    Shown regular;
-    const auto run = [](const char* id, bool detailOpen) {
-        Shown shown;
-        facet::BeginListDetail(id, &detailOpen);
-        shown.list = facet::BeginListPane();
-        if (shown.list)
-            facet::EndListPane();
-        shown.detail = facet::BeginDetailPane();
-        if (shown.detail)
-            facet::EndDetailPane();
-        facet::EndListDetail();
-        return shown;
-    };
-    session.SetUi([&] {
-        const facet::Theme& theme = facet::T();
-        const float height = facet::Px(theme.metrics.controlHeightLarge * 4.0f);
-        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
-        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
-        compactList = run("list", false);
-        compactDetail = run("detail", true);
-        ImGui::EndChild();
-        ImGui::BeginChild("regular", ImVec2(facet::Px(theme.layout.regularFrom + 40.0f), height));
-        CHECK(facet::AvailableWidthClass() != facet::WidthClass::Compact);
-        regular = run("both", true);
-        ImGui::EndChild();
-    });
-    session.Frame();
-    CHECK(compactList.list);
-    CHECK_FALSE(compactList.detail);
-    CHECK_FALSE(compactDetail.list);
-    CHECK(compactDetail.detail);
-    CHECK(regular.list);
-    CHECK(regular.detail);
-}
-
-TEST_CASE("An outer list-detail placeholder keeps its state past a nested one")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    Values v;
-    bool outerList = false;
-    bool innerDetail = false;
-    bool outerDetail = true;
-    session.SetUi([&] {
-        const facet::Theme& theme = facet::T();
-        const float height = facet::Px(theme.metrics.controlHeightLarge * 8.0f);
-        ImGui::BeginChild("compact", ImVec2(facet::Px(theme.layout.regularFrom * 0.5f), height));
-        CHECK(facet::AvailableWidthClass() == facet::WidthClass::Compact);
-        CHECK_BALANCED({
-            bool outerOpen = false;
-            bool innerOpen = true;
-            facet::BeginListDetail("outer", &outerOpen);
-            outerList = facet::BeginListPane();
-            if (outerList)
-            {
-                facet::BeginListDetail("inner", &innerOpen);
-                if (facet::BeginListPane())
-                    facet::EndListPane();
-                innerDetail = facet::BeginDetailPane();
-                if (innerDetail)
-                    facet::EndDetailPane();
-                facet::EndListDetail();
-                facet::EndListPane();
-            }
-            outerDetail = facet::BeginDetailPane();
-            if (outerDetail)
-                facet::EndDetailPane();
-            facet::EndListDetail();
-        });
-        ImGui::EndChild();
-    });
-    session.Frame();
-    CHECK(outerList);
-    CHECK(innerDetail);
-    CHECK_FALSE(outerDetail);
 }

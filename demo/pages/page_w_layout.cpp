@@ -61,6 +61,9 @@ const char* const kTags[kFlowTags] = {"Tag",          "A longer tag", "Short",  
                                       "Tag nine",     "Tag 10",       "Last but one", "Last tag"};
 const char* const kFlowLines[] = {"No limit", "One line", "Two lines"};
 const char* const kFlowAligns[] = {"Start", "Center", "End", "Stretch"};
+// List and detail: placeholder entries, and the narrow region's share of the Regular breakpoint.
+constexpr int kEntries = 6;
+constexpr float kNarrowShare = 0.75f;
 
 struct LayoutState
 {
@@ -105,9 +108,13 @@ struct LayoutState
     int childLevel = 50;
     bool hideParent = false;
     bool hiddenToggle = false;
+    // List and detail
+    bool listDetailNarrow = false;
+    bool detailOpen = false;
+    int entry = 0;
+    int detailPresses = 0;
     // Placeholders of the planned widgets
     float panelSizes[3] = {0.25f, 0.5f, 0.25f};
-    bool detailOpen = false;
     ImGuiSelectionBasicStorage selection;
 };
 
@@ -415,6 +422,52 @@ void SplitViews(facet::demo::PageCtx& ctx, LayoutState& s)
     ProbeDivider(ctx, "layout.split.vertical");
 }
 
+void ListDetails(facet::demo::PageCtx& ctx, LayoutState& s)
+{
+    SectionHeader("List and detail");
+    Paragraph("A list beside its detail. In a Compact width only one shows: choosing an entry opens the "
+              "detail, and its back button returns to the list. Narrow the width to see it. The entries "
+              "are placeholders.");
+    facet::BeginSettingsRow("Narrow region");
+    facet::Toggle("##value", &s.listDetailNarrow);
+    ctx.Probe("layout.ld.narrow");
+    facet::EndSettingsRow();
+    // Narrow: three quarters of the Regular breakpoint, a Compact width at every scale.
+    const float available = facet::AvailableWidthUnits();
+    const float width = s.listDetailNarrow ? std::min(available, facet::T().layout.regularFrom * kNarrowShare) : available;
+    facet::BeginCard("##listdetail", {.width = width});
+    facet::BeginListDetail("listdetail", &s.detailOpen, {.height = RegionHeight()});
+    if (facet::BeginListPane())
+    {
+        for (int i = 0; i < kEntries; ++i)
+        {
+            char label[32];
+            std::snprintf(label, sizeof(label), "Entry %d", i + 1);
+            if (facet::Button(label, {.variant = facet::ButtonVariant::Plain, .width = facet::kFill}))
+            {
+                s.entry = i;
+                s.detailOpen = true;
+            }
+            char probe[32];
+            std::snprintf(probe, sizeof(probe), "layout.ld.entry.%d", i);
+            ctx.Probe(probe);
+        }
+        facet::EndListPane();
+    }
+    if (facet::BeginDetailPane())
+    {
+        ctx.Probe("layout.ld.back");  // the back button in a Compact width
+        Note("Detail of entry %d. Placeholder text of the detail pane.", s.entry + 1);
+        if (facet::Button("Count a press##detail"))
+            ++s.detailPresses;
+        ctx.Probe("layout.ld.detail");
+        Note("Presses: %d.", s.detailPresses);
+        facet::EndDetailPane();
+    }
+    facet::EndListDetail();
+    facet::EndCard();
+}
+
 void Divide(LayoutState& s)
 {
     SectionHeader("Divide a region");
@@ -429,18 +482,6 @@ void Divide(LayoutState& s)
         }
     }
     facet::EndPanels();
-    facet::BeginListDetail("listdetail", &s.detailOpen);
-    if (facet::BeginListPane())
-    {
-        Note("List pane.");
-        facet::EndListPane();
-    }
-    if (facet::BeginDetailPane())
-    {
-        Note("Detail pane.");
-        facet::EndDetailPane();
-    }
-    facet::EndListDetail();
 }
 
 void Dependent(facet::demo::PageCtx& ctx, LayoutState& s)
@@ -516,6 +557,7 @@ FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrang
     Separators();
     Flows(ctx, s);
     SplitViews(ctx, s);
+    ListDetails(ctx, s);
     Divide(s);
     Tiles(s);
 }
@@ -734,6 +776,41 @@ FACET_DEMO_SELFTEST("layout")
     test.KeyPress(ImGuiKey_Escape);
     test.MouseUp();
     test.ExpectNear("Escape during a drag puts the ratio back", [] { return State().splitRatio; }, 0.4, 0.001);
+    // List and detail: an entry opens the detail; in a Compact width the back button returns.
+    test.Do([] {
+        LayoutState& s = State();
+        s.listDetailNarrow = false;
+        s.detailOpen = false;
+        s.entry = 0;
+        s.detailPresses = 0;
+    });
+    // The panes are skipped while out of sight, so the row above them is revealed first.
+    test.Reveal("layout.ld.narrow");
+    test.WaitSeconds(0.4f);
+    test.Click("layout.ld.entry.2");
+    test.Expect("an entry opens its detail", [] { return State().detailOpen && State().entry == 2; });
+    test.Click("layout.ld.detail");
+    test.Expect("the detail's button works", [] { return State().detailPresses == 1; });
+    test.Do([] { State().listDetailNarrow = true; });
+    test.Wait(3);
+    test.Click("layout.ld.back");
+    test.Expect("in a Compact width the back button returns to the list", [] { return !State().detailOpen; });
+    // Keyboard only: from the narrow switch, Tab enters the list; Enter opens the detail.
+    test.Do([] { State().listDetailNarrow = false; });
+    test.Wait(2);
+    test.Click("layout.ld.narrow");
+    test.Expect("the switch narrows the region", [] { return State().listDetailNarrow; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.ld.narrow");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.ld.entry.0");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(3);
+    test.ExpectFocused("layout.ld.back");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter on the focused back button returns to the list", [] { return !State().detailOpen; });
+    test.Do([] { State().listDetailNarrow = false; });
+
     test.Reveal("layout.split.vertical");
     test.WaitSeconds(0.4f);
     test.Drag({T::Item("layout.split.vertical"), T::Item("layout.split.vertical").Offset(0.0f, 20.0f)}, 0.3f);

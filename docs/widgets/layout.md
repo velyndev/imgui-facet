@@ -183,8 +183,6 @@ its two neighbours.
 
 ### BeginListDetail
 
-Status: planned
-
 ```cpp
 void BeginListDetail(const char* id, bool* detailOpen, const ListDetailOptions& options = {});
 [[nodiscard]] bool BeginListPane();
@@ -197,7 +195,26 @@ class ListPaneScope;
 class DetailPaneScope;
 ```
 
-A list and a detail pane side by side, or one at a time with a back button in a Compact width.
+A list pane and a detail pane in the available width, `height` units tall (0 fills the available
+height; with no height left, `metrics.panelHeight`).
+
+- Regular and Expanded widths: the list pane is `listWidth` units wide (0: `layout.labelColumn` +
+  `layout.minRowControl`), at most the width less the band and `layout.minRowControl`; then a band of
+  `layout.dividerBand` with a hairline in `separator`, and the detail pane in the rest. The divider
+  does not move; use `BeginSplitView` for a resizable split.
+- Compact width: one pane at the full size, the list while `*detailOpen` is false, the detail while
+  it is true. The caller writes `*detailOpen = true` when an entry is chosen. The detail pane starts
+  with a plain back button (icon "chevron-left", `Strings::back`) that writes `*detailOpen = false`;
+  when the detail opens while the keyboard focus was in the list pane and the last input was the
+  keyboard, the focus moves to the back button, so it is not left on an entry that went away.
+- Each pane is a scroll area of the scroll core: a child window with Facet's overlay bars whose
+  keyboard navigation belongs to the window around it; its content keeps its ids under the pane.
+- A pane Begin returns false while its pane is hidden (the Compact rule) and while it is out of sight;
+  its End only after true. `EndListDetail` is always called; the view is one group, the last item
+  after it. List-details nest in their panes. A null `detailOpen` counts as false and is never
+  written.
+
+Status: ready.
 
 ### BeginSettingsRow
 
