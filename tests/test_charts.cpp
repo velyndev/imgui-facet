@@ -329,3 +329,153 @@ TEST_CASE("A hovered sparkline names its nearest value in a tooltip and is not a
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
+
+// ---- Legend ----------------------------------------------------------------------------------------
+
+TEST_CASE("A legend entry flips hidden on click, Space and Enter, and each entry is a Tab stop")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::LegendItem items[] = {{"Series 1"}, {"Series 2"}, {"Series 3"}};
+    int writes = 0;
+    ImGuiID legendId = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        legendId = ImGui::GetID("legend");
+        if (facet::Legend("legend", items))
+            ++writes;
+        session.Track("legend");
+    });
+    session.Frame();
+    session.Click(fi::ChartLegendEntryRect(legendId, 1).GetCenter());
+    CHECK(items[1].hidden);
+    CHECK_FALSE(items[0].hidden);
+    CHECK(writes == 1);
+
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 0, 0));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(items[0].hidden);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 0, 2));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(items[2].hidden);
+    CHECK(writes == 3);
+}
+
+TEST_CASE("Alt with a legend entry shows it alone, and again shows every entry")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::LegendItem items[] = {{"Series 1"}, {"Series 2", 0, true}, {"Series 3"}};
+    ImGuiID legendId = 0;
+    session.SetUi([&] {
+        legendId = ImGui::GetID("legend");
+        facet::Legend("legend", items);
+    });
+    session.Frame();
+    const ImVec2 second = fi::ChartLegendEntryRect(legendId, 1).GetCenter();
+    session.KeyDown(ImGuiMod_Alt);
+    session.Click(second);
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK(items[0].hidden);
+    CHECK_FALSE(items[1].hidden);
+    CHECK(items[2].hidden);
+    session.KeyDown(ImGuiMod_Alt);
+    session.Click(second);
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK_FALSE(items[0].hidden);
+    CHECK_FALSE(items[1].hidden);
+    CHECK_FALSE(items[2].hidden);
+
+    // The same from the keyboard: Alt with Space or Enter on the focused entry.
+    session.KeyPress(ImGuiKey_Tab);  // after the click, the first Tab shows the focus on entry 1
+    REQUIRE(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 0, 1));
+    session.KeyPress(ImGuiKey_Space | ImGuiMod_Alt);
+    CHECK(items[0].hidden);
+    CHECK_FALSE(items[1].hidden);
+    CHECK(items[2].hidden);
+    session.KeyPress(ImGuiKey_Enter | ImGuiMod_Alt);
+    CHECK_FALSE(items[0].hidden);
+    CHECK_FALSE(items[2].hidden);
+}
+
+TEST_CASE("A read-only legend stays focusable and writes nothing; a disabled or passive one is no Tab stop")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::LegendItem readOnly[] = {{"Series 1"}, {"Series 2", 0, true}};
+    facet::LegendItem disabled[] = {{"Series 1"}};
+    facet::LegendItem passive[] = {{"Series 1"}};
+    bool written = false;
+    ImGuiID readOnlyId = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        readOnlyId = ImGui::GetID("read only");
+        written = facet::Legend("read only", readOnly, {.readOnly = true}) || written;
+        ImGui::BeginDisabled();
+        written = facet::Legend("disabled", disabled) || written;
+        ImGui::EndDisabled();
+        written = facet::Legend("passive", passive, {.toggle = false}) || written;
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(fi::ChartLegendEntryRect(readOnlyId, 0).GetCenter());
+    CHECK_FALSE(readOnly[0].hidden);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == fi::ChartEntryId(readOnlyId, 0, 0));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(readOnly[0].hidden);
+    CHECK(readOnly[1].hidden);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    // Past the second read-only entry: the disabled and the passive legend take no focus.
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    CHECK_FALSE(written);
+    CHECK_FALSE(disabled[0].hidden);
+}
+
+TEST_CASE("Legend entries wrap within the legend width, cut long labels and keep ids under item ids")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::LegendItem items[] = {{"A long series label that cannot fit", 0, false, 7},
+                                 {"Series 2", 0, false, 9},
+                                 {"Series 3", 0, false, 11}};
+    ImRect rect;
+    ImGuiID legendId = 0;
+    const float rowHeight = facet::ControlHeight(facet::ControlSize::Small);
+    session.SetUi([&] {
+        legendId = ImGui::GetID("legend");
+        facet::Legend("legend", items, {.width = 90.0f});
+        rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    });
+    session.Frame();
+    CHECK(rect.GetWidth() == doctest::Approx(facet::Px(90.0f)));
+    CHECK(rect.GetHeight() >= 2.0f * rowHeight - 0.5f);
+    for (int i = 0; i < 3; ++i)
+    {
+        const ImRect entry = fi::ChartLegendEntryRect(legendId, i);
+        CHECK(entry.Min.x >= rect.Min.x - 0.5f);
+        CHECK(entry.Max.x <= rect.Max.x + 0.5f);
+    }
+    // Entry ids follow item.id, so focus stays on an entry when the caller reorders the items.
+    session.Click(fi::ChartLegendEntryRect(legendId, 2).GetCenter());
+    CHECK(items[2].hidden);
+    CHECK(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 11, 2));
+    std::swap(items[0], items[2]);
+    session.Frame();
+    CHECK(ImGui::GetFocusID() == fi::ChartEntryId(legendId, 11, 0));
+}

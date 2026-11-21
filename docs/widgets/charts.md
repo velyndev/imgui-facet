@@ -110,7 +110,25 @@ caller's frame times. Status: planned.
 bool Legend(const char* id, std::span<LegendItem> items, const LegendOptions& options = {});
 ```
 
-Swatches with labels that toggle series; Alt isolates one. Status: planned.
+Color swatches with labels, flowed into rows of the legend width (`Orientation::Horizontal`) or
+stacked one per row (`Vertical`). An entry's color is `color`, or the chart palette color of its
+index, so a legend next to a chart with automatic colors matches it.
+
+- **Toggle:** with `toggle` (the default) every entry is its own item and Tab stop, with the hover
+  fill, the hand cursor and the focus ring after keyboard input. A click, Enter or Space flips the
+  entry's `hidden` member; with Alt held, the entry is shown alone (every other entry hidden), and
+  when it already is the only one shown, every entry is shown again. The legend returns true on
+  the frame a member was written. Without `toggle` the entries are drawn but are not items.
+- **Hidden entries** have a hollow swatch and their label in labelSecondary, so the state does not
+  depend on color alone.
+- **Read-only** (`readOnly` or a pushed `ImGuiItemFlags_ReadOnly`): entries stay Tab stops and show
+  their state but never flip. Disabled (`ImGui::BeginDisabled`): the disabled colors, no Tab stops.
+- **Ids:** entries get ids under the legend id from `LegendItem::id` when it is not 0, else from the
+  index, so focus stays on an entry when the caller reorders entries with ids.
+- **Size:** `width` 0 fills the available width; one row is the small control height. A label longer
+  than the legend is cut with an ellipsis and shows in full as a tooltip on hover and keyboard focus.
+
+Status: ready.
 
 ### ChartRangeBrush
 

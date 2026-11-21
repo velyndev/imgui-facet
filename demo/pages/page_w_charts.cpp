@@ -87,6 +87,22 @@ bool Is(const facet::demo::PageCtx& ctx, CaptureState state)
     return ctx.capture && ctx.captureState == state;
 }
 
+// Probes for the entries of a legend: "<probe>.<i>" with the entry's id, for clicks and focus.
+void ProbeLegend(facet::demo::PageCtx& ctx, const char* probe, const char* id, std::span<const facet::LegendItem> items)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImGuiID legendId = ImGui::GetID(id);
+    for (int i = 0; i < static_cast<int>(items.size()); ++i)
+    {
+        const ImRect rect = facet::internal::ChartLegendEntryRect(legendId, i);
+        char name[64];
+        std::snprintf(name, sizeof(name), "%s.%d", probe, i);
+        facet::demo::ProbeRect(ctx, name, facet::internal::ChartEntryId(legendId, items[static_cast<std::size_t>(i)].id, i),
+                               rect.Min, rect.Max);
+    }
+}
+
 void SparklineSection(facet::demo::PageCtx& ctx)
 {
     const GeneratedSeries& data = Data();
@@ -110,6 +126,36 @@ void SparklineSection(facet::demo::PageCtx& ctx)
     facet::Sparkline("Generated wave##narrow", data.wave, {.width = DemoWidth(32.0f)});
 }
 
+void LegendSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Legend");
+    Paragraph("Swatches with labels. A click, Enter or Space hides an entry; with Alt held it shows that entry "
+              "alone, and again shows them all. A hidden entry has a hollow swatch and a secondary label.");
+    LabeledRow("Toggle");
+    if (facet::Legend("legend", ui.legend))
+        ++ui.legendWrites;
+    ctx.Probe("charts.legend");
+    ProbeLegend(ctx, "charts.legend", "legend", ui.legend);
+    char shown[96] = {};
+    for (const facet::LegendItem& item : ui.legend)
+    {
+        if (item.hidden)
+            continue;
+        const std::size_t used = std::strlen(shown);
+        std::snprintf(shown + used, sizeof(shown) - used, "%s%s", used > 0 ? ", " : "", item.label);
+    }
+    Note("Shown: %s.", shown[0] != '\0' ? shown : "none");
+    LabeledRow("Vertical");
+    facet::Legend("legend vertical", ui.legendVertical, {.orientation = facet::Orientation::Vertical});
+    LabeledRow("Read-only");
+    facet::Legend("legend read only", ui.legendReadOnly, {.readOnly = true});
+    ProbeLegend(ctx, "charts.legendReadOnly", "legend read only", ui.legendReadOnly);
+    LabeledRow("Passive");
+    facet::Legend("legend passive", ui.legendVertical, {.toggle = false});
+    LabeledRow("Narrow");
+    facet::Legend("legend narrow", ui.legendNarrow, {.width = DemoWidth(140.0f)});
+}
+
 // Placeholder sections: these widgets are still planned and draw their placeholder.
 const float kSeriesA[] = {2.0f, 3.0f, 2.5f, 4.0f, 3.5f, 5.0f};
 const float kSeriesB[] = {1.0f, 1.5f, 2.0f, 1.5f, 2.5f, 2.0f};
@@ -125,10 +171,6 @@ const float kChannels[] = {0.5f, 0.4f};
 
 void PlannedSections()
 {
-    SectionHeader("Legend");
-    LabeledRow("Legend");
-    facet::Legend("legend", ui.legend);
-
     SectionHeader("Charts with axes");
     LabeledRow("Line chart");
     facet::LineChart("line chart", kSeries, {.yAxis = {.label = "Value"}, .crosshair = true});
@@ -162,6 +204,7 @@ FACET_DEMO_PAGE("charts", "Charts", "Widgets", 120, "default", "disabled")
     if (disabled)
         ImGui::BeginDisabled();
     SparklineSection(ctx);
+    LegendSection(ctx);
     PlannedSections();
     if (disabled)
         ImGui::EndDisabled();
@@ -176,4 +219,34 @@ FACET_DEMO_SELFTEST("charts")
     // Sparkline: the hovered value shows in a tooltip.
     test.Hover(T::Item("charts.sparkline", 0.5f, 0.5f), facet::T().overlay.tooltipDelay + 0.3f);
     test.Expect("hovering the sparkline names its nearest value", [] { return ui.sparklineTip; });
+
+    // Legend: the mouse flips an entry, the keys flip the focused one, Alt shows one alone.
+    test.Click("charts.legend.1");
+    test.Expect("a click hides series 2", [] { return ui.legend[1].hidden && !ui.legend[0].hidden; });
+    test.Click("charts.legend.1");
+    test.Expect("a second click shows it again", [] { return !ui.legend[1].hidden; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click, the first Tab shows the focus on the entry
+    test.ExpectFocused("charts.legend.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space hides the focused entry", [] { return ui.legend[1].hidden; });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("charts.legend.0");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter hides the first entry", [] { return ui.legend[0].hidden; });
+    test.KeyDown(ImGuiMod_Alt);
+    test.Click("charts.legend.0");
+    test.KeyUp(ImGuiMod_Alt);
+    test.Expect("Alt and a click show series 1 alone",
+                [] { return !ui.legend[0].hidden && ui.legend[1].hidden && ui.legend[2].hidden; });
+    test.KeyPress(ImGuiKey_Tab);  // after the click, the first Tab shows the focus on the entry
+    test.ExpectFocused("charts.legend.0");
+    test.KeyPress(ImGuiKey_Space | ImGuiMod_Alt);
+    test.Expect("Alt and Space on the entry shown alone show every entry",
+                [] { return !ui.legend[0].hidden && !ui.legend[1].hidden && !ui.legend[2].hidden; });
+    test.Expect("each press was reported once", [] { return ui.legendWrites == 6; });
+    test.Click("charts.legendReadOnly.1");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("the read-only legend writes nothing",
+                [] { return ui.legendReadOnly[1].hidden && !ui.legendReadOnly[0].hidden; });
+    test.ExpectFocused("charts.legendReadOnly.1");
 }
