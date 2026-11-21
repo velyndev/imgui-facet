@@ -394,7 +394,7 @@ void PeopleSection(facet::demo::PageCtx& ctx)
     facet::Slider("##maxVisible", &ui.maxVisible, 0, 7, {.width = DemoWidth(160.0f)});
     ctx.Probe("media.group.max");
     ImGui::SameLine();
-    facet::demo::NoteBeside(ui.maxVisible == 0 ? "0 fits the width" : "%d of 7", ui.maxVisible);
+    facet::demo::NoteBeside("of 7 members; 0 fits the width");
     LabeledRow("Group");
     if (Is(ctx, kPeople))
         ctx.ForceNextItemState(ForcedItemState::Hovered);
