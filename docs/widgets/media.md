@@ -105,7 +105,18 @@ getter overload is asked for the visible entries only. Reordering by drag is pla
 bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, const CarouselOptions& options = {});
 ```
 
-One slide at a time with buttons, page dots, swipe and an optional pausable autoplay. Status: planned.
+One slide at a time (9/16 of the width by default) with round previous and next buttons over its
+sides on the elevated surface, page dots under it (the page text from `Strings::pageOf` when the
+dots do not fit) and, with `autoplay`, a pause button at the end of that row. The slides are one
+Tab stop: Left and Right page, Home and End jump; the buttons are Tab stops of their own and a dot
+takes a click. A drag moves the slide with the pointer (with resistance past the ends) and the
+release pages by more than half a slide or by a flick faster than `drag.flickSpeed`; the slide then
+settles on the standard spring, at once with reduced motion. A sideways wheel or Shift+wheel
+pages one slide per notch; the plain wheel keeps scrolling the window. `loop` wraps at both ends. Autoplay
+pages every `autoplay` seconds, wrapping at the end, and waits while the pointer or visible
+keyboard focus is on a part of it, while it is paused, and always while motion is reduced (then
+the pause button is gone too). `captions` puts the item label on an elevated chip at the bottom.
+`Loading` draws a skeleton slide, `Error` and an empty list their messages. Status: ready.
 
 ### ImageViewer
 

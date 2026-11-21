@@ -473,3 +473,147 @@ TEST_CASE("A thumbnail strip from a getter skips the entries it refuses")
     CHECK(calls > 0);
     CHECK(calls < 20);
 }
+
+// ---- Carousel ----------------------------------------------------------------------------------
+
+TEST_CASE("A carousel pages with its buttons, the arrows, Home and End, and wraps when it loops")
+{
+    ReducedMotion reduced;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem slides[] = {{"Slide 1"}, {"Slide 2"}, {"Slide 3"}};
+    int index = 0;
+    int looping = 0;
+    session.SetUi([&] {
+        facet::Carousel("slides", &index, slides, {.width = 320.0f});
+        session.Track("slides");
+        facet::Carousel("loop", &looping, slides, {.loop = true, .width = 320.0f});
+        session.Track("loop");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("slides");
+    const float edge = facet::PxSnapped(facet::T().spacing.sm);
+    const float button = facet::ControlHeight(facet::ControlSize::Regular);
+    const float slideHeight = std::round(r.GetWidth() * 9.0f / 16.0f);
+    const ImVec2 nextAt(r.Max.x - edge - button * 0.5f, r.Min.y + slideHeight * 0.5f);
+    const ImVec2 previousAt(r.Min.x + edge + button * 0.5f, r.Min.y + slideHeight * 0.5f);
+    session.Click(nextAt);
+    CHECK(index == 1);
+    session.Click(nextAt);
+    session.Click(nextAt);  // disabled at the last slide without loop
+    CHECK(index == 2);
+    session.Click(previousAt);
+    CHECK(index == 1);
+    session.Click(ImVec2(r.GetCenter().x, r.Min.y + slideHeight * 0.5f));  // the slide itself takes the focus
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(index == 2);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(index == 0);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(index == 2);
+    const ImRect l = session.ItemRect("loop");
+    session.Click(ImVec2(l.GetCenter().x, l.Min.y + slideHeight * 0.5f));
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(looping == 2);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(looping == 0);
+    // A sideways wheel pages; the plain wheel is left to the window.
+    const ImVec2 middle(l.GetCenter().x, l.Min.y + slideHeight * 0.5f);
+    session.MouseMove(middle);
+    session.Wheel(middle, -1.0f);
+    session.Wheel(middle, -1.0f);
+    CHECK(looping == 0);
+    session.Wheel(middle, 0.0f, -1.0f);
+    session.Wheel(middle, 0.0f, -1.0f);
+    CHECK(looping != 0);
+}
+
+TEST_CASE("A carousel follows a drag and pages on a flick or past half a slide")
+{
+    ReducedMotion reduced;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem slides[] = {{"Slide 1"}, {"Slide 2"}, {"Slide 3"}};
+    int index = 0;
+    session.SetUi([&] {
+        facet::Carousel("slides", &index, slides, {.width = 320.0f, .height = 120.0f});
+        session.Track("slides");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("slides");
+    const float y = r.Min.y + facet::Px(60.0f);
+    // A slow drag of less than half a slide springs back.
+    session.Drag({ImVec2(r.GetCenter().x, y), ImVec2(r.GetCenter().x - r.GetWidth() * 0.2f, y)}, 30);
+    session.Frames(2);
+    CHECK(index == 0);
+    // A drag past half a slide pages.
+    session.Drag({ImVec2(r.Max.x - 60.0f, y), ImVec2(r.Max.x - 60.0f - r.GetWidth() * 0.6f, y)}, 30);
+    CHECK(index == 1);
+    // A short fast flick pages too.
+    session.Drag({ImVec2(r.GetCenter().x, y), ImVec2(r.GetCenter().x - r.GetWidth() * 0.15f, y)}, 1);
+    CHECK(index == 2);
+    // A drag past the last slide does not leave the range.
+    session.Drag({ImVec2(r.GetCenter().x, y), ImVec2(r.Min.x + 4.0f, y)}, 4);
+    CHECK(index == 2);
+}
+
+TEST_CASE("A carousel with one slide or none has no buttons and no slide keys")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem one[] = {{"Slide 1"}};
+    int index = 0;
+    int none = 0;
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::Carousel("one", &index, one, {.width = 320.0f}))
+            ++writes;
+        session.Track("one");
+        if (facet::Carousel("none", &none, std::span<const facet::ImageItem>(), {.width = 320.0f}))
+            ++writes;
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("one"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(index == 0);
+    CHECK(writes == 0);
+}
+
+TEST_CASE("Carousel autoplay advances, pauses while hovered and with its button, and is off with reduced motion")
+{
+    ThemeGuard guard;
+    facet::Theme theme = facet::T();
+    theme.motion.reduceMotion = false;
+    facet::SetTheme(theme, false);
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetFollowSystemMotion(false);
+    static const facet::ImageItem slides[] = {{"Slide 1"}, {"Slide 2"}, {"Slide 3"}};
+    int index = 0;
+    session.SetUi([&] {
+        facet::Carousel("slides", &index, slides, {.autoplay = 0.5f, .width = 320.0f});
+        session.Track("slides");
+    });
+    session.Frame();
+    session.MouseMove(ImVec2(700.0f, 580.0f));
+    session.Seconds(0.6f);
+    CHECK(index == 1);
+    const ImRect r = session.ItemRect("slides");
+    session.MouseMove(At(r, 0.5f, 0.3f));
+    session.Seconds(1.0f);
+    CHECK(index == 1);
+    // The pause button at the end of the row stops it.
+    const float row = facet::ControlHeight(facet::ControlSize::Small);
+    session.Click(ImVec2(r.Max.x - row * 0.5f, r.Max.y - row * 0.5f));
+    session.MouseMove(ImVec2(700.0f, 580.0f));
+    session.Seconds(1.2f);
+    CHECK(index == 1);
+    theme.motion.reduceMotion = true;
+    facet::SetTheme(theme, false);
+    session.Click(ImVec2(r.Max.x - row * 0.5f, r.Max.y - row * 0.5f));  // no button any more: nothing
+    session.MouseMove(ImVec2(700.0f, 580.0f));
+    session.Seconds(1.2f);
+    CHECK(index == 1);
+    facet::SetFollowSystemMotion(true);
+}
