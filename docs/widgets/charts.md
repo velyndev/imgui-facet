@@ -171,7 +171,24 @@ Status: ready.
 void LevelMeter(const char* label, std::span<const float> channels, double min, double max, const LevelMeterOptions& options = {});
 ```
 
-Smoothed bar per channel with zones and peak hold. Status: planned.
+One bar per channel, `charts.meterSegmentGap` apart. Each bar follows its value with
+exponential smoothing (time constant `motion.durationFast`, at once with reduced motion); a value
+outside `min` to `max` is drawn clamped, NaN as `min`. The part of a fill inside a zone takes the
+zone's tone, so where a warning or clipping band starts shows on the bar itself.
+
+- **Peak hold:** with `peakHold` a mark in the label color stays at the highest recent value for
+  `charts.peakHold` seconds (times `motion.scale`), then falls back over four slow durations; with
+  reduced motion it jumps back.
+- **Segments:** `segments` draws square cells instead of a solid bar; a cell is lit up to the value.
+- **Label:** horizontal meters draw the visible label part in front (inside the width, as fields
+  do); vertical meters draw it above their columns, where a narrow column has room for it.
+- **Not interactive:** one item, not a Tab stop. Smoothing and peaks of the first 32 channels are
+  kept under the id in fixed storage; later channels show their value directly. No allocation per
+  frame.
+- **Size:** horizontal: `width` 0 fills, `height` 0 is the control height shared by the channels;
+  vertical: `width` 0 is one control height per channel, `height` 0 is `metrics.chartHeight`.
+
+Status: ready.
 
 ### FrameTimeGraph
 
