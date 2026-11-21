@@ -721,3 +721,44 @@ TEST_CASE("An image viewer without a ready image writes no view")
     CHECK(writes == 0);
     CHECK(view.zoom == 0.0f);
 }
+
+// ---- ImageCompare ------------------------------------------------------------------------------
+
+TEST_CASE("An image compare divider moves by press, drag and keys, and never in read-only")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ImageHandle a = MakeImage(160, 90, 40);
+    const facet::ImageHandle b = MakeImage(160, 90, 220);
+    float split = 0.5f;
+    float fixed = 0.5f;
+    float vertical = 0.5f;
+    session.SetUi([&] {
+        facet::ImageCompare("compare", &split, a, b, {.width = 320.0f});
+        session.Track("compare");
+        facet::ImageCompare("fixed", &fixed, a, b, {.width = 320.0f, .readOnly = true});
+        session.Track("fixed");
+        facet::ImageCompare("vertical", &vertical, a, b, {.orientation = facet::Orientation::Vertical, .width = 160.0f});
+        session.Track("vertical");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("compare");
+    CHECK(r.GetHeight() == doctest::Approx(std::round(r.GetWidth() * 90.0f / 160.0f)));
+    session.Click(At(r, 0.25f, 0.5f));
+    CHECK(split == doctest::Approx(0.25f).epsilon(0.02));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(split == doctest::Approx(0.26f).epsilon(0.02));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(split == 1.0f);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(split == 0.0f);
+    session.Drag({At(r, 0.0f, 0.5f), At(r, 0.6f, 0.5f)}, 6);
+    CHECK(split == doctest::Approx(0.6f).epsilon(0.03));
+    session.Click(At(session.ItemRect("fixed"), 0.2f, 0.5f));
+    CHECK(fixed == 0.5f);
+    // Vertical: the first image is on top, and split counts from the top.
+    session.Click(At(session.ItemRect("vertical"), 0.5f, 0.25f));
+    CHECK(vertical == doctest::Approx(0.25f).epsilon(0.03));
+    facet::ReleaseImage(a);
+    facet::ReleaseImage(b);
+}

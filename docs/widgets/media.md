@@ -142,7 +142,13 @@ linear), so single pixels are not drawn as hard squares. Status: ready.
 bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHandle after, const ImageCompareOptions& options = {});
 ```
 
-Before and after images with a draggable divider. Status: planned.
+Two images in one box (from the first image's aspect ratio), the first before the divider and the
+second after it, each with its own loading and failed look. The divider is a line of the surface
+color between boundary hairlines, so it shows over any picture, with a slider knob in its middle,
+and is one handle of the multi-handle block: drag it, press anywhere to move it there, or focus it
+and use the arrows (Shift fine, Ctrl coarse), Page Up and Down, Home and End; Escape during a drag
+restores it. Vertical moves the divider up and down with the first image on top. `beforeLabel` and
+`afterLabel` are captions on elevated chips in the corners. Status: ready.
 
 ### TimelineScrubber
 
