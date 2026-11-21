@@ -35,6 +35,7 @@ enum CaptureState
     kDateOpen,
     kDateFocused,
     kRangeOpen,
+    kTimeOpen,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -58,6 +59,9 @@ struct OtherPickersUi
     facet::Date limitedStart;
     facet::Date limitedEnd;
     facet::TimeOfDay time = {.hour = 12};
+    facet::TimeOfDay time12 = {.hour = 18, .minute = 45};
+    facet::TimeOfDay timeSeconds = {.hour = 8, .minute = 30, .second = 15};
+    facet::TimeOfDay timeInline = {.hour = 9, .minute = 30};
     float angle = 0.0f;
     facet::Icon icon = facet::Icon("star");
     int thumbnail = 0;
@@ -214,9 +218,51 @@ void RangeSection(facet::demo::PageCtx& ctx)
     Note("Range: %s to %s.", DateText(ui.start, 0), DateText(ui.end, 1));
 }
 
+// The text of a time for the notes.
+const char* TimeText(const facet::TimeOfDay& time)
+{
+    static char text[16];
+    std::snprintf(text, sizeof(text), "%02d:%02d:%02d", time.hour, time.minute, time.second);
+    return text;
+}
+
+void TimeSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("TimePicker");
+    Paragraph("A segmented time field. Up and Down step the hour, minute or second and wrap around midnight; digits "
+              "type it and Enter writes; A or P sets the half of the day on a 12-hour clock. A click, Space, Enter or "
+              "Alt+Down opens scrolling columns that write at once; Enter closes them.");
+    if (ctx.capture && ctx.captureState == kTimeOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    facet::TimePicker("24 hours", &ui.time, {.minuteStep = 5, .width = DemoWidth(220.0f), .helpText = "Minutes in steps of 5"});
+    ctx.Probe("pickers.time");
+    if (ctx.capture && ctx.captureState == kTimeOpen)
+        ctx.RevealInCapture(0.2f);
+    facet::TimePicker("12 hours", &ui.time12, {.twelveHour = true, .width = DemoWidth(220.0f)});
+    ctx.Probe("pickers.time.twelve");
+    facet::TimePicker("Seconds", &ui.timeSeconds, {.showSeconds = true, .width = DemoWidth(220.0f)});
+    ctx.Probe("pickers.time.seconds");
+    facet::TimeOfDay fixed{.hour = 14, .minute = 10};
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::TimePicker("##disabled", &fixed, {.width = DemoWidth(200.0f)});
+    ImGui::EndDisabled();
+    LabeledRow("Read-only");
+    facet::TimePicker("##readonly", &fixed, {.width = DemoWidth(200.0f), .readOnly = true});
+    LabeledRow("Inline");
+    facet::TimePicker("##inline", &ui.timeInline, {.minuteStep = 15, .inlineColumns = true, .width = DemoWidth(200.0f)});
+    ctx.Probe("pickers.time.inline");
+    Note("Values: %s, %s.", TimeText(ui.time), [] {
+        static char text[16];
+        std::snprintf(text, sizeof(text), "%02d:%02d", ui.timeInline.hour, ui.timeInline.minute);
+        return text;
+    }());
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open")
+FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
+                "time-open")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
@@ -225,11 +271,7 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
 
     DateSection(ctx);
     RangeSection(ctx);
-
-    SectionHeader("Times");
-    LabeledRow("Time");
-    facet::TimePicker("##time", &ui.time);
-    ctx.Probe("pickers.time");
+    TimeSection(ctx);
 
     SectionHeader("Other pickers");
     LabeledRow("Angle");
@@ -323,10 +365,47 @@ FACET_DEMO_SELFTEST("pickers-date")
                 [same] { return same(ui.start, Date{2026, 3, 14}) && same(ui.end, Date{2026, 3, 21}); });
     test.ExpectFocused("pickers.range");
 
-    // The planned pickers are placeholders: clicks and keys write nothing.
+    // TimePicker by keyboard: the hour steps around midnight, the columns write at once.
+    test.Reveal("pickers.time");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.time = {.hour = 23, .minute = 55}; });
     test.Click("pickers.time");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectFocused("pickers.time");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_LeftArrow);
     test.KeyPress(ImGuiKey_UpArrow);
-    test.ExpectNear("the time placeholder writes nothing", [] { return ui.time.hour; }, 12.0, 0.0);
+    test.Expect("Up on the hour wraps from 23 to 0", [] { return ui.time.hour == 0 && ui.time.minute == 55; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.Expect("Up on the minute carries into the hour", [] { return ui.time.hour == 1 && ui.time.minute == 0; });
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Type("0930");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("typed digits are written on Enter", [] { return ui.time.hour == 9 && ui.time.minute == 30; });
+    test.ExpectFocused("pickers.time");
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectNear("Down in the hour column writes at once", [] { return ui.time.hour * 100 + ui.time.minute; }, 1030.0, 0.0);
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectFocused("pickers.time");
+    // By mouse: a vertical drag on the minute steps it.
+    test.Drag({facet::demo::Target::Item("pickers.time", 0.12f), facet::demo::Target::Item("pickers.time", 0.12f).Offset(0.0f, -24.0f)},
+              0.3f);
+    test.ExpectNear("a drag up on the field steps the focused segment up",
+                    [] { return ui.time.hour * 100 + ui.time.minute; }, 1045.0, 0.0);
+    test.Click("pickers.time.twelve");
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_Escape);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Type("a");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("A on a 12-hour clock moves the time before noon", [] { return ui.time12.hour == 6 && ui.time12.minute == 45; });
+
+    // The planned pickers are placeholders: clicks and keys write nothing.
     test.Click("pickers.angle");
     test.KeyPress(ImGuiKey_RightArrow);
     test.ExpectNear("the angle placeholder writes nothing", [] { return ui.angle; }, 0.0, 0.0);

@@ -268,7 +268,34 @@ struct TimeOfDay { int hour; int minute; int second; };
 bool TimePicker(const char* label, TimeOfDay* time, const TimePickerOptions& options = {});
 ```
 
-A segmented time field with scrolling hour and minute columns, 12 or 24 hours. Status: planned.
+A segmented time field: `14:05`, `14:05:30` with `showSeconds`, and with `twelveHour` the hour 1 to
+12 (12 at noon and midnight) followed by `Strings::am` or `Strings::pm`, with a clock icon at its
+end. A field widget: the label in front, the available width by default.
+
+Keys on the focused field: Left and Right pick the segment; Up and Down step it and write at once,
+the wheel while focused and a vertical drag on the field as well, each step an edit session of the
+value drag core (Escape during a held step restores the time). Steps wrap around midnight and carry
+into the next larger unit: 23:59 plus a minute is 00:00, 00:00 minus an hour is 23:00; the AM and
+PM segment moves the time by twelve hours. Minutes step by `minuteStep` on the slots 0, step, twice
+the step and so on in every hour; a minute between slots first moves to the next slot in the
+direction of the step. Typed digits fill the segment (a first hour digit that cannot start a two
+digit hour fills it alone) and move on; `:`, `.` and a space move on too; A or P sets the half of
+the day. Typed parts are written on Enter, Tab or focus loss when they make a valid time; an
+invalid one (hour 25) stays shown as typed until corrected, and Escape drops them.
+
+A click, Enter, Space or Alt+Down opens a popover below the field with one scrolling column per
+unit (hours, minutes in slots, seconds, AM and PM), each `picker.timeColumnWidth` wide and five
+rows tall, the chosen entry on the selection pill. The focus starts on the chosen hour; Tab moves
+between the columns. A click or an arrow key in a column writes at once; Enter or a double click
+writes and closes, and the focus returns to the field; Escape or a click outside closes. With
+`inlineColumns` the columns stay under the field and scroll to the time whenever it changes
+elsewhere.
+
+`readOnly` (or a null `time`) shows and focuses but never writes or opens. `mixed` shows
+`Strings::mixed` until a time is written. `error` and `helpText` show under the field. Captures:
+`ForcedItemState::Open` shows the popover; with `inlineColumns`, a request for part 1 goes to the
+first column. State under the id: the focused segment and typed parts; the columns keep their
+scroll positions. Status: ready.
 
 ### AnglePicker
 

@@ -355,6 +355,67 @@ Date DateAtPrecision(const Date& date, DatePrecision precision)
     return out;
 }
 
+// ---- Time of day arithmetic -----------------------------------------------------------------------
+
+int TimeToSeconds(const TimeOfDay& time)
+{
+    return std::clamp(time.hour, 0, 23) * 3600 + std::clamp(time.minute, 0, 59) * 60 + std::clamp(time.second, 0, 59);
+}
+
+TimeOfDay TimeFromSeconds(long long seconds)
+{
+    const long long wrapped = ((seconds % kTimeSecondsPerDay) + kTimeSecondsPerDay) % kTimeSecondsPerDay;
+    const int day = static_cast<int>(wrapped);
+    return TimeOfDay{day / 3600, (day / 60) % 60, day % 60};
+}
+
+TimeOfDay TimeStep(const TimeOfDay& time, TimeSegment segment, int steps, int minuteStep)
+{
+    const long long total = TimeToSeconds(time);
+    switch (segment)
+    {
+    case TimeSegment::Hour:
+        return TimeFromSeconds(total + 3600LL * steps);
+    case TimeSegment::Second:
+        return TimeFromSeconds(total + steps);
+    case TimeSegment::HalfDay:
+        return TimeFromSeconds(total + 43200LL * steps);
+    case TimeSegment::Minute:
+        break;
+    }
+    const int step = std::clamp(minuteStep, 1, 60);
+    const int slots = 59 / step + 1;
+    long long hour = total / 3600;
+    const int minute = static_cast<int>((total / 60) % 60);
+    const int second = static_cast<int>(total % 60);
+    long long slot = minute / step;
+    long long remaining = steps;
+    if (minute % step != 0 && remaining != 0)
+    {
+        // Off the grid: the first step lands on the next slot in its direction.
+        if (remaining > 0)
+        {
+            ++slot;
+            --remaining;
+        }
+        else
+        {
+            ++remaining;
+        }
+    }
+    slot += remaining;
+    const long long carry = slot >= 0 ? slot / slots : -((-slot + slots - 1) / slots);
+    hour += carry;
+    slot -= carry * slots;
+    return TimeFromSeconds(hour * 3600 + slot * step * 60 + second);
+}
+
+int TimeHour12(int hour24)
+{
+    const int hour = ((hour24 % 12) + 12) % 12;
+    return hour == 0 ? 12 : hour;
+}
+
 // ---- Calendar panel -----------------------------------------------------------------------------
 
 void CalendarPanelOpen(ImGuiID panelId, const Date& focus, const CalendarPanelDesc& desc)

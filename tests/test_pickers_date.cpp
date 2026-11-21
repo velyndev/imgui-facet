@@ -598,3 +598,176 @@ TEST_CASE("A range picker shows one month when the display has no room for two")
     CHECK(range.cells[0].GetWidth() > 1.0f);
     CHECK(range.cells[2].GetWidth() == 0.0f);  // April is not shown
 }
+// ---- TimePicker ---------------------------------------------------------------------------------
+
+namespace
+{
+
+using facet::TimeOfDay;
+
+bool SameTime(const TimeOfDay& a, int hour, int minute, int second = 0)
+{
+    return a.hour == hour && a.minute == minute && a.second == second;
+}
+
+} // namespace
+
+TEST_CASE("Time steps wrap around midnight, carry into the next unit and keep the minute slots")
+{
+    using fi::TimeSegment;
+    CHECK(SameTime(fi::TimeStep({23, 0, 0}, TimeSegment::Hour, 1, 1), 0, 0));
+    CHECK(SameTime(fi::TimeStep({0, 30, 0}, TimeSegment::Hour, -1, 1), 23, 30));
+    CHECK(SameTime(fi::TimeStep({23, 59, 0}, TimeSegment::Minute, 1, 1), 0, 0));
+    CHECK(SameTime(fi::TimeStep({0, 0, 0}, TimeSegment::Minute, -1, 1), 23, 59));
+    CHECK(SameTime(fi::TimeStep({23, 59, 59}, TimeSegment::Second, 1, 1), 0, 0, 0));
+    CHECK(SameTime(fi::TimeStep({10, 59, 59}, TimeSegment::Second, 1, 1), 11, 0, 0));
+    CHECK(SameTime(fi::TimeStep({11, 0, 0}, TimeSegment::HalfDay, 1, 1), 23, 0));
+    CHECK(SameTime(fi::TimeStep({23, 0, 0}, TimeSegment::HalfDay, 1, 1), 11, 0));
+    // Minute slots of five: off the grid the first step lands on the next slot in its direction.
+    CHECK(SameTime(fi::TimeStep({10, 7, 0}, TimeSegment::Minute, 1, 5), 10, 10));
+    CHECK(SameTime(fi::TimeStep({10, 7, 0}, TimeSegment::Minute, 2, 5), 10, 15));
+    CHECK(SameTime(fi::TimeStep({10, 7, 0}, TimeSegment::Minute, -1, 5), 10, 5));
+    CHECK(SameTime(fi::TimeStep({10, 55, 0}, TimeSegment::Minute, 1, 5), 11, 0));
+    CHECK(SameTime(fi::TimeStep({23, 50, 0}, TimeSegment::Minute, 1, 15), 0, 0));
+    CHECK(SameTime(fi::TimeStep({0, 0, 0}, TimeSegment::Minute, -1, 15), 23, 45));
+    CHECK(fi::TimeHour12(0) == 12);
+    CHECK(fi::TimeHour12(12) == 12);
+    CHECK(fi::TimeHour12(13) == 1);
+    CHECK(fi::TimeHour12(11) == 11);
+}
+
+TEST_CASE("A time field steps its segments with Up and Down and wraps around midnight")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TimeOfDay time{23, 59, 0};
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::TimePicker("Time", &time))
+            ++writes;
+        session.Track("time");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("time"));
+    session.KeyPress(ImGuiKey_UpArrow);  // the hour segment comes first
+    CHECK(SameTime(time, 0, 59));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(SameTime(time, 1, 0));
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(SameTime(time, 0, 58));
+    CHECK(writes == 4);
+}
+
+TEST_CASE("A twelve-hour time field shows 12 at noon and midnight and switches the half of the day")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TimeOfDay time{0, 30, 0};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::TimePicker("Time", &time, {.twelveHour = true});
+        session.Track("time");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("time"));
+    // Hour 12 AM, then 11 PM the day before when stepped down.
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(SameTime(time, 23, 30));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_UpArrow);  // the AM and PM segment
+    CHECK(SameTime(time, 11, 30));
+    session.Type("p");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(SameTime(time, 23, 30));
+    // Typed 12-hour digits: 12 typed with AM is midnight.
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Type("12");
+    session.Type("05");
+    session.Type("a");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(SameTime(time, 0, 5));
+}
+
+TEST_CASE("Typed time digits are written on Enter or Tab, and an invalid hour waits")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TimeOfDay time{12, 0, 0};
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::TimePicker("Time", &time, {.showSeconds = true}))
+            ++writes;
+        session.Track("time");
+        ImGui::Button("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("time"));
+    session.Type("093015");
+    CHECK(SameTime(time, 12, 0));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(SameTime(time, 9, 30, 15));
+    CHECK(writes == 1);
+    // A first digit of 3 to 9 fills the hour alone and moves on.
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Type("745");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(SameTime(time, 7, 45, 15));
+    CHECK(writes == 2);
+}
+
+TEST_CASE("The time columns write at once and Enter closes them with the focus back on the field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TimeOfDay time{1, 0, 0};
+    bool open = false;
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::TimePicker("Time", &time, {.minuteStep = 15}))
+            ++writes;
+        session.Track("time");
+        open = fi::IsPopupLevelOpen(ImHashStr("##columns", 0, ImGui::GetID("Time")));
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("time"));
+    session.Frames(2);
+    REQUIRE(open);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("time"));
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    REQUIRE(open);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(SameTime(time, 2, 0));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(SameTime(time, 2, 15));
+    CHECK(open);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(open);
+    CHECK(SameTime(time, 2, 15));
+    CHECK(ImGui::GetFocusID() == session.ItemId("time"));
+    CHECK(writes == 2);
+}

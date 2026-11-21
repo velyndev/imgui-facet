@@ -73,6 +73,30 @@ void DateFormat(char* out, std::size_t size, const Date& date, DatePrecision pre
 // The date written at a precision: Month sets the day to 1, Year month and day.
 Date DateAtPrecision(const Date& date, DatePrecision precision);
 
+// ---- Time of day arithmetic -----------------------------------------------------------------------
+
+inline constexpr int kTimeSecondsPerDay = 86400;
+
+// Seconds since midnight; fields outside their ranges are clamped first.
+int TimeToSeconds(const TimeOfDay& time);
+// The time `seconds` after midnight, wrapped into one day (negative values count back).
+TimeOfDay TimeFromSeconds(long long seconds);
+// The segments of a time field.
+enum class TimeSegment
+{
+    Hour,
+    Minute,
+    Second,
+    HalfDay,  // AM and PM
+};
+// `time` stepped `steps` times on `segment`, wrapping around midnight: an hour, a minute slot of
+// `minuteStep` minutes (the slots are 0, minuteStep, 2 * minuteStep and so on in each hour, a
+// minute between slots first moves to the next slot in the direction of the step, and the hour
+// carries), a second (carrying into the minute), or half a day.
+TimeOfDay TimeStep(const TimeOfDay& time, TimeSegment segment, int steps, int minuteStep);
+// The hour 1 to 12 of a 12-hour clock, and whether it is after noon.
+int TimeHour12(int hour24);
+
 // ---- Calendar panel -----------------------------------------------------------------------------
 
 enum class CalendarView
