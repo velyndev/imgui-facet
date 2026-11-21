@@ -197,8 +197,23 @@ void FrameTimeGraph(const char* id, const FrameTimeGraphOptions& options = {});
 void FrameTimeGraph(const char* id, std::span<const float> frameTimes, const FrameTimeGraphOptions& options = {});
 ```
 
-Rolling frame time graph with the frame rate and a target line; the second overload draws the
-caller's frame times. Status: planned.
+One bar per frame, newest at the right, as many recent frames as fit at `charts.barGap` pixels
+each. The first overload draws the frame times the charts subsystem records in every
+`facet::NewFrame` (`io.DeltaTime`, the last 300 frames); the second draws the caller's times, in
+seconds, oldest first.
+
+- **Readout:** the frames per second (from the average of the frames shown) in Headline, and the
+  minimum, average and maximum frame time in milliseconds. `compact` shows only the frame rate
+  beside a small graph.
+- **Target:** a line at `target` seconds (0: 1/60); frames over it are drawn in the warning color
+  and reach above the line, so they stand out without color too. The graph's top is twice the
+  target or the slowest frame shown.
+- **Not interactive:** one item, not a Tab stop. It reads the samples in place: no allocation.
+- **Text:** the words of the readout ("fps", "min", "avg", "max", "ms") are fixed English text for
+  now; they are not in the `Strings` table yet.
+- **Size:** `width` 0 fills, `height` 0 is `metrics.chartHeight` (compact: two control heights).
+
+Status: ready.
 
 ### Legend
 
