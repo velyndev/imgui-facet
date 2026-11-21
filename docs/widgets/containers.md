@@ -143,9 +143,29 @@ bool OverlayHitTest(ImVec2 point);
 int GetOverlayInputRegions(std::span<ScreenRegion> regions);
 ```
 
-Shows and hides an overlay menu with a fade and a toggle key, and tells the host which screen
-regions take input. Called by the host outside every window, like the mini window below.
-Status: planned.
+The controller of an overlay menu, for a menu drawn over a game or another app. The host calls it
+once per frame outside every window.
+
+- **Menu.** The windows Dear ImGui begins between `BeginOverlay` and `EndOverlay` (shells, other
+  windows, their popups) form the menu. `BeginOverlay` returns false once the menu is fully hidden
+  and when `visible` is null; call `EndOverlay` only after true.
+- **Fade.** When `*visible` turns true the menu fades in, when it turns false it fades out, over
+  `motion.durationStandard` (at once with reduced motion). The fade is applied to every vertex of the
+  menu's windows, so Facet's drawing fades with Dear ImGui's. While it fades out the menu takes no
+  mouse or keyboard input and the keyboard focus leaves it.
+- **Toggle.** `toggleShortcut`, a shortcut the host registered (`core/input.h`), flips `*visible`
+  when it fires; otherwise the caller writes the flag.
+- **Scrim.** With `scrim`, the scene behind the menu is dimmed with the scrim color while the menu
+  shows, fading with it.
+- **Input.** The windows that take input in a frame are recorded for the host: the menu's root
+  windows while it is visible and not fading out, and mini windows that are not click-through.
+  `OverlayHitTest(point)` tells whether a point (pixels, main viewport) lies on one of them in the
+  last frame, `GetOverlayInputRegions` writes their rectangles (up to 32 are kept) and returns how
+  many there were. `OverlayWantsMouse` is `io.WantCaptureMouse` limited to those windows (and to a
+  drag that started on one), `OverlayWantsKeyboard` is `io.WantCaptureKeyboard` while one of them has
+  the keyboard focus; both are false while the menu is hidden.
+
+Status: ready.
 
 ### BeginMiniWindow
 
@@ -155,8 +175,24 @@ void EndMiniWindow();
 class MiniWindowScope;
 ```
 
-A compact panel that stays visible while pinned and lets input through while the overlay menu is
-hidden. Status: planned.
+A compact panel for an overlay host, called outside every window and outside `BeginOverlay`.
+
+- **Showing.** It shows while the overlay menu shows (also while it fades), and while `*pinned` is
+  true also when the menu is hidden. A null `pinned` means never pinned and no pin button.
+- **Look.** A top-level window that sizes itself to its content (or is `width` units wide) on the
+  opaque elevated surface of elevation 1 with its shadow, the card radius and `spacing.md` padding.
+  While the menu shows it has a title row: the optional `icon`, the visible label part in Headline
+  (cut with an ellipsis and a tooltip when `width` is set) and, at the trailing edge, the pin button
+  named by `Strings::pin`, or `Strings::unpin` while pinned, which flips `*pinned`.
+- **Click-through.** Pinned while the menu is hidden it shows only its content, and with
+  `clickThrough` (the default) it takes no mouse or keyboard input, so the game or app behind it
+  keeps both; it is then not part of the overlay's input regions. Otherwise it takes input and is.
+- **Moving.** While the menu shows, dragging the title row moves it. Its position is kept in design
+  units under its name (saved in the ini file with `persist`) and clamped into the display; the
+  first position is the display's top-left corner inside `overlay.viewportMargin`.
+
+`BeginMiniWindow` returns false while hidden; call `EndMiniWindow` only after true. It appears and
+disappears with the menu's state at once, without a fade of its own. Status: ready.
 
 ### BeginToolbar
 

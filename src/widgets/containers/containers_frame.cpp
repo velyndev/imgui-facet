@@ -18,10 +18,12 @@ void ContainersEndFrame()
     ClearGroupBoxStack();
     ClearCardStack();
     ClearShellStack();
+    ClearMiniWindowStack();
     ClearContainerBackdrops();
     ClearTitleBarStack();
     RotateTitleBarRegions();
     RotateAppFrameRecord();
+    RotateOverlayRegions();
     ClearTitleBarPress();
 }
 

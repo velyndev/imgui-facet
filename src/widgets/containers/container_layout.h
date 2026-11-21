@@ -175,6 +175,19 @@ void ClearTitleBarPress();
 // facet::EndFrame: this frame's app frame record becomes the one AppFrameHitTest reads.
 void RotateAppFrameRecord();
 
+// ---- Overlay ------------------------------------------------------------------------------------
+
+// Windows that take input in one frame, for the overlay's queries (OverlayHitTest and friends).
+inline constexpr int kOverlayRegionCount = 32;
+// Records window (a root window) as taking input this frame: the overlay menu's windows while it
+// is visible, and mini windows that are not click-through.
+void AddOverlayInputRegion(ImGuiWindow* window);
+// The overlay menu shows (visible or fading) in this frame once BeginOverlay ran, else in the last
+// frame; false when no overlay ran in either.
+bool OverlayMenuShown();
+// facet::EndFrame: this frame's regions become the last frame's.
+void RotateOverlayRegions();
+
 // ---- Frame end ----------------------------------------------------------------------------------
 
 // facet::EndFrame (containers_frame.cpp): every widget of the family forgets the Begins whose End
@@ -185,5 +198,6 @@ void ClearDisclosureStack();
 void ClearAccordionStack();
 void ClearShellStack();
 void ClearTitleBarStack();
+void ClearMiniWindowStack();
 
 } // namespace facet::internal

@@ -34,6 +34,7 @@ enum CaptureState
     kCaptureFocused = 2,
     kCaptureHovered = 3,
     kCaptureMenu = 4,
+    kCaptureOverlay = 5,
 };
 
 constexpr int kScrollLines = 40;
@@ -46,6 +47,12 @@ struct ContainersState
     bool shellOpen = false;
     ImRect shellRect;           // the shell window in the last frame it showed
     int shellPresses = 0;
+    // Overlay and mini window
+    bool overlayVisible = false;
+    bool miniPinned = false;
+    int menuPresses = 0;
+    ImVec2 miniCenter = {0.0f, 0.0f};
+    bool miniTakesInput = false;
     // Title bar
     const char* lastWindowButton = "none";
     bool maximized = false;
@@ -209,12 +216,63 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
         }
     }
     Note("Last pressed: %s.", s.lastWindowButton);
-    SectionHeader("App frame and overlay controller");
-    Note("The app frame and the overlay controller are root containers: the host calls them once "
-         "per frame outside every window, and the app frame fills the whole viewport, so this page "
-         "does not call them. The app frame's hit test, size limits and placement are checked"
-         " by the unit tests in tests/test_containers.cpp, and "
-         "docs/widgets/containers.md shows the host code for each.");
+    SectionHeader("App frame");
+    Note("The app frame is a root container: the host calls it once per frame outside every window "
+         "and it fills the whole viewport, so this page does not call it. Its hit test, size limits "
+         "and placement are checked by the unit tests in tests/test_containers.cpp, and "
+         "docs/widgets/containers.md shows the host code.");
+
+    SectionHeader("Overlay controller and mini window");
+    Paragraph("An overlay menu as a host would show it over a game: the first checkbox shows or hides "
+              "the menu (a small shell) with a fade. The mini window shows with the menu; pinned, it "
+              "stays while the menu is hidden and then lets input through. A host calls the controller "
+              "outside every window; this page calls it from its own code to show it.");
+    if (ctx.capture)
+    {
+        s.overlayVisible = ctx.captureState == kCaptureOverlay;
+        s.miniPinned = ctx.captureState == kCaptureOverlay;
+    }
+    LabeledRow("Overlay menu");
+    ImGui::Checkbox("##overlay", &s.overlayVisible);
+    facet::ItemCursor();
+    ctx.Probe("containers.overlay");
+    LabeledRow("Pin the mini window");
+    ImGui::Checkbox("##pinned", &s.miniPinned);
+    facet::ItemCursor();
+    ctx.Probe("containers.mini.pinned");
+    if (facet::BeginOverlay("containers.overlay", &s.overlayVisible))
+    {
+        facet::ShellOptions menu{.initialSize = {260.0f, 160.0f}, .centered = false,
+                                 .corner = facet::ScreenCorner::TopRight};
+        menu.persist = false;
+        if (facet::BeginShell("Overlay menu###containers.overlay.shell", nullptr, menu))
+        {
+            Note("Placeholder content of the overlay menu.");
+            if (facet::Button("Count a menu press"))
+                ++s.menuPresses;
+            ctx.Probe("containers.overlay.button");
+            facet::EndShell();
+        }
+        facet::EndOverlay();
+    }
+    if (facet::BeginMiniWindow("Mini window###containers.mini", &s.miniPinned,
+                               {.icon = facet::Icon("info"), .persist = false}))
+    {
+        ImGuiWindow* mini = ImGui::GetCurrentWindow();
+        const ImRect r = mini->Rect();
+        s.miniCenter = r.GetCenter();
+        Note("Placeholder content.");
+        // The pin button sits at the end of the title row, in the window's padding.
+        const float pad = facet::Px(facet::T().spacing.md);
+        const float side = facet::ControlHeight(facet::ControlSize::Small);
+        ImGui::PushClipRect(r.Min, r.Max, false);
+        facet::demo::ProbeRect(ctx, "containers.mini.pin", mini->GetID("##pin"),
+                               ImVec2(r.Max.x - pad - side, r.Min.y + pad), ImVec2(r.Max.x - pad, r.Min.y + pad + side));
+        ImGui::PopClipRect();
+        facet::EndMiniWindow();
+    }
+    s.miniTakesInput = facet::OverlayHitTest(s.miniCenter);
+    Note("Menu presses: %d. The mini window takes input: %s.", s.menuPresses, s.miniTakesInput ? "yes" : "no");
 }
 
 // One toolbar button that records its activation, probed while it shows. Returns whether it shows.
@@ -524,7 +582,7 @@ void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
 
 } // namespace
 
-FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "focused", "hovered", "menu")
+FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "focused", "hovered", "menu", "overlay")
 {
     facet::demo::PageHeader("Containers",
                             "The floating shell, the app frame and its title bar, the overlay controller, mini "
@@ -701,6 +759,39 @@ FACET_DEMO_SELFTEST("containers")
     // Status bar: not interactive; the first segment follows the tool presses.
     test.Reveal("containers.status");
     test.ExpectVisible("containers.status");
+
+    // Overlay: the checkbox shows the menu; the mini window shows with it and pins; pinned and
+    // without the menu it lets input through.
+    test.Do([] {
+        ContainersState& s = State();
+        s.overlayVisible = false;
+        s.miniPinned = false;
+        s.menuPresses = 0;
+    });
+    test.Click("containers.overlay");
+    test.WaitSeconds(0.5f);
+    test.Expect("the checkbox shows the overlay menu", [] { return State().overlayVisible; });
+    test.Click("containers.overlay.button");
+    test.Expect("a button in the overlay menu works", [] { return State().menuPresses == 1; });
+    test.Expect("the mini window takes input while the menu shows", [] { return State().miniTakesInput; });
+    test.Click("containers.mini.pin");
+    test.Expect("the pin button pins the mini window", [] { return State().miniPinned; });
+    test.Click("containers.overlay");
+    test.WaitSeconds(0.5f);
+    test.Expect("the pinned mini window lets input through without the menu", [] {
+        return !State().overlayVisible && !State().miniTakesInput;
+    });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("containers.overlay");
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.5f);
+    test.Expect("Space on the checkbox shows the menu again", [] { return State().overlayVisible; });
+    // The menu's shell took the keyboard focus as it appeared; the mouse hides the menu again.
+    test.Click("containers.overlay");
+    test.WaitSeconds(0.5f);
+    test.Expect("the checkbox hides the menu", [] { return !State().overlayVisible; });
+    test.Do([] { State().miniPinned = false; });
+    test.Wait(2);
 
     // Card: the content works and fills the inner width.
     test.Click("containers.card.button");

@@ -4,6 +4,7 @@
 // pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
 // tests/test_api_containers.cpp.
 
+#include <array>
 #include <cfloat>
 #include <string>
 
@@ -1856,4 +1857,331 @@ TEST_CASE("App frames leave every stack as they found it")
     const int before = facet::internal::UsageErrorCount();
     CHECK_FALSE(facet::BeginAppFrame("outside a frame"));
     CHECK(facet::internal::UsageErrorCount() == before);
+}
+// ---- Overlay controller -------------------------------------------------------------------------
+
+namespace
+{
+
+// An overlay whose menu is one window at (100, 100) of 200 by 150 with a button in it.
+struct OverlayProbe
+{
+    bool visible = true;
+    facet::OverlayOptions options;
+    bool shown = false;
+    int presses = 0;
+    float alpha = -1.0f;  // the opacity of the menu's marker vertex after EndOverlay
+
+    void Draw()
+    {
+        shown = facet::BeginOverlay("overlay", &visible, options);
+        if (!shown)
+            return;
+        ImGui::SetNextWindowPos(ImVec2(100.0f, 100.0f));
+        ImGui::SetNextWindowSize(ImVec2(200.0f, 150.0f));
+        ImGui::Begin("menu", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int marker = drawList->VtxBuffer.Size;
+        drawList->AddRectFilled(ImVec2(110.0f, 110.0f), ImVec2(120.0f, 120.0f), IM_COL32(255, 255, 255, 255));
+        ImGui::SetCursorScreenPos(ImVec2(120.0f, 160.0f));
+        if (ImGui::Button("menu button", ImVec2(120.0f, 40.0f)))
+            ++presses;
+        ImGui::End();
+        facet::EndOverlay();
+        alpha = static_cast<float>((drawList->VtxBuffer[marker].col >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+    }
+};
+
+} // namespace
+
+TEST_CASE("An overlay fades its menu in and out and skips it once hidden; at once with reduced motion")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    OverlayProbe probe;
+    probe.visible = false;
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(2);
+    CHECK_FALSE(probe.shown);
+    probe.visible = true;
+    session.Frames(2);
+    CHECK(probe.shown);
+    CHECK(probe.alpha > 0.0f);
+    CHECK(probe.alpha < 1.0f);
+    session.Seconds(1.0f);
+    CHECK(probe.alpha == doctest::Approx(1.0f));
+    probe.visible = false;
+    session.Frames(2);
+    CHECK(probe.shown);  // fading out
+    CHECK(probe.alpha < 1.0f);
+    session.Seconds(1.0f);
+    CHECK_FALSE(probe.shown);
+
+    const ReducedMotion motion;
+    probe.visible = true;
+    session.Frame();
+    CHECK(probe.shown);
+    CHECK(probe.alpha == doctest::Approx(1.0f));
+    probe.visible = false;
+    session.Frame();
+    CHECK_FALSE(probe.shown);
+    CHECK_FALSE(facet::BeginOverlay("no flag", nullptr));
+}
+
+TEST_CASE("An overlay's toggle shortcut flips its flag")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const facet::ShortcutId toggle = facet::RegisterShortcut("test.overlay.toggle", ImGuiKey_F8);
+    OverlayProbe probe;
+    probe.options.toggleShortcut = toggle;
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(2);
+    CHECK(probe.visible);
+    session.KeyPress(ImGuiKey_F8);
+    CHECK_FALSE(probe.visible);
+    session.KeyPress(ImGuiKey_F8);
+    CHECK(probe.visible);
+    facet::UnregisterShortcut(toggle);
+}
+
+TEST_CASE("An overlay reports where its menu takes input, and nothing while it is hidden or fading out")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    OverlayProbe probe;
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(2);
+    CHECK(facet::OverlayHitTest(ImVec2(150.0f, 150.0f)));
+    CHECK_FALSE(facet::OverlayHitTest(ImVec2(50.0f, 50.0f)));
+    std::array<facet::ScreenRegion, 4> regions;
+    REQUIRE(facet::GetOverlayInputRegions(regions) == 1);
+    CHECK(regions[0].min.x == 100.0f);
+    CHECK(regions[0].max.y == 250.0f);
+    session.MouseMove(ImVec2(150.0f, 150.0f));
+    session.Frame();
+    CHECK(facet::OverlayWantsMouse());
+    session.MouseMove(ImVec2(500.0f, 400.0f));
+    session.Frame();
+    CHECK_FALSE(facet::OverlayWantsMouse());
+    session.Click(ImVec2(180.0f, 180.0f));
+    CHECK(probe.presses == 1);
+    CHECK(facet::OverlayWantsKeyboard() == ImGui::GetIO().WantCaptureKeyboard);
+
+    probe.visible = false;
+    session.Frames(2);
+    CHECK_FALSE(probe.shown);
+    CHECK(facet::GetOverlayInputRegions(regions) == 0);
+    CHECK_FALSE(facet::OverlayHitTest(ImVec2(150.0f, 150.0f)));
+    session.MouseMove(ImVec2(150.0f, 150.0f));
+    session.Frame();
+    CHECK_FALSE(facet::OverlayWantsMouse());
+    CHECK_FALSE(facet::OverlayWantsKeyboard());
+}
+
+TEST_CASE("A fading overlay menu takes no input")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    OverlayProbe probe;
+    session.SetUi([&] { probe.Draw(); });
+    session.Seconds(1.0f);
+    probe.visible = false;
+    session.Frame();
+    REQUIRE(probe.shown);
+    session.Click(ImVec2(180.0f, 180.0f));
+    CHECK(probe.presses == 0);
+    CHECK_FALSE(facet::OverlayHitTest(ImVec2(150.0f, 150.0f)));
+}
+
+TEST_CASE("An overlay with a scrim dims the scene behind the menu")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    OverlayProbe probe;
+    probe.options.scrim = true;
+    int scrim = 0;
+    session.SetUi([&] {
+        probe.Draw();
+        scrim = CountColor(ImGui::GetBackgroundDrawList(), 0, facet::ToU32(facet::T().colors.scrim));
+    });
+    session.Frames(2);
+    CHECK(scrim > 0);
+    probe.visible = false;
+    session.Frames(2);
+    CHECK(scrim == 0);
+}
+
+TEST_CASE("Overlays leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool visible = true;
+    bool hidden = false;
+    session.SetUi([&] {
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("hidden", &hidden)));
+        CHECK_BALANCED({
+            facet::OverlayScope overlay("overlay", &visible);
+            if (overlay)
+            {
+                facet::ShellScope shell("Overlay shell", nullptr, {.initialSize = {200.0f, 150.0f}, .persist = false});
+                if (shell)
+                    ImGui::TextUnformatted("menu");
+            }
+        });
+        const int before = facet::internal::UsageErrorCount();
+        facet::EndOverlay();
+        CHECK(facet::internal::UsageErrorCount() == before + 1);
+    });
+    session.Frames(2);
+    CHECK(visible);
+    CHECK_FALSE(hidden);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK_FALSE(facet::BeginOverlay("outside a frame", &visible));
+    CHECK(facet::OverlayHitTest(ImVec2(0.0f, 0.0f)) == false);
+}
+// ---- Mini window --------------------------------------------------------------------------------
+
+namespace
+{
+
+// An overlay menu (one shell) and a mini window outside it with a button.
+struct MiniProbe
+{
+    const char* label = "Mini";
+    bool menu = true;
+    bool pinned = false;
+    facet::MiniWindowOptions options{.persist = false};
+    bool shown = false;
+    int presses = 0;
+    ImRect window;
+    ImRect button;
+
+    void Draw()
+    {
+        if (facet::BeginOverlay("overlay", &menu))
+        {
+            ImGui::SetNextWindowPos(ImVec2(500.0f, 300.0f));
+            ImGui::SetNextWindowSize(ImVec2(200.0f, 150.0f));
+            ImGui::Begin("menu", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
+            ImGui::End();
+            facet::EndOverlay();
+        }
+        shown = facet::BeginMiniWindow(label, &pinned, options);
+        if (shown)
+        {
+            window = ImGui::GetCurrentWindow()->Rect();
+            if (ImGui::Button("mini button"))
+                ++presses;
+            button = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            facet::EndMiniWindow();
+        }
+    }
+};
+
+} // namespace
+
+TEST_CASE("A mini window shows with the menu, and while pinned also without it")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    MiniProbe probe{.label = "Mini###shows"};
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    const ImRect withTitle = probe.window;
+    session.Click(probe.button.GetCenter());
+    CHECK(probe.presses == 1);
+    probe.menu = false;
+    session.Frames(2);
+    CHECK_FALSE(probe.shown);  // not pinned
+    probe.pinned = true;
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    // Without the title row it is shorter.
+    CHECK(probe.window.GetHeight() < withTitle.GetHeight());
+    probe.pinned = false;
+    session.Frames(2);
+    CHECK_FALSE(probe.shown);
+    CHECK_FALSE(facet::BeginMiniWindow("never pinned", nullptr));
+}
+
+TEST_CASE("A pinned mini window lets input through while the menu is hidden, unless it takes input")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    MiniProbe probe{.label = "Mini###through", .menu = false, .pinned = true};
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    CHECK_FALSE(facet::OverlayHitTest(probe.button.GetCenter()));
+    session.Click(probe.button.GetCenter());
+    CHECK(probe.presses == 0);
+    session.MouseMove(probe.button.GetCenter());
+    session.Frame();
+    CHECK_FALSE(facet::OverlayWantsMouse());
+
+    probe.options.clickThrough = false;
+    session.Frames(2);
+    CHECK(facet::OverlayHitTest(probe.button.GetCenter()));
+    session.Click(probe.button.GetCenter());
+    CHECK(probe.presses == 1);
+    // While the menu shows, it takes input whatever clickThrough says.
+    probe.options.clickThrough = true;
+    probe.menu = true;
+    session.Frames(3);
+    CHECK(facet::OverlayHitTest(probe.button.GetCenter()));
+}
+
+TEST_CASE("A mini window's title row drags it and its pin button writes the flag")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    MiniProbe probe{.label = "Mini###drag"};
+    session.SetUi([&] { probe.Draw(); });
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    const ImRect start = probe.window;
+    const float pad = facet::Px(facet::T().spacing.md);
+    const float side = facet::ControlHeight(facet::ControlSize::Small);
+    const ImVec2 title(start.Min.x + pad + facet::Px(4.0f), start.Min.y + pad + side * 0.5f);
+    session.Drag({title, ImVec2(title.x + 60.0f, title.y + 40.0f)});
+    session.Frame();
+    CHECK(probe.window.Min.x == doctest::Approx(start.Min.x + 60.0f));
+    CHECK(probe.window.Min.y == doctest::Approx(start.Min.y + 40.0f));
+    // The pin button: the last item of the title row, at its trailing end.
+    const ImVec2 pin(probe.window.Max.x - pad - side * 0.5f, probe.window.Min.y + pad + side * 0.5f);
+    session.Click(pin);
+    CHECK(probe.pinned);
+    session.Click(pin);
+    CHECK_FALSE(probe.pinned);
+}
+
+TEST_CASE("Mini windows leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool pinned = true;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::MiniWindowScope mini("Mini###balanced", &pinned, {.icon = facet::Icon("info"), .width = 160.0f});
+            if (mini)
+                ImGui::TextUnformatted("content");
+        });
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginMiniWindow("Hidden", nullptr)));
+        const int before = facet::internal::UsageErrorCount();
+        facet::EndMiniWindow();
+        CHECK(facet::internal::UsageErrorCount() == before + 1);
+    });
+    session.Frames(2);
+    CHECK(pinned);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK_FALSE(facet::BeginMiniWindow("outside a frame", &pinned));
 }

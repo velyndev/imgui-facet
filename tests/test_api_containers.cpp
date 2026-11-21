@@ -48,23 +48,6 @@ void CallContainerStubs(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
     CHECK_BALANCED({
-        const bool open = facet::BeginOverlay("Overlay", &v.visible);
-        CHECK(open);
-        if (open)
-            facet::EndOverlay();
-    });
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayWantsMouse()));
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayWantsKeyboard()));
-    CHECK_BALANCED(CHECK_FALSE(facet::OverlayHitTest(ImVec2(1.0f, 1.0f))));
-    CHECK_BALANCED({
-        std::array<facet::ScreenRegion, 2> regions;
-        CHECK(facet::GetOverlayInputRegions(regions) == 0);
-    });
-    CHECK_BALANCED(if (facet::BeginMiniWindow("Mini", &v.pinned)) {
-        FAIL("BeginMiniWindow opened");
-        facet::EndMiniWindow();
-    });
-    CHECK_BALANCED({
         facet::BeginInspectorPane("Inspector", &v.visible);
         ImGui::TextUnformatted("main");
         if (facet::InspectorPaneNext())
@@ -100,7 +83,6 @@ TEST_CASE("Containers placeholders outside a frame draw nothing and return the n
     REQUIRE(session.Ready());
     session.Frame();
     const int before = facet::internal::UsageErrorCount();
-    CHECK_FALSE(facet::BeginOverlay("outside", nullptr));
     facet::BeginInspectorPane("outside", nullptr);
     facet::EndInspectorPane();
     CHECK(facet::internal::OpenScopeCount() == 0);
@@ -146,8 +128,6 @@ TEST_CASE("Containers placeholders return false where their own arguments hide t
             CHECK(facet::InspectorPaneNext());
             facet::EndInspectorPane();
         });
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Hidden overlay", &hidden)));
-        CHECK_BALANCED(CHECK_FALSE(facet::BeginOverlay("Overlay without a flag", nullptr)));
         CHECK(hidden == false);
     });
     session.Frame();
