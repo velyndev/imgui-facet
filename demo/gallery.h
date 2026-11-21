@@ -152,6 +152,11 @@ bool ProtoSegmented(PageCtx& ctx, const char* id, int* index, std::span<const ch
 
 // Records a probe for a rectangle that is not Dear ImGui's last item (a handle, a track).
 void ProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 max);
+// A probe of a part of a floating layer (a popup level, a modal, a toast, the watermark), which can
+// lie outside the page's visible area: recorded against the display, not the page's clip rect, so
+// the selftest reaches it without scrolling the page. FloatingProbe takes the id of `name`.
+void FloatingProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 max);
+void FloatingProbe(PageCtx& ctx, const char* name, const ImRect& rect);
 
 // Row wrapping for narrow windows and large scales. ContentRight() is the right edge of the
 // content area at the cursor; take it at the start of a row. SameLineIfFits continues the

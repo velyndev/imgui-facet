@@ -751,6 +751,24 @@ void ProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 ma
     g.LastItemData = backup;
 }
 
+void FloatingProbeRect(PageCtx& ctx, const char* name, ImGuiID id, ImVec2 min, ImVec2 max)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::PushClipRect(viewport->Pos, ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
+                        false);
+    ProbeRect(ctx, name, id, min, max);
+    ImGui::PopClipRect();
+}
+
+void FloatingProbe(PageCtx& ctx, const char* name, const ImRect& rect)
+{
+    if (ctx.probes == nullptr)
+        return;
+    FloatingProbeRect(ctx, name, ImGui::GetID(name), rect.Min, rect.Max);
+}
+
 namespace
 {
 

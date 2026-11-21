@@ -24,6 +24,7 @@ namespace
 {
 
 using facet::demo::DemoWidth;
+using facet::demo::FloatingProbe;
 using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
 using facet::demo::Note;
@@ -140,17 +141,6 @@ struct OverlaysState
     bool AnyLayerOpen() const { return modal || nested || confirm || popover || drawer || palette || shortcutPalette; }
 };
 
-
-// A probe of a part of a floating layer (a toast, a drawer's close button, the watermark), which can
-// lie outside the page's visible area: recorded against the display, not the page's clip rect.
-void FloatingProbe(facet::demo::PageCtx& ctx, const char* name, const ImRect& rect)
-{
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::PushClipRect(viewport->Pos, ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
-                        false);
-    ProbeRect(ctx, name, ImGui::GetID(name), rect.Min, rect.Max);
-    ImGui::PopClipRect();
-}
 
 OverlaysState& State()
 {

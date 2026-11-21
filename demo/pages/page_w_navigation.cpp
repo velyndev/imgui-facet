@@ -141,6 +141,15 @@ void ProbePart(facet::demo::PageCtx& ctx, const char* name, ImGuiID widgetId, in
         facet::demo::ProbeRect(ctx, name, partId, r.Min, r.Max);
 }
 
+// The same for a part on a popup level (a menu row, the shortcut sheet), which can lie outside the
+// page's visible area: recorded against the display, so the selftest reaches it without scrolling.
+void ProbeFloatingPart(facet::demo::PageCtx& ctx, const char* name, ImGuiID widgetId, int part, ImGuiID partId)
+{
+    const ImRect r = fi::NavigationPartRect(widgetId, part);
+    if (r.GetWidth() > 0.0f)
+        facet::demo::FloatingProbeRect(ctx, name, partId, r.Min, r.Max);
+}
+
 // A caption line above a bar: bars take the whole row, so their names go above them instead of
 // into a label column that would leave them half the width.
 void Caption(const char* text)
@@ -217,7 +226,7 @@ void TabBars(facet::demo::PageCtx& ctx, NavigationState& s)
     {
         char name[48];
         std::snprintf(name, sizeof(name), "navigation.overflow.row.%d", i);
-        ProbePart(ctx, name, overflowId, fi::NavigationMenuRowPart(i), 0);
+        ProbeFloatingPart(ctx, name, overflowId, fi::NavigationMenuRowPart(i), 0);
         std::snprintf(name, sizeof(name), "navigation.overflow.tab.%d", i);
         ProbePart(ctx, name, overflowId, i, fi::SelectionEntryId(overflowId, 0, i));
     }
@@ -427,7 +436,7 @@ void Menus(facet::demo::PageCtx& ctx, NavigationState& s)
     }
     ctx.Probe("navigation.narrowbar");
     ProbePart(ctx, "navigation.narrowbar.more", narrowId, fi::kNavigationPartMore, ImGui::GetIDWithSeed("##more", nullptr, narrowId));
-    ProbePart(ctx, "navigation.narrowbar.row.2", narrowId, fi::NavigationMenuRowPart(2), 0);
+    ProbeFloatingPart(ctx, "navigation.narrowbar.row.2", narrowId, fi::NavigationMenuRowPart(2), 0);
 }
 
 // --- Breadcrumbs and pagination --------------------------------------------------------------------
@@ -468,7 +477,7 @@ void Trails(facet::demo::PageCtx& ctx, NavigationState& s)
     {
         char name[48];
         std::snprintf(name, sizeof(name), "navigation.narrowpath.row.%d", i);
-        ProbePart(ctx, name, narrowId, fi::NavigationMenuRowPart(i), 0);
+        ProbeFloatingPart(ctx, name, narrowId, fi::NavigationMenuRowPart(i), 0);
     }
     Caption("Small");
     (void)facet::Breadcrumbs("##smallpath", std::span<const char* const>(kPathLabels, 3), {.size = facet::ControlSize::Small});
@@ -599,9 +608,9 @@ void Sheet(facet::demo::PageCtx& ctx, NavigationState& s)
     ctx.Probe("navigation.shortcuts");
     const ImGuiID sheetId = ImGui::GetID("Shortcuts");
     facet::ShortcutSheet("Shortcuts", &s.shortcutSheet);
-    ProbePart(ctx, "navigation.shortcuts.close", sheetId, fi::kNavigationPartClose, 0);
-    ProbePart(ctx, "navigation.shortcuts.filter", sheetId, fi::kNavigationPartFilter, 0);
-    ProbePart(ctx, "navigation.shortcuts.noresults", sheetId, fi::kNavigationPartNoResults, 0);
+    ProbeFloatingPart(ctx, "navigation.shortcuts.close", sheetId, fi::kNavigationPartClose, 0);
+    ProbeFloatingPart(ctx, "navigation.shortcuts.filter", sheetId, fi::kNavigationPartFilter, 0);
+    ProbeFloatingPart(ctx, "navigation.shortcuts.noresults", sheetId, fi::kNavigationPartNoResults, 0);
     if (ctx.capture && ctx.captureState == kCaptureShortcuts)
         ctx.RevealInCapture();
 }
