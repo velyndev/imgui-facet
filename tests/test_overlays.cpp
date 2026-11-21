@@ -1336,3 +1336,115 @@ TEST_CASE("UpdateToast replaces the text and restarts the timer; SetToastCorner 
     session.Seconds(0.6f);
     CHECK_FALSE(facet::IsToastVisible(toast));
 }
+
+// ---- Drawer --------------------------------------------------------------------------------------
+
+TEST_CASE("A modal drawer sits flush with its edge over the whole side, blocks the page and closes on Escape")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    int pagePresses = 0;
+    ImRect rect;
+    session.SetUi([&] {
+        if (facet::Button("Open"))
+            open = true;
+        session.Track("opener");
+        if (facet::Button("Page"))
+            ++pagePresses;
+        session.Track("page");
+        if (facet::BeginDrawer("Details", &open))
+        {
+            facet::Button("Inside");
+            session.Track("inside");
+            facet::EndDrawer();
+        }
+        rect = fi::PopupLevelRect(ImGui::GetID("Details"));
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.4f);
+    REQUIRE(open);
+    CHECK(rect.Max.x == doctest::Approx(800.0f));
+    CHECK(rect.Min.y == doctest::Approx(0.0f));
+    CHECK(rect.Max.y == doctest::Approx(600.0f));
+    CHECK(rect.GetWidth() == doctest::Approx(facet::Px(facet::T().overlay.drawerWidth)));
+    CHECK(ImGui::GetFocusID() == session.ItemId("inside"));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+    // A click on the page lands on the scrim: nothing under it is pressed, the drawer closes.
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.4f);
+    REQUIRE(open);
+    session.Click(session.ItemCenter("page"));
+    session.Frame();
+    CHECK(pagePresses == 0);
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+}
+
+TEST_CASE("A non-modal drawer leaves the page usable beside it; Escape and a bottom sheet flick close it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    int pagePresses = 0;
+    ImRect rect;
+    session.SetUi([&] {
+        if (facet::Button("Page"))
+            ++pagePresses;
+        session.Track("page");
+        if (facet::BeginDrawer("Sheet", &open, {.side = facet::DrawerSide::Bottom, .modal = false}))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndDrawer();
+        }
+        rect = fi::PopupLevelRect(ImGui::GetID("Sheet"));
+    });
+    session.Seconds(0.4f);
+    REQUIRE(open);
+    CHECK(rect.Max.y == doctest::Approx(600.0f));
+    CHECK(rect.GetHeight() == doctest::Approx(facet::Px(facet::T().overlay.drawerHeight)));
+    session.Click(session.ItemCenter("page"));
+    CHECK(pagePresses == 1);
+    CHECK(open);
+    // A fast drag down on the title row closes it.
+    const ImVec2 title(rect.GetCenter().x, rect.Min.y + facet::Px(facet::T().spacing.xl) + 6.0f);
+    session.Drag({title, ImVec2(title.x, title.y + 60.0f)}, 2);
+    session.Frames(2);
+    CHECK_FALSE(open);
+    open = true;
+    session.Seconds(0.4f);
+    session.Click(ImVec2(rect.GetCenter().x, rect.GetCenter().y));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("A resizable drawer's inner edge drags its width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    ImRect rect;
+    session.SetUi([&] {
+        if (facet::BeginDrawer("Resize", &open, {.side = facet::DrawerSide::Start, .resizable = true}))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndDrawer();
+        }
+        rect = fi::PopupLevelRect(ImGui::GetID("Resize"));
+    });
+    session.Seconds(0.4f);
+    const float before = rect.GetWidth();
+    const ImVec2 edge(rect.Max.x - facet::Px(facet::T().layout.dividerBand) * 0.5f, 300.0f);
+    session.Drag({edge, ImVec2(edge.x + 60.0f, edge.y)}, 6);
+    session.Frames(2);
+    CHECK(rect.GetWidth() == doctest::Approx(before + 60.0f).epsilon(0.02));
+    CHECK(rect.Min.x == doctest::Approx(0.0f));
+}

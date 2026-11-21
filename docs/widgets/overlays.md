@@ -216,15 +216,32 @@ Status: ready.
 
 ### BeginDrawer
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginDrawer(const char* label, bool* open, const DrawerOptions& options = {});
 void EndDrawer();
 class DrawerScope;
 ```
 
-A panel or bottom sheet that slides in from an edge, with a scrim, a resize edge and flick to close.
+A panel flush with an edge of the display (`side`: the trailing or leading edge, a bottom sheet or the
+top) over the whole of that side, `extent` units wide or tall (`overlay.drawerWidth` or
+`overlay.drawerHeight` by default, at most nine tenths of the display), with the window radius on its
+two inner corners. It slides in from its edge. The visible label part is the title row (Title3), with
+a close button while it is dismissible; the content scrolls with Facet's overlay bars in the room
+below.
+
+- **Modal** (the default): a scrim behind it, the page takes no input, and the focus stays inside and
+  comes back to the item that had it when it closes. **Not modal:** no scrim, the page beside it stays
+  usable, a click there leaves it open; the focus moves into it when it opens and comes back when it
+  closes while the focus is inside.
+- **Closing** with `dismissible`: Escape (in its place of the Escape order), a click on the scrim, the
+  close button, and a drag of the title row toward the edge past a third of the extent or faster than
+  `drag.flickSpeed` (a shorter drag springs back). Without, only the caller closes it.
+- **Resizing** with `resizable`: a band of `layout.dividerBand` along the inner edge drags the extent,
+  between `layout.minRowControl` and nine tenths of the display side, kept under the id in units. The
+  band is a mouse affordance and takes no keyboard focus.
+- It follows a resize of the display at once. Content ids are under the drawer.
+
+Status: ready.
 
 ### BeginLoadingOverlay
 

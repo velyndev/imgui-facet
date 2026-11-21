@@ -20,6 +20,7 @@ void OverlaysEndFrame()
     OverlayScrollResetStack();
     OverlayPopoverResetStack();
     OverlayModalResetStack();
+    OverlayDrawerResetStack();
     OverlayToastEndFrame();
 }
 
