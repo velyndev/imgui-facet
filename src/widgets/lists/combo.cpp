@@ -47,6 +47,7 @@ struct ComboFrame
     ControlSize size = ControlSize::Regular;
     bool opened = false;  // the list opened on this frame: the selected row takes the focus
     int rowCount = 0;
+    int areaRows = 0;     // rows the scroll area was sized for on this frame
 };
 
 struct ComboStack
@@ -150,6 +151,7 @@ bool BeginCombo(const char* label, const char* preview, const ComboOptions& opti
     frame.level = level;
     frame.size = ResolveControlSize(options.size);
     frame.opened = openNow || item.open;
+    frame.areaRows = rows;
     PushScope("BeginCombo");
     return true;
 }
@@ -165,6 +167,15 @@ void EndCombo()
     const ComboFrame frame = combos.frames[--combos.depth];
     GetState<ComboState>(frame.id).rowCount = frame.rowCount;
     EndScrollAreaCore();
+    // A list that opened with a guessed height (the first time, before its rows were counted) is
+    // placed from that height on the next frame, which may put it above the field and then let it
+    // shrink there, moving every row. It stays hidden for that frame instead, so it shows only
+    // once it is placed at its real height and its rows never move under the pointer.
+    const int shownRows = std::min(frame.rowCount, frame.areaRows);
+    // Dear ImGui counts the hidden frames down at the start of Begin, before it decides whether the
+    // window shows, so 2 hides exactly the next frame.
+    if (frame.opened && frame.rowCount > 0 && shownRows != frame.areaRows)
+        GImGui->CurrentWindow->HiddenFramesCannotSkipItems = 2;
     EndPopupLevel();
 }
 

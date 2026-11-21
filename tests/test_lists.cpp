@@ -942,6 +942,75 @@ TEST_CASE("A combo opens on a click, its rows are chosen by click, and it closes
     CHECK(popup.open);
 }
 
+TEST_CASE("A combo list opened near the window edge at scale 0.75 keeps its rows where they are drawn")
+{
+    // A row click on a combo near the bottom of the window once chose nothing in a selftest at
+    // this scale until the script scrolled the field away from the edge. The list there opens
+    // above the field (eight rows do not fit below before it knows it has five) or right above the
+    // edge: wherever it goes, its rows stay put from the first frame on and a click on one picks it.
+    facet::SetUiScale(0.75f);
+    struct ScaleGuard
+    {
+        ~ScaleGuard() { facet::SetUiScale(1.0f); }
+    } scaleGuard;
+    for (const float fromBottom : {150.0f, 40.0f, 4.0f})  // pixels from the field to the display bottom
+    {
+        CAPTURE(fromBottom);
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        int current = 0;
+        PopupProbe popup;
+        session.SetUi([&] {
+            const float height = facet::ControlHeight(facet::ControlSize::Regular);
+            ImGui::SetCursorScreenPos(ImVec2(40.0f, ImGui::GetIO().DisplaySize.y - fromBottom - height));
+            if (facet::BeginCombo("Fruit", kFruit[current].label))
+            {
+                for (int i = 0; i < static_cast<int>(std::size(kFruit)); ++i)
+                {
+                    ImGui::PushID(i);
+                    ImGui::BeginDisabled(kFruit[i].disabled);
+                    if (facet::ComboItem(kFruit[i].label, i == current))
+                        current = i;
+                    session.Track("row" + std::to_string(i));
+                    ImGui::EndDisabled();
+                    ImGui::PopID();
+                }
+                facet::EndCombo();
+            }
+            session.Track("fruit");
+            popup.Record("Fruit");
+        });
+        session.Frame();
+        session.MouseMove(session.ItemCenter("fruit"));
+        session.MouseDown();
+        session.MouseUp();  // the list opens on this frame, hidden while Dear ImGui measures it
+        // The first frame the list is drawn.
+        const auto shown = [&] {
+            char name[32];
+            std::snprintf(name, sizeof(name), "##Popup_%08x", popup.level);  // Dear ImGui's popup window
+            const ImGuiWindow* window = ImGui::FindWindowByName(name);
+            return window != nullptr && window->Active && !window->Hidden;
+        };
+        for (int i = 0; i < 4 && !shown(); ++i)
+            session.Frame();
+        REQUIRE(popup.open);
+        REQUIRE(shown());
+        const ImRect first = session.ItemRect("row3");
+        session.Frames(3);
+        const ImRect settled = session.ItemRect("row3");
+        CHECK(settled.Min.y == doctest::Approx(first.Min.y));
+        CHECK(settled.Min.x == doctest::Approx(first.Min.x));
+        // The row sits where the list geometry puts it, inside the list and the display.
+        CHECK(settled.GetCenter().y == doctest::Approx(popup.Row(3).y).epsilon(0.001));
+        CHECK(settled.Min.y >= popup.rect.Min.y);
+        CHECK(settled.Max.y <= popup.rect.Max.y);
+        CHECK(popup.rect.Max.y <= ImGui::GetIO().DisplaySize.y);
+        session.Click(settled.GetCenter());
+        CHECK(current == 3);
+        CHECK_FALSE(popup.open);
+    }
+}
+
 TEST_CASE("A combo opens with Enter on the selected row; the arrows and Enter choose, Escape closes")
 {
     facet::test::Session session;
