@@ -25,8 +25,6 @@ enough for a getter that formats its labels.
 
 ### Dropdown
 
-Status: planned
-
 ```cpp
 bool Dropdown(const char* label, int* index, std::span<const ChoiceItem> items, const DropdownOptions& options = {});
 bool Dropdown(const char* label, int* index, std::span<const char* const> items, const DropdownOptions& options = {});
@@ -34,9 +32,46 @@ bool Dropdown(const char* label, int* index, int itemCount, ChoiceGetter getter,
               const DropdownOptions& options = {});
 ```
 
-A field that opens a list with icons, group headers, typeahead and an optional fuzzy filter, and
-writes the chosen index. Items fetched from a slow source set `state`: the open list shows the
-loading or error row, and the closed field marks an error, while the field keeps its value.
+A field that opens a list and writes the chosen index. The field shows the chosen item's icon and
+label, or the placeholder (`Strings::select` by default) in labelSecondary, cut with an ellipsis and
+shown in full as a tooltip on hover and keyboard focus; the visible label part sits in front of the
+field. Default width: the available width; the three control sizes set the field height and the row
+height of the list.
+
+- **Opening:** a click, Space, Enter, Down or Alt+Down. The list opens below the field, at least as
+  wide as it, and above it when there is no room below; it follows the field when the page scrolls.
+  The chosen row is scrolled into view and is the active row.
+- **In the open list:** the field keeps the keyboard focus. Up and Down move the active row past
+  disabled items and group headers, Page Up and Down move by a page, Home and End go to the ends,
+  typing jumps to the next item whose label starts with the typed text, and Enter, Space, Tab or a
+  click chooses the active row and closes the list. The pointer moving over a row makes it the
+  active row. Escape, a click outside the list or a click on the field closes it without writing.
+- **Typeahead on the closed field:** typing writes the next item whose label starts with the
+  typed text; the same letter again cycles through the items that start with it.
+- **Searchable:** a filter field at the top of the list takes the focus and the typing. Items are
+  fuzzy matched on their visible label and ordered best first (a grouped list keeps its order under
+  its headers); the matched letters are highlighted. The arrows, Enter and Tab still operate the
+  rows; Escape closes the list and the focus goes back to the field. The filter starts empty on
+  every opening.
+- **Rows:** a check mark slot that shows the chosen item, the icon, the label and the detail at the
+  end in labelSecondary. `ChoiceItem::group` adds a header row before each run of equal group text.
+  Disabled items are shown in labelTertiary and cannot be chosen.
+- **Long lists:** the rows are virtualized. The getter overload is called for the rows shown, for
+  the chosen item on the closed field, and for every item when the list opens or the filter
+  changes (to build the group headers and the filter result); ten thousand items stay fluid.
+- **States:** disabled (`ImGui::BeginDisabled`: the disabled colors, not a Tab stop, does not
+  open), read-only (shown, focusable, no chevron, does not open), `mixed` (shows `Strings::mixed`
+  until a choice is made), `error` (destructive outline and message, recorded for
+  `ValidationSummary`) and `helpText`. `state` describes the items: Loading shows the loading row and
+  Error shows `errorText` in the open list, and the closed field shows the error glyph; the field
+  keeps its value. No items in Ready show `emptyText` (`Strings::noResults` while filtering).
+- **Result:** true on the frame a choice is made, also when it is the item already chosen;
+  `ImGui::IsItemEdited` is true on that frame.
+
+State kept under the id: the typeahead text and the mixed flag; under the list's popup level: the
+rows, the active row and the filter text.
+
+Status: ready.
 
 ### MultiDropdown
 
