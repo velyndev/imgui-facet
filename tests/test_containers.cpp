@@ -15,6 +15,7 @@
 
 #include "internal/focus.h"
 #include "internal/list_view.h"
+#include "internal/overflow.h"
 #include "internal/popup_host.h"
 #include "widgets/containers/container_layout.h"
 #include "support/session.h"
@@ -1526,4 +1527,135 @@ TEST_CASE("Virtual lists leave every stack as they found it")
     const int before = facet::internal::UsageErrorCount();
     CHECK_FALSE(facet::BeginVirtualList("outside a frame", 10, nullptr));
     CHECK(facet::internal::UsageErrorCount() == before);
+}
+// ---- Status bar ---------------------------------------------------------------------------------
+
+TEST_CASE("A status bar lays its segments out from the leading edge and hides the lowest priority first")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float width = 0.0f;  // units; 0 fills
+    ImRect bar;
+    ImRect segments[3];
+    session.SetUi([&] {
+        facet::BeginStatusBar("status", {.width = width});
+        const char* texts[3] = {"First segment", "Second segment", "Third segment"};
+        const int priorities[3] = {1, 0, 2};
+        for (int i = 0; i < 3; ++i)
+        {
+            facet::StatusItem(texts[i], {.tone = i == 0 ? facet::Tone::Success : facet::Tone::Neutral,
+                                         .priority = priorities[i]});
+            segments[i] = GImGui->LastItemData.Rect;  // the previous item's rect while hidden
+        }
+        facet::EndStatusBar();
+        bar = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    });
+    session.Frames(2);
+    CHECK(bar.GetHeight() == doctest::Approx(facet::Px(facet::T().containers.statusBarHeight)));
+    CHECK(segments[0].Min.x == doctest::Approx(bar.Min.x + facet::Px(facet::T().spacing.md)));
+    CHECK(segments[1].Min.x > segments[0].Max.x);
+    CHECK(segments[2].Min.x > segments[1].Max.x);
+    CHECK(segments[2].Max.x <= bar.Max.x);
+    // Narrow: the second (priority 0) goes first, then the first (priority 1).
+    const float scale = facet::Px(1.0f);
+    const float gap = facet::T().spacing.lg;
+    const float pad = facet::T().spacing.md;
+    const float w0 = segments[0].GetWidth() / scale;
+    const float w2 = segments[2].GetWidth() / scale;
+    width = pad * 2.0f + w0 + gap + w2 + 1.0f;
+    session.Frames(3);
+    CHECK(segments[0].Min.x == doctest::Approx(bar.Min.x + facet::Px(pad)));
+    CHECK(segments[2].Min.x == doctest::Approx(segments[0].Max.x + facet::Px(gap)));
+    width = pad * 2.0f + w2 + 1.0f;
+    session.Frames(3);
+    CHECK(segments[2].Min.x == doctest::Approx(bar.Min.x + facet::Px(pad)));
+    CHECK(segments[2].Max.x <= bar.Max.x);
+}
+
+TEST_CASE("A status segment draws its tone as a dot or a colored icon")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int dots = 0;
+    int icons = 0;
+    int neutral = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImU32 success = facet::ToU32(facet::T().colors.success);
+        const ImU32 warning = facet::ToU32(facet::T().colors.warning);
+        facet::BeginStatusBar("status");
+        int from = drawList->VtxBuffer.Size;
+        facet::StatusItem("Saved", {.tone = facet::Tone::Success});
+        dots = CountColor(drawList, from, success);
+        from = drawList->VtxBuffer.Size;
+        facet::StatusItem("Offline", {.icon = facet::Icon("warning"), .tone = facet::Tone::Warning});
+        icons = CountColor(drawList, from, warning);
+        from = drawList->VtxBuffer.Size;
+        facet::StatusItem("Ready");
+        neutral = CountColor(drawList, from, success) + CountColor(drawList, from, warning);
+        facet::EndStatusBar();
+    });
+    session.Frames(2);
+    CHECK(dots > 0);
+    CHECK(icons > 0);
+    CHECK(neutral == 0);
+}
+
+TEST_CASE("Status bars leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::StatusBarScope bar("bar");
+            facet::StatusItem("Item");
+            ImGui::TextUnformatted("text");
+            facet::StatusItem("After", {.icon = facet::Icon("info")});
+        });
+        CHECK_BALANCED({
+            facet::StatusBarScope narrow("narrow", {.width = 1.0f});
+            facet::StatusItem("A segment that cannot fit");
+        });
+        CHECK_BALANCED({ facet::StatusBarScope empty("empty"); });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::StatusBarScope disabled("disabled");
+            facet::StatusItem("Disabled", {.tone = facet::Tone::Destructive});
+        });
+        ImGui::EndDisabled();
+        CHECK_BALANCED(facet::StatusItem("Outside a bar"));
+        const int before = facet::internal::UsageErrorCount();
+        facet::EndStatusBar();
+        CHECK(facet::internal::UsageErrorCount() == before + 1);
+    });
+    session.Frames(2);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    facet::BeginStatusBar("outside a frame");
+    facet::StatusItem("Item");
+    facet::EndStatusBar();
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK(facet::internal::UsageErrorCount() == before);
+}
+TEST_CASE("The overflow fitter without a button reserves nothing for the hidden items")
+{
+    const facet::internal::OverflowItem items[3] = {{100.0f, 1}, {100.0f, 0}, {100.0f, 2}};
+    bool visible[3] = {};
+    // Two items and their gap fit exactly: the middle one (priority 0) hides, nothing is reserved.
+    facet::internal::OverflowResult fit =
+        facet::internal::FitOverflowWithoutButton(items, 210.0f, 10.0f, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 1);
+    CHECK_FALSE(fit.showButton);
+    CHECK(fit.usedWidth == doctest::Approx(210.0f));
+    CHECK(visible[0]);
+    CHECK_FALSE(visible[1]);
+    CHECK(visible[2]);
+    // The same row with a button needs room for it, so one more item hides.
+    fit = facet::internal::FitOverflow(items, 210.0f, 10.0f, 0.0f, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 2);
+    // Everything fits: nothing hides.
+    fit = facet::internal::FitOverflowWithoutButton(items, 320.0f, 10.0f, 0.0f, nullptr, visible);
+    CHECK(fit.hiddenCount == 0);
+    CHECK(fit.usedWidth == doctest::Approx(320.0f));
 }

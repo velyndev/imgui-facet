@@ -38,6 +38,8 @@ enum CaptureState
 
 constexpr int kScrollLines = 40;
 constexpr int kVirtualRows = 10000;
+// The narrow status bar: three quarters of a card, too narrow for its three segments.
+constexpr float kNarrowShare = 0.75f;
 
 struct ContainersState
 {
@@ -274,12 +276,24 @@ void Toolbars(facet::demo::PageCtx& ctx, ContainersState& s)
         ctx.RevealInCapture(0.3f);
 }
 
-void Bars(ContainersState&)
+void Bars(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Status bar");
+    Paragraph("Status segments with a tone dot or icon. The second bar is narrow: the segments that do "
+              "not fit are hidden, lowest priority first. The texts are placeholders.");
     facet::BeginStatusBar("statusbar");
-    facet::StatusItem("Status 1", {.icon = facet::Icon("info")});
-    facet::StatusItem("Status 2", {.tone = facet::Tone::Success});
+    facet::StatusItem("Placeholder status", {.icon = facet::Icon("info"), .priority = 2});
+    facet::StatusItem(s.toolPresses > 0 ? "Tool pressed" : "No tool pressed",
+                      {.tone = s.toolPresses > 0 ? facet::Tone::Success : facet::Tone::Neutral, .priority = 1});
+    facet::StatusItem("Warning placeholder", {.icon = facet::Icon("warning"), .tone = facet::Tone::Warning});
+    facet::StatusItem("Error placeholder", {.tone = facet::Tone::Destructive});
+    facet::EndStatusBar();
+    ctx.Probe("containers.status");
+    ImGui::Spacing();
+    facet::BeginStatusBar("narrowstatus", {.width = facet::T().metrics.cardWidth * kNarrowShare});
+    facet::StatusItem("Kept segment", {.tone = facet::Tone::Accent, .priority = 2});
+    facet::StatusItem("Hidden first", {.priority = 0});
+    facet::StatusItem("Hidden second", {.priority = 1});
     facet::EndStatusBar();
 }
 
@@ -519,7 +533,7 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
     ContainersState& s = State();
     Windows(ctx, s);
     Toolbars(ctx, s);
-    Bars(s);
+    Bars(ctx, s);
     Cards(ctx, s);
     GroupBoxes(ctx, s);
     Disclosures(ctx, s);
@@ -682,6 +696,10 @@ FACET_DEMO_SELFTEST("containers")
     test.Click("containers.virtual.empty");
     test.Click("containers.virtual.rows");
     test.Expect("the rows come back", [] { return State().listState == 0; });
+
+    // Status bar: not interactive; the first segment follows the tool presses.
+    test.Reveal("containers.status");
+    test.ExpectVisible("containers.status");
 
     // Card: the content works and fills the inner width.
     test.Click("containers.card.button");

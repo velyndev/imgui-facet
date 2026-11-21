@@ -192,7 +192,23 @@ void StatusItem(const char* text, const StatusItemOptions& options = {});
 class StatusBarScope;
 ```
 
-A bottom strip of toned status segments that hide by priority when narrow. Status: planned.
+A strip of `containers.statusBarHeight` on bgSecondary with a separator hairline along its top,
+filling the available width unless `width` is set. Not interactive.
+
+- **Segments.** `StatusItem` lays out one segment after the previous one from the leading edge,
+  `spacing.lg` apart: the `icon` in the segment's `tone` color, or without an icon a status dot in
+  the tone (none for Neutral), then the text in Footnote and labelSecondary. The text is read during
+  the call.
+- **Narrow.** Segments that do not fit are hidden, the lowest `priority` first and among equal
+  priorities the one furthest to the end, with the widths of the last frame kept under the id. A
+  hidden segment returns once it fits with `spacing.lg` to spare. A single segment wider than the
+  whole bar is cut with an ellipsis and shows in full as a tooltip on hover.
+- **Other widgets** submitted between `BeginStatusBar` and `EndStatusBar` sit after the previous
+  segment and are never hidden; their width is taken off the room of the segments.
+- **States.** Inside `ImGui::BeginDisabled` the segments draw in labelTertiary.
+
+`EndStatusBar` is always called; after it the bar is one item of its whole size. Outside a status
+bar a `StatusItem` is a line of its own at the cursor. Status: ready.
 
 ### BeginAccordion
 
