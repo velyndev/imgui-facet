@@ -200,6 +200,28 @@ void ResetMultiHandleState()
     CurrentPendingPick() = {};
 }
 
+void HandleMoveLimits(std::span<const double> values, int index, const HandleConstraints& constraints, double* low,
+                      double* high)
+{
+    const int n = static_cast<int>(values.size());
+    if (low == nullptr || high == nullptr)
+        return;
+    if (index < 0 || index >= n)
+    {
+        *low = constraints.min;
+        *high = constraints.max;
+        return;
+    }
+    HandleLimits(values, index, constraints, low, high);
+}
+
+void HandOverMousePress(ImGuiID id, ImGuiWindow* window, bool focus)
+{
+    if (ImGui::GetCurrentContext() == nullptr || id == 0 || window == nullptr)
+        return;
+    TransferMousePress(id, window, focus);
+}
+
 double EffectiveGap(const HandleConstraints& c, int count)
 {
     if (count < 2 || !(c.minGap > 0.0) || c.collision == CollisionMode::Free)

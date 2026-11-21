@@ -178,6 +178,19 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
 // Shutdown, through the focus subsystem).
 void ResetMultiHandleState();
 
+// The values handle `index` can take by itself, the way MoveHandle resolves the constraints
+// (neighbours and gap with Clamp, room for the others with Push, the whole run with fixedSpan,
+// the mirrored half with mirror). For a widget that runs its own items, such as one axis of a
+// box: pass them to ValueDragOptions::clampLow and clampHigh (or the per-axis ones of the two-axis
+// drag) so an edit never writes a value MoveHandle would move back.
+void HandleMoveLimits(std::span<const double> values, int index, const HandleConstraints& constraints, double* low,
+                      double* high);
+
+// Gives the mouse press in progress to item `id` of `window`, as if it had landed there: the item
+// becomes Dear ImGui's active item and owns the left button; `focus` also moves the keyboard focus
+// to it. For a widget whose background item takes every press and hands it to the part it picks.
+void HandOverMousePress(ImGuiID id, ImGuiWindow* window, bool focus);
+
 // The rectangle of handle `value` on `track` for a handle of `size` pixels: centered on the
 // track's cross axis.
 ImRect HandleRect(const ImRect& track, Orientation orientation, const ValueMapping& mapping, double value, float size);

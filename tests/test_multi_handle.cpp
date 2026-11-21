@@ -807,3 +807,55 @@ TEST_CASE("Multi-handle behaviour: N handles, removal by key")
     session.KeyPress(ImGuiKey_Delete);
     CHECK(removed == 2);
 }
+
+TEST_CASE("Multi-handle: the move limits of a handle match what MoveHandle allows")
+{
+    const std::array<double, 3> values = {20.0, 50.0, 80.0};
+    double low = 0.0;
+    double high = 0.0;
+    facet::internal::HandleMoveLimits(values, 1, Range(5.0), &low, &high);
+    CHECK(low == 25.0);
+    CHECK(high == 75.0);
+    facet::internal::HandleMoveLimits(values, 0, Range(5.0, CollisionMode::Push), &low, &high);
+    CHECK(low == 0.0);
+    CHECK(high == 90.0);
+    facet::internal::HandleMoveLimits(values, 2, Range(5.0, CollisionMode::Free), &low, &high);
+    CHECK(low == 0.0);
+    CHECK(high == 100.0);
+    // An index outside the handles gets the whole range.
+    facet::internal::HandleMoveLimits(values, 7, Range(5.0), &low, &high);
+    CHECK(low == 0.0);
+    CHECK(high == 100.0);
+}
+
+TEST_CASE("Multi-handle: a press handed over makes the item active and can move the focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiID target = 0;
+    bool handOver = false;
+    session.SetUi([&] {
+        ImGui::Button("source", ImVec2(100.0f, 30.0f));
+        session.Track("source");
+        target = ImGui::GetID("target");
+        if (handOver && ImGui::IsItemActivated())
+            facet::internal::HandOverMousePress(target, ImGui::GetCurrentWindow(), true);
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const ImRect rect(pos, ImVec2(pos.x + 100.0f, pos.y + 30.0f));
+        ImGui::ItemSize(rect.GetSize());
+        ImGui::ItemAdd(rect, target);
+        bool hovered = false;
+        bool held = false;
+        ImGui::ButtonBehavior(rect, target, &hovered, &held);
+        session.Track("target");
+    });
+    session.Frame();
+    handOver = true;
+    session.MouseMove(session.ItemCenter("source"));
+    session.MouseDown();
+    session.Frame();
+    CHECK(ImGui::GetActiveID() == target);
+    CHECK(ImGui::GetFocusID() == target);
+    session.MouseUp();
+    CHECK(ImGui::GetActiveID() == 0);
+}
