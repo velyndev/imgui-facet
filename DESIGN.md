@@ -4,8 +4,8 @@ Every visual choice in Facet with a one-line reason. Values are the starting tok
 `include/facet/core/theme.h` and `src/core/theme.cpp`, in design units (pixels at scale 1).
 Widgets read them from `facet::T()` and pass lengths through `facet::Px()`.
 
-This document sets the rules for the planned widgets as well as for the parts that exist;
-README.md lists what exists today.
+This document sets the rules for the planned widgets (the composites) as well as for the parts
+that exist; README.md lists what exists today.
 
 ## Direction
 
@@ -26,8 +26,8 @@ the selected entry and springs to the next one when the selection changes (stand
 Tabs, the sidebar, segmented controls and lists share this one gesture, so it is recognisably
 Facet without any ornament; today the selection pill block in `src/internal/selection_pill.h`
 draws it for segmented controls, toggle button groups, choice chips, the key bind mode
-selector, the lists, the demo navigation and the block prototypes. Tabs and the sidebar are
-planned.
+selector, the lists, tab bars, the sidebar, pagination, the time picker columns, the demo
+navigation and the block prototypes.
 
 **Dose caps.** Effects are allowed only where they carry meaning:
 
@@ -440,6 +440,24 @@ Sliders:
 - **Multi slider segments** take the series colors (the chart palette) unless the caller gives a
   color; a handle dragged off the track
   takes the disabled look, which shows that releasing it there removes it.
+- **Pads** (XYPad, BoxRangePad, the square JoystickPad) use the field frame: a pad is an input
+  surface, so it shares a field's fill, boundary, hover, read-only, disabled and error looks.
+- **One handle shape.** Every pad point, box handle, arc handle, allocation divider and stick is the
+  slider knob, so the whole family has one handle.
+- **XYPad guides** are labelTertiary hairlines and its readouts labelSecondary Footnote: the guides
+  only decorate, the values must be read.
+- **Pad grid.** Separator hairlines at every step up to 32 per axis, otherwise at the quarters,
+  because more lines would read as a texture.
+- **BoxRangePad box.** An accentSubtle wash with an accent outline that thickens while the body
+  would be grabbed: it is the selected range, like a range slider's filled span. Edge knobs show
+  only on edges at least three knobs long, so a small box does not pile up knobs.
+- **AllocationBar** segments sit on the slider track in chart palette colors with Caption
+  captions; the share is kept over the label when crowded, because the number is the data.
+- **ArcRangeSlider** defaults to four control heights so two handles and both values fit inside;
+  its band is the accent on the boundary arc.
+- **JoystickPad.** An accent line from the centre shows the vector, a separator cross marks zero
+  and the deadzone ring is labelTertiary; the spring back uses motion.standard because the return
+  signals the release.
 
 Text inputs:
 
@@ -553,6 +571,179 @@ Display:
 - **Count badge.** A pill (a circle for one digit), so it is never mistaken for a status badge.
 - **Live dot.** A pulsing dot grows a fading ring once per pulsePeriod and stands still with
   reduced motion.
+
+Data table:
+
+- **Surface.** DataTable sits on the grouped surface (bgSecondary, card radius, hairline): a
+  bounded data region whose scrolled content needs a visible edge, like the log view.
+- **Header labels** are Footnote labelSecondary, label while sorted, with an arrow for the
+  direction: column captions rank below the data, and the arrow carries the sort without color.
+- **Rows** have no lines and use the list fills, selection and focus ring, so table rows read and
+  behave like every Facet list row.
+- **Row band.** The row fill and focus ring span the visible table width, also while scrolled
+  sideways: one band per row, and the ring is never cut.
+- **Cell focus.** During cell navigation the focus ring moves around the focused cell, which shows
+  the cell F2 or Enter will edit.
+- **Header dividers** are hairlines inset by spacing.sm that turn into a focusRing line while a
+  resize band is hovered or dragged, so the resize affordance shows where and when it acts.
+- **Frozen columns.** A hairline marks their edge while the table is scrolled sideways, so it shows
+  where pinned content ends as other columns pass under it.
+- **Cell padding** is spacing.md, so cell text sits spacing.lg from the surface edge, the same
+  inset as list row text.
+
+Layout:
+
+- **Divider grip.** A split or panels divider shows a short grip in the scroll thumb color in the
+  middle of its hairline: the part that reaches 3:1 and tells that it can be dragged.
+- **Dependent group** draws a separator hairline down the middle of its indent, so the indented
+  rows read as belonging to the setting above.
+- **Panel header** has a hairline under it and folds to a strip of the header height, so a
+  collapsed panel keeps a way back without taking room.
+- **List and detail** sit side by side with a hairline band and no grip, because that divider does
+  not move.
+- **Flow count chip** is a neutral Badge, so hidden items are counted without looking like a
+  control.
+
+Overlays:
+
+- **Popover arrow** (overlay.arrowSize, the surface color, a hairline on its two slanted sides)
+  ties the card to its anchor at a glance.
+- **Popovers do not block.** A card next to a control should not freeze the page; a click outside
+  both dismisses it and acts.
+- **Toast.** An elevation 2 surface with the popover radius, newest nearest the corner, sliding in
+  from the edge and moving on a spring: status news that never covers or jumps the page content.
+- **Drawer.** Flush with its edge, window radius on the inner corners only, sliding from its edge,
+  so it reads as part of the window frame, not a floating card.
+- **Dialog title** in Title3 with a Plain Small close button submitted last: the title leads, and
+  keyboard focus lands on the content first.
+- **Hold to confirm.** A fill[0] fill grows across the held button, so the waiting is visible, not
+  only timed.
+- **Loading overlay.** The scrim plus a level 1 card under the spinner and message, so the message
+  keeps AA contrast over any content.
+- **Command palette.** A frameless Large search field with a hairline under it, recent picks first:
+  the field is the focus of the layer, and repeat actions are one key away.
+- **Unsaved changes bar.** A level 1 card floating above the window bottom: present without hiding
+  the page edge, it slides only when the change count crosses zero.
+- **Watermark.** A level 1 strip with a hairline and Footnote text, readable over any scene and
+  quieter than the UI.
+
+Navigation:
+
+- **Tab underline** in the focus ring color: a non-text selection mark must reach 3:1 on every
+  surface, and focusRing is the accent derived for exactly that.
+- **Count badges** use the grey wash for Neutral and the tone's solid fill otherwise, so a count
+  that asks for attention stands out without relying on color alone.
+- **Sidebar** on bgSecondary with the card radius and flush list-height rows, so the column reads as
+  one navigation surface beside the page content.
+- **Rail badges** sit on the icon's top-right corner, so the count stays visible without widening
+  the rail.
+- **Menu bar** has a hairline under it, which separates the titles from the content without a
+  filled band.
+- **Radio menu rows** show a dot at 40 % of the icon slot, so a choice of several reads differently
+  from a check mark.
+- **Step markers.** A done step is an accent disc with a check, the current step a focus ring ring
+  on accentSubtle, an open step a boundary ring; connectors take the focus ring color when done and
+  the boundary color otherwise. The check keeps progress readable without color.
+- **Breadcrumbs** show ancestors in labelSecondary and the current place in label: hierarchy
+  without extra weight.
+- **Pagination.** The current page sits on the selection pill, the identity motif that marks the
+  selection in every bar.
+- **Wizard** content slides spacing.xxxl over motion.durationStandard: the motion signals the
+  direction of the step change, and it stands still with reduced motion.
+- **Shortcut sheet.** The list stops growing at half the work area, so the title and the search
+  field stay on screen.
+
+Color pickers:
+
+- **Handles** are filled with their color, with an inner ring in white or black (whichever reads on
+  the color) and a hairline of the other outside it: they read on any color in both themes
+  without a theme color.
+- **Gradients** are drawn in gamma sRGB as exact linear stretches (the hue in six, the square as
+  white to hue under a black alpha ramp), so the color under a handle's centre is the value it
+  stands for.
+- **Color bars** are picker.colorBarHeight, thinner than the knob, with rounded caps in the end
+  colors: the slider anatomy, and the knob centre always sits on its color.
+- **Disabled pickers** dim gradients and swatches to 35 % and draw handle rings in labelTertiary:
+  the color stays visible as information while reading as unavailable.
+- **Chosen swatch.** A label-colored ring outside it plus a white or black check, so the choice
+  does not rest on color alone.
+- **Mixed color well** shows diagonal labelTertiary stripes over fill[2]: a value that is not one
+  color.
+- **Wheel mode** puts hue 0 at the top and keeps the triangle fixed (hue right, white lower left,
+  black upper left), so the arrow keys keep their direction.
+- **Compare strip** shows the current color left and the original right, and only the right half
+  can be pressed: one target restores.
+- **ColorModeEditor preview** animates with SampleAnimatedColor and stands still under reduced
+  motion: motion only shows what the setting does.
+
+Date, time and other pickers:
+
+- **Calendar choice.** The picked day and the range ends sit on the accent fill with onAccent
+  semibold numbers, because a calendar has one strong choice that must read at a glance.
+- **Today** has a hairline outline in the control boundary color plus accentText numbers, so it is
+  marked by shape, not by color alone.
+- **Range band.** accentSubtle across the days between the ends and half cells under the ends, so
+  the band reads as one span joining them.
+- **Date and time fields** use the ISO segment order with the focused segment on accentSubtle, the
+  look of DurationInput, because one segmented look serves every segmented field.
+- **Time columns** use the selection pill in scrolling columns, the identity motif applied to a
+  picker.
+- **Angle dial.** The Knob's face with four quarter ticks in labelTertiary (decoration) and an
+  accent needle with a tip dot, so the direction reads without the number.
+- **Icon and thumbnail tiles.** The chosen tile has the row selection fill and a ring two hairlines
+  wide in accentText (4.5:1 on every surface), so the choice does not depend on the fill alone.
+- **Thumbnail badges.** A lock on a bgElevated disc and a check on an accent disc, so locked and
+  checked tiles differ by shape.
+- **File browser.** The list is framed like the inline lists, and the path is cut in the middle so
+  the folder name stays visible.
+- **Popover surfaces.** Calendar popovers use the glass surface (the popover dose cap); the time and
+  icon popovers stay solid so their edge fades blend into bgElevated.
+
+Charts:
+
+- **Readout.** A box on the level 1 elevated surface with a hairline, inside the plot, so reading
+  values needs no hover delay and never leaves the chart.
+- **Shape cues.** Markers cycle circle, square, diamond and triangle per series, hidden legend
+  entries are hollow, and stacked segments and donut slices keep a bar gap of surface between them,
+  so series differ without relying on color.
+- **Axis labels** are measured, then thinned until none overlap; automatic ranges end on whole
+  ticks so the grid frames the data.
+- **Area fills** take the alpha of accentSubtle over the series color, the strength of every other
+  tinted wash, so an area never hides the grid or the series above it.
+- **Range brush.** Edges in the focus ring color with grips on the level 1 surface and a control
+  boundary hairline; the window has the accent wash and the outside the fill wash. The edges reach
+  3:1 on every surface.
+- **Gauge and meter tones.** Zones and fills use the progress tone colors (focusRing for the
+  accent), which reach 3:1; level meter fills have square ends so zone pieces and segments meet
+  edge to edge.
+- **Frame time graph.** Frames over the target use the warning color and also rise past the target
+  line, so they stand out without color too.
+
+Media:
+
+- **Sharp pictures.** Image boxes land on whole pixels and an image at its texture size is drawn
+  one texel per pixel, so pictures stay sharp at scale 1.
+- **Rounded image corners** are geometry with the texture mapped over them, so no picture shows
+  past a corner.
+- **Avatar fallback.** Without a ready image an avatar shows initials in label on fill[1], or the
+  user icon: a neutral fallback that invents no picture.
+- **Selected avatars and thumbnails** get an accent ring two hairlines wide inside their edge, with
+  a hairline gap, so the choice shows without the item growing or relying on color alone.
+- **Surface rings.** Overlapping avatars and an avatar's status dot are ringed in the surface color,
+  so the edge between them stays visible.
+- **Image feedback.** Hover and press on images are fill[2] and fill[1] washes over the picture,
+  the same feedback as other controls.
+- **Carousel buttons and image captions** sit on bgElevated with a hairline, so their glyphs and
+  text keep their contrast over any picture.
+- **Image compare divider.** A surface-colored line between boundary hairlines, visible over light
+  and dark pictures, with the slider knob as its handle.
+- **Timeline layers.** Accent for the played part, labelTertiary for the buffered band,
+  accentSubtle for the loop region and loop markers in the slider knob look, so each layer reads
+  apart.
+- **Drop zone** outline is dashed in the boundary color (3:1); an accepted drag takes the drag and
+  drop target look and a refused type gets no highlight.
+- **Glide.** Strips and carousels hand the drag's speed to a spring (standard motion) on release,
+  so they glide and snap without a jump; with reduced motion they jump.
 
 ## Effects
 
