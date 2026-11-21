@@ -824,3 +824,62 @@ TEST_CASE("Alt alone moves the focus to the first title of the menu bar")
     CHECK(facet::internal::KeyboardModality());
 }
 
+// --- Breadcrumbs --------------------------------------------------------------------------------
+
+TEST_CASE("Breadcrumbs return the activated segment; the last one is not a link; Left and Right move")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kPath[] = {"Root", "Folder", "Current"};
+    int activated = -1;
+    ImGuiID trail = 0;
+    session.SetUi([&] {
+        trail = ImGui::GetID("path");
+        const int a = facet::Breadcrumbs("path", kPath);
+        if (a >= 0)
+            activated = a;
+    });
+    session.Frame();
+    session.Click(Center(NavigationPartRect(trail, 1)));
+    CHECK(activated == 1);
+    activated = -1;
+    session.Click(Center(NavigationPartRect(trail, 2)));
+    CHECK(activated == -1);
+    session.Click(Center(NavigationPartRect(trail, 1)));
+    activated = -1;
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activated == 0);
+}
+
+TEST_CASE("Breadcrumbs collapse middle segments into a menu that activates them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kPath[] = {"Root", "Level one", "Level two", "Level three", "Current place"};
+    int activated = -1;
+    ImGuiID trail = 0;
+    float width = 0.0f;
+    session.SetUi([&] {
+        trail = ImGui::GetID("path");
+        const int a = facet::Breadcrumbs("path", kPath, {.width = width});
+        if (a >= 0)
+            activated = a;
+    });
+    session.Frame();
+    width = 240.0f;
+    session.Frames(3);
+    CHECK(NavigationPartRect(trail, 0).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(trail, 4).GetWidth() > 0.0f);
+    CHECK(NavigationPartRect(trail, 1).GetWidth() == 0.0f);
+    const ImRect more = NavigationPartRect(trail, facet::internal::kNavigationPartMore);
+    REQUIRE(more.GetWidth() > 0.0f);
+    CHECK(more.Min.x > NavigationPartRect(trail, 0).Max.x);
+    CHECK(NavigationPartRect(trail, 4).Max.x <= NavigationPartRect(trail, 0).Min.x + facet::Px(240.0f) + 0.5f);
+    session.Click(more.GetCenter());
+    session.Seconds(0.3f);
+    session.Click(Center(NavigationPartRect(trail, facet::internal::NavigationMenuRowPart(1))));
+    CHECK(activated == 1);
+}
+
