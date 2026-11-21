@@ -191,6 +191,59 @@ void FocusRowAt(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImRec
     SetKeyboardModality(true);
 }
 
+// ---- Tab ------------------------------------------------------------------------------------------
+//
+// Rows inside a BeginMultiSelect scope cannot be reached or left with Tab by Dear ImGui alone (its
+// tabbing only visits items of the focus scope that holds the focus). See "Tab" in list_view.h.
+
+struct TabExit
+{
+    bool pending = false;
+    int dir = 0;          // +1 Tab, -1 Shift+Tab
+    ImGuiID proxy = 0;    // the tab stop the focus was put on
+};
+
+TabExit& PendingTabExit()
+{
+    static TabExit exit;
+    return exit;
+}
+
+ImGuiID TabProxyId(ImGuiID listId)
+{
+    return ImHashStr("##facet.tab", 0, listId);
+}
+
+// Submits the tab stop of a list in the surrounding focus scope (not interactive, not hoverable).
+// Returns true when the focus has just landed on it from outside, so the list moves it on to a row.
+bool SubmitTabProxy(ImGuiID proxyId, const ImRect& rect)
+{
+    ImGuiContext& g = *GImGui;
+    // Read before ItemAdd: a backward tabbing request stops scoring when it reaches this item.
+    const TabExit& exit = PendingTabExit();
+    const bool leaving = (exit.pending && exit.proxy == proxyId) ||
+                         ((g.NavMoveSubmitted || g.NavMoveScoringItems) && (g.NavMoveFlags & ImGuiNavMoveFlags_IsTabbing) != 0);
+    ImGui::ItemAdd(rect, proxyId);
+    return g.NavId == proxyId && !leaving;
+}
+
+// While a row of the list has the focus: the list owns Tab, and a press puts the focus on its tab
+// stop, from where ListCoreNewFrame starts Dear ImGui's tabbing in the next frame.
+void ClaimTabExit(ImGuiWindow* window, ImGuiID owner, ImGuiID proxyId, ImGuiID outerScope, const ImRect& proxyRect)
+{
+    ImGuiContext& g = *GImGui;
+    ImGui::SetKeyOwner(ImGuiKey_Tab, owner);
+    if (!ImGui::IsKeyPressed(ImGuiKey_Tab, ImGuiInputFlags_Repeat, owner) || g.IO.KeyCtrl || g.IO.KeyAlt)
+        return;
+    ImGuiWindow* navWindow = g.NavWindow != nullptr ? g.NavWindow : window;
+    ImGui::SetNavID(proxyId, ImGuiNavLayer_Main, outerScope, ImGui::WindowRectAbsToRel(navWindow, proxyRect));
+    ImGui::ItemAdd(proxyRect, proxyId);  // alive in this frame, so navigation keeps it as the focus
+    TabExit& exit = PendingTabExit();
+    exit.pending = true;
+    exit.dir = g.IO.KeyShift ? -1 : 1;
+    exit.proxy = proxyId;
+}
+
 // After a move made by the list itself (typeahead, Left to the parent): the selection follows the
 // focus as after a plain arrow key, and a later Shift range starts there.
 bool SelectOnly(ListSelection* selection, ImGuiID storageId, ImGuiID focusScope, ImGuiSelectionUserData data)
@@ -554,6 +607,7 @@ struct TreeFrame
     TypeaheadMatch matchAfter;
     TypeaheadMatch matchAny;
     bool focusNext = false;
+    bool enterByTab = false;  // Tab landed on the tree's tab stop: the node Tab lands on takes the focus
     bool navHandled = false;  // a Left or Right request was handled this frame
     ImGuiID tabStopId = 0;
     bool tabStopGiven = false;
@@ -885,6 +939,18 @@ bool BeginListView(ImGuiID id, const ListViewDesc& desc)
         if (desc.keyOwner != 0)
             DriveHighlight(frame);
     }
+    // The tab stop of a list whose rows are in a selection scope of their own (see "Tab").
+    bool enterByTab = false;
+    if ((frame.multi || frame.choiceScope) && !frame.driven)
+    {
+        // Submitted only while no row has the focus, so the arrows between rows never land on it.
+        const ImGuiID proxyId = TabProxyId(id);
+        const bool rowFocused = g.NavId != 0 && g.NavFocusScopeId == frame.focusScope;
+        if (!rowFocused)
+            enterByTab = SubmitTabProxy(proxyId, window->InnerRect);
+        else if (frame.listFocused)
+            ClaimTabExit(window, id, proxyId, g.CurrentFocusScopeId, window->InnerRect);
+    }
     if (frame.listFocused && !frame.driven && desc.entry != nullptr && UpdateTypeahead(state.typed))
     {
         const int target = ListTypeaheadFind(state.typed.text, desc.rowCount, state.focusIndex, desc.entry, desc.user);
@@ -922,6 +988,22 @@ bool BeginListView(ImGuiID id, const ListViewDesc& desc)
         frame.tabStop = state.focusIndex;
     else if (desc.choice != nullptr && *desc.choice >= 0 && *desc.choice < desc.rowCount)
         frame.tabStop = *desc.choice;
+    if (enterByTab)
+    {
+        // The focus moves on from the tab stop to the row Tab lands on; the selection stays.
+        const int target = frame.tabStop >= 0 ? frame.tabStop : EnabledFrom(desc, 0, 1);
+        if (target >= 0)
+        {
+            const ImGuiID rowId = RowId(frame, KeyOf(desc, EntryOf(desc, target), target));
+            const ImRect rect = RowRect(frame, target);
+            FocusRowAt(window, rowId, frame.focusScope, rect);
+            state.focusIndex = target;
+            state.focusedId = rowId;
+            frame.tabStop = target;
+            frame.listFocused = true;
+            ScrollAreaRevealRect(window, rect, ScrollAlign::Nearest, false);
+        }
+    }
     BeginListRows({.rowCount = desc.rowCount, .rowHeight = frame.rowHeight, .columns = 1, .keepAlive = frame.tabStop});
 
     if (desc.revealRow >= 0 && desc.revealRow < desc.rowCount)
@@ -1097,6 +1179,17 @@ bool BeginListTree(ImGuiID id, const ListTreeDesc& desc)
     }
     if (frame.multi)
     {
+        // The tab stop in the surrounding scope (see "Tab"); the node Tab lands on takes the focus
+        // when it is submitted.
+        const ImGuiID proxyId = TabProxyId(id);
+        const bool nodeFocused = g.NavId != 0 && g.NavFocusScopeId == frame.scope;
+        if (!nodeFocused)
+            frame.enterByTab = SubmitTabProxy(proxyId, window->InnerRect);
+        else if (frame.listFocused)
+            ClaimTabExit(window, id, proxyId, g.CurrentFocusScopeId, window->InnerRect);
+    }
+    if (frame.multi)
+    {
         const ImGuiMultiSelectFlags flags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
         ApplyTree(frame, ImGui::BeginMultiSelect(flags, desc.selection->Size, -1), previous,
                   state.disabled[state.current ^ 1]);
@@ -1166,6 +1259,14 @@ ListTreeNodeState ListTreeNode(const char* label, const ListTreeNodeOptions& opt
         tabStop = true;
     frame.tabStopGiven = frame.tabStopGiven || tabStop;
     frame.focusedSeen = frame.focusedSeen || id == state.focusedId;
+    if (frame.enterByTab && tabStop)
+    {
+        frame.enterByTab = false;
+        FocusRowAt(window, id, frame.scope, rect);
+        state.focusedId = id;
+        frame.listFocused = true;
+        ScrollAreaRevealRect(window, rect, ScrollAlign::Nearest, false);
+    }
 
     RowEnv env;
     env.window = window;
@@ -1406,6 +1507,27 @@ void DrawListState(const ImRect& rect, DataState state, const char* emptyText, c
     PopTextStyle();
 }
 
+void ListCoreNewFrame()
+{
+    TabExit& exit = PendingTabExit();
+    if (!exit.pending)
+        return;
+    exit.pending = false;
+    ImGuiContext* context = ImGui::GetCurrentContext();
+    if (context == nullptr)
+        return;
+    ImGuiContext& g = *context;
+    // Dear ImGui's own tabbing from the list's tab stop, as if Tab had been pressed there: the
+    // items of this frame are scored and the result applies at the next ImGui::NewFrame.
+    if (g.NavWindow == nullptr || g.NavId != exit.proxy || g.NavMoveSubmitted)
+        return;
+    g.NavTabbingDir = exit.dir;
+    ImGui::NavMoveRequestSubmit(ImGuiDir_None, exit.dir < 0 ? ImGuiDir_Up : ImGuiDir_Down,
+                                ImGuiNavMoveFlags_IsTabbing | ImGuiNavMoveFlags_Activate,
+                                ImGuiScrollFlags_KeepVisibleEdgeX | ImGuiScrollFlags_KeepVisibleEdgeY);
+    g.NavTabbingCounter = -1;
+}
+
 void ListCoreEndFrame()
 {
     ListRowsEndFrame();
@@ -1421,6 +1543,7 @@ void ListCoreEndFrame()
 
 void ListCoreShutdown()
 {
+    PendingTabExit() = TabExit();
     ListRowsShutdown();
     Views().depth = 0;
     Trees().depth = 0;

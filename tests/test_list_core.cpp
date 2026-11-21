@@ -530,6 +530,39 @@ TEST_CASE("List view: the focused row stays alive when scrolled out, and it is t
     CHECK(session.ItemVisible("row4"));
 }
 
+TEST_CASE("List view: Tab and Shift+Tab enter a selection list at its tab stop and leave it")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    selection.SetItemSelected(2, true);
+    ListUi ui;
+    ui.desc.rowCount = 6;
+    ui.desc.selection = &selection;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        ui.Ui(session);
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    session.Click(Row(session, 2));  // the tab stop is the row last focused
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(GImGui->NavId == RowId(session, 2));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(GImGui->NavId == session.ItemId("after"));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(GImGui->NavId == RowId(session, 2));
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(GImGui->NavId == session.ItemId("before"));
+    // Entering and leaving by Tab keeps the selection.
+    CHECK(Selected(selection) == std::set<ImGuiID>{2});
+}
+
 TEST_CASE("List view: typeahead jumps to the next matching label and restarts after a pause")
 {
     MotionGuard guard;

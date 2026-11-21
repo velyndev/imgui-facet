@@ -63,6 +63,15 @@
 //     ListRowState::activated and ListViewResult::activated, and writes `choice` unless readOnly.
 //     Typeahead is off: the driving field has the typed text.
 //
+//   - Tab: the rows of a selection or choice live in the focus scope of ImGui::BeginMultiSelect,
+//     and Dear ImGui's tabbing only moves between items of the focus scope that holds the focus, so
+//     on its own it never enters or leaves such a list. A view (and a tree with a selection) adds a
+//     tab stop item in the surrounding scope before its rows: when Tab, Shift+Tab or an arrow key
+//     lands on it, the focus moves on to the row Tab lands on (without changing the selection).
+//     While a row has the focus, the view owns Tab; a press puts the focus back on that item and
+//     ListCoreNewFrame starts Dear ImGui's tabbing from there in the next frame, so the focus moves
+//     to the item after (or, with Shift, before) the list as from any other item.
+//
 // State kept under the view id (state_storage.h): the focused row, the typeahead text and its
 // time. The scroll offset is the scroll area's.
 
@@ -332,6 +341,9 @@ void DrawListState(const ImRect& rect, DataState state, const char* emptyText, c
 
 // Called by the scroll module's frame hooks (the list core has no subsystem entry): reports row
 // ranges, selections, views and trees still open at the end of the frame and resets them.
+// ListCoreNewFrame starts the Tab move out of a list that the list asked for in the last frame
+// (see "Tab" at the top of this file).
+void ListCoreNewFrame();
 void ListCoreEndFrame();
 void ListCoreShutdown();
 

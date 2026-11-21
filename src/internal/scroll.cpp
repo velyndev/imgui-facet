@@ -401,6 +401,7 @@ void ScrollNewFrame()
     StepMotion(*context, dt);
     ClaimWheel(*context);
     Prune(*context);
+    ListCoreNewFrame();
 }
 
 void ScrollEndFrame()
