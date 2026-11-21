@@ -5,10 +5,10 @@
 //
 // Rows outside a row group take the label column of the options or the labelColumn token, so in a
 // column of settings rows every control starts at one x whatever the label lengths; a label longer
-// than its column ends in an ellipsis and shows in full as a tooltip. Rows that start at one x in one
-// window under one id stack top form a column: each keeps free at its end the widest reset slot the
-// column had in the last frame (RowOptions::endReserve), so the controls also end in one line and
-// every row of the column stacks at the same width.
+// than its column ends in an ellipsis and shows in full as a tooltip. The rows of one window under one
+// id stack top form a column: each keeps free at its end the widest reset slot the column had in the
+// last frame (RowOptions::endReserve), so the controls also end in one line (rows indented by a
+// dependent group included) and every row of the column stacks at the same width.
 //
 // The label lines up with the text of the control: the block centers it on a control of the size
 // it is given. The row measures the height of its control in each frame (the last item submitted in
@@ -45,9 +45,9 @@ struct SettingsRowMeasure
     float scale = 0.0f;          // the scale it was measured at
 };
 
-// The settings rows that start at one x in one window under one id stack top form a column. Every
-// row of a column keeps free at its end the widest reset slot of the column in the last frame, so
-// their controls end in one line and the rows stack at the same width.
+// The settings rows of one window under one id stack top form a column. Every row of a column keeps
+// free at its end the widest reset slot of the column in the last frame, so their controls end in
+// one line and the rows stack at the same width.
 struct SettingsRowColumn
 {
     int frame = -1;
@@ -144,8 +144,7 @@ void BeginSettingsRow(const char* label, const SettingsRowOptions& options)
 
     // The column this row belongs to, and the room its reset slots take.
     ImGuiContext& g = *GImGui;
-    const int x = static_cast<int>(std::lround(window->DC.CursorPos.x - window->Pos.x));
-    const ImGuiID columnId = ImHashData(&x, sizeof(x), ImHashStr("##facet.settingscolumn", 0, window->IDStack.back()));
+    const ImGuiID columnId = ImHashStr("##facet.settingscolumn", 0, window->IDStack.back());
     SettingsRowColumn& column = internal::GetState<SettingsRowColumn>(columnId);
     if (column.frame != g.FrameCount)
     {

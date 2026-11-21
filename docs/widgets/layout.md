@@ -161,10 +161,10 @@ the control (whatever the caller submits between Begin and End) in the rest of t
 - Columns: the label column is `labelWidth` units, or the `layout.labelColumn` token, with the
   `spacing.sm` gap included, so in a column of settings rows every control starts at one x whatever
   the label lengths. A label too long for its column ends in an ellipsis and shows in full as a
-  tooltip on hover, and under the label while the row's control has the keyboard focus. Rows that
-  start at one x in one window under one id stack top form a column: each keeps the widest reset
-  slot of the column (as measured in the last frame) free at its end, so the controls also end in
-  one line and every row of the column stacks at the same width.
+  tooltip on hover, and under the label while the row's control has the keyboard focus. The rows of
+  one window under one id stack top form a column: each keeps the widest reset slot of the column
+  (as measured in the last frame) free at its end, so the controls also end in one line (rows
+  indented by a dependent group included) and every row of the column stacks at the same width.
 - Narrow widths: when the column and `layout.minRowControl` do not fit, the label goes on its own
   line and the control takes the whole width under it.
 - The control slot pushes its width as the item width and narrows the window's work rect, so Facet
