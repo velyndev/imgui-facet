@@ -20,6 +20,7 @@
 #include <facet/facet.h>
 
 #include "core/core_internal.h"
+#include "internal/focus.h"
 #include "internal/list_core.h"
 #include "internal/list_view.h"
 #include "internal/scroll.h"
@@ -601,6 +602,23 @@ TEST_CASE("List view: Tab and Shift+Tab enter a selection list at its tab stop a
     CHECK(GImGui->NavId == session.ItemId("before"));
     // Entering and leaving by Tab keeps the selection.
     CHECK(Selected(selection) == std::set<ImGuiID>{2});
+}
+
+TEST_CASE("List view: a window that picks its default focus does not pick the tab stop of a list")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiSelectionBasicStorage selection;
+    ListUi ui;
+    ui.desc.rowCount = 6;
+    ui.desc.selection = &selection;
+    session.SetUi([&] { ui.Ui(session); });
+    REQUIRE_FALSE(fi::KeyboardModality());
+    session.Frames(3);
+    // Entering by Tab moves the focus to a row as keyboard input (ring shown, row revealed); a
+    // window that appears with no key pressed does neither.
+    CHECK_FALSE(fi::KeyboardModality());
 }
 
 TEST_CASE("List view: typeahead jumps to the next matching label and restarts after a pause")

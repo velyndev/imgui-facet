@@ -223,7 +223,9 @@ bool SubmitTabProxy(ImGuiID proxyId, const ImRect& rect)
     const TabExit& exit = PendingTabExit();
     const bool leaving = (exit.pending && exit.proxy == proxyId) ||
                          ((g.NavMoveSubmitted || g.NavMoveScoringItems) && (g.NavMoveFlags & ImGuiNavMoveFlags_IsTabbing) != 0);
-    ImGui::ItemAdd(rect, proxyId);
+    // Not a default focus candidate: a window that picks its first item to focus (when it appears
+    // or gets the keyboard) takes a real item, so only Tab moves the focus into the list.
+    ImGui::ItemAdd(rect, proxyId, nullptr, ImGuiItemFlags_NoNavDefaultFocus);
     return g.NavId == proxyId && !leaving;
 }
 
