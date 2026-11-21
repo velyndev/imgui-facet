@@ -60,6 +60,11 @@ ImVec2 Center(const ImRect& r)
     return r.GetCenter();
 }
 
+ImVec2 Nudge(ImVec2 p)
+{
+    return ImVec2(p.x + 1.0f, p.y);
+}
+
 const facet::ChoiceItem kTabs[] = {
     {.label = "Alpha", .id = 11}, {.label = "Beta", .id = 12}, {.label = "Gamma", .id = 13}, {.label = "Delta", .id = 14}};
 
@@ -378,5 +383,120 @@ TEST_CASE("A tab bar with a null index draws read-only and writes nothing")
     session.Click(Center(NavigationPartRect(bar, facet::internal::NavigationClosePart(0))));
     CHECK_FALSE(written);
     CHECK(closed == -1);
+}
+
+// --- Sidebar ------------------------------------------------------------------------------------
+
+TEST_CASE("Sidebar items are one Tab stop, Up and Down move the focus and Enter activates")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int page = 0;
+    int activations = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::BeginSidebar("nav", {.mode = facet::SidebarMode::Expanded, .height = 300.0f}))
+        {
+            for (int i = 0; i < 3; ++i)
+            {
+                char label[16];
+                std::snprintf(label, sizeof(label), "Page %d", i + 1);
+                if (facet::SidebarItem(label, facet::Icon("list"), {.selected = page == i}))
+                {
+                    page = i;
+                    ++activations;
+                }
+                session.Track(label);
+            }
+            facet::EndSidebar();
+        }
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("Page 3"));
+    CHECK(page == 2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 3"));  // the selected item is the Tab stop
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 2"));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 1"));
+    // Down moves one item, though the items after the focused one come later in the frame.
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 2"));
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(page == 0);
+    CHECK(activations == 2);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("An Auto sidebar is a rail in a narrow width and names its items in tooltips")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float columnWidth = 0.0f;
+    bool tooltip = false;
+    bool narrow = true;
+    session.SetUi([&] {
+        ImGui::BeginChild("frame", ImVec2(facet::Px(narrow ? 300.0f : 780.0f), facet::Px(320.0f)));
+        if (facet::BeginSidebar("nav", {.height = 300.0f}))
+        {
+            facet::SidebarItem("Settings", facet::Icon("settings"), {.selected = true, .badge = 3});
+            session.Track("item");
+            // The tooltip levels are queried inside the frame, where the popup host answers.
+            tooltip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
+            facet::EndSidebar();
+        }
+        columnWidth = ImGui::GetItemRectSize().x;
+        ImGui::EndChild();
+    });
+    session.Seconds(1.0f);
+    CHECK(columnWidth == doctest::Approx(std::round(facet::Px(facet::T().containers.railWidth))));
+    session.MouseMove(session.ItemCenter("item"));
+    session.MouseMove(Nudge(session.ItemCenter("item")));
+    session.Seconds(facet::T().overlay.tooltipDelay * facet::T().motion.scale + 0.3f);
+    CHECK(tooltip);
+    narrow = false;
+    session.MouseMove(ImVec2(1.0f, 1.0f));
+    session.Seconds(1.0f);
+    CHECK(columnWidth == doctest::Approx(std::round(facet::Px(facet::T().containers.sidebarWidth))));
+}
+
+TEST_CASE("A collapsible sidebar section toggles on a click and on Left and Right; Hidden draws nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool shown = false;
+    bool hidden = true;
+    session.SetUi([&] {
+        hidden = facet::BeginSidebar("off", {.mode = facet::SidebarMode::Hidden});
+        if (facet::BeginSidebar("nav", {.mode = facet::SidebarMode::Expanded, .height = 300.0f}))
+        {
+            shown = facet::BeginSidebarSection("Group", {.collapsible = true, .defaultOpen = false});
+            session.Track("header");
+            if (shown)
+            {
+                facet::SidebarItem("Inside", facet::Icon("list"));
+                facet::EndSidebarSection();
+            }
+            facet::EndSidebar();
+        }
+    });
+    session.Frames(2);
+    CHECK_FALSE(hidden);
+    CHECK_FALSE(shown);
+    session.Click(session.ItemCenter("header"));
+    CHECK(shown);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK_FALSE(shown);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(shown);
 }
 
