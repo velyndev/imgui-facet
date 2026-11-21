@@ -1,7 +1,7 @@
 // Demo page: Display. Shows every display widget with its variants, grouped by purpose: text,
 // alerts and states, progress and loading, badges and status marks, keys and text marks, code and
 // logs, and data. Every value on the page is a labelled placeholder or generated (the log rows, the
-// stat tile's trend); the DataTable section stays a placeholder until its own package.
+// stat tile's trend). DataTable has a page of its own (page_w_data_table.cpp).
 
 #include <cmath>
 #include <cstring>
@@ -48,12 +48,6 @@ enum CaptureState
 };
 
 // Example data: neutral placeholders, not real content.
-const facet::DataTableColumn kColumns[] = {
-    {"Column 1"},
-    {"Column 2"},
-    {"Column 3", 0.0f, facet::Align::End},
-};
-constexpr int kTableRows = 3;
 const int kHighlightedLines[] = {3};
 constexpr const char* kCodeSample =
     "// Placeholder code: a small function and a loop.\n"
@@ -109,7 +103,6 @@ struct DisplayUi
     double statValue = 40.0;
     double statDelta = 2.0;
     float trend[kTrendSamples] = {};
-    ImGuiSelectionBasicStorage selection;
 };
 
 DisplayUi ui;
@@ -471,7 +464,6 @@ void CodeSection(facet::demo::PageCtx& ctx)
 
 void DataSection(facet::demo::PageCtx& ctx)
 {
-    const float viewHeight = facet::T().spacing.xxxl * 4.0f;
     SectionHeader("Data");
     LabeledRow("Key value list");
     ImGui::BeginGroup();  // keeps the rows in the control column of the row
@@ -527,25 +519,7 @@ void DataSection(facet::demo::PageCtx& ctx)
         ui.statDelta = -5.0;
     }
     ImGui::EndGroup();
-    LabeledRow("Data table");
-    if (facet::BeginDataTable("table", kColumns, kTableRows, &ui.selection,
-                              {.sortable = true, .frozenColumns = 1, .height = viewHeight}))
-    {
-        facet::RowRange rows;
-        while (facet::NextVisibleRows(&rows))
-        {
-            for (int row = rows.first; row < rows.last; ++row)
-            {
-                facet::DataTableRow(row);
-                for (int column = 0; column < static_cast<int>(std::size(kColumns)); ++column)
-                {
-                    ImGui::TableNextColumn();
-                    ImGui::Text("Row %d, column %d", row + 1, column + 1);
-                }
-            }
-        }
-        facet::EndDataTable();
-    }
+    Note("DataTable has a page of its own: Widgets, Data table.");
 }
 
 } // namespace
@@ -558,7 +532,7 @@ FACET_DEMO_PAGE("display", "Display", "Widgets", 110, "default", "alerts", "prog
 
     facet::demo::PageHeader("Display",
                             "Text styles, alerts and empty states, progress and loading, badges and status marks, "
-                            "key caps, code and log views, key-value lists, stat tiles and data tables.");
+                            "key caps, code and log views, key-value lists and stat tiles.");
     facet::demo::PlannedFamilyNote("display");
 
     const bool disabled = Is(ctx, kDisabled);
