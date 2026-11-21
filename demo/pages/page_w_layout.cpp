@@ -32,6 +32,7 @@ enum CaptureState
     kCaptureArrange = 2,
     kCaptureSplit = 3,
     kCaptureDependent = 4,
+    kCaptureTiles = 5,
 };
 
 // Split views: the width slider's lowest share, the first pane's minimum and the vertical minimums
@@ -64,6 +65,12 @@ const char* const kFlowAligns[] = {"Start", "Center", "End", "Stretch"};
 // List and detail: placeholder entries, and the narrow region's share of the Regular breakpoint.
 constexpr int kEntries = 6;
 constexpr float kNarrowShare = 0.75f;
+// Item grid: the tile count, the minimum tile width (units), the tiles with a probe, and the data
+// states of the state control.
+constexpr int kTiles = 500;
+constexpr float kTileWidth = 64.0f;
+constexpr int kProbedTiles = 12;
+const char* const kTileStates[] = {"Tiles", "Empty", "Loading", "Error"};
 
 struct LayoutState
 {
@@ -117,8 +124,11 @@ struct LayoutState
     float panelSizes[3] = {0.25f, 0.5f, 0.25f};
     bool panelOpen[3] = {};
     int panelPresses = 0;
-    // Placeholders of the planned widgets
-    ImGuiSelectionBasicStorage selection;
+    // Item grid
+    int tileState = 0;
+    ImGuiSelectionBasicStorage tileSelection;
+    int activatedTile = -1;
+    bool gridOpen = false;
 };
 
 // Height of the sample regions: a few large control heights in design units, so it follows the
@@ -554,28 +564,77 @@ void Dependent(facet::demo::PageCtx& ctx, LayoutState& s)
          s.hiddenToggle ? "on" : "off");
 }
 
-void Tiles(LayoutState& s)
+void Tiles(facet::demo::PageCtx& ctx, LayoutState& s)
 {
-    SectionHeader("Tiles");
-    Paragraph("A virtualized grid of equal tiles for libraries and inventories.");
-    if (facet::BeginItemGrid("items", 500, &s.selection, {.height = RegionHeight()}))
+    SectionHeader("Item grid");
+    Paragraph("A scrolling grid of equal tiles that reflows with the width and submits only the visible "
+              "tiles. Click, Ctrl, Shift, a drag from between the tiles and the arrow keys select; a "
+              "double click or Enter activates a tile. The tiles are numbered placeholders.");
+    facet::BeginSettingsRow("Data state");
+    facet::SegmentedControl("##value", &s.tileState, kTileStates);
+    ctx.Probe("layout.tiles.state");
+    facet::EndSettingsRow();
+    const facet::DataState states[] = {facet::DataState::Ready, facet::DataState::Ready, facet::DataState::Loading,
+                                       facet::DataState::Error};
+    const int count = s.tileState == 1 ? 0 : kTiles;
+    if (facet::Button("Clear the selection"))
+        s.tileSelection.Clear();
+    ctx.Probe("layout.tiles.before");
+    if (ctx.capture && ctx.captureState == kCaptureTiles)
+    {
+        s.tileSelection.Clear();
+        s.tileSelection.SetItemSelected(1, true);
+        s.tileSelection.SetItemSelected(2, true);
+        ctx.ForceNextItemState(ForcedItemState::Focused, 2);
+    }
+    s.gridOpen = facet::BeginItemGrid("tiles", count, &s.tileSelection,
+                                      {.minTileWidth = kTileWidth, .state = states[s.tileState], .height = RegionHeight()});
+    if (s.gridOpen)
     {
         facet::RowRange tiles;
         while (facet::NextVisibleRows(&tiles))
-            for (int tile = tiles.first; tile < tiles.last; ++tile)
-                facet::ItemGridTile(tile);
+            for (int i = tiles.first; i < tiles.last; ++i)
+            {
+                if (facet::ItemGridTile(i))
+                    s.activatedTile = i;
+                const ImVec2 min = ImGui::GetItemRectMin();
+                const ImVec2 max = ImGui::GetItemRectMax();
+                if (i < kProbedTiles)
+                {
+                    char probe[32];
+                    std::snprintf(probe, sizeof(probe), "layout.tiles.%d", i);
+                    ctx.Probe(probe);
+                }
+                // The tile's content: its number, centered, in the label color.
+                char number[16];
+                std::snprintf(number, sizeof(number), "%d", i + 1);
+                facet::PushTextStyle(facet::TextStyle::Body);
+                const ImVec2 size = ImGui::CalcTextSize(number);
+                ImGui::GetWindowDrawList()->AddText(ImVec2(std::floor((min.x + max.x - size.x) * 0.5f),
+                                                           facet::CenteredTextY(min.y, max.y - min.y)),
+                                                    facet::ToU32(facet::T().colors.label), number);
+                facet::PopTextStyle();
+            }
         facet::EndItemGrid();
     }
+    ctx.Probe("layout.tiles.grid");
+    if (ctx.capture && ctx.captureState == kCaptureTiles)
+        ctx.RevealInCapture();
+    if (facet::Button("Select every tile"))
+        for (int i = 0; i < count; ++i)
+            s.tileSelection.SetItemSelected(static_cast<ImGuiID>(i), true);
+    ctx.Probe("layout.tiles.after");
+    Note("%d tiles selected; last activated: %d.", s.tileSelection.Size, s.activatedTile >= 0 ? s.activatedTile + 1 : 0);
 }
 
 } // namespace
 
-FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrange", "split", "dependent")
+FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrange", "split", "dependent", "tiles")
 {
     facet::demo::PageHeader("Layout",
                             "Stacks, grids, flow layout, split views, panels, list and detail, settings rows, "
                             "dependent groups, separators and item grids.");
-    facet::demo::PlannedFamilyNote("layout");
+    facet::demo::ReadyFamilyNote("layout");
     LayoutState& s = State();
     if (ctx.capture)
         s.parentEnabled = s.hideParent = ctx.captureState == kCaptureDependent;
@@ -590,7 +649,7 @@ FACET_DEMO_PAGE("layout", "Layout", "Widgets", 90, "default", "focused", "arrang
     SplitViews(ctx, s);
     ListDetails(ctx, s);
     PanelsSection(ctx, s);
-    Tiles(s);
+    Tiles(ctx, s);
 }
 
 FACET_DEMO_SELFTEST("layout")
@@ -889,6 +948,45 @@ FACET_DEMO_SELFTEST("layout")
     test.KeyPress(ImGuiKey_Enter);
     test.WaitSeconds(0.5f);
     test.Expect("Enter on the focused strip button expands it", [] { return State().panelOpen[0]; });
+
+    // Item grid: mouse selection and activation, then the keyboard; the states replace the tiles.
+    test.Do([] {
+        LayoutState& s = State();
+        s.tileState = 0;
+        s.tileSelection.Clear();
+        s.activatedTile = -1;
+    });
+    test.Reveal("layout.tiles.before");
+    test.WaitSeconds(0.4f);
+    // The first line holds at least two tiles at every size the selftest runs at.
+    test.Click("layout.tiles.0");
+    test.Expect("a click selects one tile",
+                [] { return State().tileSelection.Size == 1 && State().tileSelection.Contains(0); });
+    test.KeyDown(ImGuiMod_Ctrl);
+    test.Click("layout.tiles.1");
+    test.KeyUp(ImGuiMod_Ctrl);
+    test.Expect("Ctrl and a click add a tile",
+                [] { return State().tileSelection.Size == 2 && State().tileSelection.Contains(1); });
+    test.DoubleClick("layout.tiles.1");
+    test.Expect("a double click activates a tile", [] { return State().activatedTile == 1; });
+    test.Click("layout.tiles.before");
+    test.Expect("the button before the grid clears the selection", [] { return State().tileSelection.Size == 0; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.tiles.1");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Expect("an arrow key moves the focus and the selection to the tile before",
+                [] { return State().tileSelection.Size == 1 && State().tileSelection.Contains(0); });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter activates the focused tile", [] { return State().activatedTile == 0; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("layout.tiles.after");
+    test.Do([] { State().tileState = 2; });
+    test.Wait(2);
+    test.Expect("while loading the grid shows its state instead of tiles", [] { return !State().gridOpen; });
+    test.Do([] { State().tileState = 0; });
+    test.Wait(2);
+    test.Expect("ready again, the tiles are back", [] { return State().gridOpen; });
 
     test.Reveal("layout.split.vertical");
     test.WaitSeconds(0.4f);

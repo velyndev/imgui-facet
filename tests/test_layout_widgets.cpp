@@ -1564,3 +1564,205 @@ TEST_CASE("Panels leave every stack balanced, nested, disabled and outside a fra
     facet::EndPanels();
     CHECK(fi::OpenScopeCount() == 0);
 }
+
+// ---- ItemGrid -----------------------------------------------------------------------------------
+
+namespace
+{
+
+// A button, an item grid and a button; records the tiles of the latest frame.
+struct ItemGridUi
+{
+    static constexpr int kTracked = 12;
+    int count = 40;
+    bool selectable = true;
+    facet::ItemGridOptions options{.minTileWidth = 72.0f, .width = 420.0f, .height = 300.0f};
+    ImGuiSelectionBasicStorage selection;
+    bool open = false;
+    int submitted = 0;
+    int activated = -1;
+    ImRect tiles[kTracked];
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        submitted = 0;
+        open = facet::BeginItemGrid("grid", count, selectable ? &selection : nullptr, options);
+        session.Track("grid");
+        if (open)
+        {
+            facet::RowRange range;
+            char name[16];
+            while (facet::NextVisibleRows(&range))
+                for (int i = range.first; i < range.last; ++i)
+                {
+                    ++submitted;
+                    if (facet::ItemGridTile(i))
+                        activated = i;
+                    if (i < kTracked)
+                    {
+                        tiles[i] = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+                        std::snprintf(name, sizeof(name), "tile%d", i);
+                        session.Track(name);
+                    }
+                }
+            facet::EndItemGrid();
+        }
+        ImGui::Button("after");
+        session.Track("after");
+    }
+};
+
+} // namespace
+
+TEST_CASE("An item grid fits as many tiles of the minimum width as it can and makes them square")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ItemGridUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    REQUIRE(ui.open);
+    const float gap = facet::Px(facet::T().spacing.sm);
+    const float tile = ui.tiles[0].GetWidth();
+    CHECK(tile >= 72.0f);
+    CHECK(ui.tiles[0].GetHeight() == doctest::Approx(tile));
+    int columns = 1;
+    while (columns < ItemGridUi::kTracked && ui.tiles[columns].Min.y == ui.tiles[0].Min.y)
+        ++columns;
+    CHECK(columns == static_cast<int>(std::floor((ui.tiles[0].GetWidth() * columns + gap * (columns - 1) + gap) /
+                                                 (72.0f + gap))));
+    CHECK(ui.tiles[1].Min.x - ui.tiles[0].Max.x == doctest::Approx(gap));
+    CHECK(ui.tiles[columns].Min.x == doctest::Approx(ui.tiles[0].Min.x));
+    CHECK(ui.tiles[columns].Min.y == doctest::Approx(ui.tiles[0].Max.y + gap));
+    // Taller tiles with an aspect.
+    ui.options.tileAspect = 1.5f;
+    session.Frames(2);
+    CHECK(ui.tiles[0].GetHeight() == doctest::Approx(std::round(ui.tiles[0].GetWidth() * 1.5f)));
+}
+
+TEST_CASE("An item grid submits only its visible tiles")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ItemGridUi ui;
+    ui.count = 100000;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    REQUIRE(ui.open);
+    CHECK(ui.submitted > 0);
+    CHECK(ui.submitted < 200);
+    // Scrolled to the end, the last tiles are handed out.
+    session.Wheel(session.ItemCenter("grid"), -100000.0f);
+    session.Frames(30);
+    CHECK(ui.submitted < 200);
+}
+
+TEST_CASE("An item grid selects with clicks and moves in two dimensions with the arrows")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ItemGridUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("tile2"));
+    CHECK(ui.selection.Size == 1);
+    CHECK(ui.selection.Contains(2));
+    session.MouseMove(session.ItemCenter("tile4"));
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.MouseDown();
+    session.MouseUp();
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(ui.selection.Size == 2);
+    CHECK(ui.selection.Contains(4));
+    // Down moves a whole line; Right wraps at its end.
+    session.Click(session.ItemCenter("tile0"));
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.Frames(2);
+    int columns = 1;
+    while (columns < ItemGridUi::kTracked && ui.tiles[columns].Min.y == ui.tiles[0].Min.y)
+        ++columns;
+    CHECK(ui.selection.Size == 1);
+    CHECK(ui.selection.Contains(columns));
+    // Double click activates a tile.
+    session.DoubleClick(session.ItemCenter("tile3"));
+    CHECK(ui.activated == 3);
+}
+
+TEST_CASE("An item grid is one Tab stop, with and without a selection, and End jumps to the last tile")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ItemGridUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    for (const bool selectable : {true, false})
+    {
+        CAPTURE(selectable);
+        ui.selectable = selectable;
+        session.Frames(2);
+        session.Click(session.ItemCenter("before"));
+        session.KeyPress(ImGuiKey_Tab);  // shows the focus on the button
+        session.KeyPress(ImGuiKey_Tab);
+        session.Frames(2);
+        CHECK(GImGui->NavId == session.ItemId("tile0"));
+        session.KeyPress(ImGuiKey_Tab);
+        session.Frames(2);
+        CHECK(GImGui->NavId == session.ItemId("after"));
+    }
+    ui.selectable = true;
+    session.Frames(2);
+    session.Click(session.ItemCenter("tile1"));
+    session.KeyPress(ImGuiKey_End);
+    session.Frames(2);
+    CHECK(ui.selection.Size == 1);
+    CHECK(ui.selection.Contains(ui.count - 1));
+}
+
+TEST_CASE("An item grid shows its loading, error and empty states in its place")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ItemGridUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    for (const facet::DataState state : {facet::DataState::Loading, facet::DataState::Error})
+    {
+        ui.options.state = state;
+        session.Frames(2);
+        CHECK_FALSE(ui.open);
+        CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(300.0f));
+    }
+    ui.options.state = facet::DataState::Ready;
+    ui.count = 0;
+    session.Frames(2);
+    CHECK_FALSE(ui.open);
+    CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(300.0f));
+    ui.count = 1;
+    session.Frames(2);
+    CHECK(ui.open);
+    CHECK(ui.submitted == 1);
+}
+
+TEST_CASE("An item grid holds at a width of a few pixels and at every scale, and leaves the stacks balanced")
+{
+    ScaleGuard scale;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    ItemGridUi ui;
+    ui.options.width = 3.0f;
+    session.SetUi([&] { CHECK_BALANCED(ui.Ui(session)); });
+    for (const float uiScale : {0.75f, 1.0f, 2.0f})
+    {
+        CAPTURE(uiScale);
+        facet::SetUiScale(uiScale);
+        session.Frames(2);
+        REQUIRE(ui.open);
+        // One column of tiles at least a pixel wide, none overlapping.
+        CHECK(ui.tiles[0].GetWidth() >= 1.0f);
+        CHECK(ui.tiles[1].Min.y >= ui.tiles[0].Max.y);
+    }
+    CHECK(fi::OpenScopeCount() == 0);
+}

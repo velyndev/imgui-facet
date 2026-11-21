@@ -340,8 +340,6 @@ Status: ready.
 
 ### BeginItemGrid
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginItemGrid(const char* id, int itemCount, ImGuiSelectionBasicStorage* selection,
                                  const ItemGridOptions& options = {});
@@ -350,7 +348,39 @@ void EndItemGrid();
 class ItemGridScope;
 ```
 
-A virtualized, reflowing grid of equal tiles with two-dimensional selection.
+A scrolling grid of `itemCount` equal tiles in a scroll area of the scroll core, `width` x `height`
+units (0 fills the available room; with no height left, `metrics.panelHeight`).
+
+- Reflow: the column count is the most tiles of at least `minTileWidth` units (0:
+  `layout.minRowControl`) that fit the area with `gap` between them, at least one; the tiles share the
+  width and are `tileAspect` times as tall as wide. At a width of a few pixels there is one column of
+  tiles at least a pixel wide.
+- Virtualized: the row ranges of the list core hand out whole lines of tiles, only the visible ones
+  plus the focused tile and the range start of a Shift selection, so a hundred thousand tiles cost
+  what a screenful does. Loop `NextVisibleRows`; its range holds tile indices.
+- `ItemGridTile(index)` places and registers the tile and draws its hover fill, selection fill
+  (`accentSubtle` while the grid has the keyboard focus, `fill[1]` otherwise) and, over every tile,
+  the focus ring. It is Dear ImGui's last item afterwards, so the caller draws the tile's content in
+  its rectangle (`ImGui::GetItemRectMin` / `Max`). It returns true when the tile was activated by a
+  double click or Enter.
+- Selection: with `selection` the tiles run through `ImGui::BeginMultiSelect`: a click selects, Ctrl
+  adds, Shift selects a range, Ctrl+A all, Escape or a click between tiles clears, and with
+  `boxSelect` a drag that starts between tiles selects the tiles it covers in two dimensions. Entries
+  are keyed by `AdapterIndexToStorageId(index)`. With `selection` null the tiles are not selectable.
+- Keyboard: the grid is one Tab stop (the focused tile, else the first); the arrows move in two
+  dimensions through Dear ImGui's navigation and wrap at the line ends, Page Up and Down move by a
+  page, Home and End jump to the first and last tile (with Shift: a range). With a selection, the
+  list view's tab stop carries Tab into and out of the selection scope. The focused tile is kept
+  under the id, so the focus survives scrolling; the scroll offset is the area's.
+- States: while `state` is Loading or Error, or with no tile, the area keeps its size and shows the
+  list view's loading, error or empty state (`emptyText`, `errorText`, else `Strings::empty` and
+  `Strings::loadFailed`), and Begin returns false. Begin also returns false while the area is out of
+  sight; `EndItemGrid` only after true.
+- A capture's `ForceNextItemState` before `BeginItemGrid` goes to the tile whose index is the part.
+
+There is no typeahead: tiles have no labels the grid knows.
+
+Status: ready.
 
 ## Usage examples
 
