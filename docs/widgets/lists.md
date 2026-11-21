@@ -295,15 +295,34 @@ Status: ready.
 
 ### CheckboxTree
 
-Status: planned
-
 ```cpp
 struct CheckTreeItem { const char* label; Icon icon; int depth; ImGuiID id; };
 bool CheckboxTree(const char* id, std::span<CheckState> states, std::span<const CheckTreeItem> items,
                   const CheckboxTreeOptions& options = {});
 ```
 
-A tree with a tri-state checkbox per node; a parent sets its children and shows Mixed when they differ.
+A tree with a tri-state checkbox per node, over items in depth-first order (a node's children follow
+it with depth + 1). It is built on the tree of TreeView, so rows, indent, chevrons, indent guides,
+keys and typeahead are the same; it has no selection. Default width: the available width; `height`
+0 fits the rows, a height scrolls.
+
+- **Checkboxes:** Off is the neutral box with the boundary hairline; On and Mixed are the accent box
+  with the check or minus glyph in onAccent, so Mixed differs by its shape; read-only boxes are
+  labelSecondary.
+- **Toggling:** a click on a row or Space toggles its node: Off and Mixed become On, On becomes Off.
+  With `cascade` the new state goes to every descendant and each ancestor becomes On or Off when all
+  its children are, Mixed otherwise. Without it only the node changes. A click on the chevron, Enter,
+  Left and Right open and close nodes without toggling.
+- **Entries:** `states` holds one entry per item; a missing entry shows as Off, counts as Off for its
+  parent and is never written.
+- **Open state:** kept per node under `CheckTreeItem::id` (else the index); `defaultOpen` is the
+  open state of a parent the first time it appears.
+- **States:** read-only (shown, focusable, nothing toggles), nodes inside `ImGui::BeginDisabled`;
+  while `state` is Loading or Error, or with no items, the tree shows the loading row, `errorText`
+  or `emptyText` and nothing is written.
+- **Result:** true on the frame a state was written; `ImGui::IsItemEdited` is true then.
+
+Status: ready.
 
 ### TransferList
 

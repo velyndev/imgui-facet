@@ -1377,3 +1377,132 @@ TEST_CASE("A drag resting at the edge of a scroll area around a reorderable list
     session.Frames(2);
     CHECK(scroll > 0.0f);
 }
+
+// ---- CheckboxTree ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// Group 1 (Item 1, Item 2), Group 2 (Item 3 (Item 4)).
+const facet::CheckTreeItem kCheckItems[] = {
+    {.label = "Group 1"},
+    {.label = "Item 1", .depth = 1},
+    {.label = "Item 2", .depth = 1},
+    {.label = "Group 2"},
+    {.label = "Item 3", .depth = 1},
+    {.label = "Item 4", .depth = 2},
+};
+
+// The center of visible row `row` of a tree that fits its rows (the area padding, then the rows).
+ImVec2 TreeRowCenter(const ImRect& rect, int row)
+{
+    const float height = fi::ListRowHeight(facet::ControlSize::Regular);
+    return ImVec2(rect.GetCenter().x, rect.Min.y + fi::FocusRingOutset() + height * (static_cast<float>(row) + 0.5f));
+}
+
+using States = std::array<facet::CheckState, 6>;
+constexpr facet::CheckState kOff = facet::CheckState::Off;
+constexpr facet::CheckState kOn = facet::CheckState::On;
+constexpr facet::CheckState kMixed = facet::CheckState::Mixed;
+
+} // namespace
+
+TEST_CASE("A checkbox tree cascades a toggle to the children and up to the parents")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    States states = {kOff, kOff, kOff, kOff, kOff, kOff};
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::CheckboxTree("checks", states, kCheckItems))
+            ++writes;
+        session.Track("checks");
+    });
+    session.Frames(2);
+    const ImRect rect = session.ItemRect("checks");
+    session.Click(TreeRowCenter(rect, 1));  // Item 1
+    CHECK(states == States{kMixed, kOn, kOff, kOff, kOff, kOff});
+    session.Click(TreeRowCenter(rect, 2));  // Item 2
+    CHECK(states == States{kOn, kOn, kOn, kOff, kOff, kOff});
+    session.Click(TreeRowCenter(rect, 0));  // Group 1: On becomes Off for the whole group
+    CHECK(states == States{kOff, kOff, kOff, kOff, kOff, kOff});
+    session.Click(TreeRowCenter(rect, 5));  // Item 4: Item 3 and Group 2 follow
+    CHECK(states == States{kOff, kOff, kOff, kOn, kOn, kOn});
+    CHECK(writes == 4);
+}
+
+TEST_CASE("Space toggles a checkbox tree node, Enter and the arrows open and close it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    States states = {kOff, kOff, kOff, kOff, kOff, kOff};
+    session.SetUi([&] {
+        facet::CheckboxTree("checks", states, kCheckItems);
+        session.Track("checks");
+    });
+    session.Frames(2);
+    const float before = session.ItemRect("checks").GetHeight();
+    session.Click(TreeRowCenter(session.ItemRect("checks"), 1));
+    CHECK(states == States{kMixed, kOn, kOff, kOff, kOff, kOff});
+    // After a click the first navigation key shows the focus (Dear ImGui's rule); Up moves to Group 1.
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(states == States{kOn, kOn, kOn, kOff, kOff, kOff});
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(states == States{kOff, kOff, kOff, kOff, kOff, kOff});
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(states == States{kOn, kOn, kOn, kOff, kOff, kOff});
+    session.KeyPress(ImGuiKey_Enter);  // closes Group 1 without a toggle
+    session.Frames(2);
+    CHECK(states == States{kOn, kOn, kOn, kOff, kOff, kOff});
+    CHECK(session.ItemRect("checks").GetHeight() < before);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frames(2);
+    CHECK(session.ItemRect("checks").GetHeight() == doctest::Approx(before));
+}
+
+TEST_CASE("Without cascade a checkbox tree toggles one node, and missing entries are never written")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    States states = {kOff, kOff, kOff, kOff, kOff, kOff};
+    std::array<facet::CheckState, 2> shortStates = {kOff, kOff};
+    session.SetUi([&] {
+        facet::CheckboxTree("plain", states, kCheckItems, {.cascade = false});
+        session.Track("plain");
+        facet::CheckboxTree("short", shortStates, kCheckItems);
+        session.Track("short");
+    });
+    session.Frames(2);
+    session.Click(TreeRowCenter(session.ItemRect("plain"), 0));
+    CHECK(states == States{kOn, kOff, kOff, kOff, kOff, kOff});
+    // Item 1 is the last entry of the short span; the group's other child counts as Off.
+    session.Click(TreeRowCenter(session.ItemRect("short"), 1));
+    CHECK(shortStates == std::array<facet::CheckState, 2>{kMixed, kOn});
+    session.Click(TreeRowCenter(session.ItemRect("short"), 2));  // Item 2: no entry
+    CHECK(shortStates == std::array<facet::CheckState, 2>{kMixed, kOn});
+}
+
+TEST_CASE("A checkbox tree in a data state or read-only writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    States states = {kOff, kOff, kOff, kOff, kOff, kOff};
+    facet::DataState state = facet::DataState::Loading;
+    bool readOnly = false;
+    bool changed = false;
+    session.SetUi([&] {
+        changed |= facet::CheckboxTree("checks", states, kCheckItems, {.state = state, .readOnly = readOnly});
+        session.Track("checks");
+    });
+    session.Frames(2);
+    CHECK(session.ItemRect("checks").GetHeight() >= fi::ListRowHeight(facet::ControlSize::Regular));
+    session.Click(TreeRowCenter(session.ItemRect("checks"), 0));
+    state = facet::DataState::Ready;
+    readOnly = true;
+    session.Frames(2);
+    session.Click(TreeRowCenter(session.ItemRect("checks"), 1));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(changed);
+    CHECK(states == States{kOff, kOff, kOff, kOff, kOff, kOff});
+}

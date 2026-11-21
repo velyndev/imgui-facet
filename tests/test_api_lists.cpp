@@ -60,7 +60,6 @@ void CallListStubs(Values& v)
     const std::span<bool> checked(v.checked);
     const std::span<facet::CheckState> states(v.states);
 
-    CHECK_BALANCED(CHECK_FALSE(facet::CheckboxTree("Check tree", states, kTree)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer", checked, kItems)));
     CHECK_BALANCED(CHECK_FALSE(facet::TransferList("Transfer labels", checked, kLabels)));
     CHECK_BALANCED(CHECK_FALSE(facet::SearchableChecklist("Checklist", checked, kItems)));

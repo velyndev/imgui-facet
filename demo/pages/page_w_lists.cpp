@@ -52,7 +52,9 @@ const facet::CheckTreeItem kCheckTree[] = {
     {.label = "Option 1", .depth = 1},
     {.label = "Option 2", .depth = 1},
     {.label = "Group 2", .icon = facet::Icon("folder")},
-    {.label = "Option 3", .depth = 1},
+    {.label = "Group 2.1", .icon = facet::Icon("folder"), .depth = 1},
+    {.label = "Option 3", .depth = 2},
+    {.label = "Option 4", .depth = 1},
 };
 
 constexpr int kGeneratedCount = 10000;
@@ -93,8 +95,10 @@ struct ListsState
     int combo = 0;
     bool checklist[kChecklistCount] = {};
     bool transfer[5] = {false, true, false, false, false};
-    facet::CheckState checkTree[5] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
-                                      facet::CheckState::Off, facet::CheckState::Off};
+    facet::CheckState checkTree[7] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
+                                      facet::CheckState::Off, facet::CheckState::Off, facet::CheckState::Off,
+                                      facet::CheckState::Off};
+    facet::CheckState checkTreePlain[7] = {};
     ImGuiSelectionBasicStorage selection;
 
     // ReorderableList
@@ -462,10 +466,42 @@ void TreeViewSection(facet::demo::PageCtx& ctx, ListsState& s)
         facet::EndTreeView();
 }
 
-void Hierarchies(ListsState& s)
+const char* CheckName(facet::CheckState state)
+{
+    switch (state)
+    {
+    case facet::CheckState::On:
+        return "on";
+    case facet::CheckState::Mixed:
+        return "mixed";
+    default:
+        return "off";
+    }
+}
+
+void CheckboxTreeSection(facet::demo::PageCtx& ctx, ListsState& s)
 {
     SectionHeader("Checkbox tree");
-    facet::CheckboxTree("checktree", s.checkTree, kCheckTree);
+    Paragraph("A click or Space toggles a node: a group sets all its entries, and a group shows on, off or mixed "
+              "from them. Enter or the arrows open and close groups.");
+    Columns columns;
+    if (facet::CheckboxTree("checktree", s.checkTree, kCheckTree, {.width = columns.width / facet::Px(1.0f)}))
+        ++s.writes;
+    ctx.Probe("lists.checktree");
+    columns.Next();
+    facet::CheckboxTree("checktreeplain", s.checkTreePlain, kCheckTree,
+                        {.cascade = false, .width = columns.width / facet::Px(1.0f)});
+    ctx.Probe("lists.checktree.plain");
+    columns.End();
+    Note("Group 1 is %s, Group 2 is %s. The right tree toggles each node on its own.", CheckName(s.checkTree[0]),
+         CheckName(s.checkTree[3]));
+    Columns states;
+    facet::CheckboxTree("checktreereadonly", s.checkTree, kCheckTree,
+                        {.width = states.width / facet::Px(1.0f), .readOnly = true});
+    states.Next();
+    facet::CheckboxTree("checktreefailed", s.checkTree, kCheckTree,
+                        {.state = facet::DataState::Error, .width = states.width / facet::Px(1.0f)});
+    states.End();
 }
 
 } // namespace
@@ -485,8 +521,8 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     ComboSection(ctx, s);
     TreeViewSection(ctx, s);
     ReorderSection(ctx, s);
+    CheckboxTreeSection(ctx, s);
     ChooseSeveral(s);
-    Hierarchies(s);
 }
 
 FACET_DEMO_SELFTEST("lists")
@@ -738,4 +774,37 @@ FACET_DEMO_SELFTEST("lists")
     test.Wait(2);
     test.ExpectText("Escape puts a picked-up row back", [] { return std::string(State().reorder[2].label); },
                     "Option 4");
+
+    // CheckboxTree. Rows: Group 1, Option 1, Option 2, Group 2, Group 2.1, Option 3, Option 4.
+    test.Do([] {
+        ListsState& s = State();
+        const facet::CheckState start[7] = {facet::CheckState::Mixed, facet::CheckState::On, facet::CheckState::Off,
+                                            facet::CheckState::Off, facet::CheckState::Off, facet::CheckState::Off,
+                                            facet::CheckState::Off};
+        std::copy(std::begin(start), std::end(start), s.checkTree);
+    });
+    const auto treeRow = [](const char* probe, int row) {
+        return T::Item(probe, 0.5f, 0.0f).Offset(0.0f, 4.0f + 32.0f * (static_cast<float>(row) + 0.5f));
+    };
+    test.Reveal("lists.checktree");
+    test.MouseMove(treeRow("lists.checktree", 2));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("checking Option 2 turns Group 1 on", [] { return State().checkTree[0] == facet::CheckState::On; });
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space clears Option 1 and Group 1 shows mixed",
+                [] { return State().checkTree[0] == facet::CheckState::Mixed; });
+    test.MouseMove(treeRow("lists.checktree", 5));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("checking Option 3 turns Group 2.1 on and Group 2 mixed", [] {
+        return State().checkTree[4] == facet::CheckState::On && State().checkTree[3] == facet::CheckState::Mixed;
+    });
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on Group 2 checks all of it", [] {
+        return State().checkTree[3] == facet::CheckState::On && State().checkTree[6] == facet::CheckState::On;
+    });
 }
