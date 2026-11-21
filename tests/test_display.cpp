@@ -619,6 +619,37 @@ TEST_CASE("A pulsing status dot stands still while motion is reduced")
     CHECK(tip);
 }
 
+// ==== StatusPill ====
+
+TEST_CASE("A status pill crossfades to a new tone over the fast duration")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    facet::Tone tone = facet::Tone::Success;
+    int target = 0;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::StatusPill("Status###pill", {.tone = tone, .icon = facet::Icon("check")});
+        target = CountColor(from, facet::ToU32(c.warningSubtle));
+    });
+    session.Frames(2);
+    CHECK(target == 0);
+    tone = facet::Tone::Warning;
+    session.Frame();
+    CHECK(target == 0);  // on its way
+    session.Seconds(facet::T().motion.durationFast * 4.0f);
+    CHECK(target > 0);
+    // With reduced motion the change is at once.
+    DisplayGuard::ReduceMotion(true);
+    tone = facet::Tone::Success;
+    session.Frame();
+    tone = facet::Tone::Warning;
+    session.Frame();
+    CHECK(target > 0);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

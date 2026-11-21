@@ -235,14 +235,13 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
         };
         wide("ProgressRing", [] { ProgressRing("##ring", 0.5f); });
         wide("Spinner", [] { Spinner("##spinner"); });
-        wide("StatusPill", [] { StatusPill("A"); });
         wide("KeyCap", [] { KeyCap(ImGuiKey_A); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0, {.ring = true}); });
         wide("InlineCode", [] { InlineCode("a"); });
     });
     session.Frame();
-    CHECK(checked == 7);
+    CHECK(checked == 6);
 }
 
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")

@@ -171,7 +171,10 @@ interactive. Status: ready.
 void StatusPill(const char* label, const StatusPillOptions& options = {});
 ```
 
-Toned pill for the state of a connection, job or device; tone changes crossfade. Status: planned.
+A pill in the tone's wash with the visible label part in `label` and an optional leading icon, or a
+pulsing live dot, in the tone's glyph color, in three sizes (Caption, Footnote or Body text). A tone
+change crossfades the wash and the glyph over `motion.durationFast` under the id (at once with
+reduced motion). It sits on the text baseline like a badge. Not interactive. Status: ready.
 
 ### KeyCap
 
