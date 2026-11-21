@@ -555,3 +555,83 @@ TEST_CASE("ColorPicker in the Wheel mode turns the hue on the ring and picks on 
     session.KeyPress(ImGuiKey_DownArrow);
     CHECK(facet::internal::ColorToHsv(color).h == doctest::Approx(0.99).epsilon(0.02));
 }
+
+// ---- ColorWell ------------------------------------------------------------------------------------
+
+TEST_CASE("ColorWell opens its picker, follows it, and Escape restores the color and the focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImVec4 start(0.2f, 0.4f, 0.8f, 1.0f);
+    ImVec4 color = start;
+    ImGuiID well = 0;
+    bool open = false;
+    ImRect levelRect;
+    session.SetUi([&] {
+        well = ImGui::GetID("Well");
+        (void)facet::ColorWell("Well", &color);
+        session.Track("well");
+        // The host answers inside a frame only.
+        const ImGuiID level = PartId(well, "##popover");
+        open = facet::internal::IsPopupLevelOpen(level);
+        levelRect = facet::internal::PopupLevelRect(level);
+    });
+    session.Frame();
+    // The swatch frame after the label.
+    const ImRect wellRect = session.ItemRect("well");
+    session.Click(ImVec2(wellRect.Max.x - 8.0f, wellRect.GetCenter().y));
+    session.Frames(2);
+    CHECK(open);
+    // The level sits below the well.
+    CHECK(levelRect.Min.y >= session.ItemRect("well").Max.y);
+    // The focus went into the picker: the square takes the arrows.
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK_FALSE(Same(color, start));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK_FALSE(open);
+    CHECK(Same(color, start));
+    CHECK(ImGui::GetFocusID() == well);
+    // Enter opens it again from the keyboard.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(open);
+}
+
+TEST_CASE("ColorWell copies and pastes hex text on Ctrl+C and Ctrl+V")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.2f, 0.4f, 1.0f, 1.0f);
+    ImVec4 readOnly(0.2f, 0.4f, 1.0f, 1.0f);
+    ImGuiID top = 0;
+    session.SetUi([&] {
+        top = facet::internal::TopPopupLevel();
+        ImGui::Button("before");
+        session.Track("before");
+        (void)facet::ColorWell("Well", &color);
+        session.Track("well");
+        (void)facet::ColorWell("Read-only", &readOnly, {.readOnly = true});
+        session.Track("readOnly");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("well"));
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "#3366FF");
+    session.SetClipboard("#FF8000");
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(color.x == 1.0f);
+    CHECK(color.y == 128.0f / 255.0f);
+    CHECK(color.z == 0.0f);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("readOnly"));
+    session.KeyPress(ImGuiKey_V | ImGuiMod_Ctrl);
+    CHECK(readOnly.x == 0.2f);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(top == 0);
+}
