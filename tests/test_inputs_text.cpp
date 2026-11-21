@@ -2017,3 +2017,22 @@ TEST_CASE("A narrow TagInput keeps its chips and text inside its width")
     session.Frames(3);
     CHECK(session.ItemRect("tags").GetWidth() == doctest::Approx(facet::Px(80.0f)));
 }
+
+TEST_CASE("A narrow TagInput keeps the text beside one short chip until the typed text no longer fits")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags = {"a"};
+    session.SetUi([&] {
+        facet::TagInput("##tags", &tags, {.width = 150.0f});
+        session.Track("tags");
+    });
+    session.Frames(3);
+    const float row = facet::ControlHeight(facet::ControlSize::Regular);
+    CHECK(session.ItemRect("tags").GetHeight() == doctest::Approx(row));
+    session.Click(TagTextPoint(session.ItemRect("tags")));
+    session.Type("an entry far wider than the space left");
+    session.Frames(3);
+    CHECK(session.ItemRect("tags").GetHeight() > row * 1.5f);
+    REQUIRE(tags.size() == 1);
+}

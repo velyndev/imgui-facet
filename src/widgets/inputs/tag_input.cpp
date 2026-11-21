@@ -33,9 +33,6 @@ namespace facet
 namespace
 {
 
-// The narrowest the text part may get before it moves to a row of its own, in control heights.
-constexpr float kTagInputMinTextHeights = 3.0f;
-
 struct TagInputMatch
 {
     int index = 0;
@@ -178,6 +175,21 @@ float TagInputChipEstimate(const std::string& tag, ControlSize chipSize, bool re
     return std::round(m.paddingX * 2.0f + ImGui::CalcTextSize(tag.c_str()).x + remove);
 }
 
+// The narrowest the text part may get beside the last chip before it moves to a row of its own:
+// room for a few characters (spacing.xxxl), or the typed text and a caret gap when that is wider,
+// never more than the content width. With no chips the text part has the whole first row anyway.
+float TagInputMinTextWidth(const internal::ControlMetrics& metrics, const std::string& text, float contentWidth)
+{
+    const Theme& t = T();
+    float typed = 0.0f;
+    if (!text.empty())
+    {
+        const internal::ControlTextScope scope(metrics);
+        typed = ImGui::CalcTextSize(text.c_str()).x + Px(t.spacing.sm);
+    }
+    return std::min(contentWidth, std::max(Px(t.spacing.xxxl), std::round(typed)));
+}
+
 } // namespace
 
 bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputOptions& options)
@@ -235,7 +247,7 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
         }
         x += std::min(width, contentWidth) + gap;
     }
-    const float minText = std::min(contentWidth, metrics.height * kTagInputMinTextHeights);
+    const float minText = TagInputMinTextWidth(metrics, state.text, contentWidth);
     if (x > 0.0f && x + minText > contentWidth)
     {
         ++row;

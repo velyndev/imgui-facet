@@ -170,7 +170,8 @@ bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputO
 A field frame holding the tags as chips (`facet::Chip` from `selection.h`, one size smaller than the
 field, with their remove button unless read-only or disabled) followed by a frameless text part for
 the next entry. The chips flow into rows and wrap; the text part takes the rest of the last row, or
-a row of its own when less than three control heights are left, and the frame grows with the rows
+a row of its own when less than `spacing.xxxl` (or the width of the typed text, when that is wider)
+is left, and the frame grows with the rows
 (one row is one control height). The label sits in front and the width fills the row by default.
 
 The text part keeps the keyboard and is the widget's only Tab stop; the chips are not Tab stops.

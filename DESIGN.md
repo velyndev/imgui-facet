@@ -428,7 +428,8 @@ Text inputs:
 - **ValidationSummary.** A block on destructiveSubtle with label-colored, always underlined links
   and the error glyph, so the list reads as errors without relying on red text.
 - **TagInput** chips are one control size smaller than the field, so a row of chips keeps the
-  field's height.
+  field's height. The text part stays beside the last chip while `spacing.xxxl` or the typed text
+  still fits, so a short tag never leaves an empty row under it.
 - **FilterField** toggles are the glyphs "Aa" and an underlined "ab", which users already read as
   match case and whole word; the on state is a fill plus the label color.
 - **CopyField.** The copy icon turns into a check for motion.feedbackHold as the confirmation.
