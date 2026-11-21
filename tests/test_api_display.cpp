@@ -211,13 +211,12 @@ TEST_CASE("Display placeholders are at least as tall as a small control")
             CHECK(ImGui::GetItemRectSize().y >= minimum);
             ++checked;
         };
-        tall("TruncatedText", [] { TruncatedText("A"); });
         tall("Skeleton, one line", [] { Skeleton({.lines = 1}); });
         tall("Skeleton, low", [] { Skeleton({.shape = SkeletonShape::Rect, .height = 4.0f}); });
         tall("StatusDot", [] { StatusDot("##dot"); });
     });
     session.Frame();
-    CHECK(checked == 4);
+    CHECK(checked == 3);
 }
 
 TEST_CASE("Content-sized display placeholders are wide enough to name the widget and say planned")

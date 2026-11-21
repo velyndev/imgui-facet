@@ -36,7 +36,13 @@ and drawn in batches of lines without allocating. Status: ready.
 void TruncatedText(const char* text, const TruncatedTextOptions& options = {});
 ```
 
-Text cut with an ellipsis at the end, middle or start; full text as tooltip when cut. Status: planned.
+Text cut with an ellipsis so it fits its width (the available width by default): at the end, in the
+middle (keeps the end, for paths and file names) or at the start. With `maxLines` above 1 (End mode
+only) the text wraps and the last line ends in the ellipsis. Cuts fall on character boundaries of
+UTF-8 text, and widths of a few pixels draw what fits (or nothing) without trouble. While the text is
+cut, resting the pointer on it shows the whole text as a tooltip; a text that fits shows none. With
+`focusable` it is a Tab stop (never activated) with a focus ring, and keyboard focus shows the
+tooltip too. A line break ends a one-line text as if the rest did not fit. Status: ready.
 
 ### SectionHeader
 

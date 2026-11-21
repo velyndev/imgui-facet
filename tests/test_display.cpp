@@ -394,6 +394,98 @@ TEST_CASE("Styled text draws its tone, the secondary label and the disabled colo
     CHECK(endRight == doctest::Approx(itemRight).epsilon(0.02));
 }
 
+// ==== TruncatedText ====
+
+TEST_CASE("Truncated text shows its tooltip on hover only while it is cut")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool cutTip = false;
+    bool wholeTip = false;
+    session.SetUi([&] {
+        facet::TruncatedText(kUtf8Text, {.width = 60.0f});
+        session.Track("cut");
+        cutTip = TooltipOpen(ImGui::GetItemID());
+        facet::TruncatedText("Fits", {.width = 200.0f});
+        session.Track("whole");
+        wholeTip = TooltipOpen(ImGui::GetItemID());
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("whole"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK_FALSE(wholeTip);
+    session.MouseMove(session.ItemCenter("cut"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(cutTip);
+    CHECK(session.ItemRect("cut").GetWidth() == doctest::Approx(facet::Px(60.0f)));
+}
+
+TEST_CASE("Truncated text keeps a few pixels of width and every mode without trouble")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int calls = 0;
+    session.SetUi([&] {
+        for (const float width : {0.25f, 1.0f, 2.0f, 3.0f, 6.0f, 12.0f})
+            for (const auto mode : {facet::TruncateMode::End, facet::TruncateMode::Middle, facet::TruncateMode::Start})
+            {
+                ImGui::PushID(calls);
+                facet::TruncatedText(kUtf8Text, {.mode = mode, .maxLines = 3, .width = width});
+                CHECK(ImGui::GetItemRectSize().x >= 1.0f);
+                facet::TruncatedText("", {.mode = mode, .width = width});
+                facet::TruncatedText(nullptr, {.mode = mode, .width = width});
+                ImGui::PopID();
+                ++calls;
+            }
+    });
+    session.Frames(2);
+    CHECK(calls == 36);
+}
+
+TEST_CASE("Truncated text wraps into at most maxLines lines in End mode")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float lineHeight = 0.0f;
+    session.SetUi([&] {
+        lineHeight = facet::MeasureText(facet::TextStyle::Body, "").y;
+        facet::TruncatedText("One two three four five six seven eight nine ten eleven twelve",
+                             {.maxLines = 2, .width = 80.0f});
+        session.Track("two");
+        facet::TruncatedText("Short", {.maxLines = 3, .width = 200.0f});
+        session.Track("one");
+        facet::TruncatedText("One two three four five six", {.mode = facet::TruncateMode::Middle, .maxLines = 3, .width = 40.0f});
+        session.Track("middle");
+    });
+    session.Frame();
+    CHECK(session.ItemRect("two").GetHeight() == doctest::Approx(lineHeight * 2.0f));
+    CHECK(session.ItemRect("one").GetHeight() == doctest::Approx(lineHeight));
+    CHECK(session.ItemRect("middle").GetHeight() == doctest::Approx(lineHeight));  // maxLines is End mode only
+}
+
+TEST_CASE("A focusable truncated text is a Tab stop and shows its whole text on keyboard focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool tip = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::TruncatedText(kUtf8Text, {.focusable = true, .width = 60.0f});
+        session.Track("text");
+        tip = TooltipOpen(ImGui::GetItemID());
+        ImGui::Button("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.MouseMove(ImVec2(1.0f, 590.0f));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("text"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")
