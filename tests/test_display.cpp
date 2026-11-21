@@ -585,6 +585,40 @@ TEST_CASE("A count badge caps large counts, hides zero unless asked and is never
     CHECK(session.ItemRect("custom").GetWidth() > session.ItemRect("capped").GetWidth());
 }
 
+// ==== StatusDot ====
+
+TEST_CASE("A pulsing status dot stands still while motion is reduced")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    int ring = 0;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::StatusDot("Live", {.tone = facet::Tone::Success, .pulse = true});
+        // The ring is the tone at a lower alpha; the dot itself is opaque.
+        ring = CountColor(from, facet::ToU32(c.success), true) - CountColor(from, facet::ToU32(c.success));
+        session.Track("dot");
+    });
+    session.Seconds(facet::T().motion.pulsePeriod * 0.3f);
+    CHECK(ring > 0);
+    DisplayGuard::ReduceMotion(true);
+    session.Seconds(facet::T().motion.pulsePeriod * 0.3f);
+    CHECK(ring == 0);
+    // A dot alone names itself in a tooltip on hover.
+    bool tip = false;
+    session.SetUi([&] {
+        facet::StatusDot("##Connected");
+        session.Track("alone");
+        tip = TooltipOpen(ImGui::GetItemID());
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("alone"));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tip);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

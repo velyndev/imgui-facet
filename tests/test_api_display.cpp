@@ -213,10 +213,9 @@ TEST_CASE("Display placeholders are at least as tall as a small control")
         };
         tall("Skeleton, one line", [] { Skeleton({.lines = 1}); });
         tall("Skeleton, low", [] { Skeleton({.shape = SkeletonShape::Rect, .height = 4.0f}); });
-        tall("StatusDot", [] { StatusDot("##dot"); });
     });
     session.Frame();
-    CHECK(checked == 3);
+    CHECK(checked == 2);
 }
 
 TEST_CASE("Content-sized display placeholders are wide enough to name the widget and say planned")
@@ -236,7 +235,6 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
         };
         wide("ProgressRing", [] { ProgressRing("##ring", 0.5f); });
         wide("Spinner", [] { Spinner("##spinner"); });
-        wide("StatusDot", [] { StatusDot("##dot"); });
         wide("StatusPill", [] { StatusPill("A"); });
         wide("KeyCap", [] { KeyCap(ImGuiKey_A); });
         wide("CharacterCounter", [] { CharacterCounter(1, 0); });
@@ -244,7 +242,7 @@ TEST_CASE("Content-sized display placeholders are wide enough to name the widget
         wide("InlineCode", [] { InlineCode("a"); });
     });
     session.Frame();
-    CHECK(checked == 8);
+    CHECK(checked == 7);
 }
 
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")

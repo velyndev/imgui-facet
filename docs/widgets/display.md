@@ -159,7 +159,11 @@ A counter in a solid pill of the tone (Accent by default): a circle for one digi
 void StatusDot(const char* label, const StatusDotOptions& options = {});
 ```
 
-Status dot with an optional label and a pulsing live ring. Status: planned.
+A dot of `metrics.statusDotSize` in the tone's glyph color (`labelSecondary` for Neutral), centered on
+the capitals of the line, with the visible label part after it. `pulse` adds a ring that grows out of
+the dot and fades once per `motion.pulsePeriod`; with reduced motion the ring is left out and the dot
+stands still. A dot alone (`"##Online"`) shows the text after `"##"` as its tooltip on hover. Not
+interactive. Status: ready.
 
 ### StatusPill
 
