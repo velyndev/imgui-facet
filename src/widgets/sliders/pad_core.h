@@ -44,4 +44,9 @@ ImRect PadKnobRect(ImVec2 point, float knob);
 void DrawPadGrid(ImDrawList* drawList, const ImRect& area, const ValueMapping& mappingX, const ValueMapping& mappingY,
                  bool yDown);
 
+// The stick of the JoystickPad with item id `id` as it was last drawn: its offset from the centre
+// in [-1, 1] per axis, y up, after the spring back (src/widgets/sliders/joystick_pad.cpp). For
+// tests of the return motion; {0, 0} for a pad never drawn.
+ImVec2 JoystickPadStickOffset(ImGuiID id);
+
 } // namespace facet::internal

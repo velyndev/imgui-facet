@@ -337,8 +337,33 @@ Status: ready.
 bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& options = {});
 ```
 
-A round stick returning -1 to 1 per axis, with a deadzone and a spring back to the center.
-Status: planned.
+A pad with a stick: `*value` is its deflection, -1 to 1 per axis, x to the right and y up. The pad
+is `diameter` units across (the padSize token by default, at most the available width), round with
+the fill and 3:1 boundary of a field (with `circular` off, the square field frame of XYPad). The
+stick is the slider knob, with a line in the accent from the centre to it, so the vector reads at a
+glance; a short separator cross marks the centre. The stick centre travels half a knob inside the
+pad. The label is the tooltip, as for XYPad; one item and one Tab stop.
+
+- **Pointer:** a press on the stick grabs it, a press elsewhere moves it there first; the drag
+  follows the pointer, Shift keeps one axis, Ctrl snaps to tenths. With `circular` the stick stays
+  inside the unit circle, moved onto its edge in the pointer's direction; otherwise inside the square.
+- **springReturn** (on by default): the end of every drag or key session writes `{0, 0}` (the call
+  returns true on that frame), and the drawn stick springs back to the centre with the
+  motion.standard spring of the animation store: the same path at any frame rate, and at once with
+  reduced motion. The arrows hold the stick at the edge in their direction while they are down (two
+  arrows: the diagonal, on the circle or in the corner; Shift: half way), and letting go returns it.
+  Escape during a drag restores the value from its start. At rest the reported vector is zero.
+- **Without springReturn** the stick stays where it is left, and the keys step it as XYPad's do (a
+  hundredth of the range, Shift finer, Ctrl coarser, Page Up and Down y by a tenth, Home and End x
+  to -1 and 1); a value the caller writes moves the stick there.
+- **deadzone** (0 to 1 of the radius): inside it the value is 0; outside it the distance from the
+  deadzone's edge is scaled up to the full radius, so the value grows from 0 without a jump and
+  still reaches 1 at the edge. `showDeadzone` draws its ring in labelTertiary.
+- **States:** disabled and `readOnly` as XYPad (the line in labelSecondary read-only); `error`
+  draws the destructive outline and the message under the pad. A null value pointer shows the pad
+  read-only.
+
+Status: ready.
 
 ### ArcRangeSlider
 

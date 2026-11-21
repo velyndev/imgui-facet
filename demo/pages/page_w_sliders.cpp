@@ -1,8 +1,8 @@
 // Demo page: Sliders. One section per widget of facet/widgets/sliders.h with its important
-// variants, capture states for the looks that need input (hovered, focused, dragging), and one
-// selftest that operates the ready widgets by mouse and keyboard. A widget whose docs entry is not
-// ready yet draws its placeholder at its default size.
+// variants, capture states for the looks that need input (hovered, focused, dragging, the pads and
+// the ranges in use), and one selftest that operates every widget by mouse and keyboard.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <span>
@@ -147,8 +147,14 @@ struct SlidersUi
     float arcSmallLow = 0.2f, arcSmallHigh = 0.7f;
     float arcLimitLow = 10.0f, arcLimitHigh = 90.0f;
 
-    // The planned widgets below.
+    // JoystickPad
     ImVec2 stick = {0.0f, 0.0f};
+    ImVec2 stickFree = {0.3f, -0.2f};
+    ImVec2 stickSquare = {0.0f, 0.0f};
+    ImVec2 stickFixed = {0.4f, 0.4f};
+    ImVec2 stickOff = {-0.3f, 0.5f};
+    int stickChanges = 0;   // frames that wrote stick
+    float stickPeak = 0.0f; // the largest deflection of stick seen
 };
 
 SlidersUi ui;
@@ -162,6 +168,7 @@ enum CaptureState
     kDragging,
     kPads,       // the two-dimensional widgets in use: a pad dragged, a box handle focused
     kShares,     // the allocation bar with a divider dragged, the arc range with a handle focused
+    kSticks,     // the joysticks, the free one focused
 };
 
 const float kZoomStops[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
@@ -651,13 +658,59 @@ void ArcRangeSection(facet::demo::PageCtx& ctx)
     ImGui::PopID();
 }
 
+// Joysticks side by side: 120 units, smaller than the pad default, so two fit a row.
+constexpr float kStickSize = 120.0f;
+
+void JoystickSection(facet::demo::PageCtx& ctx)
+{
+    ImGui::PushID("stick");
+    SectionHeader("JoystickPad");
+    Paragraph("A stick that reports a vector from -1 to 1 per axis. Drag it, or hold the arrows to push it to the "
+              "edge (Shift half way); on release it springs back and reports zero. Without the spring the arrows "
+              "step it and it stays where it is left. Inside the deadzone the value is zero.");
+    const float side = facet::Px(kStickSize);
+    LabeledRow("Spring, deadzone");
+    if (facet::JoystickPad("Stick", &ui.stick, {.deadzone = 0.15f, .showDeadzone = true}))
+        ++ui.stickChanges;
+    ui.stickPeak = std::max(ui.stickPeak, std::sqrt(ui.stick.x * ui.stick.x + ui.stick.y * ui.stick.y));
+    ctx.Probe("stick.spring");
+    if (ctx.capture && ctx.captureState == kSticks)
+        ctx.RevealInCapture(0.2f);
+    LabeledRow("Free, square");
+    float right = facet::demo::ContentRight();
+    const bool outside = std::fabs(ui.stickFree.x) > 0.8f || std::fabs(ui.stickFree.y) > 0.8f;
+    if (ctx.capture && ctx.captureState == kSticks)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::JoystickPad("Free", &ui.stickFree,
+                       {.springReturn = false, .diameter = facet::demo::DemoWidth(kStickSize),
+                        .error = outside ? "Keep each axis within 0.8" : nullptr, .helpText = "Stays where it is left"});
+    ctx.Probe("stick.free");
+    facet::demo::SameLineIfFits(right, side);
+    facet::JoystickPad("Square", &ui.stickSquare, {.circular = false, .diameter = facet::demo::DemoWidth(kStickSize)});
+    ctx.Probe("stick.square");
+    LabeledRow("States");
+    right = facet::demo::ContentRight();
+    facet::JoystickPad("Read-only", &ui.stickFixed,
+                       {.springReturn = false, .diameter = facet::demo::DemoWidth(kStickSize), .readOnly = true});
+    ctx.Probe("stick.readOnly");
+    facet::demo::SameLineIfFits(right, side);
+    ImGui::BeginDisabled();
+    facet::JoystickPad("Disabled", &ui.stickOff, {.springReturn = false, .diameter = facet::demo::DemoWidth(kStickSize)});
+    ImGui::EndDisabled();
+    ctx.Probe("stick.disabled");
+    Note("Stick %+.2f, %+.2f (largest deflection %.2f, written on %d frames). Free %+.2f, %+.2f. Square %+.2f, %+.2f.",
+         ui.stick.x, ui.stick.y, ui.stickPeak, ui.stickChanges, ui.stickFree.x, ui.stickFree.y, ui.stickSquare.x,
+         ui.stickSquare.y);
+    ImGui::PopID();
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging", "pads", "ranges")
+FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focused", "dragging", "pads", "ranges", "sticks")
 {
     facet::demo::PageHeader("Sliders",
                             "Sliders, range sliders, multi-handle sliders, knobs and two-dimensional pads.");
-    facet::demo::PlannedFamilyNote("sliders");
+    facet::demo::ReadyFamilyNote("sliders");
 
     SliderSection(ctx);
 
@@ -712,9 +765,7 @@ FACET_DEMO_PAGE("sliders", "Sliders", "Widgets", 30, "default", "hovered", "focu
 
     ArcRangeSection(ctx);
 
-    SectionHeader("JoystickPad");
-    LabeledRow("Joystick");
-    facet::JoystickPad("##stick", &ui.stick, {.deadzone = 0.1f, .showDeadzone = true});
+    JoystickSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("sliders")
@@ -1228,4 +1279,44 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("the first edit of a mixed arc sets it", [] { return ui.arcMixedSet; });
     test.Drag({ArcAt("arc.limit", 0.9f, 270.0f, 112.0f), ArcAt("arc.limit", 0.6f, 270.0f, 112.0f)}, 0.3f);
     test.Expect("narrowing the band clears the error", [] { return ui.arcLimitHigh - ui.arcLimitLow <= 60.0f; });
+
+    // JoystickPad: a drag deflects the stick and the release reports zero; held arrows push it to
+    // the edge until they are up; without the spring the arrows step it and it stays.
+    test.Reveal("stick.spring");
+    test.WaitSeconds(0.4f);
+    test.Do([] { ui.stick = {0.0f, 0.0f}; ui.stickPeak = 0.0f; ui.stickFree = {0.3f, -0.2f}; });
+    test.MouseMove(T::Item("stick.spring", 0.5f, 0.5f));
+    test.MouseDown();
+    test.MouseMove(T::Item("stick.spring", 0.5f, 0.5f).Offset(60.0f, 0.0f));
+    test.Expect("a drag to the right deflects the stick to the right",
+                [] { return ui.stick.x > 0.3f && std::fabs(ui.stick.y) < 0.02f; });
+    test.MouseUp();
+    test.Expect("the release reports zero", [] { return ui.stick.x == 0.0f && ui.stick.y == 0.0f; });
+    test.ExpectFocused("stick.spring");
+    test.KeyDown(ImGuiKey_UpArrow);
+    test.ExpectNear("a held Up pushes the stick to the top", [] { return ui.stick.y; }, 1.0, 0.0);
+    test.KeyUp(ImGuiKey_UpArrow);
+    test.Expect("letting go of Up reports zero again", [] { return ui.stick.x == 0.0f && ui.stick.y == 0.0f; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("stick.free");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right steps the free stick one hundredth of its range", [] { return ui.stickFree.x; }, 0.32, 1e-4);
+    test.KeyPress(ImGuiKey_End);
+    test.Expect("End sends the free stick to the right edge of its circle", [] {
+        return ui.stickFree.x > 0.95f && std::fabs(std::sqrt(ui.stickFree.x * ui.stickFree.x + ui.stickFree.y * ui.stickFree.y) - 1.0f) < 1e-4f;
+    });
+    test.WaitSeconds(0.5f);
+    test.Expect("the free stick stays where the keys left it", [] { return ui.stickFree.x > 0.9f; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("stick.square");
+    test.KeyDown(ImGuiKey_LeftArrow);
+    test.KeyDown(ImGuiKey_DownArrow);
+    test.Expect("the square stick holds the diagonal in the corner",
+                [] { return ui.stickSquare.x == -1.0f && ui.stickSquare.y == -1.0f; });
+    test.KeyUp(ImGuiKey_DownArrow);
+    test.KeyUp(ImGuiKey_LeftArrow);
+    test.Drag({T::Item("stick.readOnly", 0.5f, 0.5f), T::Item("stick.readOnly", 0.9f, 0.9f)}, 0.2f);
+    test.ExpectNear("the read-only stick keeps its value", [] { return ui.stickFixed.x; }, 0.4, 1e-6);
+    test.Drag({T::Item("stick.disabled", 0.5f, 0.5f), T::Item("stick.disabled", 0.9f, 0.9f)}, 0.2f);
+    test.ExpectNear("the disabled stick keeps its value", [] { return ui.stickOff.x; }, -0.3, 1e-6);
 }

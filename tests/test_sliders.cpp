@@ -14,6 +14,7 @@
 #include <facet/facet.h>
 
 #include "support/session.h"
+#include "widgets/sliders/pad_core.h"
 #include "widgets/sliders/range_core.h"
 #include "widgets/sliders/slider_core.h"
 
@@ -1800,6 +1801,188 @@ TEST_CASE("An arc range at a small size keeps its parts inside, and read-only, d
     session.Drag({ArcAt(session, "mixed", 0.6), ArcAt(session, "mixed", 0.8)});
     CHECK(mixedSet);
     CHECK(mixHigh > 0.7f);
+}
+
+// ---- JoystickPad ---------------------------------------------------------------------------
+
+namespace
+{
+
+// The point of stick deflection (x, y), y up, on a 200 unit joystick tracked as `name`.
+ImVec2 StickAt(const facet::test::Session& session, const char* name, float x, float y)
+{
+    const ImRect r = session.ItemRect(name);
+    const float travel = (200.0f - KnobSize()) * 0.5f;
+    return ImVec2(r.Min.x + 100.0f + x * travel, r.Min.y + 100.0f - y * travel);
+}
+
+// Drags a 200 unit joystick from its centre to the right edge and releases it, in a session with
+// time step `dt`; returns the drawn stick offset after `seconds` more.
+float StickAfterRelease(float dt, float seconds)
+{
+    facet::test::Session session({.deltaTime = dt});
+    REQUIRE(session.Ready());
+    ImVec2 value(0.0f, 0.0f);
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        facet::JoystickPad("Stick", &value, {.diameter = 200.0f});
+        id = ImGui::GetItemID();
+        session.Track("stick");
+    });
+    session.Frame();
+    session.MouseMove(StickAt(session, "stick", 0.0f, 0.0f));
+    session.MouseDown();
+    session.MouseMove(StickAt(session, "stick", 1.0f, 0.0f));
+    REQUIRE(value.x == doctest::Approx(1.0f));
+    // The release frame is the first step of the return: `seconds` in all.
+    session.MouseUp();
+    CHECK(value.x == 0.0f);
+    const int frames = static_cast<int>(std::lround(seconds / dt)) - 1;
+    if (frames > 0)
+        session.Frames(frames);
+    return facet::internal::JoystickPadStickOffset(id).x;
+}
+
+} // namespace
+
+TEST_CASE("A joystick follows a drag inside the unit circle and reports zero after the release")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 value(0.0f, 0.0f);
+    int changes = 0;
+    int commits = 0;
+    session.SetUi([&] {
+        if (facet::JoystickPad("Stick", &value, {.diameter = 200.0f}))
+            ++changes;
+        if (facet::IsItemEditCommitted())
+            ++commits;
+        session.Track("stick");
+    });
+    session.Frame();
+    session.MouseMove(StickAt(session, "stick", 0.0f, 0.0f));
+    session.MouseDown();
+    CHECK(value.x == 0.0f);
+    session.MouseMove(StickAt(session, "stick", 0.5f, 0.25f));
+    CHECK(value.x == doctest::Approx(0.5f).epsilon(0.02));
+    CHECK(value.y == doctest::Approx(0.25f).epsilon(0.02));
+    // Far out to the upper right: on the circle, in the pointer's direction.
+    session.MouseMove(StickAt(session, "stick", 3.0f, 3.0f));
+    CHECK(value.x == doctest::Approx(std::sqrt(0.5f)).epsilon(0.01));
+    CHECK(value.y == doctest::Approx(std::sqrt(0.5f)).epsilon(0.01));
+    const int before = changes;
+    session.MouseUp();
+    CHECK(value.x == 0.0f);
+    CHECK(value.y == 0.0f);
+    CHECK(changes == before + 1);
+    CHECK(commits == 1);
+    // At rest nothing more is written.
+    session.Frames(30);
+    CHECK(changes == before + 1);
+}
+
+TEST_CASE("A joystick springs back the same way at any frame rate and at once with reduced motion")
+{
+    const float slow = StickAfterRelease(1.0f / 30.0f, 0.1f);
+    const float fast = StickAfterRelease(1.0f / 240.0f, 0.1f);
+    CHECK(slow > 0.0f);
+    CHECK(slow < 1.0f);
+    CHECK(slow == doctest::Approx(fast).epsilon(0.01));
+    CHECK(StickAfterRelease(1.0f / 60.0f, 3.0f) == 0.0f);
+
+    const facet::Theme saved = facet::T();
+    facet::Theme reduced = saved;
+    reduced.motion.reduceMotion = true;
+    facet::SetTheme(reduced, false);
+    CHECK(StickAfterRelease(1.0f / 60.0f, 0.0f) == 0.0f);
+    facet::SetTheme(saved, false);
+}
+
+TEST_CASE("A joystick's arrows hold it at the edge while down, and step it without springReturn")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 spring(0.0f, 0.0f);
+    ImVec2 free(0.0f, 0.0f);
+    ImVec2 square(0.0f, 0.0f);
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::JoystickPad("Spring", &spring, {.diameter = 120.0f});
+        session.Track("spring");
+        facet::JoystickPad("Free", &free, {.springReturn = false, .diameter = 120.0f});
+        session.Track("free");
+        facet::JoystickPad("Square", &square, {.circular = false, .diameter = 120.0f});
+        session.Track("square");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("spring"));
+    session.KeyDown(ImGuiKey_RightArrow);
+    CHECK(spring.x == 1.0f);
+    CHECK(spring.y == 0.0f);
+    session.KeyDown(ImGuiKey_UpArrow);
+    CHECK(spring.x == doctest::Approx(std::sqrt(0.5f)));
+    CHECK(spring.y == doctest::Approx(std::sqrt(0.5f)));
+    session.KeyUp(ImGuiKey_UpArrow);
+    session.KeyUp(ImGuiKey_RightArrow);
+    session.Frame();
+    CHECK(spring.x == 0.0f);
+    CHECK(spring.y == 0.0f);
+    session.KeyDown(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    CHECK(spring.x == doctest::Approx(-0.5f));
+    session.KeyUp(ImGuiKey_LeftArrow | ImGuiMod_Shift);
+    session.Frame();
+    CHECK(spring.x == 0.0f);
+    // Without springReturn the arrows step a hundredth of the range and the stick stays.
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("free"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.Frames(10);
+    CHECK(free.x == doctest::Approx(0.02f));
+    CHECK(free.y == doctest::Approx(0.02f));
+    // A square stick holds the diagonal in the corner.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyDown(ImGuiKey_RightArrow);
+    session.KeyDown(ImGuiKey_DownArrow);
+    CHECK(square.x == 1.0f);
+    CHECK(square.y == -1.0f);
+    session.KeyUp(ImGuiKey_DownArrow);
+    session.KeyUp(ImGuiKey_RightArrow);
+}
+
+TEST_CASE("A joystick's deadzone keeps small deflections at zero and the value continuous past it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 value(0.0f, 0.0f);
+    ImVec2 fixed(0.5f, 0.0f);
+    ImVec2 off(0.0f, 0.5f);
+    session.SetUi([&] {
+        facet::JoystickPad("Stick", &value, {.deadzone = 0.2f, .springReturn = false, .showDeadzone = true, .diameter = 200.0f});
+        session.Track("stick");
+        facet::JoystickPad("Fixed", &fixed, {.diameter = 120.0f, .readOnly = true});
+        session.Track("fixed");
+        ImGui::BeginDisabled();
+        facet::JoystickPad("Off", &off, {.diameter = 120.0f});
+        ImGui::EndDisabled();
+        session.Track("off");
+    });
+    session.Frame();
+    session.Drag({StickAt(session, "stick", 0.0f, 0.0f), StickAt(session, "stick", 0.1f, 0.0f)});
+    CHECK(value.x == 0.0f);
+    session.Drag({StickAt(session, "stick", 0.1f, 0.0f), StickAt(session, "stick", 0.6f, 0.0f)});
+    CHECK(value.x == doctest::Approx(0.5f).epsilon(0.02));
+    CHECK(value.y == 0.0f);
+    const ImRect f = session.ItemRect("fixed");
+    session.Drag({f.GetCenter(), f.Max});
+    CHECK(fixed.x == 0.5f);
+    const ImRect o = session.ItemRect("off");
+    session.Drag({o.GetCenter(), o.Max});
+    CHECK(off.y == 0.5f);
 }
 
 // ---- RangeSliderHistogram ------------------------------------------------------------------

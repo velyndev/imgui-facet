@@ -1,8 +1,7 @@
 // The public API of the sliders family (facet/widgets/sliders.h): every options struct follows
-// the conventions and the multi-handle model, and every widget that is still a placeholder is safe
-// to call, submits one item that cannot be operated, leaves the Dear ImGui stacks as it found
-// them, returns the neutral result and writes nothing. Behaviour tests of implemented widgets go
-// into tests/test_sliders.cpp.
+// the conventions and the multi-handle model, a call outside a frame writes nothing, and the pads
+// keep their size rule. Every widget of the family is implemented; their behaviour tests are in
+// tests/test_sliders.cpp.
 
 #include <concepts>
 #include <span>
@@ -85,24 +84,9 @@ static_assert(HasFormatMembers<facet::AllocationBarOptions>());
 static_assert(facet::HandleCollision{} == facet::HandleCollision::Clamp);
 static_assert(facet::KnobVariant{} == facet::KnobVariant::Arc);
 
-// Every placeholder of the family once, with the overloads, as an app would call it.
-void CallSliderStubs(Values& v)
-{
-    using namespace facet;
-    FACET_CHECK_STUB(false, JoystickPad("Stick 1", &v.point, {.deadzone = 0.1f}));
-}
-
-// Number of FACET_CHECK_STUB calls in CallSliderStubs.
-constexpr int kSliderStubCalls = 1;
-
 } // namespace
 
-TEST_CASE("Every sliders placeholder returns the neutral result, writes nothing and keeps the stacks")
-{
-    FACET_CHECK_FAMILY_STUBS(CallSliderStubs, kSliderStubCalls);
-}
-
-TEST_CASE("Sliders placeholders called outside a frame return the neutral result")
+TEST_CASE("Sliders called outside a frame return the neutral result and write nothing")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -110,48 +94,13 @@ TEST_CASE("Sliders placeholders called outside a frame return the neutral result
     const std::string pristine = Describe(values);
     CHECK_FALSE(facet::Slider("Slider 1", &values.number, 0.0f, 1.0f));
     CHECK_FALSE(facet::RangeSlider("Range 1", &values.low, &values.high, 0.0f, 1.0f));
+    CHECK_FALSE(facet::XYPad("Pad 1", &values.point, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f)));
+    CHECK_FALSE(facet::JoystickPad("Stick 1", &values.point));
+    CHECK_FALSE(facet::ArcRangeSlider("Arc 1", &values.low, &values.high, 0.0f, 1.0f));
+    CHECK_FALSE(facet::BoxRangePad("Box 1", &values.boxLow, &values.boxHigh, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f)));
+    CHECK_FALSE(facet::AllocationBar("Allocation 1", std::span<float>(values.shares), kLabels));
     CHECK(Describe(values) == pristine);
 }
-
-TEST_CASE("A sliders placeholder is one item under the label's id that cannot be operated")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    ImVec2 stick(0.25f, 0.5f);
-    float gain = 0.5f;
-    float gainHigh = 0.75f;
-    ImGuiID expected = 0;
-    session.SetUi([&] {
-        ImGui::Button("before");
-        session.Track("before");
-        expected = ImGui::GetID("Volume##value");
-        facet::JoystickPad("Volume##value", &stick);
-        session.Track("slider");
-        facet::JoystickPad("Gain", &stick);
-        session.Track("knob");
-        ImGui::Button("after");
-        session.Track("after");
-    });
-    session.Frame();
-
-    CHECK(session.ItemId("slider") == expected);
-    // Tab goes from the stock button before straight to the one after: no placeholder is a Tab stop.
-    session.Click(session.ItemCenter("before"));
-    session.KeyPress(ImGuiKey_Tab);
-    CHECK(ImGui::GetFocusID() == session.ItemId("before"));
-    session.KeyPress(ImGuiKey_Tab);
-    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
-    // Clicks and drags on the placeholders activate nothing and write nothing.
-    session.Click(session.ItemCenter("knob"));
-    CHECK_FALSE(ImGui::IsAnyItemActive());
-    const ImRect slider = session.ItemRect("slider");
-    session.Drag({ImVec2(slider.Min.x + 4.0f, slider.GetCenter().y), ImVec2(slider.Max.x - 4.0f, slider.GetCenter().y)});
-    CHECK(stick.x == 0.25f);
-    CHECK(stick.y == 0.5f);
-    CHECK(gain == 0.5f);
-    CHECK(gainHigh == 0.75f);
-}
-
 TEST_CASE("Pads keep their default size in a wide row and fit a short row")
 {
     facet::test::Session session;
