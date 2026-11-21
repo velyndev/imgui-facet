@@ -8,6 +8,8 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 #include <imgui.h>
@@ -17,7 +19,10 @@
 #include "gallery.h"
 #include "internal/popup_host.h"
 #include "pages/pages.h"
+#include "internal/focus.h"
+#include "internal/list_view.h"
 #include "widgets/pickers/date_picker_parts.h"
+#include "widgets/pickers/file_browser_parts.h"
 #include "widgets/pickers/icon_picker_parts.h"
 
 namespace
@@ -41,6 +46,7 @@ enum CaptureState
     kAngleFocused,
     kIconOpen,
     kThumbnailsFocused,
+    kFiles,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -76,7 +82,15 @@ struct OtherPickersUi
     int thumbnail = 0;
     bool thumbnailChecks[6] = {true, false, false, false, false, false};
     int thumbnailState = 0;  // 0 Ready, 1 Loading, 2 Error, 3 Empty
-    std::string path;
+    // FileBrowser: it starts at the root of drive C, whose top folders are the same on every
+    // Windows machine, so captures show no personal path. A selftest points it at a sample tree of
+    // its own and bumps `browserEpoch`, which gives a new browser that starts there.
+    std::string path = "C:\\";
+    std::string folderPath = "C:\\";
+    int browserEpoch = 0;
+    ImGuiID browserId = 0;
+    int browserMode = 0;  // 0 Open, 1 Save, 2 Folder
+    std::string sampleRoot;
 };
 
 OtherPickersUi ui;
@@ -389,15 +403,76 @@ void ThumbnailSection(facet::demo::PageCtx& ctx)
                            {.thumbnailSize = {72.0f, 54.0f}, .state = data, .errorText = "The pictures could not be read"});
 }
 
+// The rect of listed row `row` of the FileBrowser submitted last: under its path bar and the gap,
+// inside the list's padding.
+ImRect BrowserRowRect(int row)
+{
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const float bar = facet::ControlHeight(facet::ControlSize::Inherit);
+    const float pad = facet::internal::FocusRingOutset();
+    const float top = min.y + bar + facet::PxSnapped(facet::T().spacing.sm) + pad;
+    const float height = facet::internal::ListRowHeight(facet::ControlSize::Inherit);
+    return ImRect(min.x + pad, top + height * static_cast<float>(row), max.x - pad, top + height * static_cast<float>(row + 1));
+}
+
+void FileSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("FileBrowser");
+    Paragraph("A browser drawn inside the app, for hosts that cannot show a system dialog. Folders come first; a double "
+              "click or Enter opens a folder or picks a file, Backspace goes to the parent folder. The folder is read "
+              "on a worker thread, so a slow drive never stops the frame; an unreadable folder shows the error state.");
+    LabeledRow("Mode");
+    const char* const modes[] = {"Open", "Save", "Folder"};
+    facet::SegmentedControl("##browsermode", &ui.browserMode, modes);
+    ctx.Probe("pickers.files.mode");
+    const facet::FileBrowserMode mode = ui.browserMode == 1   ? facet::FileBrowserMode::Save
+                                        : ui.browserMode == 2 ? facet::FileBrowserMode::Folder
+                                                              : facet::FileBrowserMode::Open;
+    char label[48];
+    std::snprintf(label, sizeof(label), "Browse###browse%d.%d", ui.browserEpoch, ui.browserMode);
+    facet::FileBrowser(label, &ui.path, {.mode = mode, .fileTypes = kFileTypes, .width = DemoWidth(560.0f)});
+    ui.browserId = ImGui::GetItemID();
+    ctx.Probe("pickers.files");
+    for (int row = 0; row < 3; ++row)
+    {
+        char name[32];
+        std::snprintf(name, sizeof(name), "pickers.files.row%d", row);
+        const ImRect rect = BrowserRowRect(row);
+        facet::demo::ProbeRect(ctx, name, ui.browserId + static_cast<ImGuiID>(row + 1), rect.Min, rect.Max);
+    }
+    Note("Path: %s", ui.path.c_str());
+    if (ctx.capture && ctx.captureState == kFiles)
+        ctx.RevealInCapture(0.6f);
+    LabeledRow("Read-only");
+    facet::FileBrowser("Read-only browser", &ui.folderPath,
+                       {.mode = facet::FileBrowserMode::Folder, .width = DemoWidth(420.0f), .height = 160.0f, .readOnly = true});
+}
+
+// A sample tree for the selftest: a folder with one file in it, and two files beside it.
+std::string MakeSampleTree()
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path root = fs::temp_directory_path(error) / "facet_demo_selftest_files";
+    fs::remove_all(root, error);
+    fs::create_directories(root / "Folder 1", error);
+    std::ofstream(root / "Folder 1" / "Option 3.txt") << "placeholder";
+    std::ofstream(root / "Option 1.txt") << "placeholder";
+    std::ofstream(root / "Option 2.png") << "placeholder";
+    const std::u8string text = root.u8string();
+    return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open",
-                "time-open", "angle-focused", "icon-open", "thumbnails-focused")
+                "time-open", "angle-focused", "icon-open", "thumbnails-focused", "files")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
                             "browser. The color pickers have a page of their own.");
-    facet::demo::PlannedFamilyNote("pickers");
+    facet::demo::ReadyFamilyNote("pickers");
 
     DateSection(ctx);
     RangeSection(ctx);
@@ -409,9 +484,7 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
 
     ThumbnailSection(ctx);
 
-    SectionHeader("Files");
-    Paragraph("A browser drawn inside the app, for hosts that cannot show a system dialog.");
-    facet::FileBrowser("Browse", &ui.path, {.fileTypes = kFileTypes});
+    FileSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("pickers-date")
@@ -604,6 +677,45 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.MouseUp();
     test.ExpectNear("the data state control shows the loading tiles", [] { return ui.thumbnailState; }, 1.0, 0.0);
 
-    // The planned pickers are placeholders: clicks and keys write nothing.
-
+    // FileBrowser over a sample tree: the Images type lists the folder and the picture; a double
+    // click picks the picture, Enter opens the folder, the parent folder button comes back.
+    test.Do([] {
+        ui.sampleRoot = MakeSampleTree();
+        ui.path = ui.sampleRoot + "\\Option 1.txt";
+        ui.browserMode = 0;
+        ++ui.browserEpoch;
+    });
+    test.WaitSeconds(0.6f);
+    test.Reveal("pickers.files");
+    test.WaitSeconds(0.4f);
+    test.Expect("the sample tree lists the folder and the picture", [] {
+        facet::internal::FileBrowserView view;
+        return facet::internal::FileBrowserViewOf(ui.browserId, &view) && view.state == 0 && view.rows == 2;
+    });
+    test.DoubleClick("pickers.files.row1");
+    test.Expect("a double click on the picture writes its path", [] { return ui.path == ui.sampleRoot + "\\Option 2.png"; });
+    test.Click("pickers.files.row1");
+    test.KeyPress(ImGuiKey_Home);  // the keyboard takes over: the focus goes to the folder row
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.6f);
+    test.Expect("Enter on the folder opens it (the type filter leaves it empty)", [] {
+        facet::internal::FileBrowserView view;
+        return facet::internal::FileBrowserViewOf(ui.browserId, &view) && view.state == 0 && view.rows == 0 &&
+               view.folder == ui.sampleRoot + "\\Folder 1";
+    });
+    test.MouseMove(facet::demo::Target::Item("pickers.files", 0.02f, 0.02f));
+    test.MouseDown();
+    test.MouseUp();
+    test.WaitSeconds(0.6f);
+    test.Expect("the parent folder button goes back", [] {
+        facet::internal::FileBrowserView view;
+        return facet::internal::FileBrowserViewOf(ui.browserId, &view) && view.folder == ui.sampleRoot;
+    });
+    test.Do([] {
+        std::error_code error;
+        const std::u8string root(reinterpret_cast<const char8_t*>(ui.sampleRoot.data()), ui.sampleRoot.size());
+        std::filesystem::remove_all(std::filesystem::path(root), error);
+        ui.path = "C:\\";
+        ++ui.browserEpoch;
+    });
 }

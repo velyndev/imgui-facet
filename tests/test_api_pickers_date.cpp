@@ -1,9 +1,9 @@
 // The public API of the date, time and other pickers (DatePicker, DateRangePicker, TimePicker,
-// AnglePicker, IconPicker, ThumbnailPicker and FileBrowser in facet/widgets/pickers.h) while they
-// are planned: every options struct follows the conventions, and every function is safe to call,
-// submits one placeholder item that cannot be operated, leaves the Dear ImGui stacks as it found
-// them, returns the neutral result and writes nothing. The color pickers have their own file
-// (tests/test_api_pickers_color.cpp).
+// AnglePicker, IconPicker, ThumbnailPicker and FileBrowser in facet/widgets/pickers.h): every
+// options struct follows the conventions, and every function, called as an app would call it
+// without any input, returns false, writes nothing, submits one item and leaves the Dear ImGui
+// stacks as it found them, also inside ImGui::BeginDisabled. Their behaviour is tested in
+// tests/test_pickers_date.cpp; the color pickers have their own files.
 
 #include <span>
 #include <string>
@@ -38,32 +38,43 @@ static_assert(facet::DatePrecision{} == facet::DatePrecision::Day);
 static_assert(facet::FileBrowserMode{} == facet::FileBrowserMode::Open);
 
 // Every function of this group once, with the overloads, as an app would call it.
-void CallDatePickerStubs(Values& v)
+void CallDatePickers(Values& v)
 {
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
+    FACET_CHECK_STUB(false, DatePicker("Date 1", &v.date, {.inlineCalendar = true}));
+    FACET_CHECK_STUB(false, DateRangePicker("Dates 1", &v.start, &v.end));
+    FACET_CHECK_STUB(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
+    FACET_CHECK_STUB(false, AnglePicker("Angle 1", &v.radians));
+    FACET_CHECK_STUB(false, IconPicker("Icon 1", &v.icon));
+    FACET_CHECK_STUB(false, IconPicker("Icon 2", &v.icon, kChoices));
+    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 1", &v.index, kThumbnails));
+    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 2", std::span<bool>(v.thumbnailFlags), kThumbnails,
+                                            {.state = DataState::Loading}));
     FACET_CHECK_STUB(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
     FACET_CHECK_STUB(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
 }
 
-// Number of FACET_CHECK_STUB calls in CallDatePickerStubs.
-constexpr int kDatePickerStubCalls = 2;
+// Number of FACET_CHECK_STUB calls in CallDatePickers.
+constexpr int kDatePickerCalls = 10;
 
 } // namespace
 
-TEST_CASE("Every date, time and other picker stub returns the neutral result, writes nothing and keeps the stacks")
+TEST_CASE("Every date, time and other picker returns false without input, writes nothing and keeps the stacks")
 {
-    FACET_CHECK_FAMILY_STUBS(CallDatePickerStubs, kDatePickerStubCalls);
+    FACET_CHECK_FAMILY_STUBS(CallDatePickers, kDatePickerCalls);
 }
 
-TEST_CASE("Date and other picker stubs called outside a frame return the neutral result")
+TEST_CASE("Date and other pickers called outside a frame return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
     Values values;
     const std::string pristine = Describe(values);
     CHECK_FALSE(facet::DatePicker("Date 1", &values.date));
+    CHECK_FALSE(facet::TimePicker("Time 1", &values.time));
+    CHECK_FALSE(facet::IconPicker("Icon 1", &values.icon));
     CHECK_FALSE(facet::FileBrowser("Browser 1", &values.text));
     CHECK(Describe(values) == pristine);
 }

@@ -402,7 +402,37 @@ bool FileBrowser(const char* label, char* buffer, std::size_t bufferSize, const 
 
 A file browser drawn inside the app, for overlays and hosts that cannot show a system dialog. Like
 the other panels, it does not draw its label beside it but shows it as its tooltip on hover and
-keyboard focus. Status: planned.
+keyboard focus. It fills the available width (`width` otherwise) and stacks a path bar (the parent
+folder button, named `Strings::parentFolder`, and the folder's path cut in the middle, whole as a
+tooltip), a framed list of the folder's entries `metrics.panelHeight` tall (`height` sets the
+height of the whole browser), the file name field (`Strings::fileName`, Save only), and a bottom
+line with the file type dropdown (`Strings::fileType`, when `fileTypes` is not empty; at most 32
+types) and the confirm button (`Strings::open`, `save` or `chooseFolder` by mode).
+
+It starts in the folder the current path names, else the folder of the file it names, else the
+current directory, and keeps the folder it shows under its id. Every file system call runs on one
+worker thread, so a slow or unreachable folder never blocks a frame: the list shows the loading
+state while a folder is read, the error state with `Strings::loadFailed` for a folder that cannot be
+read (no permission, gone, not a folder), and the empty state for an empty one. While a folder is
+shown it is checked every two seconds on the worker; a folder that changed is read again (the rows
+stay until the new ones arrive, and the chosen entry is kept by name), and a folder that disappeared
+turns into the error state, from which the parent folder button still leads out. The list is a list
+view of the list core, so a folder of any size costs what its visible rows cost; names that do not
+fit end in an ellipsis and show whole as a tooltip.
+
+Folders come first, then files, each by name without case; hidden and system entries and names
+starting with a dot are left out unless `showHidden`; files are filtered by the patterns of the
+chosen file type (`*` and `?`, separated by `;`, ASCII case folded), and Folder mode lists folders
+only. The arrows, Page Up and Down, Home and End move in the list and typing jumps to a name; a
+double click or Enter opens a folder and, on a file, confirms (Save takes the file's name first);
+Backspace in the list goes to the parent folder. In Save mode choosing a file copies its name into
+the name field, and Enter in the field confirms. The confirm button writes the folder joined with
+the chosen file (Open), the typed name (Save), or the chosen folder, else the shown folder (Folder),
+as one UTF-8 path; it is off while nothing fits the mode, while `readOnly` is set (browsing and
+choosing still work), and, in the buffer form, while the path does not fit `bufferSize` bytes with
+its terminating zero. Paths are joined with a backslash; the browser does not create, rename or
+delete anything. The worker is joined in `facet::Shutdown`; a folder read in progress then finishes
+first. Status: ready.
 
 ### Usage of the other pickers
 

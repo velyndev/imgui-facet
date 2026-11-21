@@ -6,10 +6,15 @@
 // tests/test_api_pickers_date.cpp. Popup levels and calendar cells are read inside the frame (the
 // popup host and the state store answer there), so the ui code of a test records them.
 
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <span>
 #include <string>
+#include <thread>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -21,7 +26,9 @@
 #include "internal/popup_host.h"
 #include "support/session.h"
 #include "widgets/pickers/date_picker_parts.h"
+#include "widgets/pickers/file_browser_parts.h"
 #include "widgets/pickers/icon_picker_parts.h"
+#include "internal/list_view.h"
 
 namespace
 {
@@ -1268,4 +1275,265 @@ TEST_CASE("A thumbnail grid of fifty thousand tiles submits only the lines in vi
     CHECK(last.GetWidth() > 0.0f);
     session.KeyPress(ImGuiKey_Enter);
     CHECK(index == kCount - 1);
+}
+// ---- FileBrowser --------------------------------------------------------------------------------
+
+namespace
+{
+
+namespace fs = std::filesystem;
+
+// A folder tree under the temporary directory, removed again at the end of the test.
+struct TempTree
+{
+    fs::path root;
+
+    TempTree()
+    {
+        static int counter = 0;
+        root = fs::temp_directory_path() / ("facet_file_browser_" + std::to_string(++counter) + "_" +
+                                            std::to_string(reinterpret_cast<std::uintptr_t>(this)));
+        std::error_code error;
+        fs::remove_all(root, error);
+        fs::create_directories(root, error);
+    }
+    ~TempTree()
+    {
+        std::error_code error;
+        fs::remove_all(root, error);
+    }
+    void File(const fs::path& relative) const
+    {
+        std::ofstream out(root / relative);
+        out << "placeholder";
+    }
+    void Folder(const fs::path& relative) const
+    {
+        std::error_code error;
+        fs::create_directories(root / relative, error);
+    }
+    std::string Utf8(const fs::path& relative = {}) const
+    {
+        const std::u8string text = (relative.empty() ? root : root / relative).u8string();
+        return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+    }
+};
+
+// Runs frames until the browser `label` is not loading, for at most two seconds of real time.
+fi::FileBrowserView WaitForBrowser(facet::test::Session& session, ImGuiID id)
+{
+    fi::FileBrowserView view;
+    for (int i = 0; i < 400; ++i)
+    {
+        session.Frame();
+        if (fi::FileBrowserViewOf(id, &view) && view.state != 1 && !fi::FileBrowserBusy(id))
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    return view;
+}
+
+// The center of listed row `row` of a browser whose widget rect is `widget`: the path bar, the gap,
+// the area padding, then the rows.
+ImVec2 BrowserRow(const ImRect& widget, int row)
+{
+    const float bar = facet::ControlHeight(facet::ControlSize::Inherit);
+    const float top = widget.Min.y + bar + facet::PxSnapped(facet::T().spacing.sm) + fi::FocusRingOutset();
+    const float height = fi::ListRowHeight(facet::ControlSize::Inherit);
+    return ImVec2(widget.Min.x + facet::Px(60.0f), top + height * (static_cast<float>(row) + 0.5f));
+}
+
+const facet::FileType kBrowserTypes[] = {{"All files", nullptr}, {"Images", "*.png;*.JPG"}};
+
+} // namespace
+
+TEST_CASE("File browser patterns match wildcards without case")
+{
+    CHECK(fi::FileBrowserMatches("photo.PNG", "*.png;*.jpg"));
+    CHECK(fi::FileBrowserMatches("photo.jpg", "*.png; *.jpg"));
+    CHECK_FALSE(fi::FileBrowserMatches("photo.jpeg", "*.png;*.jpg"));
+    CHECK(fi::FileBrowserMatches("a1.txt", "a?.txt"));
+    CHECK_FALSE(fi::FileBrowserMatches("a12.txt", "a?.txt"));
+    CHECK(fi::FileBrowserMatches("anything", nullptr));
+    CHECK(fi::FileBrowserMatches("anything", ""));
+    CHECK(fi::FileBrowserMatches("archive.tar.gz", "*.gz"));
+}
+
+TEST_CASE("A file browser lists folders first, opens a folder, writes a file and goes back with Backspace")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TempTree tree;
+    tree.Folder("Folder A");
+    tree.Folder("Folder B");
+    tree.File("Folder B/inner.txt");
+    tree.File("image.png");
+    tree.File("notes.txt");
+    tree.File(".hidden.txt");
+    std::string path = tree.Utf8("notes.txt");
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::FileBrowser("Files", &path, {.fileTypes = kBrowserTypes}))
+            ++writes;
+        session.Track("files");
+    });
+    session.Frame();
+    const ImGuiID browser = session.ItemId("files");
+    fi::FileBrowserView view = WaitForBrowser(session, browser);
+    REQUIRE(view.state == 0);
+    CHECK(view.folder == tree.Utf8());
+    REQUIRE(view.rows == 4);  // the hidden file is left out
+    CHECK(std::string(fi::FileBrowserRowName(browser, 0)) == "Folder A");
+    CHECK(std::string(fi::FileBrowserRowName(browser, 1)) == "Folder B");
+    CHECK(std::string(fi::FileBrowserRowName(browser, 2)) == "image.png");
+
+    session.DoubleClick(BrowserRow(session.ItemRect("files"), 1));
+    view = WaitForBrowser(session, browser);
+    CHECK(view.folder == tree.Utf8() + "\\Folder B");
+    REQUIRE(view.rows == 1);
+    session.DoubleClick(BrowserRow(session.ItemRect("files"), 0));
+    CHECK(path == tree.Utf8() + "\\Folder B\\inner.txt");
+    CHECK(writes == 1);
+    session.KeyPress(ImGuiKey_Backspace);
+    view = WaitForBrowser(session, browser);
+    CHECK(view.folder == tree.Utf8());
+    CHECK(view.rows == 4);
+}
+
+TEST_CASE("A file browser shows an empty folder, and a folder that disappears turns into the error state")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TempTree tree;
+    tree.Folder("Empty");
+    tree.Folder("Going");
+    tree.File("Going/file.txt");
+    std::string path = tree.Utf8("Empty");
+    std::string second = tree.Utf8("Going");
+    session.SetUi([&] {
+        facet::FileBrowser("Empty", &path, {.mode = facet::FileBrowserMode::Folder});
+        session.Track("empty");
+        facet::FileBrowser("Going", &second);
+        session.Track("going");
+    });
+    session.Frame();
+    fi::FileBrowserView view = WaitForBrowser(session, session.ItemId("empty"));
+    CHECK(view.state == 0);
+    CHECK(view.rows == 0);
+    view = WaitForBrowser(session, session.ItemId("going"));
+    CHECK(view.folder == tree.Utf8() + "\\Going");
+    CHECK(view.rows == 1);
+
+    std::error_code error;
+    fs::remove_all(tree.root / "Going", error);
+    REQUIRE_FALSE(error);
+    // The next check (every two seconds of frame time) finds the folder gone.
+    session.Seconds(2.2f);
+    for (int i = 0; i < 400 && view.state != 2; ++i)
+    {
+        session.Frame();
+        fi::FileBrowserViewOf(session.ItemId("going"), &view);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    CHECK(view.state == 2);
+    // The parent folder button still works.
+    const ImRect widget = session.ItemRect("going");
+    const float bar = facet::ControlHeight(facet::ControlSize::Inherit);
+    session.Click(ImVec2(widget.Min.x + bar * 0.5f, widget.Min.y + bar * 0.5f));
+    view = WaitForBrowser(session, session.ItemId("going"));
+    CHECK(view.state == 0);
+    CHECK(view.folder == tree.Utf8());
+}
+
+TEST_CASE("A file browser lists a folder of three thousand files and reaches the last with End")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TempTree tree;
+    for (int i = 0; i < 3000; ++i)
+    {
+        char name[32];
+        std::snprintf(name, sizeof(name), "file_%05d.txt", i);
+        tree.File(name);
+    }
+    const std::string longName(180, 'n');
+    tree.File(longName + ".txt");
+    std::string path = tree.Utf8("file_00000.txt");
+    session.SetUi([&] {
+        facet::FileBrowser("Files", &path);
+        session.Track("files");
+    });
+    session.Frame();
+    const ImGuiID browser = session.ItemId("files");
+    const fi::FileBrowserView view = WaitForBrowser(session, browser);
+    REQUIRE(view.rows == 3001);
+    CHECK(std::string(fi::FileBrowserRowName(browser, 3000)) == longName + ".txt");
+    session.Click(BrowserRow(session.ItemRect("files"), 0));
+    session.KeyPress(ImGuiKey_End);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(path.size() > longName.size());
+    CHECK(path.substr(path.size() - longName.size() - 4) == longName + ".txt");
+}
+
+TEST_CASE("Save mode writes the typed name, and a path that does not fit the buffer is never written")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    TempTree tree;
+    tree.File("existing.txt");
+    std::string path = tree.Utf8("existing.txt");
+    char tiny[8] = "x";
+    session.SetUi([&] {
+        facet::FileBrowser("Save", &path, {.mode = facet::FileBrowserMode::Save});
+        session.Track("save");
+        facet::FileBrowser("Small", tiny, sizeof(tiny));
+        session.Track("small");
+    });
+    session.Frame();
+    WaitForBrowser(session, session.ItemId("save"));
+    const ImRect widget = session.ItemRect("save");
+    // The name field is the line under the list; typing there and Enter save.
+    const float bar = facet::ControlHeight(facet::ControlSize::Inherit);
+    const float gap = facet::PxSnapped(facet::T().spacing.sm);
+    const float listHeight = std::round(facet::Px(facet::T().metrics.panelHeight));
+    session.Click(ImVec2(widget.Max.x - facet::Px(40.0f), widget.Min.y + bar + gap + listHeight + gap + bar * 0.5f));
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.Type("new name.txt");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(path == tree.Utf8() + "\\new name.txt");
+
+    // The small buffer: a file is chosen and Enter pressed, but the path does not fit.
+    WaitForBrowser(session, session.ItemId("small"));
+    session.Click(BrowserRow(session.ItemRect("small"), 0));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(std::string(tiny) == "x");
+}
+
+TEST_CASE("A folder the system does not let the user read shows the error state")
+{
+    // Every NTFS volume has this folder, and a normal user may not list it.
+    const fs::path locked = "C:\\System Volume Information";
+    std::error_code error;
+    if (!fs::is_directory(locked, error))
+    {
+        MESSAGE("no locked system folder on this machine; skipped");
+        return;
+    }
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string path = "C:\\System Volume Information";
+    session.SetUi([&] {
+        facet::FileBrowser("Files", &path);
+        session.Track("files");
+    });
+    session.Frame();
+    const fi::FileBrowserView view = WaitForBrowser(session, session.ItemId("files"));
+    fs::directory_iterator probe(locked, error);
+    if (!error)
+    {
+        MESSAGE("this user may read the system folder; skipped");
+        return;
+    }
+    CHECK(view.state == 2);
+    CHECK(path == "C:\\System Volume Information");
 }
