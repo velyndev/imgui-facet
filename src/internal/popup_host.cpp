@@ -55,6 +55,7 @@ struct Level
 {
     ImGuiID id = 0;
     PopupAnchor anchor;
+    ImRect anchorRegion;         // the window that holds the anchor (AnchorRegion); empty for none
     PopupOptions options;
     Phase phase = Phase::Idle;
     ImGuiID parent = 0;
@@ -493,11 +494,26 @@ bool AnchorIsEmpty(const PopupAnchor& anchor)
     return anchor.rect.Min.x == 0.0f && anchor.rect.Min.y == 0.0f && anchor.rect.Max.x == 0.0f && anchor.rect.Max.y == 0.0f;
 }
 
+// The window a level's anchor lies in, for the alignment rule of popup_place.h: the current window
+// of the call that opens or moves a Popup level, when that window is part of the page (not itself
+// a popup or tooltip, whose submenus keep their alignment). Empty otherwise.
+ImRect AnchorRegion(const PopupOptions& options)
+{
+    const ImGuiWindow* window = GImGui->CurrentWindow;
+    if (options.kind != PopupKind::Popup || window == nullptr)
+        return ImRect();
+    const ImGuiWindow* root = window->RootWindow != nullptr ? window->RootWindow : window;
+    if ((root->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
+        return ImRect();
+    return window->Rect();
+}
+
 void PlaceLevel(Level& level, ImVec2 wanted)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
     PopupPlaceInput in;
     in.anchor = level.anchor.rect;
+    in.region = level.anchorRegion;
     in.side = level.anchor.side;
     in.align = level.anchor.align;
     in.matchWidth = level.anchor.matchWidth;
@@ -1217,10 +1233,12 @@ void OpenPopupLevel(ImGuiID id, const PopupAnchor& anchor, const PopupOptions& o
     if (level->phase == Phase::Open && ImGuiPopupIndex(id) >= 0)
     {
         level->anchor = anchor;
+        level->anchorRegion = AnchorRegion(level->options);
         return;
     }
     level->snapshot.Clear();
     level->anchor = anchor;
+    level->anchorRegion = AnchorRegion(options);
     level->options = options;
     level->parent = CurrentPopupLevel();
     level->phase = Phase::Open;
@@ -1237,7 +1255,10 @@ void SetPopupLevelAnchor(ImGuiID id, const PopupAnchor& anchor)
         return;
     Level* level = FindLevel(id);
     if (level != nullptr && level->phase == Phase::Open)
+    {
         level->anchor = anchor;
+        level->anchorRegion = AnchorRegion(level->options);
+    }
 }
 
 void ClosePopupLevel(ImGuiID id)
@@ -1512,6 +1533,7 @@ void ForcePopupLevelOpen(ImGuiID id, const PopupAnchor& anchor, const PopupOptio
     level->forcedFrame = State().frame;
     level->lastUseFrame = State().frame;
     level->anchor = anchor;
+    level->anchorRegion = AnchorRegion(options);
     level->options = options;
     level->openTime = 1.0e6f;  // forced levels show settled
 }

@@ -229,6 +229,96 @@ TEST_CASE("popup placement: shifts along the edge and aligns")
     CHECK(p.rect.Max.y == 280.0f);
 }
 
+TEST_CASE("popup placement: an end-aligned level turns toward the window that holds its anchor")
+{
+    // A narrow toolbar at the leading edge of a page window that starts at x 240, with a "more"
+    // button at its start: aligned at the button's end, a 180 wide menu would cover the window
+    // to the left of the page.
+    const ImRect region(ImVec2(240.0f, 40.0f), ImVec2(792.0f, 592.0f));
+    const ImRect button(ImVec2(300.0f, 100.0f), ImVec2(328.0f, 128.0f));
+    PopupPlaceInput in = Input(button, PopupSide::Below, ImVec2(180.0f, 80.0f));
+    in.align = PopupAlign::End;
+    PopupPlacement p = fi::PlacePopup(in);
+    CHECK(p.rect.Max.x == 328.0f);  // without a region the alignment is kept
+    CHECK(p.align == PopupAlign::End);
+    in.region = region;
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::Start);
+    CHECK(p.rect.Min.x == 300.0f);
+    CHECK(p.rect.Min.x >= region.Min.x);
+
+    // A button at the trailing end of the window keeps End: Start would leave the region.
+    const ImRect trailing(ImVec2(740.0f, 100.0f), ImVec2(768.0f, 128.0f));
+    in = Input(trailing, PopupSide::Below, ImVec2(180.0f, 80.0f));
+    in.align = PopupAlign::End;
+    in.region = region;
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::End);
+    CHECK(p.rect.Max.x == 768.0f);
+
+    // The same for Start: a list wider than its field at the trailing edge turns to End.
+    const ImRect field(ImVec2(640.0f, 100.0f), ImVec2(760.0f, 128.0f));
+    in = Input(field, PopupSide::Below, ImVec2(240.0f, 80.0f));
+    in.region = ImRect(ImVec2(240.0f, 40.0f), ImVec2(770.0f, 592.0f));
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::End);
+    CHECK(p.rect.Max.x == 760.0f);
+
+    // Neither end fits inside a region narrower than the level: the alignment that leaves less of
+    // it outside wins, and a tie keeps the requested one.
+    in = Input(button, PopupSide::Below, ImVec2(180.0f, 80.0f));
+    in.align = PopupAlign::End;
+    in.region = ImRect(ImVec2(290.0f, 40.0f), ImVec2(340.0f, 592.0f));
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::Start);
+    in.region = ImRect(ImVec2(300.0f - 76.0f, 40.0f), ImVec2(328.0f + 76.0f, 592.0f));
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::End);
+
+    // Beside the anchor the rule acts on the vertical axis, and Center is never turned.
+    in = Input(ImRect(ImVec2(300.0f, 500.0f), ImVec2(400.0f, 530.0f)), PopupSide::After, ImVec2(120.0f, 120.0f));
+    in.region = ImRect(ImVec2(8.0f, 8.0f), ImVec2(792.0f, 560.0f));
+    p = fi::PlacePopup(in);
+    CHECK(p.align == PopupAlign::End);
+    CHECK(p.rect.Max.y == 530.0f);
+    in.align = PopupAlign::Center;
+    CHECK(fi::PlacePopup(in).align == PopupAlign::Center);
+}
+
+TEST_CASE("popup host: an end-aligned level opened at the leading edge of a page window stays over it")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImRect page;
+    session.SetUi([&] {
+        // A page window that starts well right of the display edge, like the content beside the
+        // gallery navigation, with a "more" button at its leading edge.
+        ImGui::SetCursorPos(ImVec2(300.0f, 40.0f));
+        ImGui::BeginChild("page", ImVec2(400.0f, 400.0f));
+        page = ImGui::GetCurrentWindow()->Rect();
+        ImGui::Button("more", ImVec2(28.0f, 28.0f));
+        session.Track("more");
+        if (ImGui::IsItemClicked())
+            fi::OpenPopupLevel(kLevel1, {LastItemRect(), PopupSide::Below, PopupAlign::End},
+                               {.size = ImVec2(180.0f, 60.0f)});
+        if (fi::BeginPopupLevel(kLevel1))
+        {
+            ImGui::TextUnformatted("menu");
+            fi::EndPopupLevel();
+        }
+        ImGui::EndChild();
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("more"));
+    session.Frames(2);
+    const ImRect menu = fi::PopupLevelRect(kLevel1);
+    REQUIRE(menu.GetWidth() > 0.0f);
+    // Aligned at the button's start instead of its end, so it stays over the page window.
+    CHECK(menu.Min.x == doctest::Approx(std::floor(session.ItemRect("more").Min.x)));
+    CHECK(menu.Min.x >= page.Min.x);
+}
+
 TEST_CASE("popup placement: minimum width and the anchor width for dropdowns")
 {
     const ImRect anchor(ImVec2(300, 250), ImVec2(520, 280));

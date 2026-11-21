@@ -224,7 +224,10 @@ bool ContextMenuRequested(ContextRequestTarget target, ImVec2* at);
 // (popup_place.h), inside the main viewport's work area minus overlay.viewportMargin. While the
 // anchor stays where it is, a level keeps the side it took as long as it fits there, so content
 // that grows and shrinks does not make it jump; when the anchor moves it is placed afresh. A
-// Modal whose anchor rect is empty (the default) is centered in the work area.
+// Modal whose anchor rect is empty (the default) is centered in the work area. A Popup level
+// opened from a window of the page (not from another level) passes that window as the region of
+// popup_place.h, so its Start or End alignment turns to the other end when only that keeps the
+// level over the window it belongs to.
 
 // Moves an open level to a new anchor; call it every frame while the anchor can move (it
 // scrolls, the window resizes). Unlike OpenPopupLevel it never opens a closed level, so calling

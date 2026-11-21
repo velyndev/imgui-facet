@@ -24,7 +24,10 @@
 //      when even that room is below minExtent, the level is clamped into the bounds and may
 //      cover its anchor (an anchor as tall as the display has no room beside it).
 //   3. Along the anchor edge the level is aligned by `align`, then shifted to stay inside the
-//      bounds.
+//      bounds. With a `region` (the window that holds the anchor), a Start or End alignment
+//      turns to the other end when only that keeps more of the level over the region: a "more"
+//      button at the leading edge of a narrow toolbar opens its menu toward the toolbar instead
+//      of over the window beside it.
 //   4. Positions are rounded down to whole pixels, so the surface edges stay crisp.
 // A zero-size anchor (the pointer, the caret) works like any other. An anchor partly or wholly
 // outside the bounds (scrolled away) still gives a level inside the bounds.
@@ -51,6 +54,7 @@ struct PopupPlaceInput
     bool keepSide = false;              // stay on currentSide while it has room
     PopupSide currentSide = PopupSide::Below;
     bool center = false;                // centered in the bounds, the anchor ignored (dialogs)
+    ImRect region;                      // the anchor's window; an empty rect for none (rule 3)
 };
 
 struct PopupPlacement
@@ -60,6 +64,7 @@ struct PopupPlacement
     bool flipped = false;               // the side is the opposite of the preferred one
     bool shrunk = false;                // smaller than wanted along the side's axis (it scrolls)
     bool coversAnchor = false;          // no room on either side: clamped over the anchor
+    PopupAlign align = PopupAlign::Start;  // the alignment it took along the anchor edge (rule 3)
 };
 
 PopupPlacement PlacePopup(const PopupPlaceInput& input);

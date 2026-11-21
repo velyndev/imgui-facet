@@ -52,6 +52,12 @@ float AlignOnEdge(PopupAlign align, float anchorMin, float anchorMax, float leng
     return anchorMin;
 }
 
+// How much of the span from `pos`, `length` long, lies outside [lo, hi].
+float OutsideSpan(float pos, float length, float lo, float hi)
+{
+    return std::max(0.0f, lo - pos) + std::max(0.0f, pos + length - hi);
+}
+
 } // namespace
 
 PopupSide OppositePopupSide(PopupSide side)
@@ -138,13 +144,34 @@ PopupPlacement PlacePopup(const PopupPlaceInput& in)
             pos.x = in.anchor.Min.x - in.gap - size.x;
             break;
         }
-        // 3. Along the anchor edge.
-        if (IsVertical(side))
-            pos.x = AlignOnEdge(in.align, in.anchor.Min.x, in.anchor.Max.x, size.x);
-        else
-            pos.y = AlignOnEdge(in.align, in.anchor.Min.y, in.anchor.Max.y, size.y);
+        // 3. Along the anchor edge; a Start or End alignment turns to the other end when that
+        // keeps more of the level over the anchor's window (both measured after the shift into
+        // the bounds).
+        const int axis = IsVertical(side) ? 0 : 1;
+        const float boundsMin = in.bounds.Min[axis];
+        const float boundsMax = in.bounds.Min[axis] + avail[axis];
+        PopupAlign align = in.align;
+        float along = AlignOnEdge(align, in.anchor.Min[axis], in.anchor.Max[axis], size[axis]);
+        const bool hasRegion = in.region.Max[axis] > in.region.Min[axis];
+        if (hasRegion && align != PopupAlign::Center)
+        {
+            const PopupAlign other = align == PopupAlign::Start ? PopupAlign::End : PopupAlign::Start;
+            const float otherAlong = AlignOnEdge(other, in.anchor.Min[axis], in.anchor.Max[axis], size[axis]);
+            const float lo = in.region.Min[axis];
+            const float hi = in.region.Max[axis];
+            const float outside = OutsideSpan(ClampSpan(along, size[axis], boundsMin, boundsMax), size[axis], lo, hi);
+            const float otherOutside =
+                OutsideSpan(ClampSpan(otherAlong, size[axis], boundsMin, boundsMax), size[axis], lo, hi);
+            if (otherOutside + 0.5f < outside)
+            {
+                align = other;
+                along = otherAlong;
+            }
+        }
+        pos[axis] = along;
 
         out.side = side;
+        out.align = align;
         out.flipped = side != preferred;
         out.shrunk = shrink;
         out.coversAnchor = cover;
