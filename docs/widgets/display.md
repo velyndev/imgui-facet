@@ -439,7 +439,69 @@ void EndDataTable();
 class DataTableScope;
 ```
 
-Sortable, resizable table with a sticky header, frozen columns, virtualized rows and selection. Status: planned.
+A Dear ImGui table (`BeginTableEx` with both scroll axes) on the grouped surface (`bgSecondary`, card
+radius, hairline), with a Facet header row that stays in view, virtualized rows and an optional
+selection. Column widths, order, visibility and sort are Dear ImGui's state of the table, kept under
+the id and in its ini file.
+
+- **Header:** each visible column has a header cell with the visible part of its label in Footnote,
+  `labelSecondary`, or `label` while the column sorts, cut with an ellipsis (the whole label on hover
+  and keyboard focus) and placed by the column's `align`. `align` places the header only; cells draw
+  their own content (`StyledText` with `.align` and `.width = kFill` lines numbers up). Header cells
+  are Tab stops in display order. Hover and press fill the cell inset by `spacing.xs`; the focus ring
+  goes around that fill.
+- **Sorting** (`sortable`): a click, Enter or Space on a header sorts by its column and the next one
+  turns the direction (Dear ImGui's `TableSetColumnSortDirection`); with `multiSort`, Shift adds the
+  column to the sort. A sorted column shows an arrow (up ascending, down descending) and, while more
+  than one column sorts, its place in the order. Read `ImGui::TableGetSortSpecs` between Begin and
+  End; its `SpecsDirty` is true once per change (and once for a new table), never on frames without
+  one. `ImGuiTableColumnFlags_NoSort` and the other stock sort flags apply.
+- **Resizing** (`resizable`): a band of `table.resizeBand` on the right edge of a header cell resizes
+  the column by drag; a double click fits it to its content. A hairline divider sits between header
+  cells and turns into a `focusRing` line while its band is hovered or dragged. No column gets
+  narrower than `table.minColumnWidth` (its padding included). Resizing has no keys.
+- **Reordering** (`reorderable`): dragging a header past a neighbour's edge moves the column there,
+  never across the frozen columns (Dear ImGui's rule). There are no keys for it.
+- **Column menu:** a right click on a header (or on the header row after the last column), or the
+  Menu key or Shift+F10 on a focused header, opens a menu with `Strings::sortAscending` and
+  `Strings::sortDescending` for a sortable column and, with `hideable`, the `Strings::columns`
+  submenu, whose rows show and hide columns. A column with `ImGuiTableColumnFlags_NoHide`, and the
+  last column shown, cannot be hidden. Without `sortable` and `hideable` there is no menu.
+- **Frozen columns** (`frozenColumns`): the leading columns stay in place while the others scroll
+  sideways under them; a hairline marks their edge while the table is scrolled.
+- **Rows:** `rowHeight`, or the list row height of the inherited control size (`PushControlSize`).
+  Rows are virtualized by the row ranges of the list core: only the visible rows, the focused row and
+  the start of a Shift range are handed out by `NextVisibleRows`, so a hundred thousand rows cost what
+  a screenful does, and a frame allocates nothing once the table is shown. Each row is exactly one row
+  height; content taller than the row is not supported. Text in cells is centered on the row.
+- **Row look:** `DataTableRow` submits one row item that spans every column, from the first column
+  to the right edge of the visible table, also while the table is scrolled sideways. It draws in the
+  table's background channel, under the cells: the hover fill (`fill[2]`), the selection
+  (`accentSubtle` while the rows have the focus, `fill[1]` when not) and the focus ring around the
+  whole row, or around the focused cell. A control in a cell takes the pointer before the row.
+- **Selection** (`selection` set): click, Ctrl, Shift, Shift with the arrows, Ctrl+A, Escape and box
+  select through `ImGui::BeginMultiSelect` and the storage; `singleSelect` keeps one row. The start of
+  a Shift range stays on its item when the caller sorts (the selection storage keys rows through
+  `AdapterIndexToStorageId`, see the usage below).
+- **Keys** while a row has the focus: Up, Down, Page Up and Page Down move between rows (Dear ImGui
+  navigation, the selection follows as in a list); Home and End go to the first and last row; Left
+  and Right move a focused cell along the columns in display order, scrolling it into view, and Left
+  from the first column gives the focus back to the whole row; Enter or a double click activates the
+  row (`DataTableRow` returns true), except on an editable cell, which they edit. Tab enters the rows
+  at the focused row (the first one before any) and leaves them for the next item; the rows are one
+  Tab stop. Rows have no typeahead.
+- **States:** `Loading`, `Error` (`errorText` or `Strings::loadFailed`) and `Ready` with no rows
+  (`emptyText` or `Strings::empty`) draw under the header in place of the rows; BeginDataTable then
+  returns false, the header still sorts, resizes and opens its menu.
+- **Read-only and disabled:** `readOnly` (or a pushed `ImGuiItemFlags_ReadOnly`) keeps every cell
+  out of edit mode; selection, sorting and the column menu still work, and a double click activates.
+  Inside `ImGui::BeginDisabled` nothing is selected, sorted or edited and nothing is a Tab stop.
+- **Size:** width by the rule of the conventions (the available width by default); `height` in
+  units, 0 fills the available height but keeps at least the header and three rows. A table narrower
+  than its columns scrolls sideways with the overlay bars of the scroll core, which the header and
+  the frozen columns leave free.
+
+Status: ready.
 
 ### DataTable cell edit
 
@@ -449,7 +511,17 @@ void EndDataTableCellEdit();
 class DataTableCellEditScope;
 ```
 
-Edits one cell in place with any editor widget. Status: planned.
+Edits one cell in place with the caller's editor widget. A cell of a column declared `editable`
+enters edit mode on F2 or Enter while it is the focused cell (F2 on a focused row edits its first
+editable cell in display order), or on a double click. On that row and column BeginDataTableCellEdit
+returns true: submit one editor labelled `"##edit"` (`TextField`, `NumberInput` or any other widget
+on the text field and number cores); it fills the cell, sits centered on the row and takes the
+keyboard focus. The editor writes as it always does (text per keystroke, numbers on Enter) and
+reports the outcome through `IsItemEditCommitted` and `IsItemEditCanceled` right after it; Escape
+restores the value from the start of the edit. The session ends when the editor is deactivated: Enter,
+Tab and Escape give the focus back to the cell, a click elsewhere leaves it where the click went. A
+session whose editor never becomes active within a few frames is dropped. `readOnly`, a disabled
+table and columns that are not `editable` never enter edit mode. Status: ready.
 
 ### Usage: sorting, selection and cell editing
 
