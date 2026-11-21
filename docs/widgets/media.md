@@ -166,7 +166,14 @@ DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTy
 const ImGuiPayload* DropZonePayload();
 ```
 
-Area that accepts drag and drop payloads of given types and can be activated. Status: planned.
+A dashed area (`media.dashLength` and `media.dashGap` in the boundary color) with the icon over the
+hint. While a payload of an accepted type is over it, it takes the drop target look of the drag and
+drop core; a payload of another type gets no highlight and the not-allowed cursor. A drop returns
+`Dropped` and `DropZonePayload` gives the payload until the end of the frame. With `activatable` it
+is a Tab stop activated by a click, Enter or Space. A disabled zone refuses every payload. Without a
+hint the visible label part is the text in the zone, shown in full on hover and focus when it is cut;
+with a hint it is the tooltip.
+Status: ready.
 
 ## Usage
 

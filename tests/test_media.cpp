@@ -762,3 +762,53 @@ TEST_CASE("An image compare divider moves by press, drag and keys, and never in 
     facet::ReleaseImage(a);
     facet::ReleaseImage(b);
 }
+
+// ---- DropZone ----------------------------------------------------------------------------------
+
+TEST_CASE("A drop zone takes payloads of its types, refuses others, and activates by click and keys")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const types[] = {"test.file"};
+    int drops = 0;
+    int activations = 0;
+    int dropped = 0;
+    int payload = 7;
+    const char* sourceType = "test.file";
+    session.SetUi([&] {
+        ImGui::Button("source");
+        session.Track("source");
+        if (ImGui::BeginDragDropSource())
+        {
+            ImGui::SetDragDropPayload(sourceType, &payload, sizeof(payload));
+            ImGui::EndDragDropSource();
+        }
+        const facet::DropZoneAction action = facet::DropZone("Drop here", types, {.height = 80.0f});
+        session.Track("zone");
+        if (action == facet::DropZoneAction::Dropped)
+        {
+            ++drops;
+            const ImGuiPayload* p = facet::DropZonePayload();
+            if (p != nullptr && p->DataSize == sizeof(int))
+                std::memcpy(&dropped, p->Data, sizeof(int));
+        }
+        if (action == facet::DropZoneAction::Activated)
+            ++activations;
+    });
+    session.Frame();
+    session.DragAndHold({session.ItemCenter("source"), session.ItemCenter("zone")}, 6, 3);
+    session.Frames(2);
+    CHECK(drops == 1);
+    CHECK(dropped == 7);
+    CHECK(facet::DropZonePayload() == nullptr);
+    sourceType = "test.other";
+    session.DragAndHold({session.ItemCenter("source"), session.ItemCenter("zone")}, 6, 3);
+    session.Frames(2);
+    CHECK(drops == 1);
+    session.Click(session.ItemCenter("zone"));
+    CHECK(activations == 1);
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activations == 3);
+}
