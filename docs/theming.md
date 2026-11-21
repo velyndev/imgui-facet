@@ -46,7 +46,7 @@ facet::SetTheme(theme);
 ### The token behind an option's default
 
 Widget options whose comment says "0 for the token default" (or names a default size) read these
-tokens. The widgets are planned; the table fixes which token each one takes.
+tokens. Each widget in the table reads the token listed for its option.
 
 | Options | Token |
 |---|---|

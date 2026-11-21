@@ -92,10 +92,10 @@ second one.
 | State kept across frames | `GetState`, `GetPersistentState` (`internal/state_storage.h`) |
 | Selection highlight | `SelectionPill`, `PushPillLabelStyle` (`internal/selection_pill.h`) |
 | Items that move into a "more" menu | `FitOverflow` (`internal/overflow.h`) |
-| Dragging a value, several handles | `internal/value_drag.h`, `internal/multi_handle.h` |
+| Dragging a value, several handles, a point on two axes | `internal/value_drag.h` (`ValueDragBehavior`, `ValueDrag2DBehavior`), `internal/multi_handle.h` |
 | Popups, menus, Escape and context menu keys | `internal/popup_host.h`, `internal/popup_menu.h`, `internal/popup_place.h` |
-| Lists, rows, selection, typeahead | `internal/list_core.h`, `internal/list_view.h` |
-| Scrolling | `internal/scroll.h` |
+| Lists, rows, selection, typeahead | `internal/list_core.h`, `internal/list_view.h`; `ListTabProxy` and `ListClaimTabExit` for a container that places its own rows in a selection scope |
+| Scrolling | `internal/scroll.h`; `BeginScrollAreaBars` gives the overlay bars to a window another call begins (a Dear ImGui table) |
 | Drag and drop | `internal/drag_drop.h` |
 | Labelled rows | `internal/row_layout.h` |
 | Fuzzy matching, key chords, charts | `internal/fuzzy.h`, `internal/keys.h`, `internal/chart_core.h` |

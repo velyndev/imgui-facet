@@ -7,24 +7,35 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 **Status: early development.** The building blocks of Phase 1 exist inside the library and
 work. Planned blocks: overlay scrollbars inside popup levels and multiline text areas (both still
 use Dear ImGui's own bar there). The fourteen widget family headers in `include/facet/widgets/`
-declare every widget with documentation comments, and every declared function links. The
-implemented widgets:
+declare every widget with documentation comments, and every declared function links. Every
+widget of thirteen families is implemented:
 
-- Buttons, Selection, Inputs (text and value inputs), Lists and Containers: every widget of the
-  family.
-- Sliders: `Slider`, `SliderStepped`, `SliderWithInput`, `RangeSlider`, `RangeInput`,
-  `RangeSliderHistogram`, `MultiSlider` and `Knob`. Planned: `XYPad`, `JoystickPad`,
-  `ArcRangeSlider`, `BoxRangePad` and `AllocationBar`.
-- Display: every widget except `DataTable` and its cell editing, which are planned.
+- Buttons, Selection and Lists.
+- Sliders, including the two-dimensional pads (`XYPad`, `BoxRangePad`, `JoystickPad`),
+  `ArcRangeSlider` and `AllocationBar`.
+- Inputs: the text inputs and the value inputs.
+- Pickers: the color pickers (`ColorWell`, `ColorPicker`, `ColorInputs`, `SwatchPalette`,
+  `SatValSquare`, `ColorChannelSlider`, `ColorModeEditor`) and `DatePicker`, `DateRangePicker`,
+  `TimePicker`, `AnglePicker`, `IconPicker`, `ThumbnailPicker` and `FileBrowser`.
+- Navigation: `Sidebar`, `TabBar`, `MenuBar`, menus and menu items, `Breadcrumbs`, `Pagination`,
+  `StepIndicator`, `Wizard` and `ShortcutSheet`.
+- Containers.
+- Layout: `SettingsRow`, `Stack`, `Grid`, the separators, `DependentGroup`, `SplitView`, `Flow`,
+  `ListDetail`, `Panels` and `ItemGrid`.
+- Overlays: `Modal`, `ConfirmDialog`, `Popover`, `ContextMenu`, tooltips (plain and rich), toasts,
+  `Drawer`, `LoadingOverlay`, `CommandPalette`, `UnsavedChangesBar` and `WatermarkOverlay`.
+- Display, including `DataTable` and its cell editing.
+- Charts: `Sparkline`, `Legend`, `LineChart`, `BarChart`, `DonutChart`, `Gauge`, `LevelMeter`,
+  `FrameTimeGraph` and `ChartRangeBrush`.
+- Media: `ImageView`, `Avatar`, `AvatarGroup`, `ThumbnailStrip`, `Carousel`, `ImageViewer`,
+  `ImageCompare`, `DropZone` and `TimelineScrubber`, next to the core image and icon items.
 
-The widgets of the Pickers, Navigation, Layout, Overlays, Charts, Media and Composites families
-are planned, apart from the core items listed on the media page (`docs/widgets/media.md`). A
-planned widget function draws a placeholder that says "planned", returns the neutral result and
-writes nothing, and planned End functions, queries and helpers draw nothing and return neutral
-values. Besides the widgets, `ApplyReorderMove`, `PassesFilter`, the built-in strings and the
-edit session queries in `common.h` work, and the `BeginDataTable` placeholder opens a plain Dear
-ImGui table so the caller's cells land in it. The status of each widget is the last line of its
-entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exists today:
+The widgets of the Composites family are planned. A planned widget function draws a placeholder
+that says "planned", returns the neutral result and writes nothing, and planned End functions,
+queries and helpers draw nothing and return neutral values. Besides the widgets,
+`ApplyReorderMove`, `PassesFilter`, the built-in strings and the edit session queries in
+`common.h` work. The status of each widget is the last line of its entry on its family page under
+`docs/widgets/` (see `docs/widgets.md`). What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -70,16 +81,16 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
   stack (`PushControlSize`), control heights, the built-in strings (`SetStrings`) and the edit
   session queries (`IsItemEditCommitted`, `IsItemEditCanceled`) work; `NextVisibleRows`
   forwards to the list core and hands out rows inside the row ranges the list core opens (a
-  `VirtualList` opens one), so inside a placeholder such as `BeginDataTable`, which opens none, it
-  returns false. `facet/facet.h`
+  `VirtualList` and a `DataTable` open one), and returns false outside them. `facet/facet.h`
   includes every core and widget header. The rules for widget declarations are in `docs/api-conventions.md`.
 - The building blocks of the widgets, internal to the library (`src/internal/`, each header
   starts with a usage sketch): item behaviour (hover, press, focus, disabled and hit targets
   of at least `minHitTarget`), keyboard modality and the focus ring, labelled rows and row
   groups, overflow fitting, the value drag core (linear, logarithmic, stepped, wrapping and
-  delta mappings with one edit session per drag or key press), the multi-handle model, the
-  selection pill, fuzzy matching with ranked match ranges, chord capture, the chart core
-  (scales, ticks and labels, hover snapping, decimation and series colors), the control anatomy
+  delta mappings with one edit session per drag or key press, and a drag on two axes for pads),
+  the multi-handle model, the selection pill, fuzzy matching with ranked match ranges, chord
+  capture, the chart core (scales, ticks and labels, hover snapping, decimation, gaps and series
+  colors), the control anatomy
   every widget shares (`control.h`: sizes and paddings, the label in front of or above a
   control, text cut with an ellipsis and its tooltip, fill feedback, the field frame, the loading
   spinner and the help and error line, whose errors are collected for `ValidationSummary`), and:
@@ -87,11 +98,13 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
     clamp, an end alignment that turns toward the window holding the anchor, nested levels on Dear
     ImGui's popup stack, Escape and the context menu keys through
     key ownership, focus return, glass or opaque surfaces, an open motion and a close motion
-    that replays the last frame, tooltips with hover intent, and the modal scrim; and the menu
-    rows on it (`popup_menu.h`): submenus that open after a rest or by key and stay open while
-    the pointer aims at them, a shortcut column, and icons or check marks;
+    that replays the last frame, tooltips with hover intent, panel levels that leave the page
+    around them usable, and the modal scrim; and the menu rows on it (`popup_menu.h`): submenus
+    that open after a rest or by key and stay open while the pointer aims at them, a shortcut
+    column, icons, check marks or radio dots, and typeahead;
   - the scroll core (`scroll.h`): scroll areas with overlay bars, smooth wheel scrolling that
-    hands over between nested areas, edge fades, revealing a rectangle and edge scrolling;
+    hands over between nested areas, edge fades, revealing a rectangle and edge scrolling, and
+    the same bars for a window another call begins (a Dear ImGui table);
   - the list and selection core (`list_core.h`, `list_view.h`): virtualized rows, Dear
     ImGui's multi-select with box selection, keyboard and typeahead, trees, the loading,
     error and empty states, an active row driven from a field that keeps the keyboard, and the
@@ -175,15 +188,12 @@ entry on its family page under `docs/widgets/` (see `docs/widgets.md`). What exi
   - Widgets: one page per widget family, and two for the families whose widget groups are built
     apart (Buttons, Selection, Sliders, Text inputs and Value inputs, Color pickers and Other
     pickers, Lists, Navigation, Containers, Layout, Overlays, Display and Data table, Charts,
-    Media, Composites). Buttons, Selection, Sliders, Text inputs, Value inputs, Lists, Containers
-    and Display show every implemented widget of their family in its variants, sizes and states
-    (read-only, disabled, error, mixed, loading and empty where the widget has them, and narrow
-    widths), with capture states that force hover, press, keyboard focus, open popups and drags
-    per section, and a selftest that operates each of them by mouse and keyboard and checks the
-    values. The planned widgets on the Sliders page, and every widget on the pages of the planned
-    families and on the Data table page, are placeholders of their declared size that cannot be
-    operated; the selftests of the Color pickers, Other pickers and Data table pages check that
-    they write nothing.
+    Media, Composites). Every page except Composites shows every widget of its family in its
+    variants, sizes and states (read-only, disabled, error, mixed, loading and empty where the
+    widget has them, and narrow widths), with capture states that force hover, press, keyboard
+    focus, open popups and drags per section, and a selftest that operates each of them by mouse
+    and keyboard and checks the values. The Composites page shows its planned widgets as
+    placeholders of their declared size that cannot be operated.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection

@@ -7,18 +7,15 @@ control size stack, the edit session queries and the built-in strings). Every de
 follows [the API conventions](api-conventions.md).
 
 **Status: in progress.** Every family header declares its widgets with documentation comments,
-and every declared function links. Every widget of the buttons, selection, inputs, lists and
-containers families is ready; the sliders family has five planned widgets (`XYPad`,
-`JoystickPad`, `ArcRangeSlider`, `BoxRangePad`, `AllocationBar`) and the display family two
-(`DataTable` and its cell editing); the widgets of the other families are planned, apart from the
-core items listed on the media page. The status of each widget is the last line of its entry on
-its family page under `docs/widgets/`: "Status: ready." for a widget that works as its header
-describes, "Status: planned." for one that does not yet, so one search for either text lists
-them. A planned widget function draws a placeholder at the widget's default size ("Name:
+and every declared function links. Every widget of the buttons, selection, sliders, inputs,
+pickers, lists, navigation, containers, layout, overlays, display, charts and media families is
+ready; the widgets of the composites family are planned. The status of each widget is the last
+line of its entry on its family page under `docs/widgets/`: "Status: ready." for a widget that
+works as its header describes, "Status: planned." for one that does not yet, so one search for
+either text lists them. A planned widget function draws a placeholder at the widget's default size ("Name:
 planned"), returns the neutral result and writes nothing; planned End functions, queries and
 helpers draw nothing and return neutral values. Besides the ready widgets, `ApplyReorderMove`,
-`PassesFilter`, the built-in strings and the edit session queries in `common.h` work, and the
-`BeginDataTable` placeholder opens a plain Dear ImGui table so the caller's cells land in it. The
+`PassesFilter`, the built-in strings and the edit session queries in `common.h` work. The
 demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
 inputs), the pickers (color pickers and the other pickers) and the display family (the display
 widgets and the data table). How a widget is built is described in
