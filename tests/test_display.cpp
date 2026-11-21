@@ -1289,6 +1289,119 @@ TEST_CASE("A character counter warns near its limit and turns destructive over i
     CHECK(destructive > 0);
 }
 
+// ==== LogView ====
+
+namespace
+{
+
+struct GeneratedLog
+{
+    int reads = 0;
+    char line[64] = {};
+};
+
+bool ReadGeneratedLine(void* user, int index, facet::LogEntry* out)
+{
+    GeneratedLog* log = static_cast<GeneratedLog*>(user);
+    ++log->reads;
+    ImFormatString(log->line, sizeof(log->line), "Generated line %d", index);
+    out->text = log->line;
+    out->level = index % 10 == 0 ? facet::LogLevel::Warning : facet::LogLevel::Info;
+    out->time = static_cast<double>(index) * 0.25;
+    return true;
+}
+
+} // namespace
+
+TEST_CASE("A log of a hundred thousand rows reads only its visible entries")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GeneratedLog log;
+    int count = 100000;
+    session.SetUi([&] {
+        facet::LogView("log", count, &ReadGeneratedLine, &log, {.height = 240.0f});
+        session.Track("log");
+    });
+    session.Frames(3);
+    log.reads = 0;
+    session.Frame();
+    const int perFrame = log.reads;
+    const float rows = session.ItemRect("log").GetHeight() / facet::internal::ListRowHeight(facet::ControlSize::Small);
+    CHECK(perFrame > 0);
+    CHECK(perFrame <= static_cast<int>(rows) + 8);
+    count = 1000;
+    session.Frames(2);
+    log.reads = 0;
+    session.Frame();
+    CHECK(log.reads == perFrame);
+}
+
+TEST_CASE("A log follows new entries, stops when scrolled up and resumes at the end")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    DisplayGuard::ReduceMotion(true);  // scrolls land at once
+    GeneratedLog log;
+    int count = 500;
+    ImGuiID viewId = 0;
+    session.SetUi([&] {
+        viewId = ImGui::GetID("log");
+        facet::LogView("log", count, &ReadGeneratedLine, &log, {.height = 200.0f});
+        session.Track("log");
+    });
+    session.Frames(3);
+    CHECK(facet::internal::DisplayLogViewFollowing(viewId));
+    count += 50;
+    session.Frames(3);
+    CHECK(facet::internal::DisplayLogViewFollowing(viewId));
+    // Scrolling up stops following; new entries leave the view where it is.
+    session.Wheel(session.ItemCenter("log"), 3.0f);
+    session.Frames(2);
+    CHECK_FALSE(facet::internal::DisplayLogViewFollowing(viewId));
+    count += 50;
+    session.Frames(3);
+    CHECK_FALSE(facet::internal::DisplayLogViewFollowing(viewId));
+    // The jump button under the log resumes it.
+    const ImRect rect = session.ItemRect("log");
+    const float button = facet::ControlHeight(facet::ControlSize::Small);
+    session.Click(ImVec2(rect.Max.x - facet::Px(40.0f), rect.Max.y - button * 0.5f));
+    session.Frames(2);
+    CHECK(facet::internal::DisplayLogViewFollowing(viewId));
+    // Scrolling back down to the end resumes it as well.
+    session.Wheel(session.ItemCenter("log"), 3.0f);
+    session.Frames(2);
+    CHECK_FALSE(facet::internal::DisplayLogViewFollowing(viewId));
+    for (int i = 0; i < 6; ++i)
+        session.Wheel(session.ItemCenter("log"), -3.0f);
+    session.Frames(3);
+    CHECK(facet::internal::DisplayLogViewFollowing(viewId));
+}
+
+TEST_CASE("Ctrl+C in a log copies the selected lines in log order")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::LogEntry entries[] = {
+        {"First entry", facet::LogLevel::Info, 1.5, "core"},
+        {"Second entry", facet::LogLevel::Warning, 62.0},
+        {"Third entry", facet::LogLevel::Error},
+    };
+    session.SetUi([&] {
+        facet::LogView("log", entries, {.autoScroll = false, .height = 200.0f});
+        session.Track("log");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("log");
+    const float row = facet::internal::ListRowHeight(facet::ControlSize::Small);
+    const float pad = facet::internal::FocusRingOutset();
+    session.Click(ImVec2(rect.GetCenter().x, rect.Min.y + pad + row * 0.5f));
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
+    CHECK(session.Clipboard() == "00:01.500  core  First entry\n01:02.000  Second entry\n");
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

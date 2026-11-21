@@ -288,7 +288,18 @@ void LogView(const char* id, std::span<const LogEntry> entries, const LogViewOpt
 void LogView(const char* id, int entryCount, LogGetter getter, void* user, const LogViewOptions& options = {});
 ```
 
-Virtualized log with level colors, time column and follow mode. Status: planned.
+A virtualized log on the list view block, on the grouped surface: only the visible entries are read,
+so a hundred thousand rows cost what a screenful does. Each row is one Body line in the small list row
+height: the time (`mm:ss.mmm`, or `h:mm:ss.mmm` from one hour on, in a column measured for the widest
+time) with `timestamps`, the level (warning and error icons in their tone; trace and debug text in
+`labelSecondary`), the source tag in `labelSecondary` and the text, cut at the view edge with the
+whole line on hover and keyboard focus. Rows select like any Facet list (click, Ctrl, Shift, Shift
+with the arrows, Ctrl+A, box select, Escape) and Ctrl+C copies the selected lines in log order as
+`time  source  text`. The view is one Tab stop; the arrows, Page Up and Down, Home and End move the
+focused row and scroll. While it shows the end it follows new entries; a scroll up (wheel, keys,
+scrollbar) stops following and shows `Strings::jumpToLatest` under the log, which, like End or
+scrolling back to the end, resumes it. Loading, Error and an empty log show their states. Lines
+that wrap are not supported yet (see the end of this page). Status: ready.
 
 ### KeyValueList
 
