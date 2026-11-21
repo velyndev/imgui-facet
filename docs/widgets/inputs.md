@@ -154,7 +154,30 @@ scan per frame. Status: ready.
 bool TagInput(const char* label, std::vector<std::string>* tags, const TagInputOptions& options = {});
 ```
 
-A field that turns entries into removable chips, with suggestions. Status: planned.
+A field frame holding the tags as chips (`facet::Chip` from `selection.h`, one size smaller than the
+field, with their remove button unless read-only or disabled) followed by a frameless text part for
+the next entry. The chips flow into rows and wrap; the text part takes the rest of the last row, or
+a row of its own when less than three control heights are left, and the frame grows with the rows
+(one row is one control height). The label sits in front and the width fills the row by default.
+
+The text part keeps the keyboard and is the widget's only Tab stop; the chips are not Tab stops.
+Enter adds the typed text (trimmed) and keeps the keyboard in the field; Enter with nothing typed
+ends the session. Every comma, typed or pasted, ends an entry, so pasting "a, b, c" adds three tags.
+Backspace in the empty text selects the last chip and a second Backspace removes it; Left at the
+start of the text selects the last chip, Left and Right move the selection, Right past the last chip
+returns to the text, and Delete or Backspace removes the selected chip; typing or Escape clears the
+selection. A click on a chip selects it, its remove button removes it, and a click on the frame
+outside the chips gives the text the keyboard. `suggestions` that match the typed text (fuzzy,
+best first, without the tags already there unless `allowDuplicates`) open in a completion list under
+the frame, operated as in SearchField. With `allowCreate` off only a suggestion becomes a tag, in
+the suggestion's spelling; without `allowDuplicates` a tag equal to an existing one (ASCII case
+aside) is refused; at `maxTags` nothing more is added. A refused entry stays in the text. Returns
+true when `*tags` changed (several tags added in one frame are one write). `readOnly`, a null `tags`
+or a pushed `ImGuiItemFlags_ReadOnly` show the chips without remove buttons and add nothing; the
+error or help line sits under the frame. A tag containing "##" shows only the part before it,
+because the chip treats its text as a label. The chips rely on `Chip`, which is still a placeholder
+in this build of the selection family, so they show its placeholder until that widget is ready.
+Status: ready.
 
 ### TextArea
 

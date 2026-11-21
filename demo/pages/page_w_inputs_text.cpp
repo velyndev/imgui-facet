@@ -39,6 +39,7 @@ enum CaptureState
     kFilled,
     kOpen,
     kSuggestions,
+    kFormatted,  // the TagInput section and the formatted fields after it
 };
 
 constexpr const char* kSample = "Sample text";
@@ -110,6 +111,10 @@ struct TextInputsUi
     std::string filter;
     facet::FilterSettings filterSettings;
     std::vector<std::string> tags = {"Option 1"};
+    std::vector<std::string> tagsLimited;
+    std::vector<std::string> tagsWrap = {"Sample tag 1", "Sample tag 2", "Sample tag 3", "Sample tag 4"};
+    std::vector<std::string> tagsError;
+    std::vector<std::string> tagsReadOnly = {"Sample tag 1", "Sample tag 2"};
     std::string name = "Option 1";
     bool renaming = false;
     std::string masked;
@@ -419,8 +424,6 @@ void PlannedSections(facet::demo::PageCtx&)
     SectionHeader("Search and suggestions");
     LabeledRow("Filter field");
     facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
-    LabeledRow("Tags");
-    facet::TagInput("##tags", &ui.tags, {.suggestions = kOptions});
 
     SectionHeader("Formatted fields");
     LabeledRow("Masked");
@@ -478,6 +481,44 @@ void CopyFieldSection(facet::demo::PageCtx& ctx)
     LabeledRow("Narrow");
     facet::CopyField("A label longer than its share##copyNarrow", kSampleLong, {.width = 160.0f});
     Note("Copies: %d.", ui.copies);
+}
+
+void TagInputSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("TagInput");
+    Paragraph("Entries become chips. Enter or a comma adds the typed text, Backspace in the empty field selects and then "
+              "removes the last chip, Left and Right move between chips, Delete removes the selected one. Matching "
+              "suggestions open under the field while typing.");
+
+    LabeledRow("Suggestions");
+    if (ctx.capture && ctx.captureState == kFormatted)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    facet::TagInput("##tags", &ui.tags, {.placeholder = "Type and press Enter", .suggestions = kOptions});
+    ProbeFrame(ctx, "inputs.tags");
+    if (ctx.capture && ctx.captureState == kFormatted)
+        ctx.RevealInCapture(0.15f);
+
+    LabeledRow("Limited");
+    facet::TagInput("##tagsLimited", &ui.tagsLimited,
+                    {.suggestions = kOptions, .allowCreate = false, .maxTags = 2,
+                     .helpText = "Suggestions only, two at most"});
+    ProbeFrame(ctx, "inputs.tags.limited");
+
+    LabeledRow("Wrapping");
+    facet::TagInput("##tagsWrap", &ui.tagsWrap, {.width = 240.0f});
+
+    LabeledRow("Error");
+    facet::TagInput("##tagsError", &ui.tagsError,
+                    {.error = ui.tagsError.empty() ? "Add at least one tag" : nullptr});
+
+    LabeledRow("Read-only");
+    facet::TagInput("##tagsReadOnly", &ui.tagsReadOnly, {.readOnly = true});
+
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::TagInput("##tagsDisabled", &ui.tagsReadOnly);
+    ImGui::EndDisabled();
+    Note("Tags: %d in the first field.", static_cast<int>(ui.tags.size()));
 }
 
 // Records the rows of the ValidationSummary just drawn as "inputs.summary.<row>", where the
@@ -549,7 +590,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
 
 } // namespace
 
-FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions")
+FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered", "focused", "filled", "open", "suggestions", "formatted")
 {
     if (ctx.capture)
     {
@@ -569,6 +610,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     AutocompleteSection(ctx);
     ValidationSection(ctx);
     CopyFieldSection(ctx);
+    TagInputSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -793,8 +835,8 @@ FACET_DEMO_SELFTEST("inputs-text")
     // ValidationSummary and FieldValidation: from a fresh page the name and the port have errors.
     test.Do([] { ui = {}; });
     test.Wait(3);
-    test.ExpectNear("the summary lists the name, the port and the CopyField error example",
-                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 3.0, 0.0);
+    test.ExpectNear("the summary lists the name, the port and the CopyField and TagInput error examples",
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 4.0, 0.0);
     test.Click("inputs.summary.0");
     test.Wait(2);
     test.ExpectFocused("inputs.valid.name");
@@ -804,17 +846,17 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectNear("the click counts as one activation", [] { return ui.summaryActivations; }, 1.0, 0.0);
     test.KeyPress(ImGuiKey_Enter);
     test.Wait(2);
-    // The name is fixed, so two rows are left: the port and the error example of CopyField further
-    // down. Shift+Tab from the name reaches the last row.
+    // The name is fixed, so three rows are left: the port and the error examples of CopyField and
+    // TagInput further down. Shift+Tab from the name reaches the last row.
     test.Click("inputs.valid.name");
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("inputs.summary.1");
+    test.ExpectFocused("inputs.summary.2");
     test.KeyPress(ImGuiKey_Enter);
     test.ExpectNear("Enter on a summary row activates it", [] { return ui.summaryActivations; }, 2.0, 0.0);
     test.Do([] { ui.validPort = 80; });
     test.Wait(3);
     test.ExpectNear("a field back in range leaves the summary",
-                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 1.0, 0.0);
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 2.0, 0.0);
     test.Click("inputs.stock");
     test.Expect("the stock checkbox under a message turns on", [] { return ui.stockCheck; });
 
@@ -834,5 +876,32 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.KeyPress(ImGuiKey_C | ImGuiMod_Ctrl);
     test.ExpectClipboard("Ctrl+C in the masked field copies the real value", "Placeholder secret value");
     test.ExpectNear("three copies in all", [] { return ui.copies; }, 3.0, 0.0);
+    test.KeyPress(ImGuiKey_Escape);
+
+    // TagInput: Enter and a comma add, a suggestion by keyboard, Backspace selects and removes.
+    // The first click scrolls the field into view, the second lands in its text part at the end.
+    test.Click("inputs.tags");
+    test.MouseMove(T::Item("inputs.tags", 1.0f, 0.5f).Offset(-12.0f, 0.0f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Type("Sample tag");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.Type("Second tag,");
+    test.Expect("Enter and a comma add tags", [] {
+        return ui.tags.size() == 3 && ui.tags[1] == "Sample tag" && ui.tags[2] == "Second tag";
+    });
+    test.Type("ion 2");
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Down and Enter take the suggestion", [] { return ui.tags.size() == 4 && ui.tags[3] == "Option 2"; });
+    test.KeyPress(ImGuiKey_Backspace);
+    test.KeyPress(ImGuiKey_Backspace);
+    test.Expect("Backspace twice removes the last tag", [] { return ui.tags.size() == 3; });
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.tags.limited");
+    test.Type("free,");
+    test.Expect("the limited field refuses text that is no suggestion", [] { return ui.tagsLimited.empty(); });
     test.KeyPress(ImGuiKey_Escape);
 }

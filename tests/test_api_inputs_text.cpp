@@ -53,7 +53,6 @@ void CallTextInputStubs(Values& v)
     FACET_CHECK_STUB(false, FilterField("Filter 1", &v.text, &v.filter));
     FACET_CHECK_STUB(false, FilterField("Filter 2", buffer, bufferSize, nullptr, {.placeholder = "Placeholder"}));
     CHECK(PassesFilter(v.text, v.filter, "Sample text"));
-    FACET_CHECK_STUB(false, TagInput("Tags 1", &v.tags, {.suggestions = std::span(kLabels)}));
     FACET_CHECK_STUB(false, InlineRename("Rename 1", &v.text, &v.editing));
     FACET_CHECK_STUB(false, InlineRename("Rename 2", buffer, bufferSize, nullptr, {.selectStem = true}));
     FACET_CHECK_STUB(false, MaskedInput("Masked 1", &v.text, "9999-9999"));
@@ -66,7 +65,7 @@ void CallTextInputStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 11;
+constexpr int kTextInputStubCalls = 10;
 
 } // namespace
 

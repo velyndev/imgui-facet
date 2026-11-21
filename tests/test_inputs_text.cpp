@@ -8,6 +8,7 @@
 #include <array>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -1519,4 +1520,128 @@ TEST_CASE("A loading or empty CopyField copies nothing")
     session.Click(SlotButtonCenter(session.ItemRect("empty"), 0));
     CHECK(copies == 0);
     CHECK(session.Clipboard() == "before");
+}
+// ---- TagInput ----------------------------------------------------------------------------------
+
+namespace
+{
+
+// A point in the text part of a TagInput whose tags fit one row: near the end of the frame.
+ImVec2 TagTextPoint(const ImRect& rect)
+{
+    return ImVec2(rect.Max.x - facet::Px(16.0f), rect.Min.y + facet::ControlHeight(facet::ControlSize::Regular) * 0.5f);
+}
+
+const char* const kTagSuggestions[] = {"Option 1", "Option 2", "Other"};
+
+} // namespace
+
+TEST_CASE("TagInput adds the typed text on Enter and on a comma and keeps the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags;
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::TagInput("##tags", &tags) ? 1 : 0;
+        session.Track("tags");
+    });
+    session.Frame();
+    session.Click(TagTextPoint(session.ItemRect("tags")));
+    session.Type("  first ");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    REQUIRE(tags.size() == 1);
+    CHECK(tags[0] == "first");
+    CHECK(writes == 1);
+    session.Type("second,third,");
+    REQUIRE(tags.size() == 3);
+    CHECK(tags[1] == "second");
+    CHECK(tags[2] == "third");
+    CHECK(writes == 2);  // both arrived in one frame: one write
+    // A duplicate (case aside) is refused and stays in the text, so Enter adds nothing either.
+    session.Type("First,");
+    CHECK(tags.size() == 3);
+    CHECK(writes == 2);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(tags.size() == 3);
+}
+
+TEST_CASE("TagInput selects and removes chips with Backspace, the arrows and Delete")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags = {"a", "b", "c"};
+    session.SetUi([&] {
+        facet::TagInput("##tags", &tags);
+        session.Track("tags");
+    });
+    session.Frame();
+    session.Click(TagTextPoint(session.ItemRect("tags")));
+    session.KeyPress(ImGuiKey_Backspace);  // selects "c"
+    CHECK(tags.size() == 3);
+    session.KeyPress(ImGuiKey_Backspace);  // removes it
+    REQUIRE(tags.size() == 2);
+    CHECK(tags[1] == "b");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_LeftArrow);  // selects "b"
+    session.KeyPress(ImGuiKey_LeftArrow);  // moves to "a"
+    session.KeyPress(ImGuiKey_Delete);
+    REQUIRE(tags.size() == 1);
+    CHECK(tags[0] == "b");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_LeftArrow);   // selects "b"
+    session.KeyPress(ImGuiKey_RightArrow);  // back to the text
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(tags.size() == 1);
+}
+
+TEST_CASE("TagInput takes a suggestion from its list and can be limited to suggestions and a count")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags;
+    session.SetUi([&] {
+        facet::TagInput("##tags", &tags, {.suggestions = kTagSuggestions, .allowCreate = false, .maxTags = 2});
+        session.Track("tags");
+    });
+    session.Frame();
+    session.Click(TagTextPoint(session.ItemRect("tags")));
+    session.Type("opt");
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    REQUIRE(tags.size() == 1);
+    CHECK(tags[0] == "Option 1");
+    // Not a suggestion: refused.
+    session.Type("free,");
+    CHECK(tags.size() == 1);
+    session.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    session.KeyPress(ImGuiKey_Backspace);
+    // A suggestion typed in another case takes the suggestion's spelling.
+    session.Type("other,");
+    REQUIRE(tags.size() == 2);
+    CHECK(tags[1] == "Other");
+    // Full: nothing more is added.
+    session.Type("option 2,");
+    CHECK(tags.size() == 2);
+}
+
+TEST_CASE("A read-only TagInput adds and removes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<std::string> tags = {"a"};
+    int writes = 0;
+    session.SetUi([&] {
+        writes += facet::TagInput("##tags", &tags, {.readOnly = true}) ? 1 : 0;
+        session.Track("tags");
+    });
+    session.Frame();
+    session.Click(TagTextPoint(session.ItemRect("tags")));
+    session.Type("b,");
+    session.KeyPress(ImGuiKey_Backspace);
+    session.KeyPress(ImGuiKey_Backspace);
+    CHECK(tags.size() == 1);
+    CHECK(writes == 0);
 }
