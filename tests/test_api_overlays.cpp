@@ -47,11 +47,6 @@ void CallOverlayStubs(Values& v)
         FAIL("BeginContextMenu opened");
         facet::EndContextMenu();
     });
-    CHECK_BALANCED(facet::ItemTooltip("Tooltip %d", 1));
-    CHECK_BALANCED(if (facet::BeginRichTooltip()) {
-        FAIL("BeginRichTooltip opened");
-        facet::EndRichTooltip();
-    });
     CHECK_BALANCED({
         const facet::ToastId toast = facet::ShowToast("Toast");
         CHECK_FALSE(toast.IsValid());

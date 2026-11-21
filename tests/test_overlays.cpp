@@ -203,3 +203,104 @@ TEST_CASE("An interactive tooltip stays while the pointer moves into it and take
     session.Frames(2);
     CHECK_FALSE(tipOpen);
 }
+
+// ---- Tooltips ------------------------------------------------------------------------------------
+
+TEST_CASE("ItemTooltip shows after the hover delay, hides when the pointer leaves and takes no focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    bool shown = false;
+    session.SetUi([&] {
+        if (facet::Button("Save"))
+            ++presses;
+        session.Track("save");
+        facet::ItemTooltip("Saves the %s", "file");
+        shown = fi::IsPopupLevelOpen(fi::PopupTooltipLevel(ImGui::GetItemID()));
+        ImGui::Button("other");
+        session.Track("other");
+    });
+    session.Frame();
+    session.MouseMove(session.ItemCenter("save"));
+    session.Seconds(facet::T().overlay.tooltipDelay * 0.5f);
+    CHECK_FALSE(shown);
+    session.Seconds(facet::T().overlay.tooltipDelay);
+    CHECK(shown);
+    // The tooltip window lets input through and never holds the keyboard focus.
+    const ImGuiContext& g = *ImGui::GetCurrentContext();
+    const ImGuiID focusBefore = g.NavId;
+    session.Click(session.ItemCenter("save"));
+    CHECK(presses == 1);
+    CHECK(g.NavWindow != nullptr);
+    CHECK((g.NavWindow->Flags & ImGuiWindowFlags_Tooltip) == 0);
+    (void)focusBefore;
+    session.MouseMove(kAway);
+    session.Frames(2);
+    CHECK_FALSE(shown);
+}
+
+TEST_CASE("ItemTooltip shows on keyboard focus and never for a disabled item")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool shownEnabled = false;
+    bool shownDisabled = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::Button("Enabled");
+        session.Track("enabled");
+        facet::ItemTooltip("Enabled tip");
+        shownEnabled = fi::IsPopupLevelOpen(fi::PopupTooltipLevel(ImGui::GetItemID()));
+        ImGui::BeginDisabled();
+        facet::Button("Disabled");
+        session.Track("disabled");
+        facet::ItemTooltip("Disabled tip");
+        shownDisabled = fi::IsPopupLevelOpen(fi::PopupTooltipLevel(ImGui::GetItemID()));
+        ImGui::EndDisabled();
+    });
+    session.Frame();
+    HoverFor(session, session.ItemCenter("disabled"), TooltipWait());
+    CHECK_FALSE(shownDisabled);
+    session.MouseMove(kAway);
+    session.Click(session.ItemCenter("before"));
+    session.MouseMove(kAway);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("enabled"));
+    session.Seconds(TooltipWait());
+    CHECK(shownEnabled);
+    // Tab does not land on the disabled button, so the focus leaves and the tooltip with it.
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frames(2);
+    CHECK_FALSE(shownEnabled);
+    CHECK_FALSE(shownDisabled);
+}
+
+TEST_CASE("A rich tooltip submits its content only while it shows and keeps the scopes balanced")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int contentFrames = 0;
+    session.SetUi([&] {
+        ImGui::Button("item");
+        session.Track("item");
+        if (facet::BeginRichTooltip({.maxWidth = 120.0f}))
+        {
+            ++contentFrames;
+            ImGui::TextUnformatted("A long rich tooltip text that wraps at its width");
+            facet::EndRichTooltip();
+        }
+        // The scope class ends only what began.
+        facet::RichTooltipScope scope;
+    });
+    session.Frames(3);
+    CHECK(contentFrames == 0);
+    HoverFor(session, session.ItemCenter("item"), TooltipWait());
+    CHECK(contentFrames > 0);
+    CHECK(fi::OpenScopeCount() == 0);
+    // The text wraps at maxWidth: the tooltip is no wider than it plus its padding.
+    const ImRect tip = fi::PopupLevelRect(fi::PopupTooltipLevel(session.ItemId("item")));
+    CHECK(tip.GetWidth() <= facet::Px(120.0f) + facet::Px(facet::T().spacing.sm) * 2.0f + 1.0f);
+}

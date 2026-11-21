@@ -76,8 +76,6 @@ A menu that opens on right click, the Menu key or Shift+F10 over an item or empt
 
 ### ItemTooltip, BeginRichTooltip
 
-Status: planned
-
 ```cpp
 void ItemTooltip(const char* fmt, ...);
 [[nodiscard]] bool BeginRichTooltip(const TooltipOptions& options = {});
@@ -85,8 +83,31 @@ void EndRichTooltip();
 class RichTooltipScope;
 ```
 
-A themed tooltip for the last item after the hover delay and on keyboard focus, as text or with
-arbitrary content.
+A themed tooltip for the last item, called right after it every frame. `ItemTooltip` formats its
+text (printf, cut at 1024 bytes, never allocated) in Footnote and the label color, wrapped at
+`overlay.tooltipMaxWidth`; `BeginRichTooltip` takes any content until `EndRichTooltip`, wrapped at
+`TooltipOptions::maxWidth` when set.
+
+- **When it shows:** after the pointer rests on the item for `overlay.tooltipDelay`, below and after
+  the pointer so the cursor never covers it, and after the same delay while the item has visible
+  keyboard focus (below the item). Within `overlay.tooltipGrace` after a tooltip was visible, the
+  next item shows its own at once. A mouse press hides it until the pointer leaves the item, a key
+  press until the pointer moves. It flips and moves to stay inside the display.
+- **When it never shows:** for a disabled item (`ImGui::BeginDisabled`); there is no option that
+  changes this. Also not while another item is active or a popup above blocks the item, the same
+  rule as `ImGui::IsItemHovered`.
+- **Input:** a tooltip never takes the keyboard focus or a key, and a plain one lets every click
+  through. With `interactive`, a rich tooltip takes the mouse and stays while the pointer moves
+  into it (inside the box between where the pointer was and the tooltip), so its content can be
+  hovered and clicked; it still takes no keyboard focus, and a click inside gives Dear ImGui's window
+  focus to it.
+- **Look and motion:** the elevated surface at level 1 with a hairline, the control radius, padding
+  `spacing.sm` by `spacing.xs`; it fades in and out with the popup motion, at once under reduced
+  motion.
+- Text items without an id (`ImGui::TextUnformatted`) are named by their rectangle, as Dear ImGui
+  names them for its own tooltips. One tooltip shows at a time.
+
+Status: ready.
 
 ### ShowToast
 
