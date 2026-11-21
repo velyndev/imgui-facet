@@ -3,6 +3,7 @@
 // operate it by mouse and keyboard. A planned widget is called once and draws its placeholder.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -31,6 +32,12 @@ struct SelectionUi
     bool wifi = true;
     bool bluetooth = false;
     bool sizes[3] = {false, true, true};
+    // Centers (pixels) of the "Sizes" row label and of its smallest and largest switch, and
+    // whether they share one line, measured every frame for the selftest.
+    float sizesLabelCenter = 0.0f;
+    float sizesSmallCenter = 0.0f;
+    float sizesLargeCenter = 0.0f;
+    bool sizesOneLine = false;
     bool wide = true;
     bool loading = false;
     bool mixedToggle = false;
@@ -224,16 +231,21 @@ void ToggleSection(facet::demo::PageCtx& ctx)
         ctx.Probe("sel.toggle.bluetooth");
     }
 
-    LabeledRow("Sizes");
+    const bool labelStacked = facet::LayoutLabeledRow(ImGui::GetContentRegionAvail().x).stacked;
+    LabeledRow("Sizes", facet::ControlHeight(facet::ControlSize::Large));
+    ui.sizesLabelCenter = facet::demo::LastLabeledRowBox().GetCenter().y;
     {
+        ui.sizesOneLine = !labelStacked && facet::AvailableWidthClass() != facet::WidthClass::Compact;
         MixedHeightRow row(facet::ControlHeight(facet::ControlSize::Large), RowGap());
         row.Item(facet::ControlHeight(facet::ControlSize::Small));
         facet::Toggle("Small", &ui.sizes[0], {.size = facet::ControlSize::Small});
         ctx.Probe("sel.toggle.small");
+        ui.sizesSmallCenter = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
         row.Item(facet::ControlHeight(facet::ControlSize::Regular));
         facet::Toggle("Regular", &ui.sizes[1]);
         row.Item(facet::ControlHeight(facet::ControlSize::Large));
         facet::Toggle("Large", &ui.sizes[2], {.size = facet::ControlSize::Large});
+        ui.sizesLargeCenter = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
     }
 
     LabeledRow("Full width");
@@ -316,7 +328,7 @@ void CheckboxSection(facet::demo::PageCtx& ctx)
         ctx.Probe("sel.check.reset");
     }
 
-    LabeledRow("Sizes");
+    LabeledRow("Sizes", facet::ControlHeight(facet::ControlSize::Large));
     {
         MixedHeightRow row(facet::ControlHeight(facet::ControlSize::Large), RowGap());
         row.Item(facet::ControlHeight(facet::ControlSize::Small));
@@ -905,6 +917,11 @@ FACET_DEMO_SELFTEST("selection")
     test.ExpectNear("each flip wrote once", [] { return ui.toggleWrites; }, 4.0, 0.0);
     test.Drag({T::Item("sel.toggle.small", 0.75f), T::Item("sel.toggle.small", 1.0f)}, 0.25f);
     test.Expect("dragging the knob to the end turns it on", [] { return ui.sizes[0]; });
+    // The row label is centered on the line of its tallest switch, like the switches themselves.
+    test.Expect("the Sizes label shares the center line of the small and large switches", [] {
+        return !ui.sizesOneLine || (std::fabs(ui.sizesLabelCenter - ui.sizesSmallCenter) <= 1.0f &&
+                                    std::fabs(ui.sizesLabelCenter - ui.sizesLargeCenter) <= 1.0f);
+    });
     test.Click("sel.toggle.disabled");
     test.Click("sel.toggle.readOnly");
     test.Click("sel.toggle.loading");

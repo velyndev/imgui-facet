@@ -658,16 +658,26 @@ void MixedHeightRow::Item(float height)
     ImGui::SetCursorScreenPos(ImVec2(x, top_ + std::max(0.0f, std::round((lineHeight_ - height) * 0.5f))));
 }
 
-void LabeledRow(const char* label)
+// The box the last LabeledRow label is centered in (its column by the line height), for
+// LastLabeledRowBox.
+static ImRect& LastLabelBox()
+{
+    static ImRect box;
+    return box;
+}
+
+void LabeledRow(const char* label, float lineHeight)
 {
     const facet::Theme& theme = facet::T();
     const facet::LabeledRowLayout row = facet::LayoutLabeledRow(ImGui::GetContentRegionAvail().x);
-    const float height = row.stacked ? facet::Px(theme.type[facet::TextStyle::Footnote].size) : ImGui::GetFrameHeight();
+    const float line = lineHeight > 0.0f ? lineHeight : ImGui::GetFrameHeight();
+    const float height = row.stacked ? facet::Px(theme.type[facet::TextStyle::Footnote].size) : line;
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float startX = ImGui::GetCursorPosX();
     ImGui::Dummy(ImVec2(row.stacked ? row.labelWidth : row.controlOffset, height));
     facet::PushTextStyle(facet::TextStyle::Footnote);
     const float y = row.stacked ? pos.y : facet::CenteredTextY(pos.y, height);
+    LastLabelBox() = ImRect(pos, ImVec2(pos.x + row.labelWidth, pos.y + height));
     // Clipped to the label column, so a long label never runs under the control.
     const ImVec2 clipMax(pos.x + row.labelWidth, pos.y + height);
     ImGui::GetWindowDrawList()->PushClipRect(pos, clipMax, true);
@@ -676,6 +686,11 @@ void LabeledRow(const char* label)
     facet::PopTextStyle();
     if (!row.stacked)
         ImGui::SameLine(startX + row.controlOffset, 0.0f);
+}
+
+ImRect LastLabeledRowBox()
+{
+    return LastLabelBox();
 }
 
 void Note(const char* fmt, ...)

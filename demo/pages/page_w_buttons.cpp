@@ -152,7 +152,7 @@ void ButtonSection(facet::demo::PageCtx& ctx)
     }
     ctx.RevealInCapture(0.3f);
 
-    LabeledRow("Sizes");
+    LabeledRow("Sizes", Height(facet::ControlSize::Large));
     {
         MixedHeightRow row(Height(facet::ControlSize::Large));
         row.Item(Height(facet::ControlSize::Small));
@@ -270,7 +270,7 @@ void IconButtonSection(facet::demo::PageCtx& ctx)
         if (facet::IconButton("Delete item", facet::Icon("trash"), {.variant = facet::ButtonVariant::Destructive}))
             Pressed(&ui.iconPresses, "Delete item");
     }
-    LabeledRow("Sizes");
+    LabeledRow("Sizes", Height(facet::ControlSize::Large));
     {
         MixedHeightRow row(Height(facet::ControlSize::Large));
         row.Item(Height(facet::ControlSize::Small));

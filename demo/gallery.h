@@ -78,12 +78,18 @@ void ReadyFamilyNote(const char* family);
 // centered on the item's height, wherever the item's text sits.
 void NoteBeside(const char* fmt, ...) IM_FMTARGS(1);
 // Starts a settings row: `label` in Footnote labelSecondary in the label column of
-// facet::LayoutLabeledRow (the layout tokens), centered on the control height, with the cursor
-// placed after the column for the control (submit the control with a "##" label). When the
+// facet::LayoutLabeledRow (the layout tokens), centered on a line `lineHeight` pixels tall (0: the
+// regular control height), with the cursor placed after the column for the control (submit the
+// control with a "##" label). A row of controls taller than Regular passes the height of its line,
+// the same value its MixedHeightRow takes, so the label lines up with the controls' text. When the
 // content is too narrow for the column and a control, the label goes on its own line above the
 // control. The Foundations and Media pages label their settings this way; the Blocks pages use
 // the row layout block (src/internal/row_layout.h) instead.
-void LabeledRow(const char* label);
+void LabeledRow(const char* label, float lineHeight = 0.0f);
+// The box the last LabeledRow label is centered in (the label column by the height of its line),
+// in screen pixels, so a page can check in its selftest that the label and the controls of its
+// row share one center line.
+ImRect LastLabeledRowBox();
 
 // Prototype controls for the Blocks pages, built only from the interaction blocks in
 // src/internal (item behaviour, focus ring, value drag core, multi-handle model, selection
