@@ -1220,3 +1220,53 @@ TEST_CASE("HexInput with fewer digits masks the value and lowercase shows a to f
     session.KeyPress(ImGuiKey_Enter);
     CHECK(value == 0xC1ABu);
 }
+
+// ---- Every widget at the ends of the scale range -------------------------------------------------
+
+TEST_CASE("Value inputs type, step and click at scale 0.75 and 2")
+{
+    for (const float scale : {0.75f, 2.0f})
+    {
+        CAPTURE(scale);
+        facet::SetUiScale(scale);
+        {
+            facet::test::Session session;
+            REQUIRE(session.Ready());
+            int count = 1;
+            double seconds = 10.0;
+            int stars = 0;
+            facet::Keybind bind;
+            session.SetUi([&] {
+                facet::NumberInput("Count", &count, {.max = 100});
+                session.Track("count");
+                facet::DurationInput("Duration", &seconds);
+                session.Track("duration");
+                facet::Rating("##stars", &stars);
+                session.Track("stars");
+                facet::KeybindCapture("##bind", &bind);
+                session.Track("bind");
+            });
+            session.Frames(2);
+            const ImRect number = session.ItemRect("count");
+            CHECK(number.GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+            session.Click(ImVec2(number.Max.x - number.GetHeight() * 0.5f, number.GetCenter().y));  // +
+            CHECK(count == 2);
+            session.Click(ImVec2(number.GetCenter().x, number.GetCenter().y));
+            session.Type("42");
+            session.KeyPress(ImGuiKey_Enter);
+            CHECK(count == 42);
+            session.Click(session.ItemRect("duration").GetCenter());
+            session.Frame();
+            session.Type("2m");
+            session.KeyPress(ImGuiKey_Enter);
+            CHECK(seconds == 120.0);
+            session.Click(RatingIcon(session.ItemRect("stars"), 1));
+            CHECK(stars == 2);
+            session.Click(PrimarySlot(session.ItemRect("bind")));
+            session.KeyPress(ImGuiKey_F9);
+            session.Frame();
+            CHECK(bind.primary == ImGuiKey_F9);
+        }
+    }
+    facet::SetUiScale(1.0f);
+}
