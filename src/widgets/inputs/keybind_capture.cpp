@@ -335,8 +335,11 @@ bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOption
         ImGui::SetCursorScreenPos(at);
         if (!modeBeside)
             ImGui::SetNextItemWidth(std::max(1.0f, origin.x + width - at.x));
-        if (KeybindModeSelector("##mode", &mode, {.size = options.size, .readOnly = readOnly}) && bind != nullptr &&
-            !readOnly)
+        // Under the widget id, so two captures in one window keep their selectors apart.
+        ImGui::PushOverrideID(id);
+        const bool modeWritten = KeybindModeSelector("##mode", &mode, {.size = options.size, .readOnly = readOnly});
+        ImGui::PopID();
+        if (modeWritten && bind != nullptr && !readOnly)
         {
             bind->mode = mode;
             written = true;
