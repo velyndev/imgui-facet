@@ -635,3 +635,64 @@ TEST_CASE("ColorWell copies and pastes hex text on Ctrl+C and Ctrl+V")
     session.Frames(2);
     CHECK(top == 0);
 }
+
+// ---- ColorModeEditor and SampleAnimatedColor --------------------------------------------------------
+
+TEST_CASE("SampleAnimatedColor pulses, sweeps and cycles, and stands still while motion is reduced")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MotionGuard guard;
+    MotionGuard::Reduce(false);
+    const ImVec4 base(0.2f, 0.4f, 0.8f, 1.0f);
+    const ImVec4 second(0.9f, 0.6f, 0.1f, 1.0f);
+    facet::AnimatedColor pulse{facet::ColorAnimation::Pulse, base, second, 2.0f};
+    CHECK(Near(facet::SampleAnimatedColor(pulse, 0.0), base, 1e-5f));
+    CHECK(Near(facet::SampleAnimatedColor(pulse, 1.0), second, 1e-4f));
+    CHECK(Near(facet::SampleAnimatedColor(pulse, 2.0), base, 1e-5f));
+    facet::AnimatedColor sweep{facet::ColorAnimation::Gradient, base, second, 4.0f};
+    CHECK(Near(facet::SampleAnimatedColor(sweep, 2.0), second, 1e-4f));
+    CHECK(Near(facet::SampleAnimatedColor(sweep, 1.0), facet::Mix(base, second, 0.5f), 1e-4f));
+    facet::AnimatedColor cycle{facet::ColorAnimation::Cycle, base, second, 3.0f};
+    const facet::Oklch start = facet::ToOklch(base);
+    const facet::Oklch half = facet::ToOklch(facet::SampleAnimatedColor(cycle, 1.5));
+    CHECK(half.L == doctest::Approx(start.L).epsilon(0.02));
+    CHECK(std::fabs(std::fmod(half.h - start.h + 360.0f, 360.0f) - 180.0f) < 20.0f);
+    MotionGuard::Reduce(true);
+    CHECK(Same(facet::SampleAnimatedColor(pulse, 1.0), base));
+    CHECK(Same(facet::SampleAnimatedColor(cycle, 1.5), base));
+}
+
+TEST_CASE("ColorModeEditor switches the animation by keys and shows the fields it needs")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::AnimatedColor animated{facet::ColorAnimation::Static, ImVec4(0.2f, 0.4f, 0.8f, 1.0f), ImVec4(1, 1, 1, 1), 2.0f};
+    ImGuiID editor = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        editor = ImGui::GetID("Mode");
+        (void)facet::ColorModeEditor("Mode", &animated);
+        session.Track("editor");
+    });
+    session.Frame();
+    const float staticHeight = session.ItemRect("editor").GetHeight();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(animated.animation == facet::ColorAnimation::Pulse);
+    // Pulse adds the second well and the period field.
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(editor, "##color"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(editor, "##second"));
+    session.KeyPress(ImGuiKey_Tab);
+    char period[64];
+    std::snprintf(period, sizeof(period), "%s##period", facet::GetStrings().period);
+    CHECK(ImGui::GetFocusID() == PartId(editor, period));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(animated.period > 2.0f);
+    CHECK(session.ItemRect("editor").GetHeight() >= staticHeight);
+}
