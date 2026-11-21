@@ -132,11 +132,21 @@ int FormatTick(double value, const TickSet& set, char* buffer, int bufferSize);
 
 // --- Data ------------------------------------------------------------------------------------
 
+// Fills x and y of the sample in storage slot `slot` of a series that is not kept in arrays (a
+// caller's getter) and returns true, or returns false for a gap (missing data).
+using SampleReader = bool (*)(const void* source, int slot, double* x, double* y);
+
 // A series of samples, read in place. With x null, the x of sample i is i. `stride` is the
 // distance in bytes between two samples of x and of y (interleaved data), sizeof(float) for
 // plain arrays. `offset` reads a ring buffer of `count` slots in place: sample i is stored in
 // slot (offset + i) mod count, so a history whose oldest sample sits at the write index is
 // one view, oldest first (offset outside [0, count) is reduced mod count).
+//
+// Two other sources, for the chart widgets: `xd` holds x as doubles (one per slot in a plain
+// array; stride does not apply to it), so a time axis in seconds keeps its precision, and is
+// read instead of `x` when set. `reader` with `source` reads every sample through a function
+// instead of the arrays (x, xd and y are then ignored); a gap reads as NaN y. Every function of
+// this header reads samples through XAt and YAt, in double precision.
 struct SeriesView
 {
     const float* x = nullptr;
@@ -144,9 +154,19 @@ struct SeriesView
     int count = 0;
     int stride = static_cast<int>(sizeof(float));
     int offset = 0;
+    const double* xd = nullptr;
+    SampleReader reader = nullptr;
+    const void* source = nullptr;
 
     float X(int i) const;
     float Y(int i) const;
+    // The x and y of sample i in double precision; y is NaN for a gap of a reader.
+    double XAt(int i) const;
+    double YAt(int i) const;
+    // Both at once (one reader call); returns false when either is NaN.
+    bool Sample(int i, double* outX, double* outY) const;
+    // There are y values to read: y or a reader is set.
+    bool HasY() const { return y != nullptr || reader != nullptr; }
     // The storage slot of sample i (0 <= i < count).
     int Slot(int i) const;
 };
@@ -214,6 +234,24 @@ int DecimatedCapacity(float pixelWidth);
 int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
                      bool sortedByX);
 
+// The same for the samples [begin, end) only (a run between two gaps): the sorted path visits
+// the samples of the run within the x domain (and one on each side), the unsorted path every
+// sample of the run. When `indices` is not empty (at least out.size() long), it receives the
+// sample index of every point written, so a second series of the same x (a stack) can be read
+// at the same samples.
+int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
+                     bool sortedByX, int begin, int end, std::span<int> indices);
+
+// The samples a chart visits for an x domain: all of them, or for a series sorted by x those
+// within [domainMin, domainMax] plus one on each side. Written to *begin and *end.
+void VisibleSampleRange(const SeriesView& series, const Scale& xScale, bool sortedByX, int* begin, int* end);
+
+// The first sample at or after `from` (below `end`) whose x and y are both numbers, or `end`.
+int NextUsableSample(const SeriesView& series, int from, int end);
+// The first sample at or after `from` (below `end`) that is a gap (NaN x or y), or `end`. The
+// samples [NextUsableSample, NextGap) are one run of a line.
+int NextGap(const SeriesView& series, int from, int end);
+
 // --- Drawing ---------------------------------------------------------------------------------
 
 // The plot rectangle moved inward to whole pixels (Min rounded up, Max down). Layout sizes
@@ -229,6 +267,12 @@ void DrawPolyline(ImDrawList* drawList, std::span<const ImVec2> points, ImU32 co
 // The area between a polyline and the horizontal line y = baseline, clipped to `clip`.
 // Segments that cross the baseline are split there, so the fill never folds over itself.
 void DrawArea(ImDrawList* drawList, std::span<const ImVec2> points, float baseline, ImU32 color,
+              const ImRect& clip);
+
+// The band between two polylines of the same length whose points pair up (point i of `top`
+// and of `bottom` belong to the same sample, as in a stacked area), clipped to `clip`. Where the
+// two cross, the quads fold; a stack of values of one sign never crosses.
+void DrawBand(ImDrawList* drawList, std::span<const ImVec2> top, std::span<const ImVec2> bottom, ImU32 color,
               const ImRect& clip);
 
 // Hairline grid lines (draw.h HairlineV / HairlineH, snapped to the pixel grid) at the given

@@ -389,16 +389,58 @@ int SeriesView::Slot(int i) const
 
 float SeriesView::X(int i) const
 {
-    if (x == nullptr)
-        return static_cast<float>(i);
-    const std::ptrdiff_t bytes = static_cast<std::ptrdiff_t>(Slot(i)) * stride;
-    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(x) + bytes);
+    return static_cast<float>(XAt(i));
 }
 
 float SeriesView::Y(int i) const
 {
+    return static_cast<float>(YAt(i));
+}
+
+double SeriesView::XAt(int i) const
+{
+    if (reader != nullptr)
+    {
+        double sx = 0.0, sy = 0.0;
+        return reader(source, Slot(i), &sx, &sy) ? sx : std::numeric_limits<double>::quiet_NaN();
+    }
+    if (xd != nullptr)
+        return xd[Slot(i)];
+    if (x == nullptr)
+        return static_cast<double>(i);
+    const std::ptrdiff_t bytes = static_cast<std::ptrdiff_t>(Slot(i)) * stride;
+    return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(x) + bytes);
+}
+
+double SeriesView::YAt(int i) const
+{
+    if (reader != nullptr)
+    {
+        double sx = 0.0, sy = 0.0;
+        return reader(source, Slot(i), &sx, &sy) ? sy : std::numeric_limits<double>::quiet_NaN();
+    }
     const std::ptrdiff_t bytes = static_cast<std::ptrdiff_t>(Slot(i)) * stride;
     return *reinterpret_cast<const float*>(reinterpret_cast<const char*>(y) + bytes);
+}
+
+bool SeriesView::Sample(int i, double* outX, double* outY) const
+{
+    double sx = 0.0, sy = 0.0;
+    if (reader != nullptr)
+    {
+        if (!reader(source, Slot(i), &sx, &sy))
+            sy = std::numeric_limits<double>::quiet_NaN();
+    }
+    else
+    {
+        sx = XAt(i);
+        sy = y != nullptr ? YAt(i) : std::numeric_limits<double>::quiet_NaN();
+    }
+    if (outX != nullptr)
+        *outX = sx;
+    if (outY != nullptr)
+        *outY = sy;
+    return !std::isnan(sx) && !std::isnan(sy);
 }
 
 namespace
@@ -428,17 +470,17 @@ Range RangeOf(const SeriesView& series, Read read)
 
 Range SeriesRangeX(const SeriesView& series)
 {
-    return RangeOf(series, [&](int i) { return static_cast<double>(series.X(i)); });
+    return RangeOf(series, [&](int i) { return series.XAt(i); });
 }
 
 Range SeriesRangeY(const SeriesView& series, ScaleKind kind)
 {
-    if (series.y == nullptr)
+    if (!series.HasY())
         return {};
     // A logarithmic axis cannot show values at or below 0, so they do not widen its range.
     const bool positiveOnly = kind == ScaleKind::Logarithmic;
     return RangeOf(series, [&](int i) {
-        const double value = series.Y(i);
+        const double value = series.YAt(i);
         return positiveOnly && value <= 0.0 ? std::numeric_limits<double>::quiet_NaN() : value;
     });
 }
@@ -496,14 +538,22 @@ Range NiceRange(Range range, int targetCount, ScaleKind kind)
 
 bool IsSortedByX(const SeriesView& series)
 {
+    if (series.count < 1)
+        return true;
+    // Without x values the index is the x: sorted. A reader always counts as having x values.
+    if (series.x == nullptr && series.xd == nullptr && series.reader == nullptr)
+        return true;
+    double previous = series.XAt(0);
+    if (std::isnan(previous))
+        return false;
     for (int i = 1; i < series.count; ++i)
     {
-        const float a = series.X(i - 1);
-        const float b = series.X(i);
-        if (std::isnan(a) || std::isnan(b) || b < a)
+        const double next = series.XAt(i);
+        if (std::isnan(next) || next < previous)
             return false;
+        previous = next;
     }
-    return series.count < 1 || !std::isnan(series.X(0));
+    return true;
 }
 
 namespace
@@ -511,7 +561,9 @@ namespace
 
 bool Usable(const SeriesView& series, int i)
 {
-    return !std::isnan(series.X(i)) && (series.y == nullptr || !std::isnan(series.Y(i)));
+    if (!series.HasY())
+        return !std::isnan(series.XAt(i));
+    return series.Sample(i, nullptr, nullptr);
 }
 
 // First index whose x is not below `x` (a sorted series), in [0, count].
@@ -522,7 +574,7 @@ int LowerBoundX(const SeriesView& series, double x)
     while (lo < hi)
     {
         const int mid = lo + (hi - lo) / 2;
-        if (static_cast<double>(series.X(mid)) < x)
+        if (series.XAt(mid) < x)
             lo = mid + 1;
         else
             hi = mid;
@@ -538,7 +590,7 @@ int UpperBoundX(const SeriesView& series, double x)
     while (lo < hi)
     {
         const int mid = lo + (hi - lo) / 2;
-        if (static_cast<double>(series.X(mid)) <= x)
+        if (series.XAt(mid) <= x)
             lo = mid + 1;
         else
             hi = mid;
@@ -562,14 +614,14 @@ int NearestSampleByX(const SeriesView& series, double x, bool sortedByX)
         while (right < series.count && !Usable(series, right))
             ++right;
         // Among samples with the same x the lowest index wins, as in the scan.
-        while (left > 0 && series.X(left - 1) == series.X(left) && Usable(series, left - 1))
+        while (left > 0 && series.XAt(left - 1) == series.XAt(left) && Usable(series, left - 1))
             --left;
         if (left < 0)
             return right < series.count ? right : -1;
         if (right >= series.count)
             return left;
-        const double toLeft = x - static_cast<double>(series.X(left));
-        const double toRight = static_cast<double>(series.X(right)) - x;
+        const double toLeft = x - series.XAt(left);
+        const double toRight = series.XAt(right) - x;
         return toLeft <= toRight ? left : right;
     }
     int best = -1;
@@ -578,7 +630,7 @@ int NearestSampleByX(const SeriesView& series, double x, bool sortedByX)
     {
         if (!Usable(series, i))
             continue;
-        const double distance = std::fabs(static_cast<double>(series.X(i)) - x);
+        const double distance = std::fabs(series.XAt(i) - x);
         if (distance < bestDistance)
         {
             bestDistance = distance;
@@ -592,15 +644,14 @@ Crosshair HoverCrosshair(const SeriesView& series, const Scale& xScale, const Sc
                          const ImRect& plot, bool sortedByX)
 {
     Crosshair crosshair;
-    if (series.count <= 0 || series.y == nullptr || !plot.Contains(mouse))
+    if (series.count <= 0 || !series.HasY() || !plot.Contains(mouse))
         return crosshair;
     const int index = NearestSampleByX(series, xScale.FromPixel(mouse.x), sortedByX);
     if (index < 0)
         return crosshair;
     crosshair.visible = true;
     crosshair.index = index;
-    crosshair.valueX = series.X(index);
-    crosshair.valueY = series.Y(index);
+    series.Sample(index, &crosshair.valueX, &crosshair.valueY);
     crosshair.point = ImVec2(xScale.ToPixel(crosshair.valueX), yScale.ToPixel(crosshair.valueY));
     crosshair.lineX = std::floor(crosshair.point.x);
     return crosshair;
@@ -622,53 +673,65 @@ namespace
 // and last sample, in sample order. Returns the points written; `overflow` tells whether
 // `out` was too small (then the points written cover the series only up to there).
 int MergeColumnRuns(const SeriesView& series, const Scale& xScale, const Scale& yScale, int begin, int end,
-                    float origin, float columnWidth, std::span<ImVec2> out, bool& overflow)
+                    float origin, float columnWidth, std::span<ImVec2> out, std::span<int> indices, bool& overflow)
 {
     const int capacity = static_cast<int>(out.size());
+    const bool writeIndices = indices.size() >= out.size();
     int written = 0;
     overflow = false;
-    const auto point = [&](int i) { return ImVec2(xScale.ToPixel(series.X(i)), yScale.ToPixel(series.Y(i))); };
 
+    // One kept sample: its index and its point in pixels.
+    struct Kept
+    {
+        int index = 0;
+        double y = 0.0;
+        ImVec2 point;
+    };
     // The current column: its first, last, lowest and highest sample.
     bool open = false;
     float column = 0.0f;
-    int first = 0, last = 0, low = 0, high = 0;
+    Kept first, last, low, high;
     const auto flush = [&]() {
-        int order[4] = {first, low, high, last};
-        std::sort(order + 1, order + 3);  // the lowest and highest in sample order, between the ends
+        const Kept* order[4] = {&first, &low, &high, &last};
+        if (order[2]->index < order[1]->index)
+            std::swap(order[1], order[2]);  // the lowest and highest in sample order, between the ends
         int previous = -1;
-        for (const int index : order)
+        for (const Kept* kept : order)
         {
-            if (index == previous)
+            if (kept->index == previous)
                 continue;
             if (written >= capacity)
             {
                 overflow = true;
                 return;
             }
-            out[static_cast<std::size_t>(written++)] = point(index);
-            previous = index;
+            if (writeIndices)
+                indices[static_cast<std::size_t>(written)] = kept->index;
+            out[static_cast<std::size_t>(written++)] = kept->point;
+            previous = kept->index;
         }
     };
     for (int i = begin; i < end && !overflow; ++i)
     {
-        if (!Usable(series, i))
+        double sx = 0.0, sy = 0.0;
+        if (!series.Sample(i, &sx, &sy))
             continue;
-        const float c = std::floor((xScale.ToPixel(series.X(i)) - origin) / columnWidth);
+        const Kept sample{i, sy, ImVec2(xScale.ToPixel(sx), yScale.ToPixel(sy))};
+        const float c = std::floor((sample.point.x - origin) / columnWidth);
         if (!open || c != column)
         {
             if (open)
                 flush();
             open = true;
             column = c;
-            first = last = low = high = i;
+            first = last = low = high = sample;
             continue;
         }
-        last = i;
-        if (series.Y(i) < series.Y(low))
-            low = i;
-        if (series.Y(i) > series.Y(high))
-            high = i;
+        last = sample;
+        if (sy < low.y)
+            low = sample;
+        if (sy > high.y)
+            high = sample;
     }
     if (open && !overflow)
         flush();
@@ -677,22 +740,65 @@ int MergeColumnRuns(const SeriesView& series, const Scale& xScale, const Scale& 
 
 } // namespace
 
+void VisibleSampleRange(const SeriesView& series, const Scale& xScale, bool sortedByX, int* begin, int* end)
+{
+    int first = 0;
+    int past = std::max(series.count, 0);
+    if (sortedByX && past > 0)
+    {
+        const double domainLo = std::min(xScale.domainMin, xScale.domainMax);
+        const double domainHi = std::max(xScale.domainMin, xScale.domainMax);
+        first = std::max(0, LowerBoundX(series, domainLo) - 1);
+        past = std::min(series.count, UpperBoundX(series, domainHi) + 1);
+    }
+    if (begin != nullptr)
+        *begin = first;
+    if (end != nullptr)
+        *end = std::max(first, past);
+}
+
+int NextUsableSample(const SeriesView& series, int from, int end)
+{
+    end = std::min(end, series.count);
+    int i = std::max(from, 0);
+    while (i < end && !Usable(series, i))
+        ++i;
+    return std::min(i, std::max(end, 0));
+}
+
+int NextGap(const SeriesView& series, int from, int end)
+{
+    end = std::min(end, series.count);
+    int i = std::max(from, 0);
+    while (i < end && Usable(series, i))
+        ++i;
+    return std::min(i, std::max(end, 0));
+}
+
 int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
                      bool sortedByX)
 {
-    if (series.count <= 0 || series.y == nullptr || out.empty())
+    return DecimatePolyline(series, xScale, yScale, out, sortedByX, 0, series.count, {});
+}
+
+int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale& yScale, std::span<ImVec2> out,
+                     bool sortedByX, int begin, int end, std::span<int> indices)
+{
+    begin = std::max(begin, 0);
+    end = std::min(end, series.count);
+    if (series.count <= 0 || !series.HasY() || out.empty() || begin >= end)
         return 0;
 
     if (sortedByX)
     {
         // Only the samples inside the x domain, plus one on each side so lines enter the plot.
         // They span at most the plot's columns plus two, which DecimatedCapacity holds.
-        const double domainLo = std::min(xScale.domainMin, xScale.domainMax);
-        const double domainHi = std::max(xScale.domainMin, xScale.domainMax);
-        const int begin = std::max(0, LowerBoundX(series, domainLo) - 1);
-        const int end = std::min(series.count, UpperBoundX(series, domainHi) + 1);
+        int first = 0, past = 0;
+        VisibleSampleRange(series, xScale, true, &first, &past);
+        first = std::max(first, begin);
+        past = std::min(past, end);
         bool overflow = false;
-        return MergeColumnRuns(series, xScale, yScale, begin, end, 0.0f, 1.0f, out, overflow);
+        return MergeColumnRuns(series, xScale, yScale, first, past, 0.0f, 1.0f, out, indices, overflow);
     }
 
     // Unsorted (a parametric curve, a curve that turns back): every sample is visited. Runs in
@@ -701,9 +807,9 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
     // polyline always spans the whole series once `out` holds four points.
     float lo = 0.0f, hi = 0.0f;
     bool any = false;
-    for (int i = 0; i < series.count; ++i)
+    for (int i = begin; i < end; ++i)
     {
-        const float x = Usable(series, i) ? xScale.ToPixel(series.X(i)) : NAN;
+        const float x = Usable(series, i) ? xScale.ToPixel(series.XAt(i)) : NAN;
         if (!std::isfinite(x))
             continue;
         lo = any ? std::min(lo, x) : x;
@@ -718,8 +824,8 @@ int DecimatePolyline(const SeriesView& series, const Scale& xScale, const Scale&
     {
         const bool last = width > span;
         bool overflow = false;
-        written = MergeColumnRuns(series, xScale, yScale, 0, series.count, lo, last ? 2.0f * span + 1.0f : width,
-                                  out, overflow);
+        written = MergeColumnRuns(series, xScale, yScale, begin, end, lo, last ? 2.0f * span + 1.0f : width, out,
+                                  indices, overflow);
         if (!overflow || last)
             return written;
     }
@@ -786,6 +892,30 @@ void DrawArea(ImDrawList* drawList, std::span<const ImVec2> points, float baseli
         }
         triangle(a, b, bBase);
         triangle(a, bBase, aBase);
+    }
+    drawList->PopClipRect();
+}
+
+void DrawBand(ImDrawList* drawList, std::span<const ImVec2> top, std::span<const ImVec2> bottom, ImU32 color,
+              const ImRect& clip)
+{
+    const int count = static_cast<int>(std::min(top.size(), bottom.size()));
+    if (drawList == nullptr || count < 2)
+        return;
+    drawList->PushClipRect(clip.Min, clip.Max, true);
+    const ImVec2 uv = drawList->_Data->TexUvWhitePixel;
+    for (int i = 0; i + 1 < count; ++i)
+    {
+        const std::size_t a = static_cast<std::size_t>(i);
+        drawList->PrimReserve(6, 4);
+        const ImDrawIdx base = static_cast<ImDrawIdx>(drawList->_VtxCurrentIdx);
+        drawList->PrimWriteVtx(top[a], uv, color);
+        drawList->PrimWriteVtx(top[a + 1], uv, color);
+        drawList->PrimWriteVtx(bottom[a + 1], uv, color);
+        drawList->PrimWriteVtx(bottom[a], uv, color);
+        const ImDrawIdx quad[6] = {0, 1, 2, 0, 2, 3};
+        for (const ImDrawIdx corner : quad)
+            drawList->PrimWriteIdx(static_cast<ImDrawIdx>(base + corner));
     }
     drawList->PopClipRect();
 }
