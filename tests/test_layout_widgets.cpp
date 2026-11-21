@@ -7,6 +7,7 @@
 
 #include <cfloat>
 #include <cmath>
+#include <cstdio>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -15,6 +16,7 @@
 #include <facet/facet.h>
 
 #include "internal/row_layout.h"
+#include "internal/state_storage.h"
 #include "widgets/layout/layout_internal.h"
 #include "support/session.h"
 #include "support/structure_stub_check.h"
@@ -613,4 +615,136 @@ TEST_CASE("A separator text is one footnote line, cut to the width, and takes no
     session.KeyPress(ImGuiKey_Tab);
     session.KeyPress(ImGuiKey_Tab);
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+// ---- DependentGroup -----------------------------------------------------------------------------
+
+namespace
+{
+
+// A parent toggle, a dependent group with a button, and a button after it.
+struct DependentUi
+{
+    bool parent = false;
+    facet::DependentGroupOptions options;
+    bool shown = false;
+    int presses = 0;
+
+    void Ui(facet::test::Session& session)
+    {
+        facet::Toggle("Parent", &parent);
+        session.Track("parent");
+        shown = facet::BeginDependentGroup("group", parent, options);
+        if (shown)
+        {
+            if (facet::Button("Child"))
+                ++presses;
+            session.Track("child");
+            facet::EndDependentGroup();
+        }
+        facet::Button("After");
+        session.Track("after");
+    }
+};
+
+} // namespace
+
+TEST_CASE("A dependent group indents its content and disables it while the parent is off")
+{
+    ReducedMotion motion;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DependentUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    REQUIRE(ui.shown);
+    const float indent = facet::Px(facet::T().spacing.lg);
+    CHECK(session.ItemRect("child").Min.x - session.ItemRect("parent").Min.x == doctest::Approx(indent));
+    session.Click(session.ItemCenter("child"));
+    CHECK(ui.presses == 0);
+    // The keyboard goes from the parent straight past the disabled content.
+    session.Click(session.ItemCenter("parent"));
+    REQUIRE(ui.parent);
+    session.Click(session.ItemCenter("parent"));
+    REQUIRE_FALSE(ui.parent);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+    // On: the content takes the mouse and the keyboard.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Space);
+    REQUIRE(ui.parent);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("child"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.presses == 1);
+    // Without indent the content starts with the parent.
+    ui.options.indent = false;
+    session.Frames(2);
+    CHECK(session.ItemRect("child").Min.x == doctest::Approx(session.ItemRect("parent").Min.x));
+}
+
+TEST_CASE("A dependent group in Hide mode collapses with an animated height and then skips its content")
+{
+    ThemeGuard guard;
+    facet::Theme theme = facet::T();
+    theme.motion.reduceMotion = false;
+    theme.motion.scale = 1.0f;
+    facet::SetTheme(theme, false);
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DependentUi ui;
+    ui.parent = true;
+    ui.options.mode = facet::DependentMode::Hide;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(30);
+    REQUIRE(ui.shown);
+    const float open = session.ItemRect("after").Min.y;
+    ui.parent = false;
+    session.Frames(2);
+    // On the way: still submitted, and "After" moves up.
+    CHECK(ui.shown);
+    const float closing = session.ItemRect("after").Min.y;
+    CHECK(closing < open);
+    session.Frames(60);
+    CHECK_FALSE(ui.shown);
+    CHECK(session.ItemRect("after").Min.y < closing);
+    // Back on: it opens again.
+    ui.parent = true;
+    session.Frames(60);
+    CHECK(ui.shown);
+    CHECK(session.ItemRect("after").Min.y == doctest::Approx(open));
+}
+
+TEST_CASE("Dependent groups leave every stack balanced, nested, disabled and outside a frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    const int errorsBefore = fi::UsageErrorCount();
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            if (facet::BeginDependentGroup("outer", false))
+            {
+                if (facet::BeginDependentGroup("inner", true, {.mode = facet::DependentMode::Hide}))
+                {
+                    facet::BeginSettingsRow("Row");
+                    ImGui::Button("##value");
+                    facet::EndSettingsRow();
+                    facet::EndDependentGroup();
+                }
+                facet::EndDependentGroup();
+            }
+        });
+        CHECK_BALANCED({
+            facet::DependentGroupScope group("scoped", true, {.indent = false});
+            ImGui::TextUnformatted("content");
+        });
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginDependentGroup("hidden", false, {.mode = facet::DependentMode::Hide})));
+    });
+    session.Frames(2);
+    CHECK(fi::UsageErrorCount() == errorsBefore);
+    CHECK(fi::OpenScopeCount() == 0);
+    CHECK_FALSE(facet::BeginDependentGroup("outside", true));
+    CHECK(fi::OpenScopeCount() == 0);
 }

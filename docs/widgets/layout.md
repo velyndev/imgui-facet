@@ -194,15 +194,30 @@ Status: ready.
 
 ### BeginDependentGroup
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginDependentGroup(const char* id, bool enabled, const DependentGroupOptions& options = {});
 void EndDependentGroup();
 class DependentGroupScope;
 ```
 
-Settings that are disabled or collapse while their parent setting is off.
+Settings that only apply while a parent setting is on; `enabled` is the parent's state.
+
+- With `indent` (the default) the content is indented by `spacing.lg`, and a hairline in `separator`
+  runs down the middle of the indent along the content, so the rows read as belonging to the setting
+  above.
+- While `enabled` is false the content is disabled through `ImGui::BeginDisabled`: Facet widgets
+  draw their disabled look and show the not-allowed cursor, and disabled items are no Tab stops, so
+  the keyboard goes from the parent straight to the first item after the group. Settings rows inside
+  draw their labels in `labelTertiary` too.
+- `DependentMode::Disable` (the default) keeps the content visible and always returns true.
+  `DependentMode::Hide` also collapses it: the collapse region of the containers family animates its
+  height to 0 over `motion.durationStandard` (at once with reduced motion), clips the content
+  meanwhile and keeps the closing items out of the keyboard focus; once closed, Begin returns false.
+  Turning the parent on opens it the same way. The animated height is kept under the id.
+- `EndDependentGroup` only after true. Groups nest (a dependent group inside a dependent group), and
+  rows, stacks and any other content work inside. Outside a frame Begin returns false.
+
+Status: ready.
 
 ### Separator, SeparatorText
 

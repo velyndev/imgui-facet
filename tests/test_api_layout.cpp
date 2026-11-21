@@ -69,12 +69,6 @@ void CallLayoutStubs(Values& v)
         facet::EndListDetail();
     });
     CHECK_BALANCED({
-        const bool open = facet::BeginDependentGroup("Dependent", false);
-        CHECK(open);
-        if (open)
-            facet::EndDependentGroup();
-    });
-    CHECK_BALANCED({
         const bool open = facet::BeginItemGrid("Items", 50, &selection);
         CHECK(open);
         if (open)
