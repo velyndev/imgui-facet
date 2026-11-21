@@ -2206,6 +2206,34 @@ TEST_CASE("Mini windows leave every stack as they found it")
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK_FALSE(facet::BeginMiniWindow("outside a frame", &pinned));
 }
+
+TEST_CASE("An overlay menu shown in an ended session does not show mini windows in the next")
+{
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        bool visible = true;
+        session.SetUi([&] {
+            if (facet::BeginOverlay("leaked", &visible))
+                facet::EndOverlay();
+        });
+        session.Frames(4);
+    }
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int shown = 0;
+    session.SetUi([&] {
+        // No overlay in this session: an unpinned mini window stays hidden in every frame,
+        // also in those whose numbers match the frames of the session before.
+        if (facet::BeginMiniWindow("After###leaked", nullptr))
+        {
+            ++shown;
+            facet::EndMiniWindow();
+        }
+    });
+    session.Frames(8);
+    CHECK(shown == 0);
+}
 // ---- Inspector pane -----------------------------------------------------------------------------
 
 namespace

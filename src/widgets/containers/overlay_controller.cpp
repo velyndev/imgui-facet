@@ -277,6 +277,12 @@ bool OverlayMenuShown()
     return false;
 }
 
+void ResetOverlayRecords()
+{
+    OverlayRecords() = OverlayFrames{};
+    Overlays() = OverlayStack{};
+}
+
 void RotateOverlayRegions()
 {
     OverlayFrames& frames = OverlayRecords();

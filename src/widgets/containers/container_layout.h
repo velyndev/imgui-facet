@@ -187,6 +187,9 @@ void AddOverlayInputRegion(ImGuiWindow* window);
 bool OverlayMenuShown();
 // facet::EndFrame: this frame's regions become the last frame's.
 void RotateOverlayRegions();
+// facet::Shutdown: forgets the overlay records, whose frame numbers belong to the context that
+// ends, so a later context (whose frame count starts again) never sees an old menu as shown.
+void ResetOverlayRecords();
 
 // ---- Frame end ----------------------------------------------------------------------------------
 
