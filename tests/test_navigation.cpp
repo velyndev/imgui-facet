@@ -965,3 +965,43 @@ TEST_CASE("Pagination takes the compact form when asked or when the row does not
     CHECK(page == 4);
 }
 
+// --- Steps ------------------------------------------------------------------------------------
+
+TEST_CASE("Done steps of a step indicator activate and write; the current and open steps do not")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ChoiceItem kSteps[] = {{"One"}, {.label = "Two", .disabled = true}, {"Three"}, {"Four"}};
+    int current = 2;
+    ImGuiID steps = 0;
+    session.SetUi([&] {
+        steps = ImGui::GetID("steps");
+        facet::StepIndicator("steps", &current, kSteps);
+    });
+    session.Frame();
+    session.Click(Center(NavigationPartRect(steps, 3)));
+    CHECK(current == 2);
+    session.Click(Center(NavigationPartRect(steps, 1)));  // done but disabled
+    CHECK(current == 2);
+    session.Click(Center(NavigationPartRect(steps, 0)));
+    CHECK(current == 0);
+}
+
+TEST_CASE("A horizontal step indicator turns vertical in a Compact width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kSteps[] = {"One", "Two", "Three"};
+    float width = 600.0f;
+    ImGuiID steps = 0;
+    session.SetUi([&] {
+        steps = ImGui::GetID("steps");
+        facet::StepIndicator("steps", 1, kSteps, {.width = width});
+    });
+    session.Frame();
+    CHECK(NavigationPartRect(steps, 1).Min.y == doctest::Approx(NavigationPartRect(steps, 0).Min.y));
+    width = 200.0f;
+    session.Frame();
+    CHECK(NavigationPartRect(steps, 1).Min.y > NavigationPartRect(steps, 0).Max.y);
+}
+
