@@ -124,7 +124,17 @@ the pause button is gone too). `captions` puts the item label on an elevated chi
 bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, const ImageViewerOptions& options = {});
 ```
 
-Zoom and pan viewport with fit and 100 percent, optional minimap. Status: planned.
+A viewport of the available width and height. Zoom 0 fits the image; otherwise `zoom` is design
+units per image pixel within the limits: never below fit or 100 percent, whichever is smaller,
+and never above `maxZoom`. The wheel zooms around the pointer, a sideways or Shift+wheel pans, a
+drag pans and a released pan glides on and slows over `drag.inertiaTime` (not with reduced motion),
+and a double click toggles between fit and 100 percent around the pointer. With keyboard focus, +
+and - zoom around the middle, the arrows pan, 0 fits and 1 shows 100 percent. The pan is clamped so
+the image always covers the viewport where it is larger, and stays centered where it is smaller.
+`checkerboard` draws `colors.checker` behind the image; `minimap` shows an overview with the
+visible region while the image is larger than the viewport. Loading and failed images show the
+skeleton and the failed marker. Zoomed in, the texture is sampled by the host's sampler (usually
+linear), so single pixels are not drawn as hard squares. Status: ready.
 
 ### ImageCompare
 

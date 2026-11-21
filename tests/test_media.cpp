@@ -617,3 +617,107 @@ TEST_CASE("Carousel autoplay advances, pauses while hovered and with its button,
     CHECK(index == 1);
     facet::SetFollowSystemMotion(true);
 }
+
+// ---- ImageViewer -------------------------------------------------------------------------------
+
+TEST_CASE("An image viewer zooms around the pointer within its limits and fits again with 0")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ImageHandle image = MakeImage(200, 100);
+    facet::ImageViewerState view;
+    session.SetUi([&] {
+        facet::ImageViewer("viewer", image, &view, {.maxZoom = 4.0f, .width = 200.0f, .height = 200.0f});
+        session.Track("viewer");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("viewer");
+    const float unit = facet::Px(1.0f);
+    // Fit: 200 by 100 in a 200-unit square viewport.
+    CHECK(view.zoom == 0.0f);
+    // The wheel zooms in around the pointer: the image point under it stays put.
+    const ImVec2 pointer = At(r, 0.75f, 0.5f);
+    const float fit = r.GetWidth() / 200.0f;
+    const ImVec2 before(100.0f + (pointer.x - r.GetCenter().x) / fit, 50.0f);
+    session.MouseMove(pointer);
+    session.Wheel(pointer, 1.0f);
+    session.Wheel(pointer, 1.0f);
+    REQUIRE(view.zoom > 0.0f);
+    const float scale = view.zoom * unit;
+    const float after = view.center.x + (pointer.x - r.GetCenter().x) / scale;
+    CHECK(after == doctest::Approx(before.x).epsilon(0.01));
+    // The closest zoom is maxZoom.
+    for (int i = 0; i < 20; ++i)
+        session.Wheel(pointer, 1.0f);
+    CHECK(view.zoom == doctest::Approx(4.0f));
+    // Zooming out stops at fit (or 100 percent when that is smaller).
+    for (int i = 0; i < 40; ++i)
+        session.Wheel(pointer, -1.0f);
+    CHECK(view.zoom * unit == doctest::Approx(std::min(fit, unit)));
+    // Keys: 1 shows 100 percent, + and - zoom, 0 fits.
+    session.Click(r.GetCenter());
+    session.KeyPress(ImGuiKey_1);
+    CHECK(view.zoom == doctest::Approx(1.0f));
+    session.KeyPress(ImGuiKey_Equal);
+    CHECK(view.zoom == doctest::Approx(1.25f));
+    session.KeyPress(ImGuiKey_Minus);
+    CHECK(view.zoom == doctest::Approx(1.0f));
+    session.KeyPress(ImGuiKey_0);
+    CHECK(view.zoom == 0.0f);
+    facet::ReleaseImage(image);
+}
+
+TEST_CASE("An image viewer pans with the arrows and a drag, clamped so the image never leaves the viewport")
+{
+    ReducedMotion reduced;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ImageHandle image = MakeImage(400, 400);
+    facet::ImageViewerState view{.zoom = 1.0f, .center = ImVec2(200.0f, 200.0f)};
+    session.SetUi([&] {
+        facet::ImageViewer("viewer", image, &view, {.width = 100.0f, .height = 100.0f});
+        session.Track("viewer");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("viewer");
+    const float unit = facet::Px(1.0f);
+    const float half = r.GetWidth() * 0.5f / unit;
+    session.Click(r.GetCenter());
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(view.center.x > 200.0f);
+    session.KeyPress(ImGuiKey_End);  // not a viewer key: nothing
+    for (int i = 0; i < 40; ++i)
+        session.KeyPress(ImGuiKey_LeftArrow);
+    CHECK(view.center.x == doctest::Approx(half));
+    // A drag to the left moves the image left, so the view's center moves right.
+    session.Drag({r.GetCenter(), ImVec2(r.GetCenter().x - 30.0f, r.GetCenter().y)}, 6);
+    CHECK(view.center.x == doctest::Approx(half + 30.0f / unit).epsilon(0.05));
+    // A double click toggles to fit, and again to 100 percent.
+    session.Seconds(0.6f);  // so the next clicks start a new count
+    session.DoubleClick(r.GetCenter());
+    CHECK(view.zoom == 0.0f);
+    session.Seconds(0.6f);
+    session.DoubleClick(r.GetCenter());
+    CHECK(view.zoom == doctest::Approx(1.0f));
+    facet::ReleaseImage(image);
+}
+
+TEST_CASE("An image viewer without a ready image writes no view")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::ImageViewerState view;
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::ImageViewer("viewer", facet::ImageHandle{}, &view, {.height = 100.0f}))
+            ++writes;
+        session.Track("viewer");
+    });
+    session.Frame();
+    session.Wheel(session.ItemCenter("viewer"), 1.0f);
+    session.Wheel(session.ItemCenter("viewer"), 1.0f);
+    session.Click(session.ItemCenter("viewer"));
+    session.KeyPress(ImGuiKey_1);
+    CHECK(writes == 0);
+    CHECK(view.zoom == 0.0f);
+}
