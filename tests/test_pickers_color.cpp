@@ -250,3 +250,84 @@ TEST_CASE("SatValSquare: a click puts the handle under the pointer and Escape re
     CHECK(Same(color, before));
     CHECK(canceled);
 }
+
+// ---- ColorChannelSlider ---------------------------------------------------------------------------
+
+TEST_CASE("ColorChannelSlider writes only its channel and steps with the slider keys")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.2f, 0.4f, 0.8f, 0.5f);
+    session.SetUi([&] {
+        (void)facet::ColorChannelSlider("Red", &color, {.channel = facet::ColorChannel::Red});
+        session.Track("red");
+        (void)facet::ColorChannelSlider("Alpha", &color, {.channel = facet::ColorChannel::Alpha});
+        session.Track("alpha");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("red"));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(color.x == 0.0f);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(color.x == doctest::Approx(0.01f));
+    session.KeyPress(ImGuiKey_End);
+    CHECK(color.x == 1.0f);
+    CHECK(color.y == 0.4f);
+    CHECK(color.z == 0.8f);
+    CHECK(color.w == 0.5f);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("alpha"));
+    session.KeyPress(ImGuiKey_PageUp);
+    CHECK(color.w == doctest::Approx(0.6f));
+    CHECK(color.x == 1.0f);
+}
+
+TEST_CASE("ColorChannelSlider wraps the hue and keeps it while the saturation passes through zero")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color = facet::internal::ColorFromHsv({0.995, 0.8, 0.9}, 1.0f);
+    session.SetUi([&] {
+        (void)facet::ColorChannelSlider("Hue", &color, {.channel = facet::ColorChannel::Hue});
+        session.Track("hue");
+        (void)facet::ColorChannelSlider("Saturation", &color, {.channel = facet::ColorChannel::Saturation});
+        session.Track("saturation");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("hue"));
+    // The hue was moved to the click; step from the end over the wrap.
+    session.KeyPress(ImGuiKey_End);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(facet::internal::ColorToHsv(color).h == doctest::Approx(0.01).epsilon(1e-3));
+    const double hue = facet::internal::ColorToHsv(color).h;
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("saturation"));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(facet::internal::ColorToHsv(color).s == 0.0);
+    session.KeyPress(ImGuiKey_End);
+    const ColorHsv back = facet::internal::ColorToHsv(color);
+    CHECK(back.s == doctest::Approx(1.0));
+    CHECK(back.h == doctest::Approx(hue).epsilon(1e-4));
+}
+
+TEST_CASE("A read-only or disabled ColorChannelSlider never writes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImVec4 start(0.2f, 0.4f, 0.8f, 1.0f);
+    ImVec4 readOnly = start, disabled = start;
+    session.SetUi([&] {
+        (void)facet::ColorChannelSlider("Read-only", &readOnly, {.channel = facet::ColorChannel::Green, .readOnly = true});
+        session.Track("readOnly");
+        ImGui::BeginDisabled();
+        (void)facet::ColorChannelSlider("Disabled", &disabled, {.channel = facet::ColorChannel::Green});
+        session.Track("disabled");
+        ImGui::EndDisabled();
+    });
+    session.Frame();
+    session.Click(ImVec2(session.ItemRect("readOnly").Max.x - 4.0f, session.ItemRect("readOnly").GetCenter().y));
+    session.KeyPress(ImGuiKey_End);
+    session.Click(ImVec2(session.ItemRect("disabled").Max.x - 4.0f, session.ItemRect("disabled").GetCenter().y));
+    CHECK(Same(readOnly, start));
+    CHECK(Same(disabled, start));
+}
