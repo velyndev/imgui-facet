@@ -39,7 +39,8 @@
 // Levels opened through this header take part on their own; layers that are not levels (a
 // shell) claim Escape with ClaimEscape. Facet reads Escape through key ownership, so this works
 // without ImGuiConfigFlags_NavEnableKeyboard. Tooltip levels are not part of the order; a Panel
-// level takes part only through the ClaimEscape of its widget (EscapeLayer::Shell).
+// level with closeOnEscape takes its place right above the Popup and Modal levels that were open
+// when it opened (the newest panel first).
 //
 // The context menu keys: a right click on the target, the Menu key or Shift+F10 while the target
 // has keyboard focus ask for its context menu (ContextMenuRequested). The keys are read through
@@ -91,11 +92,15 @@ enum class PopupKind
               // outside does not close it (the widget decides what a click on the scrim does)
     Tooltip,  // tooltips: no focus, no input, never part of the Escape order
     // Panels: a floating layer outside Dear ImGui's popup stack that takes input and focus like a
-    // window, and that neither a click outside nor Escape closes (non-modal drawers, popovers that
-    // are not dismissible). The widget closes it; Escape reaches it through ClaimEscape. When it
-    // closes while the keyboard focus is inside it, the focus goes back to the window (and its
-    // item) that had it when the panel opened. It stays in front of the window it was opened from,
-    // also after a click there, and behind the popups that are open.
+    // window and blocks nothing around it: the page under and beside it stays hoverable and
+    // clickable (popovers, non-modal drawers). With closeOnEscape, Escape closes it before the
+    // popup levels that were open when it opened, and after the popup levels opened since (a list
+    // opened from its content). With closeOnClickOutside, a press of any mouse button outside it,
+    // outside its anchor rect and outside the popup levels opened since closes it, and the press
+    // still reaches what is under the pointer. When it closes by Escape or ClosePopupLevel while the
+    // keyboard focus is inside it, the focus goes back to the window (and its item) that had it when
+    // the panel opened. It stays in front of the window it was opened from, also after a click there,
+    // and behind the popups that are open.
     Panel,
 };
 
@@ -117,10 +122,11 @@ struct PopupOptions
     bool slideIn = false;              // the open and close motion slides the whole level in from `slideEdge`
                                        // instead of growing from the anchor side (drawers)
     PopupSide slideEdge = PopupSide::After;  // the display edge a sliding level comes from
-    ImDrawFlags corners = 0;           // which surface corners are rounded (ImDrawFlags_RoundCorners*); 0 for all
+    ImDrawFlags corners = 0;           // which surface corners are rounded (ImDrawFlags_Round*); 0 for all
     bool interactive = false;          // Tooltip: takes the mouse, so its content can be clicked (no focus, no keys)
     float radius = -1.0f;              // pixels of the surface corners; < 0 for the kind's default
     int elevation = 0;                 // shadow and surface level 1 to 3; 0 for the kind's default
+    bool closeOnClickOutside = false;  // Panel: a press outside closes it (see PopupKind::Panel)
 };
 
 // Opens level `id` at `anchor`. Opened while another Popup level is being submitted, it becomes
@@ -253,6 +259,11 @@ bool ContextMenuRequested(ContextRequestTarget target, ImVec2* at);
 // it every frame cannot bring back a level that a click outside closed.
 void SetPopupLevelAnchor(ImGuiID id, const PopupAnchor& anchor);
 
+// Changes the size (pixels per axis, 0 fits the content) and the fixed rect (empty for none) of an
+// open level from this frame on, for content measured by its widget (a dialog whose content
+// scrolls) and drawers resized by their edge. Does nothing for a level that is not open.
+void SetPopupLevelLayout(ImGuiID id, ImVec2 size, const ImRect& placeRect);
+
 // Closes the chain `id` belongs to: from the outermost Popup level below it that is not under a
 // Modal (or the root) up, so a menu row that ran its action closes the whole menu. Inside a Modal
 // it closes the levels above the Modal only.
@@ -267,7 +278,9 @@ ImRect PopupLevelRect(ImGuiID id);
 PopupSide PopupLevelSide(ImGuiID id);
 
 // True on the frame a mouse button was clicked over the scrim of Modal level `id`: outside its
-// window while it is the topmost level. The level stays open; the widget decides.
+// window while it is the topmost level. The level stays open; the widget decides. A left press on
+// the scrim is held until its release, so even when the widget closes the dialog on it, it presses
+// nothing under the scrim and leaves the focus given back where it is.
 bool PopupLevelScrimClicked(ImGuiID id);
 
 // True while level `id` plays its close motion.

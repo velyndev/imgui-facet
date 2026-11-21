@@ -79,6 +79,7 @@ struct Level
     float wrapWidth = 0.0f;      // tooltips: text wrap width in pixels
     ImGuiID restoreWindow = 0;   // panels: the window that had the keyboard focus when it opened
     ImGuiID ownerWindow = 0;     // panels: the root window it was opened from, which it stays in front of
+    int stackDepthAtOpen = 0;    // panels: the size of Dear ImGui's popup stack when it opened
 
     // This frame's submission.
     ImGuiWindow* window = nullptr;
@@ -446,6 +447,69 @@ void CloseUnfocusedLevelsOnClickOutside()
             return;
         }
     }
+}
+
+// True when screen point `p` lies in a popup level opened after Dear ImGui's popup stack had
+// `depth` entries (a list opened from a panel's content), or in a panel opened from inside `owner`.
+bool InsideLevelsOpenedAfter(ImVec2 p, int depth, ImGuiID owner)
+{
+    const ImGuiContext& g = *GImGui;
+    for (int i = std::max(depth, 0); i < g.OpenPopupStack.Size; ++i)
+    {
+        const Level* level = FindLevel(g.OpenPopupStack[i].PopupId);
+        const ImGuiWindow* window = g.OpenPopupStack[i].Window;
+        if (level != nullptr && level->phase == Phase::Open ? level->rect.Contains(p)
+                                                            : (window != nullptr && window->Rect().Contains(p)))
+            return true;
+    }
+    for (const Level& level : State().levels)
+    {
+        if (level.phase == Phase::Open && level.options.kind == PopupKind::Panel && level.parent == owner && owner != 0 &&
+            level.rect.Contains(p))
+            return true;
+    }
+    return false;
+}
+
+// Panels with closeOnClickOutside close on a press of any button outside them, their anchor and
+// the levels opened after them. The press is left alone, so it still reaches what is under it.
+void ClosePanelsOnClickOutside()
+{
+    const ImGuiContext& g = *GImGui;
+    for (int button = 0; button < ImGuiMouseButton_COUNT; ++button)
+    {
+        if (!ImGui::IsMouseClicked(button, ImGuiInputFlags_None, ImGuiKeyOwner_Any))
+            continue;
+        const ImVec2 at = g.IO.MouseClickedPos[button];
+        for (Level& level : State().levels)
+        {
+            if (level.phase != Phase::Open || level.options.kind != PopupKind::Panel || !level.options.closeOnClickOutside)
+                continue;
+            if (level.rect.Contains(at) || level.anchor.rect.Contains(at) ||
+                InsideLevelsOpenedAfter(at, level.stackDepthAtOpen, level.id))
+                continue;
+            BeginClose(level, PopupCloseReason::ClickOutside, true);
+            State().focusCheckFrame = State().frame + 1;
+        }
+    }
+}
+
+// The panel Escape closes first: the newest open panel with closeOnEscape that no popup level was
+// opened above since it opened. Null when there is none.
+Level* TopEscapePanel()
+{
+    const ImGuiContext& g = *GImGui;
+    Level* best = nullptr;
+    for (Level& level : State().levels)
+    {
+        if (level.phase != Phase::Open || level.options.kind != PopupKind::Panel || !level.options.closeOnEscape ||
+            level.stackDepthAtOpen < g.OpenPopupStack.Size)
+            continue;
+        if (best == nullptr || level.openedFrame > best->openedFrame ||
+            (level.openedFrame == best->openedFrame && &level > best))
+            best = &level;
+    }
+    return best;
 }
 
 // ---- Placement and surface ------------------------------------------------------------------
@@ -976,6 +1040,14 @@ void ApplyEscape()
         return;
     // The press is the host's: nothing else in this frame reads it.
     ImGui::SetKeyOwner(ImGuiKey_Escape, kEscapeOwner, ImGuiInputFlags_LockThisFrame);
+    if (Level* panel = TopEscapePanel())
+    {
+        RestorePanelFocus(*panel);
+        BeginClose(*panel, PopupCloseReason::Escape, true);
+        s.focusCheckFrame = s.frame + 1;
+        ImGui::SetNavCursorVisible(true);
+        return;
+    }
     bool hostPopupOnTop = false;
     if (Level* top = TopStackLevel(&hostPopupOnTop))
     {
@@ -1012,7 +1084,8 @@ void ClaimEscapeForNextFrame()
     bool hostPopupOnTop = false;
     const bool levelOnTop = TopStackLevel(&hostPopupOnTop) != nullptr;
     const bool shellsOnly = g.OpenPopupStack.Size == 0 && s.claimCount[s.claimCurrent] > 0;
-    if (!(levelOnTop || shellsOnly) || g.ActiveId != 0)
+    const bool panel = TopEscapePanel() != nullptr;
+    if (!(levelOnTop || shellsOnly || panel) || g.ActiveId != 0)
         return;
     const ImGuiKeyOwnerData* owner = ImGui::GetKeyOwnerData(&g, ImGuiKey_Escape);
     if (owner->OwnerNext != ImGuiKeyOwner_NoOwner && owner->OwnerNext != kEscapeOwner)
@@ -1162,6 +1235,7 @@ void PopupNewFrame()
     SyncWithImGuiStack(s.clickedLastFrame, s.leftClickedLastFrame);
     CloseLevelsAboveClickedPopup();
     CloseUnfocusedLevelsOnClickOutside();
+    ClosePanelsOnClickOutside();
     ApplyEscape();
 
     // A click outside the topmost Modal lands on its scrim.
@@ -1175,7 +1249,13 @@ void PopupNewFrame()
             {
                 if (ImGui::IsMouseClicked(button, ImGuiInputFlags_None, ImGuiKeyOwner_Any) &&
                     !top->rect.Contains(io.MouseClickedPos[button]))
+                {
                     top->scrimClickFrame = s.frame;
+                    // The scrim takes the press: also when the widget closes the dialog on it, the
+                    // press reaches nothing under it and does not clear the focus given back.
+                    if (button == ImGuiMouseButton_Left)
+                        HoldDismissingClick();
+                }
             }
         }
     }
@@ -1305,6 +1385,7 @@ void OpenPopupLevel(ImGuiID id, const PopupAnchor& anchor, const PopupOptions& o
             level->restoreWindow = nav != nullptr ? nav->RootWindow->ID : 0;
             const ImGuiWindow* current = GImGui->CurrentWindow;
             level->ownerWindow = current != nullptr ? current->RootWindow->ID : 0;
+            level->stackDepthAtOpen = GImGui->OpenPopupStack.Size;
             level->parent = CurrentPopupLevel();
         }
         level->anchor = anchor;
@@ -1341,6 +1422,17 @@ void SetPopupLevelAnchor(ImGuiID id, const PopupAnchor& anchor)
         level->anchor = anchor;
         level->anchorRegion = AnchorRegion(level->options);
     }
+}
+
+void SetPopupLevelLayout(ImGuiID id, ImVec2 size, const ImRect& placeRect)
+{
+    if (!InFrame())
+        return;
+    Level* level = FindLevel(id);
+    if (level == nullptr || (level->phase != Phase::Open && level->forcedFrame != State().frame))
+        return;
+    level->options.size = size;
+    level->options.placeRect = placeRect;
 }
 
 void ClosePopupLevel(ImGuiID id)

@@ -2,8 +2,8 @@
 // (src/internal/popup_host.h) that the family added: Panel levels, levels at a fixed rect that slide
 // in, and interactive tooltips.
 //
-// One test case per behaviour; docs/writing-a-widget.md describes the pattern. The API checks, and
-// the placeholder checks of the widgets that are still planned, are in tests/test_api_overlays.cpp.
+// One test case per behaviour; docs/writing-a-widget.md describes the pattern. The API checks are in
+// tests/test_api_overlays.cpp.
 
 #include <algorithm>
 #include <cmath>
@@ -19,6 +19,7 @@
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/popup_host.h"
+#include "internal/popup_menu.h"
 #include "internal/scope_stack.h"
 #include "support/session.h"
 
@@ -62,7 +63,8 @@ TEST_CASE("A panel level takes input, survives a click outside and gives the foc
             ++outsidePresses;
         session.Track("outside");
         if (open && !fi::IsPopupLevelOpen(panel))
-            fi::OpenPopupLevel(panel, {.rect = ImRect(300.0f, 100.0f, 340.0f, 120.0f)}, {.kind = fi::PopupKind::Panel});
+            fi::OpenPopupLevel(panel, {.rect = ImRect(300.0f, 100.0f, 340.0f, 120.0f)},
+                               {.kind = fi::PopupKind::Panel, .closeOnEscape = false});
         if (!open && fi::IsPopupLevelOpen(panel))
             fi::ClosePopupLevel(panel);
         if (fi::BeginPopupLevel(panel))
@@ -91,7 +93,7 @@ TEST_CASE("A panel level takes input, survives a click outside and gives the foc
     CHECK(panelOpen);
     session.Click(session.ItemCenter("inside"));
     CHECK(insidePresses == 2);
-    // Escape does not close a panel by itself (its widget claims Escape).
+    // Without closeOnEscape, Escape does not close it.
     session.KeyPress(ImGuiKey_Escape);
     CHECK(panelOpen);
     // Closed while the focus is inside, the focus goes back to the page window's last item.
@@ -101,6 +103,105 @@ TEST_CASE("A panel level takes input, survives a click outside and gives the foc
     REQUIRE(g.NavWindow != nullptr);
     CHECK(g.NavWindow->Name == std::string("test"));
     CHECK(g.NavId == session.ItemId("outside"));
+}
+
+TEST_CASE("Escape closes a panel after the lists opened from it and before the dialog it opened over")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImGuiID modal = ImHashStr("test.modal");
+    const ImGuiID panel = ImHashStr("test.panel");
+    const ImGuiID list = ImHashStr("test.list");
+    int step = 0;
+    bool modalOpen = false;
+    bool panelOpen = false;
+    bool listOpen = false;
+    session.SetUi([&] {
+        if (step == 1)
+            fi::OpenPopupLevel(modal, {}, {.kind = fi::PopupKind::Modal});
+        if (fi::BeginPopupLevel(modal))
+        {
+            ImGui::Button("in modal");
+            if (step == 2)
+                fi::OpenPopupLevel(panel, {.rect = ImRect(100.0f, 100.0f, 140.0f, 120.0f)}, {.kind = fi::PopupKind::Panel});
+            if (fi::BeginPopupLevel(panel))
+            {
+                ImGui::Button("in panel");
+                if (step == 3)
+                    fi::OpenPopupLevel(list, {.rect = ImRect(100.0f, 300.0f, 140.0f, 320.0f)});
+                if (fi::BeginPopupLevel(list))
+                {
+                    ImGui::Button("in list");
+                    fi::EndPopupLevel();
+                }
+                fi::EndPopupLevel();
+            }
+            fi::EndPopupLevel();
+        }
+        modalOpen = fi::IsPopupLevelOpen(modal);
+        panelOpen = fi::IsPopupLevelOpen(panel);
+        listOpen = fi::IsPopupLevelOpen(list);
+        step = 0;
+    });
+    session.Frame();
+    for (int s = 1; s <= 3; ++s)
+    {
+        step = s;
+        session.Frames(2);
+    }
+    REQUIRE(modalOpen);
+    REQUIRE(panelOpen);
+    REQUIRE(listOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(modalOpen);
+    CHECK(panelOpen);
+    CHECK_FALSE(listOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(modalOpen);
+    CHECK_FALSE(panelOpen);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(modalOpen);
+}
+
+TEST_CASE("A panel that closes on a click outside lets the press reach the page")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImGuiID panel = ImHashStr("test.panel");
+    bool open = true;
+    int pagePresses = 0;
+    bool panelOpen = false;
+    fi::PopupCloseReason reason = fi::PopupCloseReason::None;
+    session.SetUi([&] {
+        if (ImGui::Button("page"))
+            ++pagePresses;
+        session.Track("page");
+        const fi::PopupAnchor anchor{.rect = ImRect(400.0f, 100.0f, 440.0f, 120.0f)};
+        if (open && !fi::IsPopupLevelOpen(panel))
+            fi::OpenPopupLevel(panel, anchor, {.kind = fi::PopupKind::Panel, .closeOnClickOutside = true});
+        open = false;
+        if (fi::PopupLevelClosedReason(panel) != fi::PopupCloseReason::None)
+            reason = fi::PopupLevelClosedReason(panel);
+        if (fi::BeginPopupLevel(panel))
+        {
+            ImGui::Button("inside");
+            session.Track("inside");
+            fi::EndPopupLevel();
+        }
+        panelOpen = fi::IsPopupLevelOpen(panel);
+    });
+    session.Frames(3);
+    REQUIRE(panelOpen);
+    // A press inside keeps it, and so does a press on its anchor rect.
+    session.Click(session.ItemCenter("inside"));
+    CHECK(panelOpen);
+    session.Click(ImVec2(420.0f, 110.0f));
+    CHECK(panelOpen);
+    // A press on the page closes it, and the page's button still takes the click.
+    session.Click(session.ItemCenter("page"));
+    CHECK_FALSE(panelOpen);
+    CHECK(pagePresses == 1);
+    CHECK(reason == fi::PopupCloseReason::ClickOutside);
 }
 
 TEST_CASE("A level with a fixed rect sits there and slides in from its edge")
