@@ -103,10 +103,23 @@ bool FilterField(const char* label, char* buffer, std::size_t bufferSize, Filter
 bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 ```
 
-A compact field for a filter query the caller keeps, with match case and whole word toggles when
-`settings` is not null; `PassesFilter` tests a text against the query. Status: planned (until then
-`PassesFilter` lets every text pass). `FilterSettings` and `PassesFilter` are declared in `common.h`, because the
-property grid, keybind list and settings search take the same settings through `filterSettings`.
+A field for a filter query the caller keeps, on the text field core: the filter icon in front, the
+placeholder `Strings::search` by default, a clear button while there is a query, and Escape that
+first empties a non-empty query (an edit) and then ends the session. With non-null `settings` two
+toggle buttons sit at the end of the frame: "Aa" for match case and an underlined "ab" for whole
+word, with `Strings::matchCase` and `Strings::wholeWord` as their tooltips. Each is a Tab stop after
+the text; a click, Space or Enter flips its member of `*settings` at once and the on state shows a
+fill and the label color; a click gives the keyboard back to the query. Returns true when the query
+or `*settings` was written. `readOnly` shows the query and the toggles and changes neither. Width,
+sizes, disabled and the buffer form are as for TextField.
+
+`PassesFilter` is true when every space-separated word of the query occurs in the text: ASCII
+case-insensitive unless `matchCase`; with `wholeWord` an occurrence must not touch a letter, digit,
+'_' or non-ASCII character on either side (a word that itself starts or ends with punctuation may
+touch them there). Any occurrence counts, not only the first. An empty query, or one of spaces only,
+lets every text pass. It allocates nothing. `FilterSettings` and `PassesFilter` are declared in
+`common.h`, because the property grid, keybind list and settings search take the same settings
+through `filterSettings`. Status: ready.
 
 ### Autocomplete
 

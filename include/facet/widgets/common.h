@@ -202,8 +202,7 @@ struct FilterSettings
 
 // Whether `text` matches `query` under `settings`: every space-separated word of the query occurs
 // in the text (as a whole word with wholeWord, ASCII case-insensitive unless matchCase). An
-// empty query matches everything. No allocation; usable from any thread. Until Phase 2
-// implements it, every text passes, as with an empty query.
+// empty query matches everything. No allocation; usable from any thread.
 bool PassesFilter(std::string_view query, const FilterSettings& settings, std::string_view text);
 
 // Last item: its edit session ended this frame, it was edited during the session, and the

@@ -110,6 +110,9 @@ struct TextInputsUi
     // The planned widgets below.
     std::string filter;
     facet::FilterSettings filterSettings;
+    int filterShown = 0;
+    std::string filterSmall;
+    std::string filterReadOnly = "Sample query";
     std::vector<std::string> tags = {"Option 1"};
     std::vector<std::string> tagsLimited;
     std::vector<std::string> tagsWrap = {"Sample tag 1", "Sample tag 2", "Sample tag 3", "Sample tag 4"};
@@ -421,9 +424,6 @@ void PlannedSections(facet::demo::PageCtx&)
     LabeledRow("Rename in place");
     facet::InlineRename("##rename", &ui.name, &ui.renaming);
 
-    SectionHeader("Search and suggestions");
-    LabeledRow("Filter field");
-    facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
 
     SectionHeader("Formatted fields");
     LabeledRow("Masked");
@@ -481,6 +481,45 @@ void CopyFieldSection(facet::demo::PageCtx& ctx)
     LabeledRow("Narrow");
     facet::CopyField("A label longer than its share##copyNarrow", kSampleLong, {.width = 160.0f});
     Note("Copies: %d.", ui.copies);
+}
+
+void FilterFieldSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("FilterField");
+    Paragraph("A query that filters a list the caller draws, here the names of the built-in icons from the "
+              "Autocomplete section. Aa matches case, ab matches whole words; Escape empties the query.");
+
+    LabeledRow("With toggles");
+    if (ctx.capture && ctx.captureState == kFormatted)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 2);
+    facet::FilterField("##filter", &ui.filter, &ui.filterSettings);
+    ProbeFrame(ctx, "inputs.filter");
+    ProbeSlotButton(ctx, "inputs.filter.case", ImGui::GetIDWithSeed("matchCase", nullptr, ImGui::GetItemID()), 1);
+    // The matching names on one line, joined into a fixed buffer.
+    char names[256] = {};
+    int length = 0;
+    int shown = 0;
+    for (const facet::ChoiceItem& item : kIconSuggestions)
+    {
+        if (!facet::PassesFilter(ui.filter, ui.filterSettings, item.label))
+            continue;
+        const int written = std::snprintf(names + length, sizeof(names) - static_cast<std::size_t>(length), "%s%s",
+                                          shown > 0 ? ", " : "", item.label);
+        length = std::min(static_cast<int>(sizeof(names)) - 1, length + std::max(0, written));
+        ++shown;
+    }
+    ui.filterShown = shown;
+    LabeledRow("Matches");
+    if (shown == 0)
+        Note("No icon name matches the query.");
+    else
+        facet::Text(facet::TextStyle::Body, "%s", names);
+
+    LabeledRow("Small, no toggles");
+    facet::FilterField("##filterSmall", &ui.filterSmall, nullptr, {.size = facet::ControlSize::Small});
+
+    LabeledRow("Read-only");
+    facet::FilterField("##filterReadOnly", &ui.filterReadOnly, &ui.filterSettings, {.readOnly = true});
 }
 
 void TagInputSection(facet::demo::PageCtx& ctx)
@@ -611,6 +650,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     ValidationSection(ctx);
     CopyFieldSection(ctx);
     TagInputSection(ctx);
+    FilterFieldSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -903,5 +943,25 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectFocused("inputs.tags.limited");
     test.Type("free,");
     test.Expect("the limited field refuses text that is no suggestion", [] { return ui.tagsLimited.empty(); });
+    test.KeyPress(ImGuiKey_Escape);
+
+    // FilterField: the query filters the list, the toggles by pointer and keyboard, Escape empties.
+    test.Click("inputs.filter");
+    test.Type("l");
+    test.ExpectNear("the letter l keeps the eight names that contain it", [] { return ui.filterShown; }, 8.0, 0.0);
+    test.Click("inputs.filter.case");
+    test.Expect("a click on Aa turns match case on", [] { return ui.filterSettings.matchCase; });
+    test.ExpectNear("match case drops Layers, which has only an upper-case L", [] { return ui.filterShown; }, 7.0, 0.0);
+    test.Wait(2);
+    test.Type("x");
+    test.ExpectText("the keyboard went back to the query", [] { return ui.filter; }, "lx");
+    test.ExpectNear("nothing matches: the empty state", [] { return ui.filterShown; }, 0.0, 0.0);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.filter.case");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on Aa turns match case off", [] { return !ui.filterSettings.matchCase; });
+    test.Click("inputs.filter");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape empties the query", [] { return ui.filter; }, "");
     test.KeyPress(ImGuiKey_Escape);
 }

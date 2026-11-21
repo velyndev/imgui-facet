@@ -1645,3 +1645,84 @@ TEST_CASE("A read-only TagInput adds and removes nothing")
     CHECK(tags.size() == 1);
     CHECK(writes == 0);
 }
+// ---- FilterField and PassesFilter --------------------------------------------------------------
+
+TEST_CASE("PassesFilter needs every query word, ignores case unless asked and can match whole words")
+{
+    const facet::FilterSettings plain;
+    const facet::FilterSettings matchCase{.matchCase = true};
+    const facet::FilterSettings wholeWord{.wholeWord = true};
+    CHECK(facet::PassesFilter("", plain, "anything"));
+    CHECK(facet::PassesFilter("   ", plain, "anything"));
+    CHECK(facet::PassesFilter("sam", plain, "Sample text"));
+    CHECK(facet::PassesFilter("TEXT sam", plain, "Sample text"));
+    CHECK_FALSE(facet::PassesFilter("sam other", plain, "Sample text"));
+    CHECK_FALSE(facet::PassesFilter("sam", matchCase, "Sample text"));
+    CHECK(facet::PassesFilter("Sam", matchCase, "Sample text"));
+    CHECK_FALSE(facet::PassesFilter("sam", wholeWord, "Sample text"));
+    CHECK(facet::PassesFilter("text", wholeWord, "Sample text"));
+    CHECK(facet::PassesFilter("text", wholeWord, "context, text"));  // a later occurrence counts
+    CHECK(facet::PassesFilter("file_name", wholeWord, "a file_name.txt"));
+    CHECK_FALSE(facet::PassesFilter("name", wholeWord, "a file_name.txt"));
+    CHECK_FALSE(facet::PassesFilter("longer than the text", plain, "short"));
+}
+
+TEST_CASE("FilterField writes the query and flips its toggles by pointer and keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    facet::FilterSettings settings;
+    int writes = 0;
+    ImGuiID fieldId = 0;
+    session.SetUi([&] {
+        fieldId = ImGui::GetID("##filter");
+        writes += facet::FilterField("##filter", &query, &settings) ? 1 : 0;
+        session.Track("field");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("abc");
+    CHECK(query == "abc");
+    CHECK(writes == 1);  // typed in one frame
+    // The whole word toggle is the rightmost slot button, match case the one before it.
+    session.Click(SlotButtonCenter(session.ItemRect("field"), 0));
+    CHECK(settings.wholeWord);
+    CHECK(writes == 2);
+    session.Frames(2);
+    session.Type("d");
+    CHECK(query == "abcd");  // the click gave the keyboard back to the query
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ImGui::GetIDWithSeed("matchCase", nullptr, fieldId));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(settings.matchCase);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ImGui::GetIDWithSeed("wholeWord", nullptr, fieldId));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK_FALSE(settings.wholeWord);
+}
+
+TEST_CASE("FilterField empties the query on the first Escape and a read-only one changes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query = "start";
+    std::string fixed = "fixed";
+    facet::FilterSettings settings;
+    session.SetUi([&] {
+        facet::FilterField("##filter", &query, nullptr);
+        session.Track("field");
+        facet::FilterField("##fixed", &fixed, &settings, {.readOnly = true});
+        session.Track("fixed");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(query.empty());
+    CHECK(ImGui::GetActiveID() == session.ItemId("field"));
+    session.Click(session.ItemCenter("fixed"));
+    session.Type("x");
+    session.Click(SlotButtonCenter(session.ItemRect("fixed"), 0));
+    CHECK(fixed == "fixed");
+    CHECK_FALSE(settings.wholeWord);
+}
