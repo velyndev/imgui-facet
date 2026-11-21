@@ -187,7 +187,7 @@ bool Legend(const char* id, std::span<LegendItem> items, const LegendOptions& op
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

@@ -862,7 +862,7 @@ ValueDrag2DResult ValueDrag2DBehavior(const ItemState& item, double* x, double* 
         if (wrote)
         {
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
     };
     const auto cancel = [&]() {
@@ -871,7 +871,7 @@ ValueDrag2DResult ValueDrag2DBehavior(const ItemState& item, double* x, double* 
             *x = session.startX;
             *y = session.startY;
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
         result.canceled = true;
         result.ended = true;

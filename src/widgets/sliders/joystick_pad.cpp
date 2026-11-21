@@ -170,7 +170,7 @@ bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& o)
             *value = next2;
             written = true;
             if (!edit.changed)
-                ImGui::MarkItemEdited(id);
+                internal::MarkWidgetEdited(id);
         }
         state.reported = *value;
     }

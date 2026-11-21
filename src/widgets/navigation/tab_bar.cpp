@@ -694,7 +694,7 @@ bool TabBarImpl(const char* id, int* index, const SelectionItems& items, const T
     ImGui::EndGroup();
     FinishWidgetGroup(barId);
     if (changed)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return changed;
 }
 

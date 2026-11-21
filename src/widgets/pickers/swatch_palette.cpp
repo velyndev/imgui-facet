@@ -425,7 +425,7 @@ bool RunSwatchPalette(const char* label, ImVec4* color, SwatchList list, ColorHi
         pick(cellUnder(g.IO.MousePos));
     }
     if (written || listChanged)
-        ImGui::MarkItemEdited(id);
+        internal::MarkWidgetEdited(id);
 
     // ---- Draw ----
     const int drawTotal = layout.history + list.count + (list.CanAdd() && !readOnly ? 1 : 0);

@@ -384,7 +384,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
             {
                 // A press on the ring away from the handles moves the nearer one there first.
                 moveHandle(values, pick, internal::FractionToValue(mapping, pointer));
-                ImGui::MarkItemEdited(handleIds[pick]);
+                internal::MarkWidgetEdited(handleIds[pick]);
                 drag.start[0] = values[0];
                 drag.start[1] = values[1];
             }
@@ -453,7 +453,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
                     target = internal::FractionToValue(mapping, f);
                 }
                 if (target != values[i] && moveHandle(values, i, target))
-                    ImGui::MarkItemEdited(handleIds[i]);
+                    internal::MarkWidgetEdited(handleIds[i]);
                 ImGui::SetKeyOwner(ImGuiKey_Escape, handleIds[i]);
                 if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, handleIds[i]))
                 {
@@ -461,7 +461,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
                     {
                         values[0] = snapshot.values[0];
                         values[1] = snapshot.values[1];
-                        ImGui::MarkItemEdited(handleIds[i]);
+                        internal::MarkWidgetEdited(handleIds[i]);
                     }
                     internal::MarkEditCanceled(handleIds[i]);
                     ImGui::ClearActiveID();
@@ -513,7 +513,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
             {
                 values[0] = next2[0];
                 values[1] = next2[1];
-                ImGui::MarkItemEdited(bandId);
+                internal::MarkWidgetEdited(bandId);
             }
             ImGui::SetKeyOwner(ImGuiKey_Escape, bandId);
             if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, bandId))

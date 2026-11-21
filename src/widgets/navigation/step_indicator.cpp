@@ -293,7 +293,7 @@ bool StepIndicatorImpl(const char* id, int current, int* write, const SelectionI
     if (!interactive || groupDisabled || chosen < 0 || chosen == current)
         return false;
     *write = chosen;
-    ImGui::MarkItemEdited(editor);
+    internal::MarkWidgetEdited(editor);
     return true;
 }
 

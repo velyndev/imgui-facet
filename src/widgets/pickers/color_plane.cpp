@@ -90,7 +90,7 @@ ColorPlaneResult ColorPlaneBehavior(const ItemState& item, double* x, double* y,
             *x = nx;
             *y = ny;
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
     };
     const auto cancel = [&]() {
@@ -99,7 +99,7 @@ ColorPlaneResult ColorPlaneBehavior(const ItemState& item, double* x, double* y,
             *x = session.startX;
             *y = session.startY;
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
         result.canceled = true;
         MarkEditCanceled(id);

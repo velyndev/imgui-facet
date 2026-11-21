@@ -365,7 +365,7 @@ bool Pagination(const char* id, int* page, int pageCount, const PaginationOption
     if (readOnly || groupDisabled || chosen < 0 || chosen == current || page == nullptr)
         return false;
     *page = chosen;
-    ImGui::MarkItemEdited(editor);
+    internal::MarkWidgetEdited(editor);
     return true;
 }
 

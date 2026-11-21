@@ -135,7 +135,7 @@ bool ChartRangeBrush(const char* label, double* low, double* high, double min, d
             if (values[0] != before[0] || values[1] != before[1])
             {
                 changed = true;
-                ImGui::MarkItemEdited(id);
+                internal::MarkWidgetEdited(id);
             }
         }
     }

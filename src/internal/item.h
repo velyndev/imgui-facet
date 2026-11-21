@@ -209,4 +209,10 @@ float ResolveItemWidth(float optionsWidth, const NextItemData& next, float defau
 // whole widget.
 void FinishWidgetGroup(ImGuiID widgetId);
 
+// Marks the last item edited, as ImGui::MarkItemEdited(id) does, also when `id` is not Dear ImGui's
+// active item: a widget whose value its popover wrote, or that Escape restored while a part inside
+// the popover was active. ImGui::MarkItemEdited asserts in that case; here the last item's edited
+// status is set the same way and the active item's edit flags are left alone.
+void MarkWidgetEdited(ImGuiID id);
+
 } // namespace facet::internal

@@ -178,7 +178,7 @@ bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& op
     {
         *radians = static_cast<float>(edited / kDegreesPerRadian);
         written = true;
-        ImGui::MarkItemEdited(id);
+        internal::MarkWidgetEdited(id);
     }
     const bool mixed = mixedFlag && !written;
 

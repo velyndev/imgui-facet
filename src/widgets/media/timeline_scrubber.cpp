@@ -227,7 +227,7 @@ bool TimelineImpl(const char* label, double* playhead, double* loopIn, double* l
             {
                 *h.value = target;
                 written[i] = true;
-                ImGui::MarkItemEdited(h.id);
+                internal::MarkWidgetEdited(h.id);
             }
         }
         // A marker moved by its neighbour's limits stays where it is limited to.

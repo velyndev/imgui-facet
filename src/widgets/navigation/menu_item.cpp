@@ -17,6 +17,7 @@
 
 #include "facet/core/input.h"
 #include "internal/control.h"
+#include "internal/item.h"
 #include "internal/popup_host.h"
 #include "internal/popup_menu.h"
 
@@ -108,7 +109,7 @@ bool MenuCheckItem(const char* label, bool* checked, const MenuItemOptions& opti
     if (!MenuItemPressed(label, row, options) || checked == nullptr)
         return false;
     *checked = !*checked;
-    ImGui::MarkItemEdited(GImGui->LastItemData.ID);
+    internal::MarkWidgetEdited(GImGui->LastItemData.ID);
     return true;
 }
 
@@ -124,7 +125,7 @@ bool MenuRadioItem(const char* label, int* selection, int value, const MenuItemO
     if (!MenuItemPressed(label, row, options) || selection == nullptr)
         return false;
     *selection = value;
-    ImGui::MarkItemEdited(GImGui->LastItemData.ID);
+    internal::MarkWidgetEdited(GImGui->LastItemData.ID);
     return true;
 }
 

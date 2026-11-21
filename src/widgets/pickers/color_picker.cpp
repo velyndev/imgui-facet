@@ -392,7 +392,7 @@ bool ColorPicker(const char* label, ImVec4* color, const ColorPickerOptions& opt
                 edited = out;
                 written = true;
                 hsv = internal::ColorTrackHsv(id, edited);
-                ImGui::MarkItemEdited(compareId);
+                internal::MarkWidgetEdited(compareId);
             }
         }
         if (ImGui::IsRectVisible(strip.Min, strip.Max))

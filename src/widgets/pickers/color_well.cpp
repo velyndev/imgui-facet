@@ -96,7 +96,6 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
         {
             edited = out;
             written = true;
-            ImGui::MarkItemEdited(id);
         }
     };
 
@@ -266,6 +265,10 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
         internal::DrawControlMessage(message, ImVec2(frame.Min.x, frame.Max.y), frame.GetWidth(), item.disabled, id, frame);
     ImGui::EndGroup();
     internal::FinishWidgetGroup(id);
+    // Marked on the whole well once its group is closed: the picker in the popover, or Escape while
+    // one of its parts is active, writes the value while the well is not the active item.
+    if (written)
+        internal::MarkWidgetEdited(id);
     if (written && color != nullptr)
         *color = edited;
     return written;

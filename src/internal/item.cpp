@@ -245,4 +245,19 @@ void FinishWidgetGroup(ImGuiID widgetId)
         g.LastItemData.ID = widgetId;
 }
 
+void MarkWidgetEdited(ImGuiID id)
+{
+    ImGuiContext& g = *GImGui;
+    // The cases Dear ImGui's own check accepts.
+    if (g.DragDropActive || g.ActiveId == id || g.ActiveId == 0 || g.DeactivatedItemData.ID == id ||
+        g.ActiveIdPreviousFrame == id || g.NavJustMovedToId != 0)
+    {
+        ImGui::MarkItemEdited(id);
+        return;
+    }
+    g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_EditedInternal;
+    if ((g.LastItemData.ItemFlags & ImGuiItemFlags_NoMarkEdited) == 0)
+        g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_Edited;
+}
+
 } // namespace facet::internal

@@ -386,3 +386,27 @@ TEST_CASE("Widget exit: a group of parts reports the widget id while no part is 
     session.Frame();
     CHECK(lastId == widgetId);
 }
+
+TEST_CASE("Widget edit: a widget written while another item is active still reports the edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool hold = false;
+    bool edited = false;
+    session.SetUi([&] {
+        // Another item holds Dear ImGui's active id, as a part inside a popover does.
+        const ImGuiID other = ImGui::GetID("other");
+        if (hold)
+            ImGui::SetActiveID(other, ImGui::GetCurrentWindow());
+        ImGui::Button("widget");
+        facet::internal::MarkWidgetEdited(ImGui::GetItemID());
+        edited = ImGui::IsItemEdited();
+        if (hold)
+            ImGui::ClearActiveID();
+    });
+    session.Frame();
+    CHECK(edited);
+    hold = true;
+    session.Frame();
+    CHECK(edited);
+}
