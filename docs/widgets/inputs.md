@@ -320,9 +320,28 @@ void FieldValidation(const char* message, const FieldValidationOptions& options 
 bool ValidationSummary(const char* label, const ValidationSummaryOptions& options = {});
 ```
 
-A message under the last item, for items without an `error` option, and a summary of the errors
-in a window whose entries focus their fields. The message is not an item, so item queries after
-`FieldValidation` still describe the validated field. Status: planned.
+`FieldValidation` draws a message under the last item, for items without an `error` option (stock
+Dear ImGui widgets, groups, custom items). The message is Footnote text in the tone's color with
+the tone's icon (error, warning, success, info for Accent; Neutral is plain help text in
+labelSecondary), starting at the item's left edge spacing.xs below it and wrapping at the right edge
+of the content region; the cursor moves past it. With `outline` (the default) the item gets a
+hairline in the tone's color around its rect, at the control radius; Neutral draws none. The
+message is not an item, so item queries after the call still describe the validated field. The
+item is found by its rect, so groups and text items (id 0 while idle) work; first thing in a window,
+the message starts at the cursor. Destructive messages are reported to the error store that
+ValidationSummary reads, with the item's id (0 for a group). A null or empty message draws nothing.
+
+`ValidationSummary` lists the Destructive messages the fields of its window (its root window, so
+child windows count) reported in the previous frame: through the `error` option of Facet widgets
+and through `FieldValidation`. It is a block on the destructiveSubtle wash with the visible label
+part as a Headline heading and one row per message: the error icon and the message as an
+underlined link in label color, cut with an ellipsis when narrow (the full text shows on hover and
+keyboard focus). Each row is a Tab stop; a click, Enter or Space scrolls the field's window to it
+and gives the field the keyboard focus (a text field also takes the keyboard with its text
+selected). A message reported without an id is scrolled to but not focused. The summary keeps
+nothing under its id and submits no item while there is no message; because it reads the previous
+frame, it appears and disappears one frame after the fields change. Returns true when a row was
+activated. The width fills the row by default. Status: ready.
 
 ## Usage
 

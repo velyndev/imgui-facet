@@ -15,6 +15,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/control.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/text_field.h"
@@ -1281,4 +1282,147 @@ TEST_CASE("A read-only Autocomplete opens no list and writes nothing")
     session.KeyPress(ImGuiKey_Enter);
     CHECK(probe.text == "Beta");
     CHECK(probe.writes == 0);
+}
+
+// ---- FieldValidation and ValidationSummary -----------------------------------------------------
+
+namespace
+{
+
+// The number of vertices in the current window's draw list from `first` on that have `color`
+// and lie inside `rect`.
+int VerticesInRect(int first, ImU32 color, const ImRect& rect)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    int count = 0;
+    for (int i = first; i < drawList->VtxBuffer.Size; ++i)
+    {
+        const ImDrawVert& v = drawList->VtxBuffer[i];
+        if (v.col == color && rect.Contains(v.pos))
+            ++count;
+    }
+    return count;
+}
+
+} // namespace
+
+TEST_CASE("FieldValidation outlines the item in its tone and reports only destructive messages")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool first = false;
+    bool second = false;
+    ImGuiID firstId = 0;
+    int reported = -1;
+    ImGuiID reportedId = 0;
+    std::string reportedText;
+    int outlineVertices = 0;
+    int warningVertices = 0;
+    int plainVertices = 0;
+    session.SetUi([&] {
+        const auto errors = facet::internal::PreviousFrameFieldErrors();
+        reported = static_cast<int>(errors.size());
+        if (!errors.empty())
+        {
+            reportedId = errors[0].itemId;
+            reportedText = errors[0].text;
+        }
+        const ImU32 destructive = facet::ToU32(facet::T().colors.destructive);
+        const ImU32 warning = facet::ToU32(facet::T().colors.warning);
+        ImGui::Checkbox("First", &first);
+        firstId = ImGui::GetItemID();
+        ImRect rect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        rect.Expand(1.0f);
+        int start = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::FieldValidation("Error message");
+        outlineVertices = VerticesInRect(start, destructive, rect);
+        ImGui::Checkbox("Second", &second);
+        rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        rect.Expand(1.0f);
+        start = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::FieldValidation("Warning message", {.tone = facet::Tone::Warning});
+        warningVertices = VerticesInRect(start, warning, rect);
+        start = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::FieldValidation("Plain message", {.tone = facet::Tone::Warning, .outline = false});
+        plainVertices = VerticesInRect(start, warning, rect);
+        facet::FieldValidation(nullptr);
+    });
+    session.Frames(2);
+    CHECK(outlineVertices > 0);
+    CHECK(warningVertices > 0);
+    CHECK(plainVertices == 0);
+    CHECK(reported == 1);
+    CHECK(reportedId == firstId);
+    CHECK(reportedText == "Error message");
+}
+
+TEST_CASE("ValidationSummary lists the errors of the previous frame and an entry focuses its field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string name;
+    bool shown = false;
+    int activations = 0;
+    ImGuiID summaryId = 0;
+    ImGuiID fieldId = 0;
+    session.SetUi([&] {
+        ImGui::Button("Before");
+        session.Track("before");
+        summaryId = ImGui::GetID("Errors");
+        activations += facet::ValidationSummary("Errors") ? 1 : 0;
+        shown = ImGui::GetItemID() == summaryId;
+        if (shown)
+            session.Track("summary");
+        facet::TextField("Name", &name, {.error = name.empty() ? "Enter a name" : nullptr});
+        session.Track("field");
+        fieldId = ImGui::GetItemID();
+    });
+    session.Frame();
+    session.Frame();
+    REQUIRE(shown);
+
+    // Keyboard: Tab reaches the entry, Enter gives the field the keyboard. After a click the
+    // first Tab only shows the focus.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ImGui::GetIDWithSeed(0, summaryId));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(activations == 1);
+    session.Frames(2);
+    CHECK(ImGui::GetActiveID() == fieldId);
+    session.Type("a");
+    CHECK(name == "a");
+    session.Frames(2);
+    CHECK_FALSE(shown);
+
+    // Pointer: a click on the entry does the same.
+    session.KeyPress(ImGuiKey_Backspace);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    REQUIRE(shown);
+    const ImRect summary = session.ItemRect("summary");
+    session.Click(ImVec2(summary.GetCenter().x, summary.Max.y - facet::Px(facet::T().spacing.sm) - 4.0f));
+    CHECK(activations == 2);
+    session.Frames(2);
+    CHECK(ImGui::GetActiveID() == fieldId);
+}
+
+TEST_CASE("ValidationSummary submits nothing without errors in its window")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImGuiID before = 0;
+    ImGuiID after = 1;
+    session.SetUi([&] {
+        ImGui::Begin("Other window", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        facet::TextField("Name", static_cast<std::string*>(nullptr), {.error = "An error in another window"});
+        ImGui::End();
+        ImGui::Button("Before");
+        before = ImGui::GetItemID();
+        CHECK_FALSE(facet::ValidationSummary("Errors"));
+        after = ImGui::GetItemID();
+    });
+    session.Frames(3);
+    CHECK(after == before);
 }

@@ -5,6 +5,7 @@
 // one draws its placeholder at the widget's default size. The number-like inputs have their own
 // page (page_w_inputs_value.cpp). Texts are labelled samples and placeholders, not data.
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/control.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "pages/pages.h"
@@ -110,7 +112,12 @@ struct TextInputsUi
     std::string masked;
     std::string pin;
     std::string path;
+
+    // FieldValidation and ValidationSummary
+    std::string validName;
+    int validPort = 0;
     bool stockCheck = false;
+    int summaryActivations = 0;
 };
 
 TextInputsUi ui;
@@ -397,7 +404,7 @@ void AutocompleteSection(facet::demo::PageCtx& ctx)
     facet::Autocomplete("##completeError", &ui.completionError, kOptions, {.state = facet::DataState::Error});
 }
 
-void PlannedSections(facet::demo::PageCtx& ctx)
+void PlannedSections(facet::demo::PageCtx&)
 {
     SectionHeader("Other text fields");
     LabeledRow("Rename in place");
@@ -419,14 +426,73 @@ void PlannedSections(facet::demo::PageCtx& ctx)
     LabeledRow("Copy field");
     facet::CopyField("##copy", "Sample text");
 
-    SectionHeader("Validation");
-    Paragraph("Messages for items without an error option, and a summary of the errors in a window.");
-    facet::ValidationSummary("Errors");
-    // A stock Dear ImGui checkbox (it works), with the planned message under it.
-    LabeledRow("Stock control");
+}
+
+// Records the rows of the ValidationSummary just drawn as "inputs.summary.<row>", where the
+// summary places them: below its padding and Headline heading, one Small control height or a Body
+// line with spacing.xs above and below each.
+void ProbeSummaryRows(facet::demo::PageCtx& ctx, ImGuiID summaryId, int count)
+{
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const facet::Theme& t = facet::T();
+    const float pad = facet::Px(t.spacing.sm);
+    const float gap = facet::Px(t.spacing.xs);
+    const float row = std::max(facet::ControlHeight(facet::ControlSize::Small),
+                               facet::MeasureText(facet::TextStyle::Body, "Ag").y + 2.0f * gap);
+    const float top = min.y + pad + facet::MeasureText(facet::TextStyle::Headline, "Ag").y + gap;
+    for (int i = 0; i < count; ++i)
+    {
+        char name[64];
+        std::snprintf(name, sizeof(name), "inputs.summary.%d", i);
+        const float y = top + row * static_cast<float>(i);
+        facet::demo::ProbeRect(ctx, name, ImGui::GetIDWithSeed(i, summaryId), ImVec2(min.x + pad, y),
+                               ImVec2(max.x - pad, y + row));
+    }
+}
+
+void ValidationSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("FieldValidation and ValidationSummary");
+    Paragraph("A message under items that have no error option, such as stock Dear ImGui controls, and a summary of "
+              "the errors the fields of this window showed. A row of the summary takes the keyboard focus to its "
+              "field.");
+
+    if (ctx.capture && ctx.captureState == kFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 0);
+    const ImGuiID summaryId = ImGui::GetID("Errors in this window");
+    if (facet::ValidationSummary("Errors in this window", {.width = 420.0f}))
+        ++ui.summaryActivations;
+    if (ImGui::GetItemID() == summaryId)
+    {
+        ctx.Probe("inputs.summary");
+        ProbeSummaryRows(ctx, summaryId, 3);
+    }
+
+    LabeledRow("Facet field");
+    facet::TextField("##validName", &ui.validName,
+                     {.placeholder = "Name placeholder", .error = ui.validName.empty() ? "Enter a name" : nullptr});
+    ProbeFrame(ctx, "inputs.valid.name");
+
+    LabeledRow("Stock field");
+    ImGui::SetNextItemWidth(facet::Px(200.0f));
+    ImGui::InputInt("##validPort", &ui.validPort);
+    ctx.Probe("inputs.valid.port");
+    if (ui.validPort < 1 || ui.validPort > 65535)
+        facet::FieldValidation("Use a number from 1 to 65535");
+    else
+        facet::FieldValidation("In range", {.tone = facet::Tone::Success});
+
+    LabeledRow("Stock checkbox");
     ImGui::Checkbox("Option 1##stock", &ui.stockCheck);
     ctx.Probe("inputs.stock");
-    facet::FieldValidation("Placeholder message", {.tone = facet::Tone::Warning});
+    if (ui.stockCheck)
+        facet::FieldValidation("Turned on", {.tone = facet::Tone::Neutral});
+    else
+        facet::FieldValidation("Turned off: a warning, which the summary does not list", {.tone = facet::Tone::Warning});
+    if (ctx.capture && ctx.captureState == kFocused)
+        ctx.RevealInCapture(0.5f);
+    Note("Summary rows activated: %d.", ui.summaryActivations);
 }
 
 } // namespace
@@ -449,6 +515,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     SearchFieldSection(ctx);
     TextAreaSection(ctx);
     AutocompleteSection(ctx);
+    ValidationSection(ctx);
     PlannedSections(ctx);
 }
 
@@ -670,7 +737,29 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectText("a loading list leaves the field editable", [] { return ui.completionLoading; }, "x");
     test.KeyPress(ImGuiKey_Enter);
 
-    // The stock checkbox with the planned message under it works.
+    // ValidationSummary and FieldValidation: from a fresh page the name and the port have errors.
+    test.Do([] { ui = {}; });
+    test.Wait(3);
+    test.ExpectVisible("inputs.summary");
+    test.Click("inputs.summary.0");
+    test.Wait(2);
+    test.ExpectFocused("inputs.valid.name");
+    test.Type("Typed name");
+    test.ExpectText("a click on the first summary row gives its field the keyboard", [] { return ui.validName; },
+                    "Typed name");
+    test.ExpectNear("the click counts as one activation", [] { return ui.summaryActivations; }, 1.0, 0.0);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    // The name is fixed, so the port is the first row now; Shift+Tab from the name reaches it.
+    test.Click("inputs.valid.name");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("inputs.summary.0");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("Enter on a summary row activates it", [] { return ui.summaryActivations; }, 2.0, 0.0);
+    test.Do([] { ui.validPort = 80; });
+    test.Wait(3);
+    test.Expect("the summary is gone once no field shows an error",
+                [] { return facet::internal::PreviousFrameFieldErrors().empty(); });
     test.Click("inputs.stock");
     test.Expect("the stock checkbox under a message turns on", [] { return ui.stockCheck; });
 }

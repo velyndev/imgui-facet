@@ -64,12 +64,10 @@ void CallTextInputStubs(Values& v)
     FACET_CHECK_STUB(false, PathField("Path 2", buffer, bufferSize, {.browseButton = false}));
     CHECK_FALSE(PathFieldBrowsePressed());
     FACET_CHECK_STUB(false, CopyField("Copy field 1", "Sample", {.masked = true}));
-    FACET_CHECK_LAYOUT_STUB(FieldValidation("Message", {.tone = Tone::Warning}));
-    FACET_CHECK_STUB(false, ValidationSummary("Summary 1"));
 }
 
 // Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 14;
+constexpr int kTextInputStubCalls = 12;
 
 } // namespace
 
@@ -199,7 +197,7 @@ TEST_CASE("FieldValidation sits under the validated item and keeps it as the las
         checkbox = GImGui->LastItemData.Rect;
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const int firstVertex = drawList->VtxBuffer.Size;
-        facet::FieldValidation("Message");
+        facet::FieldValidation("Message", {.outline = false});
         for (int i = firstVertex; i < drawList->VtxBuffer.Size; ++i)
             drawnMin = ImMin(drawnMin, drawList->VtxBuffer[i].pos);
         lastAfter = GImGui->LastItemData.ID;
@@ -209,7 +207,7 @@ TEST_CASE("FieldValidation sits under the validated item and keeps it as the las
 
     REQUIRE(checkboxId != 0);
     CHECK(lastAfter == checkboxId);
-    // Within a pixel: the anti-aliased fringe of the outline lies half a pixel outside the box.
+    // Within a pixel: anti-aliased fringes lie half a pixel outside the shapes.
     CHECK(std::abs(drawnMin.x - checkbox.Min.x) <= 1.0f);
     CHECK(std::abs(drawnMin.y - (checkbox.Max.y + spacing)) <= 1.0f);
     CHECK(cursorAfter > drawnMin.y);
@@ -242,21 +240,21 @@ TEST_CASE("FieldValidation follows items without an id and ignores the title bar
         fieldId = GImGui->LastItemData.ID;
         field = GImGui->LastItemData.Rect;
         int firstVertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
-        facet::FieldValidation("Message");
+        facet::FieldValidation("Message", {.outline = false});
         fieldDrawn = drawnMin(firstVertex);
         // First thing in a window with a title bar: the last item is the title bar, so the
         // message starts at the cursor, not under the title bar.
         ImGui::Begin("Titled window", nullptr, ImGuiWindowFlags_NoSavedSettings);
         contentStart = ImGui::GetCursorScreenPos();
         firstVertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
-        facet::FieldValidation("Message");
+        facet::FieldValidation("Message", {.outline = false});
         firstDrawn = drawnMin(firstVertex);
         ImGui::End();
     });
     session.Frame();
 
     REQUIRE(fieldId == 0);
-    // Within a pixel: the anti-aliased fringe of the outline lies half a pixel outside the box.
+    // Within a pixel: anti-aliased fringes lie half a pixel outside the shapes.
     CHECK(std::abs(fieldDrawn.x - field.Min.x) <= 1.0f);
     CHECK(std::abs(fieldDrawn.y - (field.Max.y + spacing)) <= 1.0f);
     CHECK(std::abs(firstDrawn.x - contentStart.x) <= 1.0f);
