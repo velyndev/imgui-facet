@@ -901,3 +901,103 @@ TEST_CASE("Rating fits a short row by shrinking its icons; read-only and disable
     CHECK(rating == 2.0f);
     CHECK(disabled == 1);
 }
+
+// ---- SizeInput ---------------------------------------------------------------------------------
+
+namespace
+{
+
+// The width (0) or height (1) field of a SizeInput without a label spanning `widget`.
+ImRect SizeField(const ImRect& widget, int index)
+{
+    return VectorField(widget, index, 2);
+}
+
+// The center of slot button `index` (0 the rightmost) at the end of `field`.
+ImVec2 SlotButton(const ImRect& field, int index)
+{
+    const float gap = std::round(facet::Px(facet::T().spacing.xs));
+    const float side = field.GetHeight() - gap * 2.0f;
+    return ImVec2(field.Max.x - gap - side * 0.5f - static_cast<float>(index) * (side + gap), field.GetCenter().y);
+}
+
+} // namespace
+
+TEST_CASE("SizeInput: Tab goes width, lock, height, swap, presets; the lock keeps the ratio")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int w = 640;
+    int h = 480;
+    Signals signals;
+    const ImVec2 presets[] = {{1920.0f, 1080.0f}, {800.0f, 600.0f}};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        signals.Take(facet::SizeInput("##size", &w, &h, {.swapButton = true, .presets = presets}));
+        session.Track("size");
+        ImGui::Button("after");
+        session.Track("after");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    ImGuiID focus[6] = {};
+    for (ImGuiID& f : focus)
+    {
+        session.KeyPress(ImGuiKey_Tab);
+        f = ImGui::GetFocusID();
+    }
+    for (int i = 0; i < 5; ++i)
+        CHECK(focus[i] != focus[i + 1]);
+    CHECK(focus[5] == session.ItemId("after"));
+    // Lock, then a typed width sets the height in the same frame: one write.
+    const ImRect rect = session.ItemRect("size");
+    session.Click(SlotButton(SizeField(rect, 0), 0));
+    const int writes = signals.writes;
+    session.Click(TextPoint(SizeField(rect, 0)));
+    session.Type("1280");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(w == 1280);
+    CHECK(h == 960);
+    CHECK(signals.writes == writes + 1);
+    session.Click(TextPoint(SizeField(rect, 1)));
+    session.Type("240");
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frame();
+    CHECK(w == 320);
+    CHECK(h == 240);
+}
+
+TEST_CASE("SizeInput: swap exchanges the values; a preset writes both; values stay in range")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec2 size(640.0f, 480.0f);
+    const ImVec2 presets[] = {{1920.0f, 1080.0f}, {800.0f, 600.0f}};
+    session.SetUi([&] {
+        facet::SizeInput("##size", &size, {.max = {4096.0f, 4096.0f}, .swapButton = true, .presets = presets});
+        session.Track("size");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("size");
+    session.Click(SlotButton(SizeField(rect, 1), 1));  // swap
+    CHECK(size.x == 480.0f);
+    CHECK(size.y == 640.0f);
+    session.Click(SlotButton(SizeField(rect, 1), 0));  // presets
+    REQUIRE(GImGui->OpenPopupStack.Size == 1);
+    session.KeyPress(ImGuiKey_DownArrow);  // shows the keyboard focus in the menu
+    session.KeyPress(ImGuiKey_End);        // the last preset
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(size.x == 800.0f);
+    CHECK(size.y == 600.0f);
+    session.Click(TextPoint(SizeField(rect, 0)));
+    session.Type("-20");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(size.x == 0.0f);
+    session.Click(TextPoint(SizeField(rect, 0)));
+    session.Type("99999");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(size.x == 4096.0f);
+}

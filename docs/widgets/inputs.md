@@ -330,7 +330,19 @@ bool SizeInput(const char* label, ImVec2* value, const SizeInputOptions& options
 bool SizeInput(const char* label, int* x, int* y, const SizeInputOptions& options = {});
 ```
 
-Width and height fields with an aspect lock, a swap button and size presets. Status: planned.
+Width and height as two typed number fields (as NumberInput, without steppers) side by side after
+the label, each half of the rest of the width; when a field would get narrower than
+`metrics.numberFieldWidth` they stack. Typed values write on Enter, Tab or focus loss, clamped to
+`min` and `max` per axis (the int overload also to the int range); Up and Down step by `step`
+while typing. With `aspectLock` (the default) a lock button (`Strings::aspectLock`) sits at the end
+of the width field, between the two values; it starts unlocked, and while locked an edit of either
+value writes the other in the same frame from the ratio taken when it was locked (or from the
+values before the edit when there was none), so the call returns true once. `swapButton` adds a
+button (`Strings::swap`) at the end of the height field that exchanges the values; `presets` adds a
+menu button (`Strings::presets`) there whose rows read "1920 × 1080" in the field format, with the
+current size checked, and choosing one writes both values. Every button is a Tab stop after its
+field, so Tab goes width, lock, height, swap, presets. `error` outlines both fields and shows its
+message once under them. The lock state and ratio are kept under the id. Status: ready.
 
 ### HexInput
 

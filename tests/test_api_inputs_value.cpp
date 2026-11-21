@@ -60,24 +60,24 @@ void CallReadyValueInputs(Values& v)
     FACET_CHECK_STUB(false, VectorInput("Vector 2", std::span<int>(v.vectorInt)));
     FACET_CHECK_STUB(false, Rating("Rating 1", &v.rating, {.halfSteps = true}));
     FACET_CHECK_STUB(false, Rating("Rating 2", &v.ratingInt));
+    FACET_CHECK_STUB(false, SizeInput("Size 1", &v.size));
+    FACET_CHECK_STUB(false, SizeInput("Size 2", &v.sizeX, &v.sizeY, {.swapButton = true}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallReadyValueInputs.
-constexpr int kReadyValueInputCalls = 15;
+constexpr int kReadyValueInputCalls = 17;
 
 // Every placeholder of these widgets once, with the overloads, as an app would call it.
 void CallValueInputStubs(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, SizeInput("Size 1", &v.size));
-    FACET_CHECK_STUB(false, SizeInput("Size 2", &v.sizeX, &v.sizeY, {.swapButton = true}));
     FACET_CHECK_STUB(false, HexInput("Hex 1", &v.hex32, {.prefix = true}));
     FACET_CHECK_STUB(false, HexInput("Hex 2", &v.hex64));
     FACET_CHECK_STUB(false, DurationInput("Duration 1", &v.seconds, {.showMilliseconds = true}));
 }
 
 // Number of FACET_CHECK_STUB calls in CallValueInputStubs.
-constexpr int kValueInputStubCalls = 5;
+constexpr int kValueInputStubCalls = 3;
 
 } // namespace
 
