@@ -485,3 +485,73 @@ TEST_CASE("The editable SwatchPalette adds, removes and moves swatches in the ca
     session.Click(ImVec2(v.Min.x + step + side * 0.5f, v.GetCenter().y));
     CHECK(vector.size() == 2);
 }
+
+// ---- ColorPicker ------------------------------------------------------------------------------------
+
+TEST_CASE("ColorPicker parts are Tab stops: square, hue and alpha bars, then the compare swatch")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color(0.2f, 0.4f, 0.8f, 0.5f);
+    const ImVec4 original(0.9f, 0.1f, 0.1f, 1.0f);
+    ImGuiID picker = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        picker = ImGui::GetID("Picker");
+        (void)facet::ColorPicker("Picker", &color, {.alpha = true, .inputs = false, .original = &original});
+        session.Track("picker");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##sv"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##hue"));
+    // The hue moves, saturation and value stay.
+    const ColorHsv before = facet::internal::ColorToHsv(color);
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    const ColorHsv after = facet::internal::ColorToHsv(color);
+    CHECK(after.h != doctest::Approx(before.h));
+    CHECK(after.s == doctest::Approx(before.s).epsilon(1e-4));
+    CHECK(after.v == doctest::Approx(before.v).epsilon(1e-4));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##alpha"));
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(color.w == 0.0f);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##original"));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(Same(color, original));
+}
+
+TEST_CASE("ColorPicker in the Wheel mode turns the hue on the ring and picks on the triangle")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImVec4 color = facet::internal::ColorFromHsv({0.25, 0.5, 0.5}, 1.0f);
+    ImGuiID picker = 0;
+    session.SetUi([&] {
+        picker = ImGui::GetID("Wheel");
+        (void)facet::ColorPicker("Wheel", &color, {.mode = facet::ColorPickerMode::Wheel, .inputs = false, .width = 200.0f});
+        session.Track("wheel");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("wheel");
+    const float side = r.GetWidth();
+    const ImVec2 center(r.Min.x + side * 0.5f, r.Min.y + side * 0.5f);
+    // The top of the ring is hue 0; the triangle around the centre keeps the hue.
+    session.Click(ImVec2(center.x, r.Min.y + facet::Px(4.0f)));
+    CHECK(facet::internal::ColorToHsv(color).h == doctest::Approx(0.0).epsilon(0.02));
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##hue"));
+    session.Click(center);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##sv"));
+    const ColorHsv hsv = facet::internal::ColorToHsv(color);
+    CHECK(hsv.h == doctest::Approx(0.0).epsilon(0.02));
+    CHECK(hsv.v > 0.2);
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    CHECK(ImGui::GetFocusID() == PartId(picker, "##hue"));
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(facet::internal::ColorToHsv(color).h == doctest::Approx(0.99).epsilon(0.02));
+}
