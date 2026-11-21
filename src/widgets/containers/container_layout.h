@@ -199,5 +199,6 @@ void ClearAccordionStack();
 void ClearShellStack();
 void ClearTitleBarStack();
 void ClearMiniWindowStack();
+void ClearInspectorPaneStack();
 
 } // namespace facet::internal

@@ -431,8 +431,30 @@ void EndInspectorPane();
 class InspectorPaneScope;
 ```
 
-A details pane at the trailing edge of a region that becomes a drawer in a Compact width.
-Status: planned.
+A region with a details pane at its trailing edge, as wide as the next-item width or the available
+width and `height` units tall (0: the available height).
+
+- **Parts.** The main content follows `BeginInspectorPane`; `InspectorPaneNext` switches to the pane
+  and returns whether its content is shown (open or sliding), false while `*visible` is false and
+  on a second call. The main content and the pane are child windows that scroll on their own.
+  `EndInspectorPane` is always called; after it the region is one item of its whole size.
+- **Pane.** bgSecondary with a hairline along its leading edge and `spacing.lg` padding; a title row
+  with the visible label part in Headline (cut with an ellipsis and a tooltip) and, when `visible`
+  is not null, a close button named by `Strings::close` that writes `*visible = false`. The caller
+  writes true to open it; a null `visible` keeps it open without a close button.
+- **Sliding.** The pane slides in and out over `motion.durationStandard` (at once with reduced
+  motion); its content keeps the full pane width and is clipped while it slides, and the main content
+  takes the room it leaves.
+- **Width.** `paneWidth` is the first width (0: `containers.inspectorWidth`); with `resizable` the
+  band of `containers.resizeBorder` along the pane's leading edge drags it, within `minPaneWidth`
+  (0: `containers.inspectorMinWidth`) and `maxPaneWidth` (0: half the region). The width is kept in
+  units under the id and saved in the ini file.
+- **Compact.** In a Compact width (`core/layout.h`) the main content keeps the whole region and the
+  pane floats over it at its trailing edge as a drawer, on the elevated surface with its shadow, up
+  to the region's width less spacing.xxxl, so a strip of the main content stays in view.
+
+Moving the width by keyboard is not supported; the close button and the content are keyboard
+reachable. Status: ready.
 
 ## Usage examples
 

@@ -1,9 +1,8 @@
-// Demo page: Containers. One section per widget of facet/widgets/containers.h. The ready widgets
-// show their variants and states and record probes for the selftest; a planned widget draws its
-// placeholder. The shell is a layer: it starts closed and a checkbox opens it, so a shell never
-// covers the gallery uninvited; the capture state "shell" shows it open. The app frame, the overlay
-// controller and mini windows are root containers that a host calls outside every window, so they
-// are not called inside this page; the page says so and the family doc shows their host code.
+// Demo page: Containers. One section per widget of facet/widgets/containers.h, with its variants and
+// states and the probes of the selftest at the end of the file. The layers (the shell, the overlay
+// menu, the mini window) start closed and a checkbox opens each, so none covers the gallery
+// uninvited; the capture states "shell" and "overlay" show them open. The app frame fills the whole
+// viewport of a host, so the page only describes it; its unit tests and the family doc cover it.
 
 #include <algorithm>
 #include <cmath>
@@ -57,6 +56,9 @@ struct ContainersState
     const char* lastWindowButton = "none";
     bool maximized = false;
     bool inspectorVisible = true;
+    ImRect inspectorRect;
+    int inspectorMainPresses = 0;
+    int inspectorPanePresses = 0;
     ImGuiSelectionBasicStorage selection;
 
     // Card
@@ -573,11 +575,39 @@ void Lists(facet::demo::PageCtx& ctx, ContainersState& s)
     else
         Note("Selected rows: %d. No row activated yet.", s.selection.Size);
     SectionHeader("Inspector pane");
-    facet::BeginInspectorPane("Inspector", &s.inspectorVisible);
-    Note("Main content.");
+    Paragraph("A details pane at the trailing edge: its close button hides it, the checkbox shows it "
+              "again, and its leading edge drags its width. In a narrow window it floats over the "
+              "main content.");
+    LabeledRow("Show the pane");
+    ImGui::Checkbox("##inspector", &s.inspectorVisible);
+    facet::ItemCursor();
+    ctx.Probe("containers.inspector.toggle");
+    facet::BeginInspectorPane("Inspector###containers.inspector", &s.inspectorVisible, {.height = RegionHeight()});
+    Note("Main content of the region (placeholder).");
+    if (facet::Button("Count a main press"))
+        ++s.inspectorMainPresses;
+    ctx.Probe("containers.inspector.main");
     if (facet::InspectorPaneNext())
-        Note("Inspector pane content.");
+    {
+        ImGuiWindow* pane = ImGui::GetCurrentWindow();
+        s.inspectorRect = pane->Rect();
+        const ImRect& r = s.inspectorRect;
+        const float pad = facet::Px(facet::T().spacing.lg);
+        const float side = facet::ControlHeight(facet::ControlSize::Small);
+        const float band = facet::Px(facet::T().containers.resizeBorder);
+        ImGui::PushClipRect(r.Min, r.Max, false);
+        facet::demo::ProbeRect(ctx, "containers.inspector.close", pane->GetID("##close"),
+                               ImVec2(r.Max.x - pad - side, r.Min.y + pad), ImVec2(r.Max.x - pad, r.Min.y + pad + side));
+        facet::demo::ProbeRect(ctx, "containers.inspector.edge", pane->GetID("##resize"), r.Min,
+                               ImVec2(r.Min.x + band, r.Max.y));
+        ImGui::PopClipRect();
+        Note("Pane content (placeholder).");
+        if (facet::Button("Count a pane press"))
+            ++s.inspectorPanePresses;
+        ctx.Probe("containers.inspector.button");
+    }
     facet::EndInspectorPane();
+    Note("Main presses: %d. Pane presses: %d.", s.inspectorMainPresses, s.inspectorPanePresses);
 }
 
 } // namespace
@@ -606,6 +636,8 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
 
 // The shell's rectangle before a drag, read by the expectations after it.
 static ImRect shellStart;
+// The pane's rectangle before a drag of its edge.
+static ImRect paneStart;
 
 FACET_DEMO_SELFTEST("containers")
 {
@@ -884,4 +916,47 @@ FACET_DEMO_SELFTEST("containers")
         return s.scrollMax > 0.0f && s.scrollY >= s.scrollMax - 1.0f;
     });
     test.ExpectVisible("containers.scroll.last");
+
+    // Inspector pane: both parts work; the close button hides it, the checkbox shows it, the edge resizes it.
+    test.Do([] {
+        ContainersState& s = State();
+        s.inspectorVisible = true;
+        s.inspectorMainPresses = 0;
+        s.inspectorPanePresses = 0;
+    });
+    test.Reveal("containers.inspector.main");
+    test.Wait(2);
+    // Near its leading edge: in a narrow window the pane floats over the rest of the main content.
+    test.MouseMove(T::Item("containers.inspector.main", 0.05f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Click("containers.inspector.button");
+    test.Expect("the main content and the pane both work", [] {
+        return State().inspectorMainPresses == 1 && State().inspectorPanePresses == 1;
+    });
+    test.Do([] { paneStart = State().inspectorRect; });
+    // Narrower first (it may already be at its minimum), then wider again.
+    test.Drag({T::Item("containers.inspector.edge"), T::Item("containers.inspector.edge").Offset(30.0f, 0.0f)}, 0.3f);
+    test.Expect("dragging the leading edge right never widens the pane", [] {
+        return State().inspectorRect.GetWidth() <= paneStart.GetWidth() + 0.5f;
+    });
+    test.Do([] { paneStart = State().inspectorRect; });
+    test.Drag({T::Item("containers.inspector.edge"), T::Item("containers.inspector.edge").Offset(-30.0f, 0.0f)}, 0.3f);
+    test.Expect("dragging the leading edge left widens the pane", [] {
+        return State().inspectorRect.GetWidth() > paneStart.GetWidth() + 1.0f;
+    });
+    test.Click("containers.inspector.close");
+    test.WaitSeconds(0.5f);
+    test.Expect("the close button hides the pane", [] { return !State().inspectorVisible; });
+    test.Click("containers.inspector.toggle");
+    test.WaitSeconds(0.5f);
+    test.Expect("the checkbox shows it again", [] { return State().inspectorVisible; });
+    test.Click("containers.inspector.button");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("containers.inspector.close");
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.5f);
+    test.Expect("Enter on the focused close button hides the pane", [] { return !State().inspectorVisible; });
+    test.Do([] { State().inspectorVisible = true; });
 }

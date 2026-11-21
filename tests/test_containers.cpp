@@ -2185,3 +2185,181 @@ TEST_CASE("Mini windows leave every stack as they found it")
     CHECK(facet::internal::OpenScopeCount() == 0);
     CHECK_FALSE(facet::BeginMiniWindow("outside a frame", &pinned));
 }
+// ---- Inspector pane -----------------------------------------------------------------------------
+
+namespace
+{
+
+struct PaneProbe
+{
+    const char* label = "Details";
+    bool visible = true;
+    bool* flag = &visible;
+    facet::InspectorPaneOptions options{.height = 300.0f};
+    float width = 0.0f;  // units of the region; 0 fills
+    bool paneShown = false;
+    ImRect main;         // the main content's child window
+    ImRect pane;         // the pane's child window
+    int presses = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        if (width > 0.0f)
+            ImGui::SetNextItemWidth(facet::Px(width));
+        facet::BeginInspectorPane(label, flag, options);
+        main = ImGui::GetCurrentWindow()->Rect();
+        ImGui::Button("main button");
+        session.Track("main");
+        paneShown = facet::InspectorPaneNext();
+        if (paneShown)
+        {
+            pane = ImGui::GetCurrentWindow()->Rect();
+            if (ImGui::Button("pane button"))
+                ++presses;
+            session.Track("pane");
+        }
+        facet::EndInspectorPane();
+    }
+};
+
+} // namespace
+
+TEST_CASE("An inspector pane sits at the trailing edge beside the main content and closes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    PaneProbe probe{.label = "Details###docked"};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.paneShown);
+    const float paneWidth = facet::Px(facet::T().containers.inspectorWidth);
+    CHECK(probe.pane.GetWidth() == doctest::Approx(paneWidth));
+    CHECK(probe.main.Max.x == doctest::Approx(probe.pane.Min.x));
+    CHECK(probe.pane.GetHeight() == doctest::Approx(facet::Px(300.0f)));
+    session.Click(session.ItemCenter("pane"));
+    CHECK(probe.presses == 1);
+    // The close button at the end of the title row.
+    const float pad = facet::Px(facet::T().spacing.lg);
+    const float side = facet::ControlHeight(facet::ControlSize::Small);
+    session.Click(ImVec2(probe.pane.Max.x - pad - side * 0.5f, probe.pane.Min.y + pad + side * 0.5f));
+    CHECK_FALSE(probe.visible);
+    session.Frame();
+    CHECK_FALSE(probe.paneShown);
+    CHECK(probe.main.Max.x == doctest::Approx(probe.pane.Max.x));  // the main content takes the room
+    probe.visible = true;
+    session.Frame();
+    CHECK(probe.paneShown);
+}
+
+TEST_CASE("An inspector pane slides in and out")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PaneProbe probe{.label = "Details###slide", .visible = false};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    CHECK_FALSE(probe.paneShown);
+    const float full = probe.main.GetWidth();
+    probe.visible = true;
+    session.Frames(3);
+    CHECK(probe.paneShown);
+    CHECK(probe.main.GetWidth() < full);
+    CHECK(probe.main.GetWidth() > full - facet::Px(facet::T().containers.inspectorWidth));
+    session.Seconds(1.0f);
+    CHECK(probe.main.GetWidth() == doctest::Approx(full - facet::Px(facet::T().containers.inspectorWidth)));
+    probe.visible = false;
+    session.Frames(2);
+    CHECK(probe.paneShown);  // sliding out
+    session.Seconds(1.0f);
+    CHECK_FALSE(probe.paneShown);
+}
+
+TEST_CASE("An inspector pane resizes from its leading edge within its limits and keeps the width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    PaneProbe probe{.label = "Details###resize", .flag = nullptr};
+    probe.options.minPaneWidth = 200.0f;
+    probe.options.maxPaneWidth = 360.0f;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    const float start = probe.pane.GetWidth();
+    const float band = facet::Px(facet::T().containers.resizeBorder);
+    const ImVec2 edge(probe.pane.Min.x + band * 0.5f, probe.pane.GetCenter().y);
+    session.Drag({edge, ImVec2(edge.x - 40.0f, edge.y)});
+    session.Frame();
+    CHECK(probe.pane.GetWidth() == doctest::Approx(start + 40.0f));
+    const ImVec2 edge2(probe.pane.Min.x + band * 0.5f, probe.pane.GetCenter().y);
+    session.Drag({edge2, ImVec2(edge2.x - 400.0f, edge2.y)});
+    session.Frame();
+    CHECK(probe.pane.GetWidth() == doctest::Approx(facet::Px(360.0f)));
+    const ImVec2 edge3(probe.pane.Min.x + band * 0.5f, probe.pane.GetCenter().y);
+    session.Drag({edge3, ImVec2(edge3.x + 600.0f, edge3.y)});
+    session.Frame();
+    CHECK(probe.pane.GetWidth() == doctest::Approx(facet::Px(200.0f)));
+    session.Frames(3);
+    CHECK(probe.pane.GetWidth() == doctest::Approx(facet::Px(200.0f)));
+}
+
+TEST_CASE("In a Compact width the inspector pane floats over the main content")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ReducedMotion motion;
+    PaneProbe probe{.label = "Details###compact", .width = 360.0f};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.paneShown);
+    CHECK(probe.main.GetWidth() == doctest::Approx(facet::Px(360.0f)));
+    CHECK(probe.pane.Max.x == doctest::Approx(probe.main.Max.x));
+    CHECK(probe.pane.Min.x < probe.main.Max.x);
+    // A click on the drawer goes to the drawer, not to the content under it.
+    session.Click(session.ItemCenter("pane"));
+    CHECK(probe.presses == 1);
+}
+
+TEST_CASE("Inspector panes leave every stack as they found it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool shown = true;
+    bool hidden = false;
+    session.SetUi([&] {
+        CHECK_BALANCED({
+            facet::BeginInspectorPane("Hidden", &hidden, {.height = 100.0f});
+            CHECK_FALSE(facet::InspectorPaneNext());
+            facet::EndInspectorPane();
+        });
+        CHECK_BALANCED({
+            facet::BeginInspectorPane("Outer", &shown, {.height = 200.0f});
+            facet::BeginInspectorPane("Inner", nullptr, {.height = 80.0f});
+            ImGui::TextUnformatted("inner main");
+            if (facet::InspectorPaneNext())
+                ImGui::TextUnformatted("inner pane");
+            facet::EndInspectorPane();
+            if (facet::InspectorPaneNext())
+                ImGui::TextUnformatted("outer pane");
+            CHECK_FALSE(facet::InspectorPaneNext());  // once per pane
+            facet::EndInspectorPane();
+        });
+        CHECK_BALANCED({
+            facet::InspectorPaneScope scope("Without next", nullptr, {.height = 60.0f});
+            ImGui::TextUnformatted("main only");
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({
+            facet::InspectorPaneScope scope("Disabled", &shown, {.height = 60.0f});
+            if (facet::InspectorPaneNext())
+                ImGui::TextUnformatted("pane");
+        });
+        ImGui::EndDisabled();
+        CHECK_FALSE(facet::InspectorPaneNext());
+    });
+    session.Frames(2);
+    CHECK(shown);
+    CHECK_FALSE(hidden);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+}

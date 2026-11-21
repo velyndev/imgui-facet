@@ -19,6 +19,7 @@ void ContainersEndFrame()
     ClearCardStack();
     ClearShellStack();
     ClearMiniWindowStack();
+    ClearInspectorPaneStack();
     ClearContainerBackdrops();
     ClearTitleBarStack();
     RotateTitleBarRegions();
