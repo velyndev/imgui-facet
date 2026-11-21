@@ -196,28 +196,6 @@ TEST_CASE("Display widgets without a label submit an item whose id is not the wi
     CHECK(checked == 5);
 }
 
-TEST_CASE("Content-sized display placeholders are wide enough to name the widget and say planned")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const auto wide = [&](const char* widget, auto&& call) {
-            INFO("widget: " << std::string(widget));
-            call();
-            char text[64];
-            ImFormatString(text, sizeof(text), "%s: planned", widget);
-            CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
-            ++checked;
-        };
-        wide("CharacterCounter", [] { CharacterCounter(1, 0); });
-        wide("CharacterCounter", [] { CharacterCounter(1, 0, {.ring = true}); });
-    });
-    session.Frame();
-    CHECK(checked == 2);
-}
-
 TEST_CASE("A display End without its Begin is reported and changes no Dear ImGui stack")
 {
     facet::test::Session session;

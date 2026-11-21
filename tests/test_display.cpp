@@ -1255,6 +1255,40 @@ TEST_CASE("Inline code copies its text on activation and is a Tab stop only when
     CHECK(session.Clipboard() == "value_name");
 }
 
+// ==== CharacterCounter ====
+
+TEST_CASE("A character counter warns near its limit and turns destructive over it, with an icon")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    int count = 10;
+    int warning = 0;
+    int destructive = 0;
+    session.SetUi([&] {
+        const int from = VertexCount();
+        facet::CharacterCounter(count, 40);
+        warning = CountColor(from, facet::ToU32(c.warning));
+        destructive = CountColor(from, facet::ToU32(c.destructive));
+        session.Track("counter");
+        facet::CharacterCounter(count, 40, {.ring = true});
+        session.Track("ring");
+        facet::CharacterCounter(count, 0);
+    });
+    session.Frame();
+    CHECK(warning == 0);
+    CHECK(destructive == 0);
+    const float calm = session.ItemRect("counter").GetWidth();
+    count = 35;
+    session.Frame();
+    CHECK(warning > 0);
+    CHECK(session.ItemRect("counter").GetWidth() > calm);  // the warning icon
+    count = 41;
+    session.Frame();
+    CHECK(destructive > 0);
+}
+
 // ==== Contrast ====
 
 TEST_CASE("Display tones keep AA contrast on every content surface in both themes")

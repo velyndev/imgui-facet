@@ -253,7 +253,12 @@ shortcut without a chord. Not interactive. Status: ready.
 void CharacterCounter(int count, int max, const CharacterCounterOptions& options = {});
 ```
 
-Text length against a limit, warning near it and destructive over it. Status: planned.
+The length of a text against its limit as "count / max" in Footnote, `labelSecondary` while there is
+room. From `warnRemaining` characters left it turns to the warning tone with the warning icon, over
+the limit to the destructive tone with the error icon, so the state does not rest on color alone.
+`ring` draws a small ring filled to the share used instead, with the characters left beside it once
+it warns (negative over the limit). `max` of 0 or less shows the count alone. It sits on the Footnote
+baseline of the line. Not interactive. Status: ready.
 
 ### InlineCode
 
