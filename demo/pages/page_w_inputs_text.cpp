@@ -140,6 +140,10 @@ struct TextInputsUi
     std::string pinReadOnly = "42";
     std::string pinNarrow = "1234";
     std::string path;
+    std::string pathLong = "C:/Placeholder folder/Placeholder subfolder/Another placeholder folder/sample-file.txt";
+    std::string pathError = "C:/Placeholder folder/missing-sample.txt";
+    std::string pathReadOnly = "C:/Placeholder folder/read-only-sample.txt";
+    int browses = 0;
 
     // CopyField
     int copies = 0;
@@ -435,16 +439,6 @@ void AutocompleteSection(facet::demo::PageCtx& ctx)
     facet::Autocomplete("##completeError", &ui.completionError, kOptions, {.state = facet::DataState::Error});
 }
 
-void PlannedSections(facet::demo::PageCtx&)
-{
-
-
-    SectionHeader("Formatted fields");
-    LabeledRow("Path");
-    facet::PathField("##path", &ui.path, {.placeholder = "Placeholder path"});
-
-}
-
 // Records the slot button `index` (0 the rightmost) of the field just drawn at the Regular size,
 // as the text field core places it, under `name` with id `id`.
 void ProbeSlotButton(facet::demo::PageCtx& ctx, const char* name, ImGuiID id, int index)
@@ -635,6 +629,39 @@ void PinCodeSection(facet::demo::PageCtx& ctx)
     Note("Code: \"%s\" (%s).", ui.pin.c_str(), ui.pin.size() == 6 ? "complete" : "incomplete");
 }
 
+void PathFieldSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("PathField");
+    Paragraph("A file or folder path. A long path is shortened in the middle while the field is not being edited, so "
+              "the file name stays in view. The folder button asks the page to open a chooser; this page has none, so it "
+              "fills in a sample path instead.");
+
+    LabeledRow("Browse button");
+    if (ctx.capture && ctx.captureState == kCodes)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 1);
+    const ImGuiID pathId = ImGui::GetID("##path");
+    facet::PathField("##path", &ui.path, {.placeholder = "Placeholder path"});
+    if (facet::PathFieldBrowsePressed())
+    {
+        ui.path = "C:/Placeholder folder/Placeholder subfolder/sample-file.txt";
+        ++ui.browses;
+    }
+    ProbeFrame(ctx, "inputs.path");
+    ProbeSlotButton(ctx, "inputs.path.browse", ImGui::GetIDWithSeed("browse", nullptr, pathId), 0);
+
+    LabeledRow("Long path");
+    facet::PathField("##pathLong", &ui.pathLong, {.width = 280.0f});
+    ctx.Probe("inputs.path.long");
+
+    LabeledRow("Missing file");
+    facet::PathField("##pathError", &ui.pathError,
+                     {.browseButton = false, .error = "Placeholder error: the caller found no file here"});
+
+    LabeledRow("Read-only");
+    facet::PathField("##pathReadOnly", &ui.pathReadOnly, {.readOnly = true});
+    Note("Browse pressed: %d times.", ui.browses);
+}
+
 void TagInputSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("TagInput");
@@ -711,7 +738,7 @@ void ValidationSection(facet::demo::PageCtx& ctx)
     if (ImGui::GetItemID() == summaryId)
     {
         ctx.Probe("inputs.summary");
-        ProbeSummaryRows(ctx, summaryId, 3);
+        ProbeSummaryRows(ctx, summaryId, 5);
     }
 
     LabeledRow("Facet field");
@@ -767,7 +794,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     InlineRenameSection(ctx);
     MaskedInputSection(ctx);
     PinCodeSection(ctx);
-    PlannedSections(ctx);
+    PathFieldSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("inputs-text")
@@ -991,8 +1018,8 @@ FACET_DEMO_SELFTEST("inputs-text")
     // ValidationSummary and FieldValidation: from a fresh page the name and the port have errors.
     test.Do([] { ui = {}; });
     test.Wait(3);
-    test.ExpectNear("the summary lists the name, the port and the CopyField and TagInput error examples",
-                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 4.0, 0.0);
+    test.ExpectNear("the summary lists the name, the port and the CopyField, TagInput and PathField error examples",
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 5.0, 0.0);
     test.Click("inputs.summary.0");
     test.Wait(2);
     test.ExpectFocused("inputs.valid.name");
@@ -1002,17 +1029,17 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectNear("the click counts as one activation", [] { return ui.summaryActivations; }, 1.0, 0.0);
     test.KeyPress(ImGuiKey_Enter);
     test.Wait(2);
-    // The name is fixed, so three rows are left: the port and the error examples of CopyField and
-    // TagInput further down. Shift+Tab from the name reaches the last row.
+    // The name is fixed, so four rows are left: the port and the error examples of CopyField, TagInput
+    // and PathField further down. Shift+Tab from the name reaches the last row.
     test.Click("inputs.valid.name");
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("inputs.summary.2");
+    test.ExpectFocused("inputs.summary.3");
     test.KeyPress(ImGuiKey_Enter);
     test.ExpectNear("Enter on a summary row activates it", [] { return ui.summaryActivations; }, 2.0, 0.0);
     test.Do([] { ui.validPort = 80; });
     test.Wait(3);
     test.ExpectNear("a field back in range leaves the summary",
-                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 2.0, 0.0);
+                    [] { return static_cast<double>(facet::internal::PreviousFrameFieldErrors().size()); }, 3.0, 0.0);
     test.Click("inputs.stock");
     test.Expect("the stock checkbox under a message turns on", [] { return ui.stockCheck; });
 
@@ -1141,4 +1168,20 @@ FACET_DEMO_SELFTEST("inputs-text")
     test.ExpectText("the error example takes the code", [] { return ui.pinError; }, "5555");
     test.KeyPress(ImGuiKey_Enter);
     test.Do([] { ui.pinError.clear(); });
+
+    // PathField: typing, the browse button by pointer and keyboard.
+    test.Wait(3);
+    test.Click("inputs.path");
+    test.Type("C:/typed");
+    test.ExpectText("the path field takes typed text", [] { return ui.path; }, "C:/typed");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Click("inputs.path.browse");
+    test.ExpectNear("a click on the folder button is reported", [] { return ui.browses; }, 1.0, 0.0);
+    test.ExpectText("and the page fills in its sample path", [] { return ui.path; },
+                    "C:/Placeholder folder/Placeholder subfolder/sample-file.txt");
+    test.Click("inputs.path");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("inputs.path.browse");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectNear("Enter on the focused folder button is reported", [] { return ui.browses; }, 2.0, 0.0);
 }

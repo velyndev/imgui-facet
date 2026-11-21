@@ -1,10 +1,9 @@
 // The public API of the text-like inputs of facet/widgets/inputs.h (TextField, SecureField,
 // SearchField, TextArea, Autocomplete, CopyField, FilterField, TagInput, InlineRename, MaskedInput,
 // PinCodeInput, PathField, FieldValidation and ValidationSummary): every options struct follows
-// the conventions, and every widget that is still a placeholder is safe to call, submits one item
-// that cannot be operated, leaves the Dear ImGui stacks as it found them, returns the neutral
-// result and writes nothing. Behaviour tests of implemented widgets go into
-// tests/test_inputs_text.cpp; the number-like inputs have tests/test_api_inputs_value.cpp.
+// the conventions, every widget leaves the Dear ImGui stacks as it found them and writes nothing on
+// its own, calls outside a frame return the neutral result, and widths follow rule 6. Behaviour
+// tests are in tests/test_inputs_text.cpp; the number-like inputs have tests/test_api_inputs_value.cpp.
 
 #include <cfloat>
 #include <cmath>
@@ -44,28 +43,81 @@ static_assert(OptionsFollowConventions<facet::ValidationSummaryOptions>());
 // The zero member of every choice enum is the default (rule 12).
 static_assert(facet::SecureReveal{} == facet::SecureReveal::Toggle);
 
-// Every placeholder of these widgets once, with the overloads, as an app would call it.
-void CallTextInputStubs(Values& v)
+// The sizes of the Dear ImGui stacks a widget must leave as it found them.
+struct StackSizes
+{
+    int ids = 0;
+    int styleVars = 0;
+    int colors = 0;
+    int fonts = 0;
+    int itemFlags = 0;
+    int groups = 0;
+    int itemWidths = 0;
+
+    static StackSizes Now()
+    {
+        const ImGuiContext& g = *GImGui;
+        return {g.CurrentWindow->IDStack.Size, g.StyleVarStack.Size, g.ColorStack.Size, g.FontStack.Size,
+                g.ItemFlagsStack.Size, g.GroupStack.Size, g.CurrentWindow->DC.ItemWidthStack.Size};
+    }
+    bool operator==(const StackSizes&) const = default;
+};
+
+// Every text input once with its overloads, as an app would call it, in one frame.
+void CallTextInputs(Values& v)
 {
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, PathField("Path 1", &v.text));
-    FACET_CHECK_STUB(false, PathField("Path 2", buffer, bufferSize, {.browseButton = false}));
-    CHECK_FALSE(PathFieldBrowsePressed());
+    static const char* const kSuggestions[] = {"Option 1", "Option 2"};
+    TextField("Text 1", &v.text);
+    TextField("Text 2", buffer, bufferSize, {.clearButton = true});
+    SecureField("Secure 1", &v.text);
+    SecureField("Secure 2", buffer, bufferSize, {.reveal = SecureReveal::Hold, .strength = 0.5f});
+    SearchField("Search 1", &v.text, {.recent = kSuggestions});
+    SearchField("Search 2", buffer, bufferSize);
+    FilterField("Filter 1", &v.text, &v.filter);
+    FilterField("Filter 2", buffer, bufferSize, nullptr);
+    Autocomplete("Complete 1", &v.text, std::span<const char* const>(kSuggestions));
+    Autocomplete("Complete 2", buffer, bufferSize, std::span<const char* const>(kSuggestions));
+    TagInput("Tags 1", &v.tags, {.suggestions = kSuggestions});
+    TextArea("Area 1", &v.text, {.counter = true, .resizable = true});
+    TextArea("Area 2", buffer, bufferSize);
+    InlineRename("Rename 1", &v.text, &v.editing);
+    InlineRename("Rename 2", buffer, bufferSize, nullptr, {.selectStem = true});
+    MaskedInput("Masked 1", &v.text, "9999-9999");
+    MaskedInput("Masked 2", buffer, bufferSize, nullptr);
+    PinCodeInput("Pin 1", &v.text, {.masked = true});
+    PinCodeInput("Pin 2", buffer, bufferSize, {.length = 4, .error = "Message"});
+    PathField("Path 1", &v.text);
+    PathField("Path 2", buffer, bufferSize, {.browseButton = false});
+    CopyField("Copy 1", "Sample", {.masked = true});
+    FieldValidation("Message", {.tone = Tone::Warning});
+    ValidationSummary("Summary 1");
 }
-
-// Number of FACET_CHECK_STUB and FACET_CHECK_LAYOUT_STUB calls in CallTextInputStubs.
-constexpr int kTextInputStubCalls = 2;
 
 } // namespace
 
-TEST_CASE("Every text input placeholder returns the neutral result, writes nothing and keeps the stacks")
+TEST_CASE("Every text input leaves the Dear ImGui stacks as it found them and writes nothing on its own")
 {
-    FACET_CHECK_FAMILY_STUBS(CallTextInputStubs, kTextInputStubCalls);
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values values;
+    const std::string pristine = Describe(values);
+    StackSizes before;
+    StackSizes after;
+    session.SetUi([&] {
+        before = StackSizes::Now();
+        CallTextInputs(values);
+        after = StackSizes::Now();
+    });
+    session.Frames(3);
+    CHECK(before == after);
+    CHECK(Describe(values) == pristine);
+    CHECK_FALSE(facet::PathFieldBrowsePressed());
 }
 
-TEST_CASE("Text input placeholders called outside a frame return the neutral result")
+TEST_CASE("Text inputs called outside a frame return the neutral result")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -76,7 +128,7 @@ TEST_CASE("Text input placeholders called outside a frame return the neutral res
     CHECK(Describe(values) == pristine);
 }
 
-TEST_CASE("Text input placeholders take their width in the order of the conventions")
+TEST_CASE("Text inputs take their width in the order of the conventions")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

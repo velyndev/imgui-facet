@@ -1942,3 +1942,66 @@ TEST_CASE("PinCodeInput can take letters, hides a masked code from the clipboard
     session.KeyPress(ImGuiKey_Backspace);
     CHECK(fixed == "55");
 }
+// ---- PathField ---------------------------------------------------------------------------------
+
+TEST_CASE("PathField edits the path and reports its browse button by pointer and keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string path = "C:/folder/file.txt";
+    std::string fixed = "C:/fixed";
+    int browses = 0;
+    int writes = 0;
+    ImGuiID fieldId = 0;
+    session.SetUi([&] {
+        fieldId = ImGui::GetID("##path");
+        writes += facet::PathField("##path", &path) ? 1 : 0;
+        browses += facet::PathFieldBrowsePressed() ? 1 : 0;
+        session.Track("path");
+        facet::PathField("##fixed", &fixed, {.readOnly = true});
+        browses += facet::PathFieldBrowsePressed() ? 1 : 0;
+        session.Track("fixed");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("path"));
+    session.KeyPress(ImGuiKey_End);
+    session.Type("2");
+    CHECK(path == "C:/folder/file.txt2");
+    CHECK(writes == 1);
+    session.Click(SlotButtonCenter(session.ItemRect("path"), 0));
+    CHECK(browses == 1);
+    session.Click(session.ItemCenter("path"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == ImGui::GetIDWithSeed("browse", nullptr, fieldId));
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(browses == 2);
+    // Read-only: the browse button is off.
+    session.Click(SlotButtonCenter(session.ItemRect("fixed"), 0));
+    CHECK(browses == 2);
+    CHECK(fixed == "C:/fixed");
+}
+
+TEST_CASE("PathField shows a long path shortened in the middle while it does not have the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string path = "C:/a/very/long/folder/chain/that/does/not/fit/into/the/field/report-final.txt";
+    std::string shown;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int first = drawList->VtxBuffer.Size;
+        facet::PathField("##path", &path, {.width = 200.0f});
+        session.Track("path");
+        // The glyph quads of the shown text: count them to tell a shortened text from the full one.
+        shown = std::to_string(drawList->VtxBuffer.Size - first);
+    });
+    session.Frames(2);
+    const int idleVertices = std::stoi(shown);
+    session.Click(session.ItemCenter("path"));
+    session.Frames(2);
+    const int activeVertices = std::stoi(shown);
+    // Idle shows fewer characters (the middle is left out) than the active field, which scrolls the
+    // whole path and draws every glyph that is in view, including those under the fade.
+    CHECK(idleVertices > 0);
+    CHECK(idleVertices != activeVertices);
+}

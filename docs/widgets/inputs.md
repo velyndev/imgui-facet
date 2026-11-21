@@ -368,8 +368,18 @@ bool PathField(const char* label, char* buffer, std::size_t bufferSize, const Pa
 bool PathFieldBrowsePressed();
 ```
 
-A path field that shortens long paths in the middle and has a browse button; the caller opens the
-dialog. Status: planned.
+A TextField for a file or folder path. While the field does not have the keyboard, a path wider
+than the text area is drawn shortened in the middle with an ellipsis, so the file name at its end
+stays in view, and the whole path shows as a tooltip on hover and keyboard focus; while editing,
+the whole path is edited and scrolls as in any field. The shortened form follows the text area
+width of the frame before, so it adapts one frame after a resize. `browseButton` (on by default)
+adds a folder button at the end of the frame with `Strings::browse` as its tooltip: a Tab stop after
+the text, activated by a click, Space or Enter, and off while read-only. `PathFieldBrowsePressed()`
+is true on the frame it was activated, for the last PathField call of the frame; Facet opens no
+dialog itself, the caller opens its own (a system dialog or a FileBrowser in a modal) and writes the
+result. Writes per keystroke and returns true when the path was written. The width, sizes,
+`readOnly`, the error and help line, disabled and the buffer form are as for TextField.
+Status: ready.
 
 ### CopyField
 
