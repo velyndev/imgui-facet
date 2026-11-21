@@ -232,6 +232,9 @@ Popup host:
   Dear ImGui's own dim is not used, so the dim and the dialog arrive together.
 - **Rows in menus** draw the focus ring inside the row, because the menu padding is narrower
   than the ring.
+- **Menu row pitch.** Menu rows take the list row height and meet without a gap, the same as the
+  rows of an open list, so the pointer moving down a menu is always on a row and the highlight
+  never blinks off between two rows.
 - **Menu shortcuts** sit right-aligned at the row's end in labelSecondary, so the labels stay
   the first thing read and every shortcut lines up in one column.
 - **Menu leading slot.** An icon (labelSecondary) or a check mark sits in a slot that every row of

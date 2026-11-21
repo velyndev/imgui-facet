@@ -143,7 +143,9 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
     const char* end = ImGui::FindRenderedTextEnd(label);
     PushTextStyle(TextStyle::Body);
     const float padding = Px(t.spacing.sm);
-    const float height = ControlHeight(ControlSize::Regular);
+    // The row pitch and hit area of an open list (ListRowHeight), with no gap between rows, so the
+    // pointer moving down a menu is always on a row.
+    const float height = ListRowHeight(ControlSize::Regular);
     const float iconSize = Px(t.type[TextStyle::Body].size);
     const float slotWidth = slot ? iconSize + padding : 0.0f;
     const float labelWidth = ImGui::CalcTextSize(label, end).x;
@@ -156,7 +158,9 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
     ItemOptions options;
     options.hitTarget = false;
     options.disabled = desc.disabled;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));
     const ItemState row = ItemBehavior(ImGui::GetID(label), ImVec2(width, height), options);
+    ImGui::PopStyleVar();
     result.item = row;
     if (state.rowCountNext < kMenuTypeaheadRows)
     {

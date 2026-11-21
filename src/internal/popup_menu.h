@@ -31,7 +31,9 @@
 //     is not on its way there. The Left arrow inside a submenu closes it and the focus goes back
 //     to its row; Escape closes one level per press (the popup host). A submenu closed by a key
 //     while the pointer happens to rest on its row stays closed until the pointer moves.
-//   - Look: the level's full width, the hover fill (fill[2], fill[1] while pressed) that stays
+//   - Look: the level's full width and the row height of an open list (ListRowHeight, Regular),
+//     with no item spacing between rows, so rows meet edge to edge as in a list and the pointer
+//     never rests between two of them (other content in a level keeps the regular spacing); the hover fill (fill[2], fill[1] while pressed) that stays
 //     while the row's submenu is open, an optional leading icon or check mark in a slot every row
 //     of the level keeps once one row uses it, the label, the shortcut text right-aligned in
 //     labelSecondary overlay.menuShortcutGap after the label, a chevron-right for a submenu, and

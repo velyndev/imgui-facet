@@ -9,6 +9,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/popup_menu.h"
 #include "support/session.h"
@@ -144,6 +145,27 @@ TEST_CASE("Menu rows: the level is wide enough for the label, the gap and the sh
     CHECK(session.ItemRect("Cut").GetWidth() >= ui.needed);
     // Rows fill the level, so the shortcut column lines up at the end of every row.
     CHECK(session.ItemRect("Cut").GetWidth() == doctest::Approx(session.ItemRect("Paste").GetWidth()));
+}
+
+TEST_CASE("Menu rows: rows take the list row height and meet without a gap")
+{
+    MenuMotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    MenuUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frame();
+    session.Click(session.ItemCenter("open"));
+    session.Frames(3);
+    REQUIRE(ui.menuOpen);
+    const ImRect cut = session.ItemRect("Cut");
+    const ImRect paste = session.ItemRect("Paste");
+    CHECK(cut.GetHeight() == doctest::Approx(fi::ListRowHeight(facet::ControlSize::Regular)));
+    CHECK(paste.Min.y == doctest::Approx(cut.Max.y));
+    // A point just below the first row is already on the second one.
+    session.MouseMove(ImVec2(cut.GetCenter().x, cut.Max.y + 1.0f));
+    session.Frames(2);
+    CHECK(ImGui::GetHoveredID() == session.ItemId("Paste"));
 }
 
 TEST_CASE("Menu rows: the check of a chosen row takes the shared choice color")
