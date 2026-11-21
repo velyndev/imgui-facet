@@ -854,7 +854,7 @@ FACET_DEMO_PAGE("selection", "Selection", "Widgets", 20, "default", "hovered", "
     facet::demo::PageHeader("Selection",
                             "Toggles, checkboxes and checkbox groups, radio groups, segmented controls, chips, "
                             "cycle selectors, option cards and the key bind mode selector.");
-    facet::demo::PlannedFamilyNote("selection");
+    facet::demo::ReadyFamilyNote("selection");
 
     ToggleSection(ctx);
 

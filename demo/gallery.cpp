@@ -663,6 +663,13 @@ void PlannedFamilyNote(const char* family)
          family, family, family);
 }
 
+void ReadyFamilyNote(const char* family)
+{
+    Note("Every widget of this family works as its entry in docs/widgets/%s.md describes. Declared in "
+         "facet/widgets/%s.h; the declarations and usage examples are in docs/widgets/%s.md.",
+         family, family, family);
+}
+
 void NoteBeside(const char* fmt, ...)
 {
     const ImRect item(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());

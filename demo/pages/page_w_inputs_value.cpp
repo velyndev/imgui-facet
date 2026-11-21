@@ -343,7 +343,7 @@ FACET_DEMO_PAGE("inputs-value", "Value inputs", "Widgets", 45, "default", "hover
     facet::demo::PageHeader("Value inputs",
                             "Number, drag, unit, vector, size and duration fields, a hexadecimal field, key bind "
                             "capture and ratings.");
-    facet::demo::PlannedFamilyNote("inputs");
+    facet::demo::ReadyFamilyNote("inputs");
     (void)SampleShortcut();
 
     NumberSection(ctx);

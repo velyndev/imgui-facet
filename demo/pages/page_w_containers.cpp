@@ -621,7 +621,7 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
                             "The floating shell, the app frame and its title bar, the overlay controller, mini "
                             "windows, tool and status bars, accordions, disclosures, cards, group boxes, scroll "
                             "areas, virtual lists and the inspector pane.");
-    facet::demo::PlannedFamilyNote("containers");
+    facet::demo::ReadyFamilyNote("containers");
     ContainersState& s = State();
     Windows(ctx, s);
     Toolbars(ctx, s);

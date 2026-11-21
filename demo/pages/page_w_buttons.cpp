@@ -460,7 +460,7 @@ FACET_DEMO_PAGE("buttons", "Buttons", "Widgets", 10, "default", "hovered", "pres
     facet::demo::PageHeader("Buttons",
                             "Push buttons with variants, icon buttons, copy buttons, links and toggle button "
                             "groups.");
-    facet::demo::PlannedFamilyNote("buttons");
+    facet::demo::ReadyFamilyNote("buttons");
 
     ButtonSection(ctx);
 

@@ -780,7 +780,7 @@ FACET_DEMO_PAGE("inputs-text", "Text inputs", "Widgets", 40, "default", "hovered
     facet::demo::PageHeader("Text inputs",
                             "Text, secure and multi-line fields, search, filter and suggestion fields, tags, "
                             "formatted fields, and validation messages.");
-    facet::demo::PlannedFamilyNote("inputs");
+    facet::demo::ReadyFamilyNote("inputs");
 
     TextFieldSection(ctx);
     SecureFieldSection(ctx);

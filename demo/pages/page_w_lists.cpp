@@ -593,7 +593,7 @@ FACET_DEMO_PAGE("lists", "Lists", "Widgets", 60, "default", "dropdown-open", "dr
     facet::demo::PageHeader("Lists",
                             "Dropdowns, combo boxes, list boxes, selectable and reorderable lists, tree views, "
                             "checkbox trees, transfer lists and checklists.");
-    facet::demo::PlannedFamilyNote("lists");
+    facet::demo::ReadyFamilyNote("lists");
     ListsState& s = State();
     DropdownSection(ctx, s);
     ListBoxSection(ctx, s);
