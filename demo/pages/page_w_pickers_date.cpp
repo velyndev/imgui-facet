@@ -34,6 +34,7 @@ enum CaptureState
     kDefault,
     kDateOpen,
     kDateFocused,
+    kRangeOpen,
 };
 
 // A fixed sample date, so captures show the same month on every day.
@@ -50,8 +51,12 @@ struct OtherPickersUi
     int weekStart = 0;  // 0 Monday, 1 Sunday
     int writes = 0;
 
-    facet::Date start;
-    facet::Date end;
+    facet::Date start{2026, 3, 9};
+    facet::Date end{2026, 3, 13};
+    facet::Date presetStart;
+    facet::Date presetEnd;
+    facet::Date limitedStart;
+    facet::Date limitedEnd;
     facet::TimeOfDay time = {.hour = 12};
     float angle = 0.0f;
     facet::Icon icon = facet::Icon("star");
@@ -78,12 +83,14 @@ const facet::FileType kFileTypes[] = {
     {"All files"},
 };
 
-// The text of a date for the notes beside the pickers.
-const char* DateText(const facet::Date& date)
+// The text of a date for the notes beside the pickers; `slot` (0 or 1) picks one of two buffers,
+// so a note can show two dates.
+const char* DateText(const facet::Date& date, int slot = 0)
 {
-    static char text[16];
-    facet::internal::DateFormat(text, sizeof(text), date, facet::DatePrecision::Day);
-    return date.IsValid() ? text : "no date";
+    static char text[2][16];
+    char* out = text[slot & 1];
+    facet::internal::DateFormat(out, sizeof(text[0]), date, facet::DatePrecision::Day);
+    return date.IsValid() ? out : "no date";
 }
 
 // Records a day cell of the calendar of the date picker submitted last (its popover, or its inline
@@ -167,9 +174,49 @@ void DateSection(facet::demo::PageCtx& ctx)
     Note("Inline value: %s. Writes so far: %d.", DateText(ui.inlineDate), ui.writes);
 }
 
+// Two neutral presets: halves of the sample month.
+const facet::DateRangePreset kRangePresets[] = {
+    {"First half of March 2026", {2026, 3, 1}, {2026, 3, 15}},
+    {"Second half of March 2026", {2026, 3, 16}, {2026, 3, 31}},
+};
+
+void RangeSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("DateRangePicker");
+    Paragraph("A field that opens two months side by side. The first pick sets the start, the second the end (in "
+              "order, whichever comes first); the band follows the pointer or the arrows in between. The ends of a "
+              "range can be dragged. Presets write both ends at once.");
+    if (ctx.capture && ctx.captureState == kRangeOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    facet::DateRangePicker("Range", &ui.start, &ui.end, {.width = DemoWidth(320.0f)});
+    ctx.Probe("pickers.range");
+    ProbeDay(ctx, "pickers.range.day17", facet::Date{2026, 3, 17});
+    ProbeDay(ctx, "pickers.range.day24", facet::Date{2026, 3, 24});
+    ProbeDay(ctx, "pickers.range.day13", facet::Date{2026, 3, 13});
+    if (ctx.capture && ctx.captureState == kRangeOpen)
+        ctx.RevealInCapture(0.2f);
+    facet::DateRangePicker("With presets", &ui.presetStart, &ui.presetEnd,
+                           {.presets = kRangePresets, .width = DemoWidth(320.0f)});
+    ctx.Probe("pickers.range.presets");
+    facet::DateRangePicker("Limited", &ui.limitedStart, &ui.limitedEnd,
+                           {.min = {2026, 3, 1}, .max = {2026, 4, 30}, .firstWeekday = facet::Weekday::Sunday,
+                            .width = DemoWidth(320.0f), .helpText = "March and April 2026, weeks from Sunday"});
+    facet::Date fixedStart{2026, 3, 9};
+    facet::Date fixedEnd{2026, 3, 13};
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::DateRangePicker("##disabled", &fixedStart, &fixedEnd, {.width = DemoWidth(260.0f)});
+    ImGui::EndDisabled();
+    LabeledRow("Read-only");
+    facet::DateRangePicker("##readonly", &fixedStart, &fixedEnd, {.width = DemoWidth(260.0f), .readOnly = true});
+    LabeledRow("Error");
+    facet::DateRangePicker("##error", &fixedStart, &fixedEnd, {.width = DemoWidth(260.0f), .error = "Pick a longer range"});
+    Note("Range: %s to %s.", DateText(ui.start, 0), DateText(ui.end, 1));
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused")
+FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused", "range-open")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
@@ -177,10 +224,9 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date
     facet::demo::PlannedFamilyNote("pickers");
 
     DateSection(ctx);
+    RangeSection(ctx);
 
-    SectionHeader("Dates and times");
-    LabeledRow("Date range");
-    facet::DateRangePicker("##range", &ui.start, &ui.end);
+    SectionHeader("Times");
     LabeledRow("Time");
     facet::TimePicker("##time", &ui.time);
     ctx.Probe("pickers.time");
@@ -246,6 +292,36 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.MouseDown();
     test.MouseUp();
     test.Expect("the week start control switches to Sunday", [] { return ui.weekStart == 1; });
+
+    // DateRangePicker by mouse: two picks in reverse order make the range in order.
+    test.Reveal("pickers.range");
+    test.WaitSeconds(0.4f);
+    test.Click("pickers.range");
+    test.WaitSeconds(0.3f);
+    test.Click("pickers.range.day24");
+    test.Expect("the first pick sets the start and clears the end",
+                [same] { return same(ui.start, Date{2026, 3, 24}) && !ui.end.IsValid(); });
+    test.Click("pickers.range.day17");
+    test.Expect("the second pick before the first completes the range in order",
+                [same] { return same(ui.start, Date{2026, 3, 17}) && same(ui.end, Date{2026, 3, 24}); });
+    // Dragging the end of the range moves it.
+    test.Click("pickers.range");
+    test.WaitSeconds(0.3f);
+    test.Drag({facet::demo::Target::Item("pickers.range.day24"), facet::demo::Target::Item("pickers.range.day13")}, 0.3f);
+    test.Expect("the end dragged before the start swaps the ends",
+                [same] { return same(ui.start, Date{2026, 3, 13}) && same(ui.end, Date{2026, 3, 17}); });
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectFocused("pickers.range");
+    // By keyboard: Space opens on the start, Enter picks it, a week on, Enter ends the range.
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter, Down and Enter pick a week by keyboard",
+                [same] { return same(ui.start, Date{2026, 3, 14}) && same(ui.end, Date{2026, 3, 21}); });
+    test.ExpectFocused("pickers.range");
 
     // The planned pickers are placeholders: clicks and keys write nothing.
     test.Click("pickers.time");

@@ -435,3 +435,166 @@ TEST_CASE("An inline calendar picks in place and fits a short row")
     session.Click(day2.rect.GetCenter());
     CHECK(SameDate(date, Date{2026, 3, 2}));
 }
+
+// ---- DateRangePicker ----------------------------------------------------------------------------
+
+namespace
+{
+
+// The calendar of a DateRangePicker and a few of its day cells, as the last frame left them.
+struct RangeProbe
+{
+    ImGuiID level = 0;
+    bool open = false;
+    Date shown;
+    ImRect cells[4];
+
+    void Record(const char* label, const Date (&days)[4])
+    {
+        level = ImHashStr("##calendar", 0, ImGui::GetID(label));
+        open = fi::IsPopupLevelOpen(level);
+        shown = fi::CalendarPanelShownMonth(level);
+        for (int i = 0; i < 4; ++i)
+            cells[i] = fi::CalendarDayCellRect(level, days[i]);
+    }
+};
+
+} // namespace
+
+TEST_CASE("Two picks make a range in order, and the second pick before the first swaps them")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Date start{2026, 3, 2};
+    Date end{2026, 3, 6};
+    int writes = 0;
+    RangeProbe range;
+    const Date days[4] = {{2026, 3, 10}, {2026, 3, 18}, {2026, 4, 3}, {2026, 3, 5}};
+    session.SetUi([&] {
+        if (facet::DateRangePicker("Dates", &start, &end))
+            ++writes;
+        session.Track("dates");
+        range.Record("Dates", days);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("dates"));
+    session.Frames(2);
+    REQUIRE(range.open);
+    CHECK(SameDate(range.shown, Date{2026, 3, 1}));
+    // Two months side by side: April's 3rd is to the right of March.
+    REQUIRE(range.cells[2].GetWidth() > 1.0f);
+    CHECK(range.cells[2].Min.x > range.cells[1].Max.x);
+
+    session.Click(range.cells[1].GetCenter());
+    CHECK(SameDate(start, Date{2026, 3, 18}));
+    CHECK_FALSE(end.IsValid());
+    CHECK(writes == 1);
+    CHECK(range.open);
+    session.Click(range.cells[0].GetCenter());
+    CHECK(SameDate(start, Date{2026, 3, 10}));
+    CHECK(SameDate(end, Date{2026, 3, 18}));
+    CHECK(writes == 2);
+    CHECK_FALSE(range.open);
+
+    // By keyboard: the arrows show the cursor, Enter on it, then three weeks on, Enter.
+    session.Click(session.ItemCenter("dates"));
+    session.Frames(2);
+    REQUIRE(range.open);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(SameDate(start, Date{2026, 3, 10}));
+    CHECK_FALSE(end.IsValid());
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(SameDate(start, Date{2026, 3, 10}));
+    CHECK(SameDate(end, Date{2026, 3, 31}));
+    CHECK_FALSE(range.open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("dates"));
+}
+
+TEST_CASE("Dragging an end of a range moves it, and past the other end the two swap")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Date start{2026, 3, 10};
+    Date end{2026, 3, 18};
+    RangeProbe range;
+    const Date days[4] = {{2026, 3, 10}, {2026, 3, 18}, {2026, 3, 25}, {2026, 3, 5}};
+    session.SetUi([&] {
+        facet::DateRangePicker("Dates", &start, &end);
+        session.Track("dates");
+        range.Record("Dates", days);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("dates"));
+    session.Frames(2);
+    REQUIRE(range.open);
+    session.Drag({range.cells[1].GetCenter(), range.cells[2].GetCenter()}, 6);
+    CHECK(SameDate(start, Date{2026, 3, 10}));
+    CHECK(SameDate(end, Date{2026, 3, 25}));
+    CHECK(range.open);
+    // The start dragged past the end: the end becomes the start.
+    session.Drag({range.cells[0].GetCenter(), range.cells[2].GetCenter(), range.cells[3].GetCenter()}, 6);
+    CHECK(SameDate(start, Date{2026, 3, 5}));
+    CHECK(SameDate(end, Date{2026, 3, 25}));
+}
+
+TEST_CASE("A range preset writes both ends at once and closes the calendar")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Date start;
+    Date end;
+    int writes = 0;
+    bool open = false;
+    ImRect presetRect;
+    const facet::DateRangePreset presets[] = {{"Option 1", {2026, 1, 5}, {2026, 1, 9}},
+                                              {"Option 2", {2026, 2, 20}, {2026, 2, 10}}};
+    session.SetUi([&] {
+        if (facet::DateRangePicker("Dates", &start, &end, {.presets = presets}))
+            ++writes;
+        session.Track("dates");
+        const ImGuiID level = ImHashStr("##calendar", 0, ImGui::GetID("Dates"));
+        open = fi::IsPopupLevelOpen(level);
+        if (open)
+            presetRect = fi::PopupLevelRect(level);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("dates"));
+    session.Frames(2);
+    REQUIRE(open);
+    // The presets column starts at the level's content: a caption line, then the buttons.
+    const float pad = facet::Px(facet::T().spacing.xs);
+    const float row = facet::ControlHeight(facet::ControlSize::Inherit);
+    const ImVec2 second(presetRect.Min.x + pad + facet::Px(20.0f), presetRect.Min.y + pad + row * 2.5f);
+    session.Click(second);
+    // An end before its start is put in order.
+    CHECK(SameDate(start, Date{2026, 2, 10}));
+    CHECK(SameDate(end, Date{2026, 2, 20}));
+    CHECK(writes == 1);
+    CHECK_FALSE(open);
+}
+
+TEST_CASE("A range picker shows one month when the display has no room for two")
+{
+    facet::test::Session session(facet::test::SessionOptions{.displaySize = ImVec2(300.0f, 600.0f)});
+    REQUIRE(session.Ready());
+    Date start{2026, 3, 10};
+    Date end{2026, 3, 18};
+    RangeProbe range;
+    const Date days[4] = {{2026, 3, 10}, {2026, 3, 18}, {2026, 4, 3}, {2026, 3, 5}};
+    session.SetUi([&] {
+        facet::DateRangePicker("Dates", &start, &end);
+        session.Track("dates");
+        range.Record("Dates", days);
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("dates"));
+    session.Frames(2);
+    REQUIRE(range.open);
+    CHECK(range.cells[0].GetWidth() > 1.0f);
+    CHECK(range.cells[2].GetWidth() == 0.0f);  // April is not shown
+}

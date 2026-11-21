@@ -241,7 +241,25 @@ cursor. Today is the local date of the system clock. Status: ready.
 bool DateRangePicker(const char* label, Date* start, Date* end, const DateRangePickerOptions& options = {});
 ```
 
-Two months side by side that pick a start and an end date, with presets. Status: planned.
+A field showing the range, `2026-03-09`, an arrow and `2026-03-13` (dashes for a missing end, the
+placeholder while both are missing), with a calendar icon at its end; a field widget with the label
+in front and the available width by default. A click, Enter, Space or Alt+Down opens a popover below
+the field with the calendar of DatePicker, two months side by side (one when the display is too
+narrow for two) under one pair of previous and next buttons; it starts at the month of *start (or
+of today). The first pick writes *start and clears *end; from then on the band between the start and
+the day under the pointer (or the keyboard cursor) shows in accentSubtle, and the second pick writes
+both ends in order, earlier first, in the same frame, and closes. The ends of a completed range are
+on the accent fill; pressing one and dragging moves it (writing while dragging), and an end dragged
+past the other takes its place. Keys in the calendar are those of DatePicker; Enter and Space pick.
+`presets` adds a column of plain buttons under a `Strings::presets` caption beside the calendars
+(above them when there is no room); a preset writes both ends at once, in order and clamped into
+`[min, max]`, and closes. Days outside `[min, max]` are disabled; `firstWeekday` sets the week start.
+
+Escape or a click outside closes; a range left after one pick keeps the start and no end.
+`readOnly` (or a null pointer) shows the range and focuses but does not open. `mixed` shows
+`Strings::mixed` until an edit. `error` and `helpText` show under the field. Captures:
+`ForcedItemState::Open` shows the popover. State under the id: the first pick while a range is
+being picked, the end being dragged; the calendar keeps its shown months and cursor. Status: ready.
 
 ### TimePicker
 

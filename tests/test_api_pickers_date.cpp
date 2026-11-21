@@ -43,7 +43,6 @@ void CallDatePickerStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, DateRangePicker("Dates 1", &v.start, &v.end));
     FACET_CHECK_STUB(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
     FACET_CHECK_STUB(false, AnglePicker("Angle 1", &v.radians));
     FACET_CHECK_STUB(false, IconPicker("Icon 1", &v.icon));
@@ -56,7 +55,7 @@ void CallDatePickerStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallDatePickerStubs.
-constexpr int kDatePickerStubCalls = 9;
+constexpr int kDatePickerStubCalls = 8;
 
 } // namespace
 
