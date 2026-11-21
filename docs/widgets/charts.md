@@ -126,7 +126,23 @@ Status: ready.
 void DonutChart(const char* id, std::span<const DonutSlice> slices, const DonutChartOptions& options = {});
 ```
 
-Ring or pie of proportional slices with a center total. Status: planned.
+A ring (or with `pie` a full disc) of slices proportional to their values, from the top and
+clockwise. Negative and NaN values count as 0. The surface shows through a gap of
+`charts.barGap` between slices, so neighbouring colors never touch.
+
+- **Small slices:** with `minSliceFraction` > 0, slices below that share of the total merge into
+  one last slice named `otherLabel` (or `Strings::more`), drawn in labelSecondary.
+- **Center:** the ring's hole (`charts.donutHole` of the diameter) shows `centerText`, or the
+  total in `format` or `formatter` (default "%g"), cut to the hole.
+- **Readout:** one item and one Tab stop. The pointer over a slice, or Left, Right, Home and End,
+  pick a slice: it grows out by `spacing.xs` (over `motion.durationFast`, at once with reduced
+  motion) and the center shows its value and label; a pie names it in a box beside it.
+- **Legend:** `legend` puts a passive legend beside the ring when the width allows, else under it.
+- **States:** a total of 0 shows the empty state; `Loading` and `Error` as on LineChart.
+- **Size:** `diameter` 0 is `metrics.chartHeight`; the width is the ring and the legend, at most the
+  available width (`SetNextItemWidth` sets it); the ring shrinks to fit.
+
+Status: ready.
 
 ### Gauge
 
