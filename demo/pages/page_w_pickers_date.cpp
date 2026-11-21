@@ -1,9 +1,12 @@
-// Demo page: Other pickers. Calls every widget of facet/widgets/pickers.h that is not a color
-// picker once: date, date range and time pickers, the angle, icon and thumbnail pickers and the
-// file browser. The widgets are planned, so each call draws its placeholder at the widget's default
-// size; Phase 2 replaces them one by one. The color pickers have a page of their own
-// (page_w_pickers_color.cpp).
+// Demo page: Other pickers. One section per widget of facet/widgets/pickers.h that is not a color
+// picker: date, date range and time pickers, the angle, icon and thumbnail pickers and the file
+// browser, with their important variants and states, capture states for the open and focused
+// looks, and a selftest that operates every ready widget by mouse and keyboard. A widget that is
+// still planned draws its placeholder. The color pickers have a page of their own
+// (page_w_pickers_color.cpp). Sample values are neutral: fixed dates and times, built-in icons,
+// "Option n" entries.
 
+#include <cstdio>
 #include <string>
 
 #include <imgui.h>
@@ -11,18 +14,42 @@
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/popup_host.h"
 #include "pages/pages.h"
+#include "widgets/pickers/date_picker_parts.h"
 
 namespace
 {
 
+using facet::demo::DemoWidth;
+using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
+using facet::demo::Note;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
 
+// The capture states, in the order of the FACET_DEMO_PAGE line below.
+enum CaptureState
+{
+    kDefault,
+    kDateOpen,
+    kDateFocused,
+};
+
+// A fixed sample date, so captures show the same month on every day.
+constexpr facet::Date kSampleDate{2026, 3, 14};
+
 struct OtherPickersUi
 {
-    facet::Date date;
+    facet::Date date = kSampleDate;
+    facet::Date limited = kSampleDate;
+    facet::Date month{2026, 3, 1};
+    facet::Date inlineDate = kSampleDate;
+    facet::Date sized[3] = {kSampleDate, kSampleDate, kSampleDate};
+    facet::Date empty;
+    int weekStart = 0;  // 0 Monday, 1 Sunday
+    int writes = 0;
+
     facet::Date start;
     facet::Date end;
     facet::TimeOfDay time = {.hour = 12};
@@ -51,19 +78,107 @@ const facet::FileType kFileTypes[] = {
     {"All files"},
 };
 
+// The text of a date for the notes beside the pickers.
+const char* DateText(const facet::Date& date)
+{
+    static char text[16];
+    facet::internal::DateFormat(text, sizeof(text), date, facet::DatePrecision::Day);
+    return date.IsValid() ? text : "no date";
+}
+
+// Records a day cell of the calendar of the date picker submitted last (its popover, or its inline
+// calendar with `inlinePanel`) as probe `name`, so the selftest clicks the day wherever the
+// calendar opened.
+void ProbeDay(facet::demo::PageCtx& ctx, const char* name, const facet::Date& day, bool inlinePanel = false)
+{
+    const ImGuiID field = ImGui::GetItemID();
+    const ImGuiID panel = ImHashStr(inlinePanel ? "##inline" : "##calendar", 0, field);
+    const ImRect rect = facet::internal::CalendarDayCellRect(panel, day);
+    if (rect.GetWidth() > 0.0f)
+        facet::demo::ProbeRect(ctx, name, facet::internal::CalendarDayCellId(panel, day), rect.Min, rect.Max);
+}
+
+void DateSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("DatePicker");
+    Paragraph("A segmented date field. Left and Right pick the year, month or day; Up and Down step it; digits type "
+              "it and Enter writes. A click, Space, Enter or Alt+Down opens the calendar: the arrows move by days and "
+              "weeks, Page Up and Down by months, Enter or a click picks.");
+
+    if (ctx.capture && ctx.captureState == kDateOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open);
+    else if (ctx.capture && ctx.captureState == kDateFocused)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    if (facet::DatePicker("Date", &ui.date, {.width = DemoWidth(260.0f)}))
+        ++ui.writes;
+    ctx.Probe("pickers.date");
+    ProbeDay(ctx, "pickers.date.day20", facet::Date{2026, 3, 20});
+    ImGui::SameLine();
+    facet::demo::NoteBeside("%s", DateText(ui.date));
+    if (ctx.capture && ctx.captureState == kDateOpen)
+        ctx.RevealInCapture(0.2f);
+
+    if (facet::DatePicker("Limited", &ui.limited,
+                          {.min = {2026, 3, 10}, .max = {2026, 3, 20}, .width = DemoWidth(260.0f),
+                           .helpText = "From 2026-03-10 to 2026-03-20"}))
+        ++ui.writes;
+    ctx.Probe("pickers.date.limited");
+    if (facet::DatePicker("Month", &ui.month, {.precision = facet::DatePrecision::Month, .width = DemoWidth(260.0f)}))
+        ++ui.writes;
+    ctx.Probe("pickers.date.month");
+    if (facet::DatePicker("Empty", &ui.empty, {.width = DemoWidth(260.0f)}))
+        ++ui.writes;
+    ctx.Probe("pickers.date.empty");
+
+    LabeledRow("Sizes");
+    {
+        const facet::ControlSize sizes[] = {facet::ControlSize::Small, facet::ControlSize::Regular,
+                                            facet::ControlSize::Large};
+        const char* names[] = {"##small", "##regular", "##large"};
+        for (int i = 0; i < 3; ++i)
+        {
+            if (i > 0)
+                LabeledRow("");
+            facet::DatePicker(names[i], &ui.sized[i], {.size = sizes[i], .width = DemoWidth(200.0f)});
+        }
+    }
+    facet::Date fixed = kSampleDate;
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::DatePicker("##disabled", &fixed, {.width = DemoWidth(200.0f)});
+    ImGui::EndDisabled();
+    LabeledRow("Read-only");
+    facet::DatePicker("##readonly", &fixed, {.width = DemoWidth(200.0f), .readOnly = true});
+    LabeledRow("Error");
+    facet::DatePicker("##error", &fixed, {.width = DemoWidth(200.0f), .error = "Pick a later date"});
+    LabeledRow("Mixed");
+    facet::DatePicker("##mixed", &fixed, {.width = DemoWidth(200.0f), .mixed = true});
+
+    LabeledRow("Week starts on");
+    const char* const weekStarts[] = {"Monday", "Sunday"};
+    facet::SegmentedControl("##weekstart", &ui.weekStart, weekStarts);
+    ctx.Probe("pickers.date.weekstart");
+    LabeledRow("Inline");
+    const facet::Weekday first = ui.weekStart == 1 ? facet::Weekday::Sunday : facet::Weekday::Monday;
+    if (facet::DatePicker("##inline", &ui.inlineDate, {.firstWeekday = first, .inlineCalendar = true}))
+        ++ui.writes;
+    ctx.Probe("pickers.date.inline");
+    ProbeDay(ctx, "pickers.date.inline.day2", facet::Date{2026, 3, 2}, true);
+    Note("Inline value: %s. Writes so far: %d.", DateText(ui.inlineDate), ui.writes);
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52)
+FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52, "default", "date-open", "date-focused")
 {
     facet::demo::PageHeader("Other pickers",
                             "Date, date range and time pickers, angle, icon and thumbnail pickers, and the file "
                             "browser. The color pickers have a page of their own.");
     facet::demo::PlannedFamilyNote("pickers");
 
+    DateSection(ctx);
+
     SectionHeader("Dates and times");
-    LabeledRow("Date");
-    facet::DatePicker("##date", &ui.date);
-    ctx.Probe("pickers.date");
     LabeledRow("Date range");
     facet::DateRangePicker("##range", &ui.start, &ui.end);
     LabeledRow("Time");
@@ -86,11 +201,53 @@ FACET_DEMO_PAGE("pickers-date", "Other pickers", "Widgets", 52)
 
 FACET_DEMO_SELFTEST("pickers-date")
 {
+    using facet::Date;
+    const auto same = [](const Date& a, const Date& b) { return a.year == b.year && a.month == b.month && a.day == b.day; };
     test.Do([] { ui = {}; });
-    // The planned pickers are placeholders: clicks and keys write nothing.
+
+    // DatePicker by mouse: the field opens the calendar, a day writes and closes it.
+    test.Reveal("pickers.date");
+    test.WaitSeconds(0.4f);
     test.Click("pickers.date");
+    test.WaitSeconds(0.3f);
+    test.Click("pickers.date.day20");
+    test.Expect("a click on a day writes it", [same] { return same(ui.date, Date{2026, 3, 20}); });
+    // By keyboard: Space opens on the date, Right moves a day, Enter picks and gives the focus back.
+    test.Click("pickers.date");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectFocused("pickers.date");
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Right and Enter in the calendar pick the next day", [same] { return same(ui.date, Date{2026, 3, 21}); });
+    test.ExpectFocused("pickers.date");
     test.KeyPress(ImGuiKey_UpArrow);
-    test.Expect("the date placeholder writes nothing", [] { return !ui.date.IsValid(); });
+    test.Expect("Up steps the day segment", [same] { return same(ui.date, Date{2026, 3, 22}); });
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Type("2025");
+    test.Type("12");
+    test.Type("25");
+    test.Expect("typed parts wait for Enter", [same] { return same(ui.date, Date{2026, 3, 22}); });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter writes the typed date", [same] { return same(ui.date, Date{2025, 12, 25}); });
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_PageDown);
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("Escape closes the calendar without writing", [same] { return same(ui.date, Date{2025, 12, 25}); });
+    test.ExpectFocused("pickers.date");
+
+    // The inline calendar picks in place.
+    test.Click("pickers.date.inline.day2");
+    test.Expect("a click on an inline day writes it", [same] { return same(ui.inlineDate, Date{2026, 3, 2}); });
+    test.MouseMove(facet::demo::Target::Item("pickers.date.weekstart", 0.8f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("the week start control switches to Sunday", [] { return ui.weekStart == 1; });
+
+    // The planned pickers are placeholders: clicks and keys write nothing.
     test.Click("pickers.time");
     test.KeyPress(ImGuiKey_UpArrow);
     test.ExpectNear("the time placeholder writes nothing", [] { return ui.time.hour; }, 12.0, 0.0);

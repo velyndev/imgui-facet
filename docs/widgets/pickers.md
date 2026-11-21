@@ -194,8 +194,46 @@ struct Date { int year; int month; int day; };
 bool DatePicker(const char* label, Date* date, const DatePickerOptions& options = {});
 ```
 
-A segmented date field with a calendar popover, limits and day, month or year precision.
-Status: planned.
+A segmented date field with a calendar in a popover or in place. The field shows the date in ISO
+order (`2026-03-14`, `2026-03` at Month precision, `2026` at Year precision), the placeholder
+(`Strings::select` unless `placeholder` is set) while there is no date, and a calendar icon at its
+end. It is a field widget: the label in front, the available width by default; with
+`inlineCalendar` the default width fits the label and the calendar, at most the available width,
+and a narrower width shrinks the day cells.
+
+Keys on the focused field: Left and Right pick the year, month or day segment; Up and Down step it
+and write at once, wrapping inside the segment (day 31 goes to day 1 of the same month) while the
+day follows the length of the month; the wheel while focused and a vertical drag on the field step
+the same way. Each step is an edit session of the value drag core, so `IsItemEditCommitted` reports
+it and Escape during a held step restores the date. Typed digits fill the focused segment and move
+on to the next one (`-`, `/` and `.` move on as well); they are shown as typed and written on Enter,
+Tab or focus loss once they make a real date, clamped into `[min, max]`. An invalid date such as 31
+February stays shown as typed and is written only after it is corrected; Escape drops the typed
+parts. Backspace or Delete clears the focused segment, and a field whose segments are all cleared
+writes no date. A typed commit is reported by the result and `ImGui::IsItemEdited`, not by
+`IsItemEditCommitted`, because typing is not an edit session of Dear ImGui.
+
+A click, Enter, Space or Alt+Down opens the calendar below the field (above when there is no room),
+on the blurred popover surface. It shows the month of the date (or of today) with the weekday
+headings from `Strings::weekdayMonday` to `weekdaySunday` starting at `firstWeekday`, today with a
+hairline outline and the day number in the accent text color, the picked day on the accent fill in
+semibold, and days outside `[min, max]` disabled. The keyboard focus moves to the date: the arrows
+move by a day and a week, Page Up and Page Down by a month (with Shift by a year), Home and End to
+the start and end of the week, across month and year borders and never outside `[min, max]`;
+Enter, Space or a click picks, writes and closes, and the focus returns to the field. Escape or a
+click outside closes without writing. The previous and next buttons page the months; the title
+(`Strings::monthJanuary` to `monthDecember` and the year) opens the month view, and the month
+view's title the year view (twelve years), which hand back to the narrower view when an entry is
+picked. At Month precision the calendar starts in the month view and a month is the pick; at Year
+precision the year view, and a year is the pick. A calendar narrower than three buttons drops the
+previous and next buttons; Page Up and Page Down still page.
+
+`readOnly` (or a null `date`) shows the date and focuses, but the calendar does not open and nothing
+is written. `mixed` shows `Strings::mixed` until a date is written. Disabled through
+`ImGui::BeginDisabled`. `error` and `helpText` show under the field. Captures: `ForcedItemState::Open`
+shows the popover; with `inlineCalendar`, a request for part 1 goes to the calendar's cursor day.
+State kept under the id: the focused segment, typed parts, and the calendar's view, shown month and
+cursor. Today is the local date of the system clock. Status: ready.
 
 ### DateRangePicker
 

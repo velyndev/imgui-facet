@@ -43,7 +43,6 @@ void CallDatePickerStubs(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, DatePicker("Date 1", &v.date, {.inlineCalendar = true}));
     FACET_CHECK_STUB(false, DateRangePicker("Dates 1", &v.start, &v.end));
     FACET_CHECK_STUB(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
     FACET_CHECK_STUB(false, AnglePicker("Angle 1", &v.radians));
@@ -57,7 +56,7 @@ void CallDatePickerStubs(Values& v)
 }
 
 // Number of FACET_CHECK_STUB calls in CallDatePickerStubs.
-constexpr int kDatePickerStubCalls = 10;
+constexpr int kDatePickerStubCalls = 9;
 
 } // namespace
 
@@ -75,28 +74,6 @@ TEST_CASE("Date and other picker stubs called outside a frame return the neutral
     CHECK_FALSE(facet::DatePicker("Date 1", &values.date));
     CHECK_FALSE(facet::FileBrowser("Browser 1", &values.text));
     CHECK(Describe(values) == pristine);
-}
-
-TEST_CASE("The inline calendar placeholder fits a short row")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    facet::Date date;
-    float available = 0.0f;
-    session.SetUi([&] {
-        facet::DatePicker("Date##wide", &date, {.inlineCalendar = true});
-        session.Track("date wide");
-        ImGui::BeginChild("short row", ImVec2(facet::Px(40.0f), facet::Px(600.0f)));
-        available = ImGui::GetContentRegionAvail().x;
-        facet::DatePicker("Date", &date, {.inlineCalendar = true});
-        session.Track("date");
-        ImGui::EndChild();
-    });
-    session.Frame();
-
-    REQUIRE(available > 1.0f);
-    CHECK(session.ItemRect("date wide").GetWidth() > available);
-    CHECK(session.ItemRect("date").GetWidth() == doctest::Approx(available));
 }
 
 TEST_CASE("AnglePicker fits a short row and follows the width rules")
