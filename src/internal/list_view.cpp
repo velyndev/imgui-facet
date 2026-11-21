@@ -97,12 +97,22 @@ struct RowEnv
     bool* hasRing = nullptr;
 };
 
+// How a row is placed beyond its rectangle (ListRowDesc::inPlace, allowOverlap, ownRing).
+struct RowPlacement
+{
+    bool inPlace = false;
+    bool allowOverlap = false;
+    bool ownRing = false;
+};
+
 ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSelectionUserData data, bool selected,
-                    bool disabled, bool tabStop, int part, float indent, bool highlighted = false)
+                    bool disabled, bool tabStop, int part, float indent, bool highlighted = false,
+                    const RowPlacement& placement = {})
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = env.window;
     const Theme& theme = T();
+    const ImVec2 cursorBefore = window->DC.CursorPos;
     window->DC.CursorPos = rect.Min;
 
     const bool inMulti = env.multi && !disabled && g.CurrentMultiSelect != nullptr;
@@ -122,7 +132,8 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
     options.baseline = std::max(0.0f, (rect.GetHeight() - g.FontSize) * 0.5f);
     options.part = part;
     options.forced = env.forced;
-    ItemState item = ItemBehavior(id, rect.GetSize(), options);
+    options.allowOverlap = placement.allowOverlap;
+    ItemState item = placement.inPlace ? PartBehavior(id, rect, options) : ItemBehavior(id, rect.GetSize(), options);
     if (inMulti && item.visible)
         ImGui::MultiSelectItemFooter(id, &selected, &item.pressed);
 
@@ -164,7 +175,8 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
             FillRect(drawList, fill.Min, fill.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
         }
     }
-    if (env.ring != nullptr && (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
+    if (env.ring != nullptr && !placement.ownRing &&
+        (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
     {
         // The active row of a driven list shows the ring the keyboard focus would.
         *env.ring = item;
@@ -173,6 +185,12 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
         *env.hasRing = true;
     }
 
+    if (placement.inPlace)
+    {
+        // The container laid the row out itself: the cursor goes back where it was.
+        window->DC.CursorPos = cursorBefore;
+        return row;
+    }
     // The caller's content follows on the row's line, centered on it.
     ImGui::SameLine(0.0f, 0.0f);
     window->DC.CursorPos.x = row.content.Min.x;
@@ -276,8 +294,7 @@ struct ViewState
     int focusIndex = -1;
     ImGuiID focusedId = 0;
     int revealRow = -1;
-    ImGuiID anchorId = 0;      // storage id of the Shift range start at the end of the last frame
-    bool anchorKnown = false;
+    ListRangeAnchor anchor;    // the Shift range start at the end of the last frame
 };
 
 struct ViewFrame
@@ -498,40 +515,15 @@ void DriveHighlight(ViewFrame& frame)
         ActivateHighlight(frame, active);
 }
 
-// Dear ImGui keeps the start of a Shift range as an index. When the caller sorted or filtered since
-// the last frame, the index points at another entry: move it to the entry it was set on, found by
-// its storage id (one scan, only on the frame the order changed), or drop it when the entry is gone.
+// The start of a Shift range across a sort or filter (ListRangeAnchor in list_view.h).
 void RemapAnchor(ViewFrame& frame)
 {
-    ViewState& state = *frame.state;
-    const ListViewDesc& desc = frame.desc;
-    ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(frame.focusScope);
-    if (multi == nullptr || !state.anchorKnown || multi->RangeSrcItem < 0)
-        return;
-    const ImS64 index = multi->RangeSrcItem;
-    if (index < desc.rowCount && desc.selection->GetStorageIdFromIndex(static_cast<int>(index)) == state.anchorId)
-        return;
-    ImGuiSelectionUserData found = ImGuiSelectionUserData_Invalid;
-    for (int i = 0; i < desc.rowCount; ++i)
-    {
-        if (desc.selection->GetStorageIdFromIndex(i) == state.anchorId)
-        {
-            found = i;
-            break;
-        }
-    }
-    multi->RangeSrcItem = found;
-    if (multi->NavIdItem == index)
-        multi->NavIdItem = found;
+    frame.state->anchor.Remap(frame.desc.selection, frame.focusScope, frame.desc.rowCount);
 }
 
 void RecordAnchor(ViewFrame& frame)
 {
-    ViewState& state = *frame.state;
-    const ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(frame.focusScope);
-    state.anchorKnown = multi != nullptr && multi->RangeSrcItem >= 0 && multi->RangeSrcItem < frame.desc.rowCount;
-    if (state.anchorKnown)
-        state.anchorId = frame.desc.selection->GetStorageIdFromIndex(static_cast<int>(multi->RangeSrcItem));
+    frame.state->anchor.Record(frame.desc.selection, frame.focusScope, frame.desc.rowCount);
 }
 
 void ApplyChoice(ViewFrame& frame, const ImGuiMultiSelectIO* io)
@@ -807,8 +799,12 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
     env.forced = forced != nullptr ? forced : &kNoForce;
     env.ring = &ring;
     env.hasRing = &hasRing;
+    RowPlacement placement;
+    placement.inPlace = desc.inPlace;
+    placement.allowOverlap = desc.allowOverlap;
+    placement.ownRing = desc.ownRing;
     return RunRow(env, id, rect, desc.selection, desc.selected, desc.disabled, desc.tabStop, desc.part, desc.indent,
-                  desc.highlighted);
+                  desc.highlighted, placement);
 }
 
 void ListRowGroup::End()
@@ -883,6 +879,61 @@ void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImR
     if (window == nullptr || ImGui::GetCurrentContext() == nullptr || id == 0)
         return;
     FocusRowAt(window, id, focusScope, rect);
+}
+
+bool ListTabProxy(ImGuiID listId, const ImRect& rect)
+{
+    if (ImGui::GetCurrentContext() == nullptr || GImGui->CurrentWindow == nullptr || listId == 0)
+        return false;
+    return SubmitTabProxy(TabProxyId(listId), rect);
+}
+
+void ListClaimTabExit(ImGuiWindow* window, ImGuiID owner, ImGuiID listId, ImGuiID outerScope, const ImRect& rect)
+{
+    if (window == nullptr || ImGui::GetCurrentContext() == nullptr || listId == 0 || owner == 0)
+        return;
+    ClaimTabExit(window, owner, TabProxyId(listId), outerScope, rect);
+}
+
+void ListRangeAnchor::Remap(ListSelection* selection, ImGuiID focusScope, int rowCount)
+{
+    // Dear ImGui keeps the start of a Shift range as an index. When the caller sorted or filtered
+    // since the last frame, the index points at another entry: move it to the entry it was set on,
+    // found by its storage id (one scan, only on the frame the order changed), or drop it when the
+    // entry is gone.
+    if (selection == nullptr || ImGui::GetCurrentContext() == nullptr)
+        return;
+    ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(focusScope);
+    if (multi == nullptr || !known || multi->RangeSrcItem < 0)
+        return;
+    const ImS64 index = multi->RangeSrcItem;
+    if (index < rowCount && selection->GetStorageIdFromIndex(static_cast<int>(index)) == id)
+        return;
+    ImGuiSelectionUserData found = ImGuiSelectionUserData_Invalid;
+    for (int i = 0; i < rowCount; ++i)
+    {
+        if (selection->GetStorageIdFromIndex(i) == id)
+        {
+            found = i;
+            break;
+        }
+    }
+    multi->RangeSrcItem = found;
+    if (multi->NavIdItem == index)
+        multi->NavIdItem = found;
+}
+
+void ListRangeAnchor::Record(ListSelection* selection, ImGuiID focusScope, int rowCount)
+{
+    if (selection == nullptr || ImGui::GetCurrentContext() == nullptr)
+    {
+        known = false;
+        return;
+    }
+    const ImGuiMultiSelectState* multi = GImGui->MultiSelectStorage.GetByKey(focusScope);
+    known = multi != nullptr && multi->RangeSrcItem >= 0 && multi->RangeSrcItem < rowCount;
+    if (known)
+        id = selection->GetStorageIdFromIndex(static_cast<int>(multi->RangeSrcItem));
 }
 
 bool BeginListView(ImGuiID id, const ListViewDesc& desc)

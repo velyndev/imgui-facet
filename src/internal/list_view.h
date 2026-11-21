@@ -222,6 +222,14 @@ struct ListRowDesc
     bool highlighted = false;  // the active row of a driven list: the hover fill and the focus ring
     float indent = 0.0f;       // pixels before row.content (a tree depth)
     int part = -1;             // the part of the group's forced state this row answers to (captures)
+    // A row over space the container laid out itself (a table row spanning its cells): the row is
+    // a part (PartBehavior, no ItemSize) and the cursor is left where it was before the call.
+    bool inPlace = false;
+    // A later item over the row (a control in a table cell) may take the hover and the click.
+    bool allowOverlap = false;
+    // The container draws the focus ring of this row itself (a table draws it around the focused
+    // cell instead of the row); End leaves the row out.
+    bool ownRing = false;
 };
 
 // The rows of one list in one window, between Begin and End.
@@ -280,6 +288,30 @@ void ListFocusRow(ImGuiWindow* window, ImGuiID id, ImGuiID focusScope, const ImR
 // the focus it owns Tab, and a press hands the focus to the item after (with Shift, before) the list
 // in the next frame, as from any other item; it then returns false. (since 0.1)
 bool ListTabStop(ImGuiWindow* window, ImGuiID listId, const ImRect& rect, bool rowFocused);
+
+// Tab for a container whose rows are in a selection scope (see "Tab" at the top of this file), as
+// the view does it. While no row has the focus, ListTabProxy submits the tab stop of list `listId`
+// at `rect` (screen pixels) in the surrounding focus scope and returns true when the focus has just
+// landed on it from outside: the container then moves the focus on to the row Tab lands on
+// (ListFocusRow). While a row has the focus, ListClaimTabExit owns Tab for `owner` every frame and,
+// on a press, puts the focus back on that tab stop (`outerScope` is the focus scope around the
+// selection), so the tabbing of the next frame moves on from there.
+bool ListTabProxy(ImGuiID listId, const ImRect& rect);
+void ListClaimTabExit(ImGuiWindow* window, ImGuiID owner, ImGuiID listId, ImGuiID outerScope, const ImRect& rect);
+
+// The start of a Shift range across a sort or filter, as the view keeps it. Dear ImGui keeps the
+// range start as an index; when the caller reorders its rows, Remap (before BeginListSelection)
+// moves it back to the entry it was set on, found by its storage id in one scan of `rowCount`
+// entries on the frame the order changed only, or drops it when the entry is gone. Record (after
+// EndListSelection) remembers that entry. `focusScope` is the selection scope.
+struct ListRangeAnchor
+{
+    ImGuiID id = 0;      // storage id of the range start at the end of the last frame
+    bool known = false;
+
+    void Remap(ListSelection* selection, ImGuiID focusScope, int rowCount);
+    void Record(ListSelection* selection, ImGuiID focusScope, int rowCount);
+};
 
 // ---- Trees ----------------------------------------------------------------------------------------
 
