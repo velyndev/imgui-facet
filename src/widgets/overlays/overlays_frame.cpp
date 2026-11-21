@@ -13,6 +13,7 @@ void OverlaysEndFrame()
 {
     OverlayScrollResetStack();
     OverlayPopoverResetStack();
+    OverlayModalResetStack();
 }
 
 } // namespace

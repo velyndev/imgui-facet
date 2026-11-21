@@ -27,15 +27,35 @@ How layers open and how results come back:
 
 ### BeginModal
 
-Status: planned
-
 ```cpp
 [[nodiscard]] bool BeginModal(const char* label, bool* open, const ModalOptions& options = {});
 void EndModal();
 class ModalScope;
 ```
 
-A dialog over a scrim with a focus trap, stacking for nested modals and focus return on close.
+A dialog centered in the display over the scrim, `overlay.modalWidth` wide (`width` in units
+otherwise, never wider than the display), on the elevated surface of level 3 with the window
+radius. The visible label part is the title (Title3, cut with an ellipsis and shown in full on
+hover); with `closeButton` a Plain, Small close button named `Strings::close` sits at the end of the
+title row.
+
+- **Content:** submitted between `BeginModal` and `EndModal`, with ids under the dialog. The dialog is
+  as tall as its content; content taller than the display scrolls inside it with Facet's overlay
+  bars, and the dialog stays inside the display.
+- **Focus:** when it opens, the keyboard focus moves to the first item of the content (or the item
+  that called `ImGui::SetItemDefaultFocus`); Tab and the arrows stay inside the dialog; when it
+  closes, however it closes, the focus goes back to the item that had it before.
+- **Input:** the page under the scrim takes no hover and no click. A press on the scrim never reaches
+  what is under it.
+- **Closing:** with `dismissible`, Escape and a click on the scrim close it and write `*open = false`;
+  without, both do nothing and the caller closes it. The close button closes it as well.
+- **Stacking:** a modal opened inside another modal's content (a `ConfirmDialog` too) stacks above
+  it and Escape closes the top one first. Two modals opened at the same level of the page replace
+  each other, as two popups of one level do, so open the second one from inside the first.
+- **Motion:** it scales in from `motion.popupScaleFrom` and fades in over `motion.popupOpen`, and
+  fades out over `motion.popupClose`; the scrim fades with it.
+
+Status: ready.
 
 ### ConfirmDialog
 

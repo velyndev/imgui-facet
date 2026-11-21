@@ -793,3 +793,124 @@ TEST_CASE("A window context menu opens on a right click on empty space")
     session.Frames(2);
     CHECK(menuOpen);
 }
+
+// ---- Modal ---------------------------------------------------------------------------------------
+
+TEST_CASE("A modal takes the focus, keeps Tab inside, blocks the page and gives the focus back on Escape")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = false;
+    int pagePresses = 0;
+    ImRect dialog;
+    session.SetUi([&] {
+        if (facet::Button("Open"))
+            open = true;
+        session.Track("opener");
+        if (facet::Button("Page"))
+            ++pagePresses;
+        session.Track("page");
+        if (facet::BeginModal("Settings", &open))
+        {
+            facet::Button("First");
+            session.Track("first");
+            facet::Button("Second");
+            session.Track("second");
+            facet::EndModal();
+        }
+        dialog = fi::PopupLevelRect(ImGui::GetID("Settings"));
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    // Centered in the display.
+    CHECK(std::fabs(dialog.GetCenter().x - 400.0f) < 2.0f);
+    CHECK(ImGui::GetFocusID() == session.ItemId("first"));
+    // Tab cycles inside the dialog: the first two stops, then the close button, then back.
+    const ImGuiContext& g = *ImGui::GetCurrentContext();
+    for (int i = 0; i < 6; ++i)
+    {
+        session.KeyPress(ImGuiKey_Tab);
+        REQUIRE(g.NavWindow != nullptr);
+        CHECK(g.NavId != session.ItemId("page"));
+        CHECK(g.NavId != session.ItemId("opener"));
+    }
+    session.Click(session.ItemCenter("first"));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frame();
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+    // The page under it takes no click: a click there lands on the scrim, which dismisses the
+    // dialog, and the focus goes back to the opener all the same.
+    session.Click(session.ItemCenter("opener"));
+    session.Seconds(0.3f);
+    REQUIRE(open);
+    session.Click(session.ItemCenter("page"));
+    session.Frame();
+    CHECK(pagePresses == 0);
+    CHECK_FALSE(open);
+    CHECK(ImGui::GetFocusID() == session.ItemId("opener"));
+}
+
+TEST_CASE("A modal closes on the scrim and on Escape; one that is not dismissible ignores both")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    bool fixed = false;
+    session.SetUi([&] {
+        if (facet::BeginModal("Dismissible", &open))
+        {
+            ImGui::TextUnformatted("Content");
+            facet::EndModal();
+        }
+        if (facet::BeginModal("Must answer###fixed", &fixed, {.dismissible = false, .closeButton = false}))
+        {
+            if (facet::Button("Done"))
+                fixed = false;
+            session.Track("done");
+            facet::EndModal();
+        }
+    });
+    session.Seconds(0.3f);
+    session.Click(ImVec2(10.0f, 10.0f));
+    session.Frame();
+    CHECK_FALSE(open);
+    open = true;
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(open);
+    fixed = true;
+    session.Seconds(0.3f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Click(ImVec2(10.0f, 10.0f));
+    session.Frame();
+    CHECK(fixed);
+    session.Click(session.ItemCenter("done"));
+    session.Frame();
+    CHECK_FALSE(fixed);
+}
+
+TEST_CASE("Modal content taller than the display scrolls inside a dialog that fits the display")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    ImRect dialog;
+    session.SetUi([&] {
+        if (facet::BeginModal("Long", &open))
+        {
+            for (int i = 0; i < 100; ++i)
+                ImGui::Text("Line %d", i);
+            facet::EndModal();
+        }
+        dialog = fi::PopupLevelRect(ImGui::GetID("Long"));
+    });
+    session.Seconds(0.3f);
+    CHECK(Inside(dialog, DisplayMinusMargin()));
+    CHECK(dialog.GetWidth() == doctest::Approx(facet::Px(facet::T().overlay.modalWidth)));
+}
