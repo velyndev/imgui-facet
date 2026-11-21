@@ -399,7 +399,8 @@ FACET_DEMO_SELFTEST("pickers-color")
     // ColorInputs: paste color text into a focused field.
     test.Reveal("pickers.inputs");
     test.WaitSeconds(0.4f);
-    test.MouseMove(Target::Item("pickers.inputs", 0.97f, 0.5f));
+    // The last field: near the bottom, where the fields are also when the menu takes a line of its own.
+    test.MouseMove(Target::Item("pickers.inputs", 0.97f, 0.85f));
     test.MouseDown();
     test.MouseUp();
     test.KeyPress(ImGuiKey_Escape);
