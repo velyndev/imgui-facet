@@ -6,6 +6,7 @@
 // are not called inside this page; the page says so and the family doc shows their host code.
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include <imgui.h>
@@ -40,6 +41,8 @@ constexpr int kScrollLines = 40;
 struct ContainersState
 {
     bool shellOpen = false;
+    ImRect shellRect;           // the shell window in the last frame it showed
+    int shellPresses = 0;
     bool inspectorVisible = true;
     ImGuiSelectionBasicStorage selection;
 
@@ -114,21 +117,50 @@ void Windows(facet::demo::PageCtx& ctx, ContainersState& s)
 {
     SectionHeader("Shell");
     Paragraph("The floating shell is a window of its own that a page opens; the checkbox sets its "
-              "open flag, and its close button or Escape will clear it. A planned shell shows one "
-              "placeholder line while the flag is on.");
+              "open flag, and its close button or Escape clears it. Drag the title bar to move it "
+              "(it snaps to the display edges) and any edge or corner to resize it; its place and "
+              "size are kept in design units.");
     if (ctx.capture)
         s.shellOpen = ctx.captureState == kCaptureShell;
     LabeledRow("Shell");
     ImGui::Checkbox("##shell", &s.shellOpen);
     facet::ItemCursor();
     ctx.Probe("containers.shell");
-    if (facet::BeginShell("Shell###shell", &s.shellOpen, {.icon = facet::Icon("settings"), .closeOnEscape = true}))
+    facet::ShellOptions shell{.icon = facet::Icon("settings"),
+                              .initialSize = {300.0f, 220.0f},
+                              .minSize = {240.0f, 160.0f},
+                              .closeOnEscape = true};
+    // Capture and selftest runs start from the same place every time.
+    shell.persist = !ctx.capture && ctx.probes == nullptr;
+    if (facet::BeginShell("Shell###containers.shell", &s.shellOpen, shell))
     {
-        Note("Shell content.");
+        ImGuiWindow* root = ImGui::GetCurrentWindow()->RootWindow;
+        s.shellRect = root->Rect();
+        const float title = facet::Px(facet::T().containers.titleBarHeight);
+        const ImRect r = s.shellRect;
+        // The title bar, the close button and the bottom-right corner, for the selftest. They lie
+        // outside the content area, so they are probed against the shell window's own rectangle.
+        ImGui::PushClipRect(r.Min, r.Max, false);
+        facet::demo::ProbeRect(ctx, "containers.shell.title", root->GetID("##titlebar"), r.Min,
+                               ImVec2(r.Max.x - title, r.Min.y + title));
+        facet::demo::ProbeRect(ctx, "containers.shell.close", root->GetID("##close"), ImVec2(r.Max.x - title, r.Min.y),
+                               ImVec2(r.Max.x, r.Min.y + title));
+        const float band = facet::Px(facet::T().containers.resizeBorder);
+        facet::demo::ProbeRect(ctx, "containers.shell.corner", 0, ImVec2(r.Max.x - band, r.Max.y - band), r.Max);
+        ImGui::PopClipRect();
+        Paragraph("Content of the shell. It scrolls when the shell is short.");
+        if (facet::Button("Count a shell press"))
+            ++s.shellPresses;
+        ctx.Probe("containers.shell.button");
+        ImGui::SameLine();
+        facet::demo::NoteBeside("Presses: %d", s.shellPresses);
+        if (facet::BeginGroupBox("Group box in the shell", {.description = "Containers nest inside the shell."}))
+        {
+            Note("Placeholder content.");
+            facet::EndGroupBox();
+        }
         facet::EndShell();
     }
-    if (ctx.capture && ctx.captureState == kCaptureShell)
-        ctx.RevealInCapture();
     SectionHeader("Title bar");
     Paragraph("A title row with an icon and window buttons, as the top of an app frame or a shell.");
     facet::BeginTitleBar("Title", {.icon = facet::Icon("monitor"), .windowButtons = true});
@@ -422,12 +454,16 @@ FACET_DEMO_PAGE("containers", "Containers", "Widgets", 80, "default", "shell", "
     s.resetOpen = false;
 }
 
+// The shell's rectangle before a drag, read by the expectations after it.
+static ImRect shellStart;
+
 FACET_DEMO_SELFTEST("containers")
 {
     using T = facet::demo::Target;
     test.Do([] {
         ContainersState& s = State();
         s.shellOpen = false;
+        s.shellPresses = 0;
         s.cardPresses = 0;
         s.groupPresses = 0;
         s.scrollPresses = 0;
@@ -439,8 +475,40 @@ FACET_DEMO_SELFTEST("containers")
     test.Expect("the shell starts closed", [] { return !ContainersState{}.shellOpen; });
     test.Click("containers.shell");
     test.Expect("the checkbox opens the shell", [] { return State().shellOpen; });
+    test.Wait(2);
+    test.Click("containers.shell.button");
+    test.Expect("a button inside the shell works", [] { return State().shellPresses == 1; });
+    // Moving: the title bar drags the shell along.
+    test.Do([] { State().shellPresses = 0; });
+    test.Do([] { shellStart = State().shellRect; });
+    test.Drag({T::Item("containers.shell.title", 0.3f), T::Item("containers.shell.title", 0.3f).Offset(-40.0f, -30.0f)},
+              0.3f);
+    test.Expect("dragging the title bar moves the shell", [] {
+        const ImRect& r = State().shellRect;
+        return r.Min.x < shellStart.Min.x - 1.0f && r.Min.y < shellStart.Min.y - 1.0f &&
+               std::fabs(r.GetWidth() - shellStart.GetWidth()) < 0.5f;
+    });
+    // Resizing: the bottom-right corner grows it.
+    test.Do([] { shellStart = State().shellRect; });
+    test.Drag({T::Item("containers.shell.corner"), T::Item("containers.shell.corner").Offset(30.0f, 20.0f)}, 0.3f);
+    test.Expect("dragging the corner resizes the shell", [] {
+        const ImRect& r = State().shellRect;
+        return r.GetWidth() > shellStart.GetWidth() + 1.0f && r.GetHeight() > shellStart.GetHeight() + 1.0f &&
+               std::fabs(r.Min.x - shellStart.Min.x) < 0.5f;
+    });
+    // Keyboard: Tab reaches the content; Escape closes the shell.
+    test.Click("containers.shell.button");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("containers.shell.button");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter on the focused button inside the shell works", [] { return State().shellPresses == 2; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("Escape closes the shell", [] { return !State().shellOpen; });
+    // The close button.
     test.Click("containers.shell");
-    test.Expect("the checkbox closes the shell", [] { return !State().shellOpen; });
+    test.Wait(2);
+    test.Click("containers.shell.close");
+    test.Expect("the close button closes the shell", [] { return !State().shellOpen; });
 
     // Toolbar: clicks and Space or Enter activate; the arrows move along the row; the view buttons latch.
     test.Click("containers.toolbar.add");

@@ -17,6 +17,7 @@ void ContainersEndFrame()
     ClearDisclosureStack();
     ClearGroupBoxStack();
     ClearCardStack();
+    ClearShellStack();
     ClearContainerBackdrops();
 }
 

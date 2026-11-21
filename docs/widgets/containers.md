@@ -29,10 +29,42 @@ void EndShell();
 class ShellScope;
 ```
 
-A floating, resizable menu window: title bar as drag region, edge and corner resize, minimum and
-maximum size, snapping to display edges, size and position kept in design units and clamped back
-into the display after a resolution or scale change. Like `ImGui::Begin` it makes a top-level
-window, so a page may open one from its own code. Status: planned.
+A floating, resizable menu window that Facet draws itself. Like `ImGui::Begin` it makes a top-level
+window (the label is its Dear ImGui window name, with the usual `##` and `###` rules), also when it
+is called while another window is being submitted, so a page may open one from its own code.
+
+- **Look.** The surface is glass with its shadow (`glass`, the default), or the opaque elevated
+  surface with the elevation shadow and a hairline where blur is off or unavailable. The title bar
+  (`containers.titleBarHeight`) shows the optional `icon`, the visible label part in Headline (cut
+  with an ellipsis and shown in full as a tooltip on hover) and, when `open` is not null, a close
+  button named by `Strings::close`. A hairline divides it from the content.
+- **Moving.** Dragging the free part of the title bar moves the shell (`movable`). While dragged it
+  snaps to the display edges and corners within `spacing.lg` (`snapToEdges`).
+- **Resizing.** Bands of `containers.resizeBorder` along every edge and a square of twice that in
+  every corner resize it (`resizable`), with the resize cursors; the opposite edges stay where they
+  are. Facet's grip marks the bottom-right corner and brightens while a band is hovered or held. The
+  bands lie inside the window, so the pointer over them is over the shell and never reaches what is
+  behind it. The size stays within `minSize` (0: the title bar and one control row inside the
+  padding, at least `overlay.menuMinWidth` wide) and `maxSize` (0: the display).
+- **Place and size.** The first place is the display center (`centered`) or the display corner of
+  `corner`, at `initialSize` (0: `overlay.modalWidth` wide and a quarter taller, until a size token
+  exists). Position and size are kept in design units, the position relative to the display's work
+  area, under the window name, and with `persist` saved in Dear ImGui's ini file: the shell reopens
+  at the same place and apparent size at any scale and after a restart. With `keepInDisplay` it is
+  clamped into the display every frame, so a smaller display or a larger scale brings it back.
+- **Collapsing.** With `collapsible`, a double click on the title bar collapses the shell to its
+  title bar and back; `BeginShell` returns false while it is collapsed. The state is saved with the
+  place.
+- **Closing.** The close button writes `*open = false`; so does Escape with `closeOnEscape`, once
+  nothing above the shell takes Escape (rule 8 of the conventions). The caller writes true to open it.
+- **Content.** Below the title bar the content is a scroll area of the scroll core (overlay
+  scrollbar, smooth wheel, edge fades on the opaque surface) inset by the resize bands, with
+  `spacing.lg` around it. Keyboard navigation reaches every item inside; content ids are under the
+  shell's window.
+
+`BeginShell` returns false while closed, collapsed or skipped by Dear ImGui (it then ends its window
+itself); call `EndShell` only after true. Moving and resizing take the mouse only; the keyboard
+reaches the close button and the content. Status: ready.
 
 ### BeginAppFrame
 

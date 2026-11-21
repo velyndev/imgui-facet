@@ -158,5 +158,6 @@ void ClearCardStack();
 void ClearGroupBoxStack();
 void ClearDisclosureStack();
 void ClearAccordionStack();
+void ClearShellStack();
 
 } // namespace facet::internal

@@ -47,14 +47,6 @@ static_assert(HasDataBlock<facet::VirtualListOptions>());
 void CallContainerStubs(Values& v)
 {
     ImGuiSelectionBasicStorage selection;
-    CHECK_BALANCED(if (facet::BeginShell("Shell", &v.open)) {
-        FAIL("BeginShell opened");
-        facet::EndShell();
-    });
-    CHECK_BALANCED(if (facet::BeginShell("Shell without close", nullptr)) {
-        FAIL("BeginShell opened");
-        facet::EndShell();
-    });
     CHECK_BALANCED({
         const bool open = facet::BeginAppFrame("App");
         CHECK(open);

@@ -5,6 +5,7 @@
 // tests/test_api_containers.cpp.
 
 #include <cfloat>
+#include <string>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -887,5 +888,319 @@ TEST_CASE("Toolbars leave every stack as they found it")
     CHECK_FALSE(facet::ToolbarButton("A", facet::Icon("plus")));
     facet::EndToolbar();
     CHECK(facet::internal::OpenScopeCount() == 0);
+    CHECK(facet::internal::UsageErrorCount() == before);
+}
+
+// ---- Shell --------------------------------------------------------------------------------------
+
+namespace
+{
+
+// A shell over the session window, with a button inside and a button of the page under it.
+struct ShellProbe
+{
+    const char* label = "Shell";  // one per test: Facet keeps a shell's place for the whole process
+    bool open = true;
+    facet::ShellOptions options{.initialSize = {300.0f, 200.0f}, .closeOnEscape = true};
+    bool shown = false;
+    int presses = 0;
+    int behind = 0;
+    ImRect window;      // the shell window, pixels
+    ImGuiID windowId = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        // A wide button of the page, under the middle of the display where the shell opens.
+        ImGui::SetCursorScreenPos(ImVec2(0.0f, 250.0f));
+        if (ImGui::Button("behind", ImVec2(800.0f, 100.0f)))
+            ++behind;
+        shown = facet::BeginShell(label, &open, options);
+        if (shown)
+        {
+            ImGuiWindow* root = ImGui::GetCurrentWindow()->RootWindow;
+            window = root->Rect();
+            windowId = root->ID;
+            if (ImGui::Button("inside"))
+                ++presses;
+            session.Track("inside");
+            facet::EndShell();
+        }
+    }
+    // The middle of the title bar's free part, pixels.
+    ImVec2 Title() const { return ImVec2(window.Min.x + window.GetWidth() * 0.4f, window.Min.y + facet::Px(10.0f)); }
+};
+
+float Units(float pixels)
+{
+    return pixels / facet::Px(1.0f);
+}
+
+} // namespace
+
+TEST_CASE("A shell opens centered at its initial size as a window of its own and closes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###open"};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.shown);
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(300.0f));
+    CHECK(Units(probe.window.GetHeight()) == doctest::Approx(200.0f));
+    CHECK(probe.window.GetCenter().x == doctest::Approx(400.0f).epsilon(0.01));
+    CHECK(probe.window.GetCenter().y == doctest::Approx(300.0f).epsilon(0.01));
+    // Its own top-level window, not a child of the page it was called from.
+    CHECK(probe.windowId != ImGui::FindWindowByName("test")->ID);
+    session.Click(session.ItemCenter("inside"));
+    CHECK(probe.presses == 1);
+    // The close button at the end of the title bar writes the caller's flag.
+    const float h = facet::Px(facet::T().containers.titleBarHeight);
+    session.Click(ImVec2(probe.window.Max.x - h * 0.5f, probe.window.Min.y + h * 0.5f));
+    CHECK_FALSE(probe.open);
+    CHECK_FALSE(probe.shown);
+    probe.open = true;
+    session.Frames(2);
+    CHECK(probe.shown);
+    // Escape closes it with closeOnEscape.
+    session.Click(session.ItemCenter("inside"));
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK_FALSE(probe.open);
+}
+
+TEST_CASE("A click on a shell never reaches the page behind it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###behind"};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.shown);
+    // The middle of the shell, over the page button: the content area, empty there.
+    const ImVec2 middle(probe.window.GetCenter().x, 300.0f);
+    REQUIRE(probe.window.Contains(middle));
+    session.Click(middle);
+    CHECK(probe.behind == 0);
+    // A resize band and the title bar over the button are the shell's too.
+    session.Click(ImVec2(probe.window.Min.x + 2.0f, 300.0f));
+    CHECK(probe.behind == 0);
+    // Beside the shell the button works.
+    session.Click(ImVec2(20.0f, 300.0f));
+    CHECK(probe.behind == 1);
+}
+
+TEST_CASE("Dragging a shell's title bar moves it and snaps it to the display edges")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###drag"};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    const ImRect start = probe.window;
+    const ImVec2 grab = probe.Title();
+    session.Drag({grab, ImVec2(grab.x + 40.0f, grab.y + 30.0f)});
+    session.Frame();
+    CHECK(probe.window.Min.x == doctest::Approx(start.Min.x + 40.0f));
+    CHECK(probe.window.Min.y == doctest::Approx(start.Min.y + 30.0f));
+    CHECK(probe.window.GetWidth() == doctest::Approx(start.GetWidth()));
+    // Within spacing.lg of the left and top edges it snaps into the corner.
+    const float snap = facet::Px(facet::T().spacing.lg);
+    const ImVec2 at = probe.Title();
+    session.Drag({at, ImVec2(at.x - (probe.window.Min.x - snap * 0.5f), at.y - (probe.window.Min.y - snap * 0.5f))});
+    session.Frame();
+    CHECK(probe.window.Min.x == doctest::Approx(0.0f));
+    CHECK(probe.window.Min.y == doctest::Approx(0.0f));
+    // Dragged past the display, it stays inside.
+    const ImVec2 away = probe.Title();
+    session.Drag({away, ImVec2(away.x + 2000.0f, away.y + 2000.0f)});
+    session.Frame();
+    CHECK(probe.window.Max.x == doctest::Approx(800.0f));
+    CHECK(probe.window.Max.y == doctest::Approx(600.0f));
+}
+
+TEST_CASE("A shell resizes from every edge and corner within its minimum and maximum size")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###resize"};
+    probe.options.minSize = {200.0f, 150.0f};
+    probe.options.maxSize = {400.0f, 300.0f};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    const float band = facet::Px(facet::T().containers.resizeBorder);
+    struct Case
+    {
+        float fx, fy;     // where on the window: 0 left or top, 0.5 middle, 1 right or bottom
+        float dx, dy;     // the drag
+        float ex, ey;     // the expected change of width and height
+        bool movesX, movesY;  // the left or top edge moves
+    };
+    const Case cases[] = {
+        {1.0f, 0.5f, 30.0f, 0.0f, 30.0f, 0.0f, false, false},   // right
+        {0.0f, 0.5f, -30.0f, 0.0f, 30.0f, 0.0f, true, false},   // left
+        {0.5f, 1.0f, 0.0f, 20.0f, 0.0f, 20.0f, false, false},   // bottom
+        {0.5f, 0.0f, 0.0f, -20.0f, 0.0f, 20.0f, false, true},   // top
+        {1.0f, 1.0f, -20.0f, -10.0f, -20.0f, -10.0f, false, false},  // bottom-right
+        {0.0f, 0.0f, 10.0f, 10.0f, -10.0f, -10.0f, true, true},  // top-left
+        {1.0f, 0.0f, 10.0f, 10.0f, 10.0f, -10.0f, false, true},  // top-right
+        {0.0f, 1.0f, -10.0f, 10.0f, 10.0f, 10.0f, true, false},  // bottom-left
+    };
+    for (const Case& c : cases)
+    {
+        CAPTURE(c.fx);
+        CAPTURE(c.fy);
+        const ImRect before = probe.window;
+        // Half a band inside the edge, so the point lies on the band.
+        const float x = before.Min.x + band * 0.5f + (before.GetWidth() - band) * c.fx;
+        const float y = before.Min.y + band * 0.5f + (before.GetHeight() - band) * c.fy;
+        session.Drag({ImVec2(x, y), ImVec2(x + c.dx, y + c.dy)});
+        session.Frame();
+        CHECK(probe.window.GetWidth() == doctest::Approx(before.GetWidth() + c.ex));
+        CHECK(probe.window.GetHeight() == doctest::Approx(before.GetHeight() + c.ey));
+        CHECK(probe.window.Min.x == doctest::Approx(c.movesX ? before.Min.x + c.dx : before.Min.x));
+        CHECK(probe.window.Min.y == doctest::Approx(c.movesY ? before.Min.y + c.dy : before.Min.y));
+    }
+    // The limits: far out stops at the maximum, far in at the minimum.
+    ImRect r = probe.window;
+    session.Drag({ImVec2(r.Max.x - band * 0.5f, r.Max.y - band * 0.5f), ImVec2(r.Max.x + 600.0f, r.Max.y + 600.0f)});
+    session.Frame();
+    CHECK(Units(probe.window.GetWidth()) <= 400.0f + 0.01f);
+    CHECK(Units(probe.window.GetHeight()) <= 300.0f + 0.01f);
+    r = probe.window;
+    session.Drag({ImVec2(r.Max.x - band * 0.5f, r.Max.y - band * 0.5f), ImVec2(r.Min.x, r.Min.y)});
+    session.Frame();
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(200.0f));
+    CHECK(Units(probe.window.GetHeight()) == doctest::Approx(150.0f));
+}
+
+TEST_CASE("A shell keeps its place in units and comes back into the display at a larger scale")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const float savedScale = facet::UiScale();
+    ShellProbe probe{.label = "Shell###scale"};
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    // Into the bottom-right corner.
+    const ImVec2 grab = probe.Title();
+    session.Drag({grab, ImVec2(grab.x + 2000.0f, grab.y + 2000.0f)});
+    session.Frame();
+    REQUIRE(probe.window.Max.x == doctest::Approx(800.0f));
+    const float unitsWide = Units(probe.window.GetWidth());
+    facet::SetUiScale(savedScale * 2.0f);
+    session.Frames(2);
+    // Twice as large in pixels, the same in units, and moved back into the display.
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(unitsWide));
+    CHECK(probe.window.Max.x <= 800.0f + 0.5f);
+    CHECK(probe.window.Max.y <= 600.0f + 0.5f);
+    CHECK(probe.window.Min.x >= -0.5f);
+    facet::SetUiScale(savedScale);
+    session.Frames(2);
+    CHECK(Units(probe.window.GetWidth()) == doctest::Approx(unitsWide));
+    CHECK(probe.window.Max.x <= 800.0f + 0.5f);
+}
+
+TEST_CASE("A shell's place and size come back after a restart and fit a smaller display")
+{
+    std::string ini;
+    ImRect first;
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        ShellProbe probe{.label = "Shell###restart"};
+        session.SetUi([&] { probe.Draw(session); });
+        session.Frames(2);
+        const ImVec2 grab = probe.Title();
+        session.Drag({grab, ImVec2(grab.x + 120.0f, grab.y + 90.0f)});
+        session.Frame();
+        first = probe.window;
+        ini = ImGui::SaveIniSettingsToMemory();
+    }
+    // The record holds the place in units; move it in the text, so the next run can only find the
+    // new place through the ini file.
+    const std::size_t record = ini.find("[Shell,");
+    REQUIRE(record != std::string::npos);
+    const std::size_t pos = ini.find("pos=", record);
+    REQUIRE(pos != std::string::npos);
+    ini.replace(pos, ini.find('\n', pos) - pos, "pos=10.00,20.00");
+    {
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        ImGui::LoadIniSettingsFromMemory(ini.c_str());
+        ShellProbe probe{.label = "Shell###restart"};
+        session.SetUi([&] { probe.Draw(session); });
+        session.Frames(2);
+        CHECK(probe.window.Min.x == doctest::Approx(facet::Px(10.0f)));
+        CHECK(probe.window.Min.y == doctest::Approx(facet::Px(20.0f)));
+        CHECK(probe.window.GetWidth() == doctest::Approx(first.GetWidth()));
+        CHECK(probe.window.GetHeight() == doctest::Approx(first.GetHeight()));
+    }
+    {
+        // The host now runs at a smaller resolution: the shell is clamped back inside it.
+        facet::test::Session session({.displaySize = ImVec2(400.0f, 300.0f)});
+        REQUIRE(session.Ready());
+        ImGui::LoadIniSettingsFromMemory(ini.c_str());
+        ShellProbe probe{.label = "Shell###restart"};
+        session.SetUi([&] { probe.Draw(session); });
+        session.Frames(2);
+        CHECK(probe.window.Max.x <= 400.0f + 0.5f);
+        CHECK(probe.window.Max.y <= 300.0f + 0.5f);
+        CHECK(probe.window.Min.x >= -0.5f);
+        CHECK(probe.window.Min.y >= -0.5f);
+    }
+}
+
+TEST_CASE("A collapsible shell collapses to its title bar on a double click")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ShellProbe probe{.label = "Shell###collapse"};
+    probe.options.collapsible = true;
+    probe.options.persist = false;
+    session.SetUi([&] { probe.Draw(session); });
+    session.Frames(2);
+    REQUIRE(probe.shown);
+    const ImVec2 title = probe.Title();
+    session.DoubleClick(title);
+    session.Frame();
+    CHECK_FALSE(probe.shown);
+    ImGuiWindow* window = ImGui::FindWindowByName(probe.label);
+    REQUIRE(window != nullptr);
+    CHECK(window->Size.y == doctest::Approx(facet::Px(facet::T().containers.titleBarHeight)));
+    session.Seconds(1.0f);  // past the double click time, so the next two clicks count as a pair
+    session.DoubleClick(title);
+    session.Frame();
+    CHECK(probe.shown);
+}
+
+TEST_CASE("Shells leave every stack as they found it: open, closed, collapsed, nested and outside a frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Values v;
+    bool closed = false;
+    bool open = true;
+    session.SetUi([&] {
+        CHECK_BALANCED(CHECK_FALSE(facet::BeginShell("Closed", &closed)));
+        CHECK_BALANCED({
+            facet::ShellScope outer("Outer", nullptr, {.initialSize = {300.0f, 200.0f}});
+            if (outer)
+            {
+                ImGui::TextUnformatted("outer");
+                facet::ShellScope inner("Inner", &open, {.initialSize = {200.0f, 150.0f}, .glass = false});
+                ImGui::TextUnformatted("inner");
+            }
+        });
+        CHECK_BALANCED({
+            facet::ShellScope collapsed("Collapsed", nullptr, {.collapsible = true, .persist = false});
+        });
+        ImGui::BeginDisabled();
+        CHECK_BALANCED({ facet::ShellScope disabled("Disabled", &open, {.minSize = {1.0f, 1.0f}}); });
+        ImGui::EndDisabled();
+    });
+    session.Frames(3);
+    CHECK(open);
+    CHECK(facet::internal::OpenScopeCount() == 0);
+    const int before = facet::internal::UsageErrorCount();
+    CHECK_FALSE(facet::BeginShell("outside a frame", nullptr));
     CHECK(facet::internal::UsageErrorCount() == before);
 }
