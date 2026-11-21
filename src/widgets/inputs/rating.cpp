@@ -14,6 +14,7 @@
 #include <imgui_internal.h>
 
 #include "facet/core/color.h"
+#include "facet/core/draw.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
@@ -141,6 +142,11 @@ bool RunRating(const char* label, Value* value, const RatingOptions& options)
             if (fraction < 1.0)
                 drawList->PushClipRect(ImVec2(x, icons.Min.y),
                                        ImVec2(x + std::round(glyph * static_cast<float>(fraction)), icons.Max.y), true);
+            // An icon of the caller's has no filled form: a filled one also gets a backdrop, so the
+            // value does not show by color alone.
+            if (options.icon.IsValid() && !item.disabled)
+                FillRect(drawList, ImVec2(boxLeft, icons.Min.y), ImVec2(boxLeft + iconBox, icons.Max.y), ToU32(c.accentSubtle),
+                         Px(t.radii.element));
             internal::DrawControlIcon(drawList, filled, x, icons.GetCenter().y, glyph, fillColor);
             if (fraction < 1.0)
                 drawList->PopClipRect();
