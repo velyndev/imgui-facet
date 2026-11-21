@@ -18,6 +18,7 @@
 #include "internal/control.h"
 #include "internal/item.h"
 #include "internal/loading.h"
+#include "widgets/display/display_look.h"
 
 namespace facet
 {
@@ -42,27 +43,6 @@ float ProgressThickness(ControlSize size)
         return PxSnapped(m.progressHeightLarge);
     default:
         return PxSnapped(m.progressHeight);
-    }
-}
-
-// The fill color of a tone. Every one reaches 3:1 on the content surfaces, so the value reads as
-// a graphic: the accent through focusRing (the accent moved to 3:1), the status colors as they are.
-ImVec4 ProgressToneColor(Tone tone)
-{
-    const Colors& c = T().colors;
-    switch (tone)
-    {
-    case Tone::Neutral:
-        return c.labelSecondary;
-    case Tone::Success:
-        return c.success;
-    case Tone::Warning:
-        return c.warning;
-    case Tone::Destructive:
-        return c.destructive;
-    case Tone::Accent:
-    default:
-        return c.focusRing;
     }
 }
 
@@ -116,7 +96,7 @@ void ProgressBar(const char* label, float fraction, const ProgressBarOptions& op
     const ImRect track(bounds.Min.x, trackTop, bounds.Max.x, trackTop + thickness);
     const float radius = std::min(Px(t.radii.element), thickness * 0.5f);
     FillRect(drawList, track.Min, track.Max, ToU32(disabled ? c.fill[3] : c.fill[0]), radius);
-    const ImVec4 tone = disabled ? c.labelTertiary : ProgressToneColor(options.tone);
+    const ImVec4 tone = disabled ? c.labelTertiary : internal::DisplayProgressColor(options.tone);
 
     if (indeterminate)
     {
