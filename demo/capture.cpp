@@ -132,6 +132,11 @@ bool CaptureOne(AppShell& shell, const CaptureOptions& options, int pageIndex, i
         ctx.captureFramesLeft = options.warmupFrames - 1 - frame;
         session.Frame([&] { DrawGallery(gallery, ctx, nullptr); });
     }
+    if (ctx.captureError != nullptr)
+    {
+        std::fprintf(stderr, "error: %s: %s\n", fileName.c_str(), ctx.captureError);
+        return false;
+    }
 
     const std::filesystem::path filePath = options.directory / fileName;
     const std::string pathText = reinterpret_cast<const char*>(filePath.u8string().c_str());

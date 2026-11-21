@@ -430,10 +430,14 @@ void ToastsSection(facet::demo::PageCtx& ctx, OverlaysState& s)
     if (facet::internal::OverlayToastRects(s.toast, &body, &action, &close))
         FloatingProbe(ctx, "overlays.toast.plain.body", body);
 
-    // The capture state shows three toasts; they leave when another state starts.
+    // The capture state shows three toasts; they leave when another state starts. Every capture runs
+    // in a fresh session while this page state stays, so the toasts are queued again whenever none
+    // of them is in the current session (the second theme of the same state).
     if (ctx.capture)
     {
-        if (ctx.captureState == kToasts && !s.captureToasts)
+        const bool anyShown = facet::IsToastVisible(s.toast) || facet::IsToastVisible(s.actionToast) ||
+                              facet::IsToastVisible(s.progressToast);
+        if (ctx.captureState == kToasts && (!s.captureToasts || !anyShown))
         {
             s.toast = facet::ShowToast("Placeholder notification", {.duration = -1.0f});
             s.actionToast = facet::ShowToast("The item was removed", {.tone = facet::Tone::Success,
@@ -442,6 +446,16 @@ void ToastsSection(facet::demo::PageCtx& ctx, OverlaysState& s)
             s.progressToast = facet::ShowToast("Working", {.tone = facet::Tone::Accent, .duration = -1.0f,
                                                            .progressBar = true, .progress = 0.6f});
             s.captureToasts = true;
+        }
+        // The rects come from the last frame's EndFrame, so by the last capture frame every
+        // toast of the state must have been drawn.
+        if (ctx.captureState == kToasts && ctx.captureFramesLeft == 0)
+        {
+            for (const facet::ToastId id : {s.toast, s.actionToast, s.progressToast})
+            {
+                if (!facet::internal::OverlayToastRects(id, nullptr, nullptr, nullptr))
+                    ctx.captureError = "the toasts state shows fewer than three toasts";
+            }
         }
         if (ctx.captureState != kToasts && s.captureToasts)
         {

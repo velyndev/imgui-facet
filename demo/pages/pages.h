@@ -59,6 +59,10 @@ struct PageCtx
     float scale = 1.0f;       // total UI scale: monitor DPI / 96 in the window or --scale
                               // offscreen, times the UI scale chosen in the title strip
     ProbeTable* probes = nullptr;  // set during --selftest runs
+    // Capture runs: a page sets this, on the last frame (captureFramesLeft 0), when its state does
+    // not show what it should (a layer that never opened). The capture of that image then fails
+    // with this text as the reason, instead of writing a picture of the wrong state.
+    const char* captureError = nullptr;
 
     // Records the rect and id of the last submitted item under this name so that
     // selftest steps can click it or check its focus. Does nothing outside selftest runs.
