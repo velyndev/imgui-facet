@@ -958,7 +958,9 @@ bool TooltipWanted(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool fo
         if (t.pressSuppressed != itemId && !t.keySuppressed && (t.hoverImmediate || now - t.hoverStart >= delay))
         {
             want = true;
-            atPointer = true;
+            // At the pointer only while it is really there: a forced hover state (captures, tests)
+            // has the pointer elsewhere, so its tooltip goes below the item like a keyboard one.
+            atPointer = insideTip || itemRect.Contains(ImGui::GetIO().MousePos);
         }
     }
     else if (t.hoverItem == itemId)
@@ -1916,8 +1918,12 @@ bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, boo
             insideTip = way.Contains(pointer) || (!hovered && PopupPointerAimsAt(tip->rect));
         }
     }
+    // An item scrolled or clipped out of its window's view shows no tooltip: it would float over
+    // unrelated content with nothing to point at.
+    const ImGuiWindow* window = ImGui::GetCurrentWindowRead();
+    const bool inView = window == nullptr || itemRect.Overlaps(window->ClipRect);
     PopupAnchor anchor;
-    if (!TooltipWanted(itemId, itemRect, hovered, focusVisible, &anchor, insideTip))
+    if (!inView || !TooltipWanted(itemId, itemRect, hovered, focusVisible, &anchor, insideTip))
     {
         if (IsPopupLevelOpen(tipId))
             ClosePopupLevel(tipId);

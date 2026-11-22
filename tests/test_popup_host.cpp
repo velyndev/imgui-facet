@@ -1507,3 +1507,40 @@ TEST_CASE("popup host: placement at the screen edges at scale 0.75 and 2, follow
         CHECK(rect.Min.x >= margin - 0.5f);
     }
 }
+
+TEST_CASE("popup host: a forced hover places the tooltip below its item, and an item out of view shows none")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool shown = false;
+    bool hiddenShown = false;
+    ImRect item;
+    ImRect tip;
+    session.SetUi([&] {
+        ImGui::SetCursorPos(ImVec2(200.0f, 200.0f));
+        ImGui::Button("forced");
+        const ImGuiID id = ImGui::GetItemID();
+        item = LastItemRect();
+        // First an item far below the window's view, hovered as a forced capture state reports
+        // it: it must not take the one tooltip of the frame.
+        const ImRect below(ImVec2(item.Min.x, item.Min.y + 5000.0f), ImVec2(item.Max.x, item.Max.y + 5000.0f));
+        hiddenShown = fi::BeginPopupTooltip(ImGui::GetID("out of view"), below, true, false);
+        if (hiddenShown)
+            fi::EndPopupTooltip();
+        // Then the visible item hovered the same way, with the pointer far away.
+        shown = fi::BeginPopupTooltip(id, item, true, false);
+        if (shown)
+        {
+            ImGui::TextUnformatted("tooltip");
+            fi::EndPopupTooltip();
+        }
+        tip = fi::PopupLevelRect(fi::PopupTooltipLevel(id));
+    });
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Seconds(1.0f);
+    REQUIRE(shown);
+    CHECK(tip.Min.y >= item.Max.y);
+    CHECK(tip.Max.x >= item.Min.x);
+    CHECK_FALSE(hiddenShown);
+}
