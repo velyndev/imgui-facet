@@ -428,7 +428,12 @@ bool BeginPropertyRow(const char* label, const PropertyRowOptions& options)
     if (grid != nullptr)
     {
         if (grid->rows++ == 0)
+        {
+            // Screen pixels: negative while the grid is scrolled above the window, so the bottom
+            // starts at the top, never at 0.
             grid->rowsTop = window->DC.CursorPos.y;
+            grid->rowsBottom = grid->rowsTop;
+        }
     }
     for (int i = 0; i < s.categoryDepth; ++i)
         if (s.categories[i].hits != nullptr && s.categories[i].grid == s.gridDepth - 1)

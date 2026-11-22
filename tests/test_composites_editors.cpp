@@ -302,6 +302,31 @@ TEST_CASE("Property grid: a row's tooltip shows on hover of its label")
     CHECK_FALSE(ui.tooltipOpen);
 }
 
+TEST_CASE("Property grid: a grid scrolled above the window keeps its own height")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GridUi ui;
+    float unscrolled = 0.0f;
+    float scrolled = 0.0f;
+    float scroll = 0.0f;
+    session.SetUi([&] {
+        ImGui::BeginChild("scrolled", ImVec2(facet::Px(400.0f), facet::Px(200.0f)));
+        ImGui::SetScrollY(scroll);
+        ImGui::Dummy(ImVec2(10.0f, facet::Px(1200.0f)));
+        ui.Draw(session);
+        ImGui::Dummy(ImVec2(10.0f, facet::Px(1200.0f)));
+        ImGui::EndChild();
+    });
+    session.Frames(3);
+    unscrolled = session.ItemRect("grid").GetHeight();
+    scroll = facet::Px(1900.0f);  // the grid lies wholly above the visible part
+    session.Frames(3);
+    scrolled = session.ItemRect("grid").GetHeight();
+    CHECK(unscrolled > 0.0f);
+    CHECK(scrolled == doctest::Approx(unscrolled));
+}
+
 TEST_CASE("Property grid: a shown grid allocates nothing per frame")
 {
     facet::test::Session session;
