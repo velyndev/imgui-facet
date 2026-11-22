@@ -637,6 +637,34 @@ TEST_CASE("Media card: a click, Space and Enter activate it, and a narrow card p
     CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(facet::Px(180.0f)));
 }
 
+// ---- UserChip -----------------------------------------------------------------------------------
+
+TEST_CASE("User chip: it activates, compact is a circle of the control height, and a set width cuts the name")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    session.SetUi([&] {
+        if (facet::UserChip("Profile 1", facet::ImageHandle{}, {.description = "Placeholder"}))
+            ++presses;
+        session.Track("chip");
+        (void)facet::UserChip("Profile 2", facet::ImageHandle{},
+                              {.showStatus = true, .status = facet::Tone::Success, .compact = true});
+        session.Track("compact");
+        ImGui::SetNextItemWidth(facet::Px(60.0f));
+        (void)facet::UserChip("A name far too long for the chip", facet::ImageHandle{});
+        session.Track("narrow");
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("chip"));
+    CHECK(presses == 1);
+    const ImRect compact = session.ItemRect("compact");
+    CHECK(compact.GetWidth() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));
+    CHECK(compact.GetHeight() == doctest::Approx(compact.GetWidth()));
+    CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(facet::Px(60.0f)));
+    CHECK(session.ItemRect("chip").GetHeight() > facet::ControlHeight(facet::ControlSize::Regular));
+}
+
 // ---- Public drag and drop -----------------------------------------------------------------------
 
 namespace
