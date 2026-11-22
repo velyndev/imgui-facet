@@ -289,8 +289,30 @@ bool KeybindList(const char* id, const KeybindListOptions& options = {});
 bool KeybindList(const char* id, std::span<KeybindListItem> items, const KeybindListOptions& options = {});
 ```
 
-Editable table of key binds with conflict marks and reset; the first overload edits the shortcut
-registry. Status: planned.
+A table of actions: a line of column headings (`Strings::action`, `primaryBind`, `alternateBind`),
+then per action its label, a `KeybindCapture` for the primary chord and, with `alternate`, one for the
+alternate chord, and a reset `IconButton` (`Strings::resetToDefault`) while the row differs from its
+default. With `groups`, a heading in Headline starts each run of rows with the same group text. The
+first overload lists the shortcut registry (`ShortcutInfo::label` and `group`) and writes with
+`SetShortcutChords` and `ResetShortcut`; the second lists the caller's items and writes their `bind`
+(the reset copies `defaultBind`, its mode included).
+
+Every capture field is a Tab stop: a click or Enter listens for the next chord, Escape cancels
+listening and keeps the chord, Backspace or Delete on a focused field clears it. A chord that another
+listed action also uses marks both rows: the warning icon in the `warning` token and
+`Strings::conflictWith` with the other action's label in labelSecondary after the label, as far as
+the label column has room, and in full as the tooltip of the mark. The registry overload finds
+conflicts with `FindChordConflict` (scopes included); the item overload compares the chords of the
+other items.
+
+`filter` keeps the rows whose label or chord text matches (fuzzy, or `PassesFilter` with
+`filterSettings`); with no row left the list shows `emptyText`, else `Strings::noResults` while a
+filter is set and `Strings::empty` otherwise. Loading shows skeleton rows, Error the error state.
+Width: the available width by default; the chord columns are `composites.keybindColumnWidth` wide
+and a narrow list shrinks the label column first (labels cut with an ellipsis and a tooltip), then
+the chord columns. Height: the rows by default; a set `height` scrolls the rows under the headings.
+`readOnly` shows the chords and never listens; `ImGui::BeginDisabled` the same with the disabled
+colors. Returns true on the frame a binding was written. Status: ready.
 
 ### PresetList
 

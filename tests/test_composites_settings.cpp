@@ -19,6 +19,7 @@
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "support/session.h"
+#include "widgets/composites/keybind_list.h"
 
 namespace
 {
@@ -853,5 +854,170 @@ TEST_CASE("PresetList shows its loading, error and empty states without taking a
     });
     session.Frame();
     CHECK(session.ItemRect("empty").GetHeight() >= facet::internal::ListRowHeight(facet::ControlSize::Inherit));
+}
+
+// ---- KeybindList ---------------------------------------------------------------------------
+
+namespace
+{
+
+// Where the parts of a KeybindList without group headings are, from its item rect, by the list's
+// own layout (widgets/composites/keybind_list.h); the lists here are wide enough to stand side by
+// side.
+struct KeybindLayout
+{
+    ImRect rect;
+    int columns = 2;  // 1 without the alternate column
+
+    // Column 0: primary, 1: alternate, 2: the reset button.
+    ImVec2 At(int row, int column) const
+    {
+        const facet::internal::KeybindListLayout layout = facet::internal::KeybindListMeasure(rect.GetWidth(), columns == 2);
+        const float top = rect.Min.y + layout.headingHeight + static_cast<float>(row) * (layout.rowHeight + layout.spacing);
+        float x = rect.Min.x + layout.resetX + layout.button * 0.5f;
+        if (column < 2)
+            x = rect.Min.x + (column == 0 ? layout.primaryX : layout.alternateX) + layout.column * 0.5f;
+        return ImVec2(x, top + layout.rowHeight * 0.5f);
+    }
+};
+
+// Vertices drawn in the warning token: the conflict mark.
+int WarningVertices()
+{
+    const ImU32 warning = facet::ToU32(facet::T().colors.warning);
+    int count = 0;
+    for (const ImDrawVert& v : ImGui::GetWindowDrawList()->VtxBuffer)
+        count += v.col == warning ? 1 : 0;
+    return count;
+}
+
+} // namespace
+
+TEST_CASE("KeybindList captures a chord, and Escape while it listens cancels")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::KeybindListItem items[] = {
+        {"Action 1", nullptr, {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
+        {"Action 2", nullptr, {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
+    };
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::KeybindList("binds", items, {.groups = false, .width = 600.0f}))
+            ++writes;
+        session.Track("binds");
+    });
+    session.Frame();
+    const KeybindLayout layout{session.ItemRect("binds")};
+    session.Click(layout.At(1, 0));
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_K);
+    session.Frames(2);
+    CHECK(items[1].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_K));
+    CHECK(writes == 1);
+    // Escape while listening writes nothing.
+    session.Click(layout.At(0, 0));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(items[0].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_1));
+    CHECK(writes == 1);
+}
+
+TEST_CASE("KeybindList marks a conflict between two actions, clears a chord and resets a row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::KeybindListItem items[] = {
+        {"Action 1", nullptr, {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
+        {"Action 2", nullptr, {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_2}},
+    };
+    int warnings = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        facet::KeybindList("binds", items, {.alternate = false, .groups = false, .width = 600.0f});
+        session.Track("binds");
+        warnings = WarningVertices();
+    });
+    session.Frame();
+    CHECK(warnings > 0);
+    // Backspace on the focused field clears the chord; the conflict goes away.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Frames(2);
+    CHECK(items[0].bind.primary == ImGuiKey_None);
+    CHECK(warnings == 0);
+    // Both rows now differ from their default; the reset button of the second restores it.
+    const KeybindLayout layout{session.ItemRect("binds"), 1};
+    session.Click(layout.At(1, 2));
+    session.Frames(2);
+    CHECK(items[1].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_2));
+    CHECK(items[0].bind.primary == ImGuiKey_None);
+}
+
+TEST_CASE("KeybindList over the shortcut registry writes and resets the registered chords")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::ShortcutId first = facet::RegisterShortcut("test.keybind list.first", ImGuiMod_Ctrl | ImGuiKey_F7,
+                                                             {.label = "First test action"});
+    const facet::ShortcutId second = facet::RegisterShortcut("test.keybind list.second", ImGuiMod_Ctrl | ImGuiKey_F8,
+                                                              {.label = "Second test action"});
+    session.SetUi([&] {
+        facet::KeybindList("registry", {.filter = "test action", .filterSettings = nullptr, .alternate = false,
+                                        .groups = false, .width = 600.0f});
+        session.Track("registry");
+    });
+    session.Frame();
+    const KeybindLayout layout{session.ItemRect("registry"), 1};
+    session.Click(layout.At(1, 0));
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_F9);
+    session.Frames(2);
+    facet::ShortcutInfo info;
+    REQUIRE(facet::GetShortcut(second, &info));
+    CHECK(info.primary == (ImGuiMod_Ctrl | ImGuiKey_F9));
+    session.Click(layout.At(1, 2));
+    session.Frames(2);
+    REQUIRE(facet::GetShortcut(second, &info));
+    CHECK(info.primary == (ImGuiMod_Ctrl | ImGuiKey_F8));
+    facet::UnregisterShortcut(first);
+    facet::UnregisterShortcut(second);
+}
+
+TEST_CASE("KeybindList filters rows, shows no results, and read-only never listens")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::KeybindListItem items[] = {
+        {"Action 1", "Group 1", {ImGuiKey_A}, {ImGuiKey_A}},
+        {"Action 2", "Group 1", {ImGuiKey_B}, {ImGuiKey_B}},
+    };
+    const char* filter = "Action 2";
+    bool readOnly = false;
+    bool wrote = false;
+    session.SetUi([&] {
+        wrote |= facet::KeybindList("binds", items, {.filter = filter, .groups = false, .width = 600.0f, .readOnly = readOnly});
+        session.Track("binds");
+    });
+    session.Frame();
+    const float row = facet::ControlHeight(facet::ControlSize::Inherit);
+    const float one = session.ItemRect("binds").GetHeight();
+    filter = "";
+    session.Frame();
+    CHECK(session.ItemRect("binds").GetHeight() > one + row * 0.5f);
+    filter = "no such action";
+    session.Frame();
+    CHECK(session.ItemRect("binds").GetHeight() >= row * 2.0f);
+    filter = "";
+    readOnly = true;
+    session.Frame();
+    const KeybindLayout layout{session.ItemRect("binds")};
+    session.Click(layout.At(0, 0));
+    session.KeyPress(ImGuiKey_K);
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Frames(2);
+    CHECK_FALSE(wrote);
+    CHECK(items[0].bind.primary == ImGuiKey_A);
 }
 

@@ -23,6 +23,7 @@
 #include "internal/popup_host.h"
 #include "pages/pages.h"
 #include "selftest.h"
+#include "widgets/composites/keybind_list.h"
 
 namespace
 {
@@ -67,7 +68,12 @@ enum CaptureState
     kSearchFocus, // the search filter bar's field focused
     kSettingsHits,  // a settings search query with one hit far down, revealed and highlighted
     kPresetMenu,    // the preset list's menu open
+    kBindsFocus,    // the second row's capture field of the key bind list focused
 };
+
+// Rows of the page's key bind list, and its width in design units.
+constexpr int kBindCount = 5;
+constexpr float kBindsWidth = 560.0f;
 
 // Frames before the end of a capture's warm-up at which the settings search capture types its
 // query: the reveal scroll settles and the highlight still holds when the image is taken.
@@ -94,10 +100,13 @@ struct SettingsUi
     bool settingsFlags[10] = {true, false, false, false, true, false, false, false, false, true};
     float settingsValues[10] = {0.5f, 0.5f, 0.5f, 0.8f, 0.5f, 0.5f, 0.5f, 0.4f, 0.5f, 0.5f};
 
-    facet::KeybindListItem binds[2] = {
-        {"Action 1", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
-        {"Action 2", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
-    };
+
+    // KeybindList (filled by DefaultBinds on first use)
+    facet::KeybindListItem binds[kBindCount] = {};
+    bool bindsReady = false;
+    int bindState = 0;  // DataState
+    std::string bindFilter;
+    int bindWrites = 0;
 
     // PresetList
     DemoPreset presets[kMaxPresets] = {{"Preset 1", false, true, 1}, {"Preset 2", true, false, 2}, {"Preset 3", false, false, 3}};
@@ -301,14 +310,45 @@ void AccentSection(facet::demo::PageCtx& ctx)
     ImGui::EndDisabled();
 }
 
+// The page's own shortcuts: the zoom keys of the UI scale control, registered once, so the key
+// bind list over the registry has entries whatever page was shown before.
+struct PageShortcuts
+{
+    facet::ShortcutId zoomIn;
+    facet::ShortcutId zoomOut;
+    facet::ShortcutId zoomReset;
+};
+
+const PageShortcuts& Shortcuts()
+{
+    static const PageShortcuts shortcuts = [] {
+        PageShortcuts s;
+        const facet::ShortcutOptions group{.group = "Search and app controls page"};
+        facet::ShortcutOptions in = group;
+        in.label = "Zoom the example scale in";
+        facet::ShortcutOptions out = group;
+        out.label = "Zoom the example scale out";
+        facet::ShortcutOptions reset = group;
+        reset.label = "Reset the example scale";
+        s.zoomIn = facet::RegisterShortcut("demo.settings.zoom in", ImGuiMod_Ctrl | ImGuiKey_Equal, in);
+        s.zoomOut = facet::RegisterShortcut("demo.settings.zoom out", ImGuiMod_Ctrl | ImGuiKey_Minus, out);
+        s.zoomReset = facet::RegisterShortcut("demo.settings.zoom reset", ImGuiMod_Ctrl | ImGuiKey_0, reset);
+        return s;
+    }();
+    return shortcuts;
+}
+
 void UiScaleSection(facet::demo::PageCtx& ctx)
 {
+    const PageShortcuts& shortcuts = Shortcuts();
     SectionHeader("UiScaleControl");
     Paragraph("The user UI scale in steps, shown as percent, with zoom out and zoom in buttons. With apply on a "
               "drag applies once on release and every other change at once; here apply is off.");
     LabeledRow("UI scale");
     if (facet::UiScaleControl("##scale", &ui.uiScale, kScaleMin, kScaleMax,
-                              {.wheelZoom = ui.wheelZoom, .apply = false, .width = DemoWidth(kScaleWidth)}))
+                              {.zoomInShortcut = shortcuts.zoomIn, .zoomOutShortcut = shortcuts.zoomOut,
+                               .zoomResetShortcut = shortcuts.zoomReset, .wheelZoom = ui.wheelZoom, .apply = false,
+                               .width = DemoWidth(kScaleWidth)}))
         ++ui.scaleWrites;
     ctx.Probe("comp.scale");
     ProbeZoomButtons(ctx, "##scale", "comp.scale", facet::ControlSize::Inherit);
@@ -643,10 +683,81 @@ void PresetListSection(facet::demo::PageCtx& ctx)
                       {.width = DemoWidth(kScaleWidth), .readOnly = true});
 }
 
+// The default binds of the page's key bind list: placeholder actions in two groups, the third and
+// fourth on one chord, so the conflict mark shows from the start.
+void DefaultBinds(facet::KeybindListItem* binds)
+{
+    const ImGuiKeyChord chords[kBindCount] = {ImGuiMod_Ctrl | ImGuiKey_1, ImGuiMod_Ctrl | ImGuiKey_2,
+                                              ImGuiMod_Ctrl | ImGuiKey_3, ImGuiMod_Ctrl | ImGuiKey_3,
+                                              ImGuiMod_Ctrl | ImGuiKey_5};
+    static const char* const kLabels[kBindCount] = {"Action 1", "Action 2", "Action 3", "Action 4", "Action 5"};
+    for (int i = 0; i < kBindCount; ++i)
+    {
+        facet::KeybindListItem& item = binds[i];
+        item.label = kLabels[i];
+        item.group = i < 3 ? "Group 1" : "Group 2";
+        item.bind = {.primary = chords[i]};
+        item.defaultBind = item.bind;
+    }
+    // Action 4 was rebound from its own default, so its reset button shows.
+    binds[3].defaultBind.primary = ImGuiMod_Ctrl | ImGuiKey_4;
+}
+
+void KeybindListSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("KeybindList");
+    Paragraph("Actions with a capture field per chord. A click or Enter on a field listens for the next chord, "
+              "Escape cancels, Backspace or Delete clears; the reset button returns a changed row to its default; "
+              "a chord two actions share is marked on both. The first list edits placeholder actions, the second "
+              "the shortcut registry.");
+    if (!ui.bindsReady)
+    {
+        DefaultBinds(ui.binds);
+        ui.bindsReady = true;
+    }
+    static const char* const kStates[] = {"Ready", "Loading", "Error"};
+    LabeledRow("Data state");
+    facet::SegmentedControl("##bind state", &ui.bindState, kStates);
+    LabeledRow("Filter");
+    facet::SearchField("##bind filter", &ui.bindFilter, {.width = DemoWidth(kScaleWidth)});
+    ctx.Probe("comp.binds.filter");
+    LabeledRow("Placeholder actions");
+    if (ctx.capture && ctx.captureState == kBindsFocus)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 1);
+    if (facet::KeybindList("##binds", ui.binds,
+                           {.filter = ui.bindFilter.c_str(), .state = static_cast<facet::DataState>(ui.bindState),
+                            .width = DemoWidth(kBindsWidth)}))
+        ++ui.bindWrites;
+    ctx.Probe("comp.binds");
+    if (ctx.probes != nullptr)
+    {
+        // The first capture field, under the column headings and the first group heading, by the
+        // list's own layout.
+        const ImRect first = facet::internal::KeybindListFirstField(ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()),
+                                                                    true, true, 0);
+        facet::demo::ProbeRect(ctx, "comp.binds.first", 0, first.Min, first.Max);
+    }
+    if (ctx.capture && ctx.captureState == kBindsFocus)
+        ctx.RevealInCapture(0.3f);
+    LabeledRow("Changes");
+    {
+        char text[32];
+        std::snprintf(text, sizeof(text), "%d", ui.bindWrites);
+        facet::StyledText(text, {.secondary = true});
+    }
+
+    LabeledRow("Registry");
+    facet::KeybindList("##registry", {.filter = ui.bindFilter.c_str(), .alternate = false,
+                                      .width = DemoWidth(kBindsWidth), .height = kSettingsAreaHeight});
+    LabeledRow("Read-only");
+    facet::KeybindList("##readonly", std::span<facet::KeybindListItem>(ui.binds, 2),
+                       {.groups = false, .width = DemoWidth(kBindsWidth), .readOnly = true});
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover", "search focused", "settings hits", "preset menu")
+                "accent popover", "search focused", "settings hits", "preset menu", "binds focused")
 {
     const facet::Theme& theme = facet::T();
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
@@ -665,9 +776,7 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
 
     PresetListSection(ctx);
 
-    SectionHeader("Key binds");
-    LabeledRow("Key bind list");
-    facet::KeybindList("binds", ui.binds);
+    KeybindListSection(ctx);
 
     SectionHeader("Onboarding");
     LabeledRow("Onboarding");
@@ -750,9 +859,7 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.Click("composites.onboarding");
     test.Expect("the button shows the onboarding placeholder", [] { return ui.onboarding; });
     test.ExpectFocused("composites.onboarding");
-    // Shift+Tab and Tab come back to the button with the keyboard cursor shown.
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus on the button
     test.ExpectFocused("composites.onboarding");
     test.KeyPress(ImGuiKey_Space);
     test.Expect("Space on the focused button hides it again", [] { return !ui.onboarding; });
@@ -850,4 +957,41 @@ FACET_DEMO_SELFTEST("composites-settings")
         return ui.presetCount == 3 && std::strcmp(ui.presets[2].name, facet::GetStrings().newPreset) == 0 &&
                ui.preset == 2;
     });
+
+    // KeybindList: capture by mouse, clear, cancel and reset by keyboard.
+    test.Do([] { ui.bindsReady = false; });
+    // The start of the field: its clear button sits at the end.
+    test.MouseMove(T::Item("comp.binds.first", 0.15f));
+    test.MouseDown();
+    test.MouseUp();
+    test.KeyPress(ImGuiKey_K | ImGuiMod_Ctrl);
+    test.Wait(2);
+    test.Expect("a click listens and Ctrl+K binds Action 1", [] { return ui.binds[0].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_K); });
+    test.KeyPress(ImGuiKey_Backspace);
+    test.Expect("Backspace on the focused field clears it", [] { return ui.binds[0].bind.primary == ImGuiKey_None; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus on the field
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_J | ImGuiMod_Ctrl | ImGuiMod_Shift);
+    test.Expect("Enter listens and the next chord binds", [] {
+        return ui.binds[0].bind.primary == (ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_J);
+    });
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Escape);
+    test.Wait(2);
+    test.Expect("Escape while listening keeps the chord", [] {
+        return ui.binds[0].bind.primary == (ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_J);
+    });
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Tab reaches the reset button and Space resets the row",
+                [] { return ui.binds[0].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_1); });
+    test.Expect("four writes in the list", [] { return ui.bindWrites == 4; });
+
+    // The page's zoom shortcuts drive the example UI scale control from anywhere.
+    test.Do([] { ui.uiScale = 1.0f; });
+    test.KeyPress(ImGuiKey_Equal | ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+= zooms the example scale in", [] { return ui.uiScale; }, 1.25, 0.001);
+    test.KeyPress(ImGuiKey_0 | ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+0 resets it", [] { return ui.uiScale; }, 1.0, 0.001);
 }

@@ -93,11 +93,6 @@ void SettingsCalls()
     Check("SettingsSearchHitCount", Expect::NoItem, nullptr,
           [] { CHECK(SettingsSearchHitCount("settings", nullptr) == 0); });
 
-    Check("KeybindList, registry", Expect::Item, "binds", [] { CHECK_FALSE(KeybindList("binds", {.filter = "x"})); });
-    KeybindListItem binds[] = {{"Action", "Group", {ImGuiKey_A}, {ImGuiKey_B}}};
-    const Snapshot bindsBefore(binds);
-    Check("KeybindList, items", Expect::Item, "binds 2", [&] { CHECK_FALSE(KeybindList("binds 2", binds)); });
-    CHECK(bindsBefore.Unchanged());
 
 
     // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
