@@ -74,7 +74,7 @@ The users are C++ developers who already write Dear ImGui code, often inside a h
   4. the family default.
   
   Field widgets (sliders, text, numbers, dropdowns, pickers, progress bars) default to the available content width. Compact controls (buttons, toggles, checkboxes, segmented controls) default to their content.
-- The visible label of a field widget is drawn in front of the control and inside the widget width; it takes its measured text width plus `spacing.sm`. Unlike stock widgets, `SetNextItemWidth(-FLT_MIN)` therefore gives a widget that ends at the right edge with its label included. Aligned label columns come from `SettingsRow` (and `LayoutLabeledRow` in `core/layout.h`), not from field widgets. Toggle, checkbox and radio labels follow the mark. In table cells and settings rows, callers pass `"##name"`. *Reason: a field with its label fits a table cell at one control height.*
+- The visible label of a field widget is drawn in front of the control and inside the widget width; it takes the label column of a settings row (`layout.labelColumn`, the gap included), so a column of controls starts at one x whatever the labels say, and a longer label is cut with an ellipsis. A widget narrower than the label column plus `layout.minRowControl` gives its label only its text width plus `spacing.sm`, at most half the widget. One-line compact controls that fit their content keep their label at its text width; with a set width they take the column too. Unlike stock widgets, `SetNextItemWidth(-FLT_MIN)` therefore gives a widget that ends at the right edge with its label included. `SettingsRow` (and `LayoutLabeledRow` in `core/layout.h`) draw their own label in the same column and add what a row holds besides (descriptions, stacking in narrow widths). Toggle, checkbox and radio labels follow the mark. In table cells and settings rows, callers pass `"##name"`. *Reason: a field with its label fits a table cell at one control height.*
 - Every other value widget draws its visible label by its shape, so widgets of one shape agree:
   - one-line compact controls (`SegmentedControl`, `ToggleButtonGroup`, `KeybindModeSelector`, `CycleSelector`, `ThemeModeControl`, `AccentPicker`) draw it in front, inside the width, like fields;
   - groups that wrap into rows (`RadioGroup`, `CheckboxGroup`, `ChipGroup`, `OptionCardGroup`) draw it above;
@@ -251,7 +251,7 @@ namespace facet
 struct ToggleOptions
 {
     ControlSize size = ControlSize::Inherit;
-    float width = 0.0f;                // units; 0 fits label and switch; wider puts the switch at the end
+    float width = 0.0f;                // units; 0 fits label and switch; set: the switch follows the label column
     bool readOnly = false;
     bool loading = false;              // the knob shows a spinner; input ignored
     bool mixed = false;
