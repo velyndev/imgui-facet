@@ -185,6 +185,11 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
         return result;
     }
 
+    // The row text style, pushed in the caller's window before the scroll area begins, so it is popped
+    // there too when the function returns (after the scroll area ended); Dear ImGui checks that a
+    // window pops what it pushed.
+    ControlTextScope text(ControlTextStyle(size));
+
     // A set height scrolls the rows in a scroll area of the scroll core.
     const bool scrolled = options.height > 0.0f && fitHeight > height;
     if (scrolled)
@@ -215,7 +220,6 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
     DragDropInfo drag;
     const bool dragging = DragDropActive(kLayerRowType, &drag);
     const ImGuiID zoneId = ImGui::GetID("##zone");
-    ControlTextScope text(ControlTextStyle(size));
     const float glyph = text.IconSize();
     const float pad = Px(theme.spacing.sm);
     const float indentStep = Px(theme.spacing.lg);

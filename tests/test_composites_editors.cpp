@@ -1110,11 +1110,17 @@ TEST_CASE("Layer list: with a height the toggles stay clear of the overlay scrol
     LayerUi ui;
     ui.options.height = 60.0f;  // less than the four rows, so they scroll
     ImGuiID listId = 0;
+    int fontStackBefore = -1;
+    int fontStackAfter = -1;
     session.SetUi([&] {
         listId = ImGui::GetID("layers");
+        fontStackBefore = GImGui->FontStack.Size;
         ui.Draw(session);
+        fontStackAfter = GImGui->FontStack.Size;
     });
     session.Frames(2);
+    // The row text style is pushed and popped in the caller's window, around the scroll area.
+    CHECK(fontStackAfter == fontStackBefore);
     const ImRect r = session.ItemRect("layers");
     const ImRect lock = facet::internal::LayerListRowRect(listId, 0, 2);
     REQUIRE(lock.GetWidth() > 0.0f);
