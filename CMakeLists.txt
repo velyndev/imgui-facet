@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.24)
+# 3.28: FetchContent_Declare takes EXCLUDE_FROM_ALL (3.28) and SYSTEM (3.25).
+cmake_minimum_required(VERSION 3.28)
 
 # The version is written down once, in include/facet/core/version.h.
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/facet/core/version.h" FACET_VERSION_LINES
@@ -24,6 +25,8 @@ option(FACET_BUILD_DEMO "Build the facet_demo gallery application" ${FACET_IS_TO
 option(FACET_BUILD_TESTS "Build the unit tests" ${FACET_IS_TOP_LEVEL})
 option(FACET_USE_FREETYPE "Rasterize fonts with FreeType (fetched Dear ImGui only)" ON)
 option(FACET_WARNINGS_AS_ERRORS "Treat compiler warnings in Facet code as errors" OFF)
+option(FACET_BUILD_CONSUMER_TEST
+    "Build examples/consumer as a nested project against its own Dear ImGui and test it" OFF)
 set(FACET_IMGUI_TARGET "" CACHE STRING
     "Existing Dear ImGui target to link instead of fetching Dear ImGui")
 
@@ -97,4 +100,12 @@ endif()
 if(FACET_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if(FACET_BUILD_CONSUMER_TEST)
+    if(NOT FACET_IS_TOP_LEVEL)
+        message(FATAL_ERROR "FACET_BUILD_CONSUMER_TEST works only when Facet is the top-level project")
+    endif()
+    enable_testing()
+    include(FacetConsumerTest)
 endif()

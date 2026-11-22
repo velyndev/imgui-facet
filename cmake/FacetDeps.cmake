@@ -16,6 +16,9 @@ set(FACET_LUNASVG_TAG  "v3.5.0")
 set(FACET_DOCTEST_TAG  "v2.5.3")
 
 # Dependencies are always static and never install themselves next to Facet.
+# The dependency settings below are normal variables of Facet's directory scope, not cache
+# entries, so they never change the cache of a project that adds Facet. Every dependency's
+# cmake_minimum_required sets policy CMP0077 to NEW, so its option() calls take these values.
 set(BUILD_SHARED_LIBS OFF)
 
 # --- Dear ImGui --------------------------------------------------------------
@@ -36,12 +39,12 @@ else()
     set(imgui_dir "${facet_imgui_src_SOURCE_DIR}")
 
     if(FACET_USE_FREETYPE)
-        set(FT_DISABLE_ZLIB     ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_BZIP2    ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_PNG      ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_BROTLI   ON CACHE BOOL "" FORCE)
-        set(SKIP_INSTALL_ALL    ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_ZLIB     ON)
+        set(FT_DISABLE_BZIP2    ON)
+        set(FT_DISABLE_PNG      ON)
+        set(FT_DISABLE_HARFBUZZ ON)
+        set(FT_DISABLE_BROTLI   ON)
+        set(SKIP_INSTALL_ALL    ON)
         FetchContent_Declare(facet_freetype
             GIT_REPOSITORY https://github.com/freetype/freetype
             GIT_TAG        ${FACET_FREETYPE_TAG}
@@ -84,7 +87,8 @@ else()
 endif()
 
 # --- lunasvg -----------------------------------------------------------------
-set(LUNASVG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LUNASVG_BUILD_EXAMPLES OFF)
+set(PLUTOVG_BUILD_EXAMPLES OFF)
 FetchContent_Declare(facet_lunasvg
     GIT_REPOSITORY https://github.com/sammycage/lunasvg
     GIT_TAG        ${FACET_LUNASVG_TAG}
@@ -101,9 +105,9 @@ target_include_directories(facet_stb SYSTEM INTERFACE "${PROJECT_SOURCE_DIR}/thi
 
 # --- doctest -----------------------------------------------------------------
 if(FACET_BUILD_TESTS)
-    set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
-    set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
-    set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF CACHE BOOL "" FORCE)
+    set(DOCTEST_WITH_TESTS OFF)
+    set(DOCTEST_NO_INSTALL ON)
+    set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF)
     FetchContent_Declare(facet_doctest
         GIT_REPOSITORY https://github.com/doctest/doctest
         GIT_TAG        ${FACET_DOCTEST_TAG}

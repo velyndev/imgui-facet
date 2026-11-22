@@ -144,7 +144,7 @@ declared yet are listed at the end of their family page. What exists today:
 - Windows 10 or 11.
 - Visual Studio 2026 (or its Build Tools) with the C++ workload (MSVC v145) and a Windows SDK.
 - CMake 4.2 or newer for the "Visual Studio 18 2026" generator used by the presets.
-  The project itself requires CMake 3.24.
+  The project itself requires CMake 3.28.
 - Git and network access on the first configure: CMake downloads Dear ImGui, FreeType,
   lunasvg and doctest.
 
@@ -173,10 +173,11 @@ CMake options:
 | `FACET_USE_FREETYPE` | ON | Rasterize fonts with FreeType (fetched Dear ImGui only) |
 | `FACET_IMGUI_TARGET` | empty | Name of an existing Dear ImGui target to link instead of fetching Dear ImGui |
 | `FACET_WARNINGS_AS_ERRORS` | OFF | Compile Facet's own code with `/WX` |
+| `FACET_BUILD_CONSUMER_TEST` | OFF | Build `examples/consumer` as a nested project with its own Dear ImGui target and run it as the test `facet_consumer` |
 
 The library target is `facet::facet`. It never compiles the Dear ImGui platform or renderer
 backends; when Facet fetches Dear ImGui, the Win32 and DX11 backends are available separately
-as `facet::imgui_backends`. Using `FACET_IMGUI_TARGET` is not covered by a build test yet.
+as `facet::imgui_backends`. `FACET_BUILD_CONSUMER_TEST` checks the `FACET_IMGUI_TARGET` path.
 
 ## Run the demo
 
