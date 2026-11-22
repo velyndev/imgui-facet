@@ -1,9 +1,9 @@
 // Demo page: Text inputs. One section per text-like widget of facet/widgets/inputs.h (TextField,
 // SecureField, SearchField, TextArea, Autocomplete, CopyField, FilterField, TagInput,
-// InlineRename, MaskedInput, PinCodeInput, PathField, FieldValidation, ValidationSummary). A
-// ready widget shows its variants, sizes and states with capture states and a selftest; a planned
-// one draws its placeholder at the widget's default size. The number-like inputs have their own
-// page (page_w_inputs_value.cpp). Texts are labelled samples and placeholders, not data.
+// InlineRename, MaskedInput, PinCodeInput, PathField, FieldValidation, ValidationSummary). Each
+// widget shows its variants, sizes and states with capture states and a selftest. The number-like
+// inputs have their own page (page_w_inputs_value.cpp). Texts are labelled samples and
+// placeholders, not data.
 
 #include <algorithm>
 #include <cstdio>
@@ -110,7 +110,7 @@ struct TextInputsUi
     std::string completionError;
     int completionPicked = -1;
 
-    // The planned widgets below.
+    // The extended widgets below.
     std::string filter;
     facet::FilterSettings filterSettings;
     int filterShown = 0;

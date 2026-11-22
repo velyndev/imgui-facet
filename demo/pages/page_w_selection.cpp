@@ -1,6 +1,6 @@
-// Demo page: Selection. Each implemented widget of facet/widgets/selection.h has a section with its
-// variants, sizes and states, capture states for its important looks and selftest steps that
-// operate it by mouse and keyboard. A planned widget is called once and draws its placeholder.
+// Demo page: Selection. Each widget of facet/widgets/selection.h has a section with its variants,
+// sizes and states, capture states for its important looks and selftest steps that operate it by
+// mouse and keyboard.
 
 #include <algorithm>
 #include <cmath>

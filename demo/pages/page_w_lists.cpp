@@ -1,6 +1,6 @@
 // Demo page: Lists. One section per widget of facet/widgets/lists.h with its important variants
 // and states, capture states for the open, focused and dragged looks, and a selftest that operates
-// every ready widget by mouse and keyboard. A widget that is still planned draws its placeholder.
+// every widget by mouse and keyboard.
 // Sample entries are neutral ("Option 1") with built-in icons; generated entries are numbered.
 
 #include <algorithm>
@@ -96,7 +96,7 @@ struct ListsState
     bool multiCounted[4] = {false, true, true, false};
     bool multiNone[4] = {};
 
-    // The planned widgets below.
+    // The extended widgets below.
     int combo = 0;
     bool checklist[kChecklistCount] = {};
     bool checklistFirst[5] = {false, false, true, false, false};
