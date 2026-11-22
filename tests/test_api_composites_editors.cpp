@@ -15,7 +15,7 @@
 
 #include "core/core_internal.h"
 #include "internal/scope_stack.h"
-#include "support/content_stub_check.h"
+#include "support/content_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 
@@ -35,7 +35,7 @@ TEST_CASE("Values that mean none default to NaN, outside every value range")
 static_assert(!HasEntryId<facet::LogEntry>);  // the check itself works
 static_assert(HasEntryId<facet::LayerItem>);
 
-// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_stub_check.h).
+// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_api_check.h).
 static_assert(HasDataBlock<facet::LayerListOptions>());
 
 // Every widget that writes a value, a selection or item members has readOnly (rule 7).
@@ -78,7 +78,7 @@ TEST_CASE("An editor or canvas End without its Begin is reported and changes no 
     CHECK(reported == 4);
 }
 
-TEST_CASE("Editor, grid, canvas and layer calls keep every stack and need no placeholder")
+TEST_CASE("Editor, grid, canvas and layer calls keep every stack")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

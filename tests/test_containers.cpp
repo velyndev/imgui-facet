@@ -1,8 +1,7 @@
 // Behaviour of the containers family (facet/widgets/containers.h).
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_containers.cpp.
+// pattern. The API checks are in tests/test_api_containers.cpp.
 
 #include <array>
 #include <cfloat>
@@ -20,7 +19,7 @@
 #include "internal/popup_host.h"
 #include "widgets/containers/container_layout.h"
 #include "support/session.h"
-#include "support/structure_stub_check.h"
+#include "support/structure_api_check.h"
 
 namespace
 {

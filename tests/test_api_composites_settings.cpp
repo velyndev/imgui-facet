@@ -14,7 +14,7 @@
 
 #include "core/core_internal.h"
 #include "internal/scope_stack.h"
-#include "support/content_stub_check.h"
+#include "support/content_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 
@@ -29,7 +29,7 @@ static_assert(HasEntryId<facet::FilterChip>);
 static_assert(HasEntryId<facet::KeybindListItem>);
 static_assert(HasEntryId<facet::PresetItem>);
 
-// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_stub_check.h).
+// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_api_check.h).
 static_assert(HasDataBlock<facet::ConsoleViewOptions>());
 static_assert(HasDataBlock<facet::KeybindListOptions>());
 static_assert(HasDataBlock<facet::PresetListOptions>());

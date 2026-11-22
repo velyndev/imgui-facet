@@ -16,7 +16,7 @@
 
 #include <facet/facet.h>
 
-#include "support/content_stub_check.h"
+#include "support/content_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 

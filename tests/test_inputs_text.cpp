@@ -1,8 +1,7 @@
 // Behaviour of the text-like inputs of facet/widgets/inputs.h.
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_inputs_text.cpp.
+// pattern. The API checks are in tests/test_api_inputs_text.cpp.
 
 #include <algorithm>
 #include <array>

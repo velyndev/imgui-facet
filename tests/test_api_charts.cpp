@@ -1,6 +1,5 @@
-// The declared API of the charts family (facet/widgets/charts.h) while its widgets are
-// placeholders: every options struct follows the conventions, and every function is called once
-// inside a real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each
+// The declared API of the charts family (facet/widgets/charts.h): every options struct follows
+// the conventions, and every function is called once without input inside a real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each
 // call the id, window, group and Facet scope stacks must be as before, a widget must have
 // submitted one item of non-zero size with the id of its label, the neutral result must come back
 // and no value argument may have changed.
@@ -17,7 +16,7 @@
 #include <facet/facet.h>
 
 #include "internal/scope_stack.h"
-#include "support/content_stub_check.h"
+#include "support/content_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 

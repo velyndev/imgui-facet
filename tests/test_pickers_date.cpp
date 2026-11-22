@@ -2,9 +2,9 @@
 // AnglePicker, IconPicker, ThumbnailPicker and FileBrowser in facet/widgets/pickers.h).
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_pickers_date.cpp. Popup levels and calendar cells are read inside the frame (the
-// popup host and the state store answer there), so the ui code of a test records them.
+// pattern. The API checks are in tests/test_api_pickers_date.cpp. Popup levels and calendar cells
+// are read inside the frame (the popup host and the state store answer there), so the ui code of a
+// test records them.
 
 #include <chrono>
 #include <cmath>

@@ -2,8 +2,7 @@
 // BezierEditor, GradientEditor, PreviewCanvas, CanvasElement, LayerList).
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_composites_editors.cpp.
+// pattern. The API checks are in tests/test_api_composites_editors.cpp.
 
 #include <algorithm>
 #include <cmath>

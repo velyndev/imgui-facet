@@ -14,7 +14,7 @@
 
 #include <facet/facet.h>
 
-#include "support/controls_stub_check.h"
+#include "support/controls_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 
@@ -43,27 +43,27 @@ void CallDatePickers(Values& v)
     using namespace facet;
     char* const buffer = v.buffer.data();
     const std::size_t bufferSize = v.buffer.size();
-    FACET_CHECK_STUB(false, DatePicker("Date 1", &v.date, {.inlineCalendar = true}));
-    FACET_CHECK_STUB(false, DateRangePicker("Dates 1", &v.start, &v.end));
-    FACET_CHECK_STUB(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
-    FACET_CHECK_STUB(false, AnglePicker("Angle 1", &v.radians));
-    FACET_CHECK_STUB(false, IconPicker("Icon 1", &v.icon));
-    FACET_CHECK_STUB(false, IconPicker("Icon 2", &v.icon, kChoices));
-    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 1", &v.index, kThumbnails));
-    FACET_CHECK_STUB(false, ThumbnailPicker("Thumbnails 2", std::span<bool>(v.thumbnailFlags), kThumbnails,
+    FACET_CHECK_CALL(false, DatePicker("Date 1", &v.date, {.inlineCalendar = true}));
+    FACET_CHECK_CALL(false, DateRangePicker("Dates 1", &v.start, &v.end));
+    FACET_CHECK_CALL(false, TimePicker("Time 1", &v.time, {.showSeconds = true}));
+    FACET_CHECK_CALL(false, AnglePicker("Angle 1", &v.radians));
+    FACET_CHECK_CALL(false, IconPicker("Icon 1", &v.icon));
+    FACET_CHECK_CALL(false, IconPicker("Icon 2", &v.icon, kChoices));
+    FACET_CHECK_CALL(false, ThumbnailPicker("Thumbnails 1", &v.index, kThumbnails));
+    FACET_CHECK_CALL(false, ThumbnailPicker("Thumbnails 2", std::span<bool>(v.thumbnailFlags), kThumbnails,
                                             {.state = DataState::Loading}));
-    FACET_CHECK_STUB(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
-    FACET_CHECK_STUB(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
+    FACET_CHECK_CALL(false, FileBrowser("Browser 1", &v.text, {.mode = FileBrowserMode::Folder}));
+    FACET_CHECK_CALL(false, FileBrowser("Browser 2", buffer, bufferSize, {.fileTypes = kFileTypes, .readOnly = true}));
 }
 
-// Number of FACET_CHECK_STUB calls in CallDatePickers.
+// Number of FACET_CHECK_CALL calls in CallDatePickers.
 constexpr int kDatePickerCalls = 10;
 
 } // namespace
 
 TEST_CASE("Every date, time and other picker returns false without input, writes nothing and keeps the stacks")
 {
-    FACET_CHECK_FAMILY_STUBS(CallDatePickers, kDatePickerCalls);
+    FACET_CHECK_FAMILY_CALLS(CallDatePickers, kDatePickerCalls);
 }
 
 TEST_CASE("Date and other pickers called outside a frame return the neutral result")

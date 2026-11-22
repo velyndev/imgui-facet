@@ -1,9 +1,8 @@
 // Behaviour of the lists family (facet/widgets/lists.h).
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_lists.cpp. Popup levels are read inside the frame (the popup host answers only
-// there), so the ui code of a test records them in a PopupProbe.
+// pattern. The API checks are in tests/test_api_lists.cpp. Popup levels are read inside the frame
+// (the popup host answers only there), so the ui code of a test records them in a PopupProbe.
 
 #include <array>
 #include <cstdio>

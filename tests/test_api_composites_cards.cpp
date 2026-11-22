@@ -18,7 +18,7 @@
 
 #include "core/core_internal.h"
 #include "internal/scope_stack.h"
-#include "support/content_stub_check.h"
+#include "support/content_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 
@@ -31,7 +31,7 @@ using namespace facet::test::content;
 // Entries that can change order carry a stable id (rule 2 of the conventions).
 static_assert(HasEntryId<facet::InventoryItem>);
 
-// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_stub_check.h).
+// Views of caller data have the data block of rule 7 (HasDataBlock in support/content_api_check.h).
 static_assert(HasDataBlock<facet::InventoryGridOptions>());
 static_assert(HasDataBlock<facet::ProfileSwitcherOptions>());
 

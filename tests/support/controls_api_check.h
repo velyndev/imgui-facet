@@ -2,11 +2,10 @@
 
 // Checks shared by the API tests of the controls families (buttons, selection, sliders, inputs,
 // pickers): sample data, every value a widget could write, the Dear ImGui stacks a call must leave
-// as it found them, and the macros that call one placeholder and check it. Each family's API test
-// file (tests/test_api_<family>.cpp) uses them for its own widgets, so a family changes only its
-// own file when a widget stops being a placeholder:
+// as it found them, and the macros that call one widget without input and check it. Each family's
+// API test file (tests/test_api_<family>.cpp) uses them for its own widgets:
 //
-//     FACET_CHECK_STUB(false, facet::Slider("Slider 1", &v.number, 0.0f, 1.0f));
+//     FACET_CHECK_CALL(false, facet::Slider("Slider 1", &v.number, 0.0f, 1.0f));
 //
 // checks that the call returned the neutral result (false), left every stack as it was, and
 // submitted one new item with a size. Describe(values) before and after a frame shows that
@@ -45,7 +44,7 @@ inline const ImVec4 kSwatches[] = {{0.2f, 0.4f, 0.8f, 1.0f}, {0.8f, 0.3f, 0.2f, 
 inline const ThumbnailItem kThumbnails[] = {{"Option 1"}, {"Option 2"}};
 inline const FileType kFileTypes[] = {{"Option 1", "*.png;*.jpg"}, {"Option 2"}};
 
-// Every value a placeholder could write, set to values a placeholder would never produce.
+// Every value a widget could write, set to values a call without input never produces.
 struct Values
 {
     bool flag = true;
@@ -268,7 +267,7 @@ constexpr bool HasFormatMembers()
 
 } // namespace facet::test::controls
 
-#define FACET_CHECK_STUB(neutral, ...)                                                             \
+#define FACET_CHECK_CALL(neutral, ...)                                                             \
     do                                                                                             \
     {                                                                                              \
         const ::facet::test::controls::Stacks facetBefore = ::facet::test::controls::Snapshot();   \
@@ -277,7 +276,7 @@ constexpr bool HasFormatMembers()
         ::facet::test::controls::CheckCall(#__VA_ARGS__, facetBefore, facetItemBefore, facetResult, neutral); \
     } while (false)
 
-#define FACET_CHECK_LAYOUT_STUB(...)                                                               \
+#define FACET_CHECK_LAYOUT_CALL(...)                                                               \
     do                                                                                             \
     {                                                                                              \
         const ::facet::test::controls::Stacks facetBefore = ::facet::test::controls::Snapshot();   \
@@ -289,7 +288,7 @@ constexpr bool HasFormatMembers()
 
 // Runs `calls(values)` in one frame, again inside ImGui::BeginDisabled with every id pushed under
 // a scope of its own, checks that `expected` checks ran each time and that nothing was written.
-#define FACET_CHECK_FAMILY_STUBS(calls, expected)                                                  \
+#define FACET_CHECK_FAMILY_CALLS(calls, expected)                                                  \
     do                                                                                             \
     {                                                                                              \
         ::facet::test::Session facetSession;                                                       \

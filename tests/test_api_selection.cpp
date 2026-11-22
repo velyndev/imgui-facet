@@ -11,7 +11,7 @@
 
 #include <facet/facet.h>
 
-#include "support/controls_stub_check.h"
+#include "support/controls_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 

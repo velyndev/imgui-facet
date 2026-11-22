@@ -16,7 +16,7 @@
 
 #include <facet/facet.h>
 
-#include "support/controls_stub_check.h"
+#include "support/controls_api_check.h"
 #include "support/options_check.h"
 #include "support/session.h"
 
@@ -41,35 +41,34 @@ static_assert(facet::ColorChannel{} == facet::ColorChannel::Hue);
 static_assert(facet::ColorAnimation{} == facet::ColorAnimation::Static);
 
 // Every color picker function once, with the overloads, as an app would call it. Without input
-// each one returns false, keeps the stacks and writes nothing (the same checks the placeholders
-// had, which every ready widget still passes).
+// each one returns false, keeps the stacks and writes nothing.
 void CallColorPickers(Values& v)
 {
     using namespace facet;
-    FACET_CHECK_STUB(false, ColorWell("Well 1", &v.color, {.alpha = true, .showHex = true}));
-    FACET_CHECK_STUB(false, ColorPicker("Picker 1", &v.color, {.original = &v.color, .swatches = kSwatches}));
-    FACET_CHECK_STUB(false, ColorPicker("Picker 2", &v.color, {.alpha = true, .mode = ColorPickerMode::Wheel}));
-    FACET_CHECK_STUB(false, ColorInputs("Inputs 1", &v.color, {.model = ColorModel::Hsv}));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 1", &v.color, std::span(kSwatches), &v.history));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 2", &v.color, &v.swatches, nullptr));
-    FACET_CHECK_STUB(false, SwatchPalette("Palette 3", &v.color, std::span<ImVec4>(v.swatchStorage), &v.swatchCount, nullptr));
-    FACET_CHECK_STUB(false, SatValSquare("Square 1", &v.color));
-    FACET_CHECK_STUB(false, ColorChannelSlider("Channel 1", &v.color, {.channel = ColorChannel::Alpha}));
-    FACET_CHECK_STUB(false, ColorChannelSlider("Channel 2", &v.color, {.orientation = Orientation::Vertical}));
-    FACET_CHECK_STUB(false, ColorModeEditor("Mode editor 1", &v.animated));
+    FACET_CHECK_CALL(false, ColorWell("Well 1", &v.color, {.alpha = true, .showHex = true}));
+    FACET_CHECK_CALL(false, ColorPicker("Picker 1", &v.color, {.original = &v.color, .swatches = kSwatches}));
+    FACET_CHECK_CALL(false, ColorPicker("Picker 2", &v.color, {.alpha = true, .mode = ColorPickerMode::Wheel}));
+    FACET_CHECK_CALL(false, ColorInputs("Inputs 1", &v.color, {.model = ColorModel::Hsv}));
+    FACET_CHECK_CALL(false, SwatchPalette("Palette 1", &v.color, std::span(kSwatches), &v.history));
+    FACET_CHECK_CALL(false, SwatchPalette("Palette 2", &v.color, &v.swatches, nullptr));
+    FACET_CHECK_CALL(false, SwatchPalette("Palette 3", &v.color, std::span<ImVec4>(v.swatchStorage), &v.swatchCount, nullptr));
+    FACET_CHECK_CALL(false, SatValSquare("Square 1", &v.color));
+    FACET_CHECK_CALL(false, ColorChannelSlider("Channel 1", &v.color, {.channel = ColorChannel::Alpha}));
+    FACET_CHECK_CALL(false, ColorChannelSlider("Channel 2", &v.color, {.orientation = Orientation::Vertical}));
+    FACET_CHECK_CALL(false, ColorModeEditor("Mode editor 1", &v.animated));
     // A static color is its base color at any time.
     const AnimatedColor still{ColorAnimation::Static, v.animated.color, v.animated.second, v.animated.period};
     CHECK(SampleAnimatedColor(still, 1.0).x == v.animated.color.x);
 }
 
-// Number of FACET_CHECK_STUB calls in CallColorPickers.
+// Number of FACET_CHECK_CALL calls in CallColorPickers.
 constexpr int kColorPickerCalls = 11;
 
 } // namespace
 
 TEST_CASE("Every color picker without input returns false, writes nothing and keeps the stacks")
 {
-    FACET_CHECK_FAMILY_STUBS(CallColorPickers, kColorPickerCalls);
+    FACET_CHECK_FAMILY_CALLS(CallColorPickers, kColorPickerCalls);
 }
 
 TEST_CASE("Color pickers called outside a frame return the neutral result")

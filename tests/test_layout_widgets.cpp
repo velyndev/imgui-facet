@@ -2,8 +2,7 @@
 // row layout of facet/core/layout.h are tested in tests/test_layout.cpp.
 //
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
-// pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
-// tests/test_api_layout.cpp.
+// pattern. The API checks are in tests/test_api_layout.cpp.
 
 #include <cfloat>
 #include <cmath>
@@ -19,7 +18,7 @@
 #include "internal/state_storage.h"
 #include "widgets/layout/layout_internal.h"
 #include "support/session.h"
-#include "support/structure_stub_check.h"
+#include "support/structure_api_check.h"
 
 namespace
 {

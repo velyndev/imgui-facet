@@ -13,7 +13,7 @@
 
 #include "support/options_check.h"
 #include "support/session.h"
-#include "support/structure_stub_check.h"
+#include "support/structure_api_check.h"
 
 namespace
 {

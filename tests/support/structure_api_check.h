@@ -28,7 +28,7 @@
 namespace facet::test::structure
 {
 
-// Every value a placeholder receives through a pointer or a writable span. The placeholders must
+// Every value a widget receives through a pointer or a writable span. A call without input must
 // leave all of it alone.
 struct Values
 {
@@ -63,8 +63,8 @@ struct Values
 };
 
 // The Dear ImGui and Facet stacks a call must leave as it found them (rule 11 of the
-// conventions), the placeholder frame's narrowing of the window included, plus the values and
-// the usage error count.
+// conventions), a container's narrowing of the window included, plus the values and the usage
+// error count.
 struct Snapshot
 {
     int ids = 0;
