@@ -33,6 +33,7 @@
 #include "facet/core/draw.h"
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
+#include "internal/feedback_hold.h"
 #include "internal/fuzzy.h"
 #include "internal/scope_stack.h"
 #include "widgets/composites/settings_search.h"
@@ -289,7 +290,7 @@ bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& op
     if (record.flashRow == rowId)
     {
         const Theme& t = T();
-        const float hold = t.motion.feedbackHold * t.motion.scale;
+        const float hold = static_cast<float>(internal::FeedbackHoldSeconds());
         const float amount = Tween(active.search, internal::kSettingsSearchFlashSub, record.flashAge < hold ? 1.0f : 0.0f,
                                    t.motion.durationSlow);
         if (amount > 0.0f && record.flashHeight > 0.0f)

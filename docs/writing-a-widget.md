@@ -86,6 +86,7 @@ second one.
 | Icons | `ControlTextScope::IconSize`, `DrawControlIcon`; icons by name, `Icon("chevron-down")` |
 | Loading state | `DrawControlSpinner`; skeletons and the shared loading clock in `internal/loading.h` |
 | Confirmation after a copy | `CopyFeedbackHold`, `CopyFeedbackActive` (`internal/copy_feedback.h`): `motion.feedbackHold` times `motion.scale`, the same for every widget that copies |
+| Any other hold on `motion.feedbackHold` | `FeedbackHoldSeconds` (`internal/feedback_hold.h`): the token times `motion.scale`, never negative; the copy helpers use it too |
 | Check mark of a chosen row (menus, lists, pickers) | `ChoiceCheckColor` (`internal/popup_menu.h`): accentText, labelTertiary when disabled |
 | Key caps of a chord | `KeyCapNames`, `KeyCapLook` (`internal/key_caps.h`) |
 | Checkerboard behind translucent colors and images | `FillCheckerboard` (`core/draw.h`) with `colors.checker` and `metrics.checkerCell` |

@@ -2,23 +2,20 @@
 
 // How long a copy confirmation shows: CopyButton and CopyField swap their icon (and label) for
 // the check, InlineCode, KeyValueList and CodeView show Strings::copied above the copied text.
-// All of them hold it for motion.feedbackHold, multiplied by motion.scale as the token says, so a
-// slowed or sped up theme keeps every copy confirmation in step.
-
-#include <algorithm>
+// All of them hold it for FeedbackHoldSeconds (feedback_hold.h), so every copy confirmation
+// stays in step with the other confirmations.
 
 #include <imgui.h>
 
-#include "facet/core/theme.h"
+#include "internal/feedback_hold.h"
 
 namespace facet::internal
 {
 
-// Seconds a copy confirmation stays: motion.feedbackHold times motion.scale (never negative).
+// Seconds a copy confirmation stays: FeedbackHoldSeconds().
 inline double CopyFeedbackHold()
 {
-    const Motion& motion = T().motion;
-    return static_cast<double>(motion.feedbackHold) * static_cast<double>(std::max(motion.scale, 0.0f));
+    return FeedbackHoldSeconds();
 }
 
 // True while a confirmation that started at `copiedAt` (ImGui::GetTime(); < 0 for none) is shown.

@@ -15,6 +15,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/feedback_hold.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "support/session.h"
@@ -621,6 +622,41 @@ TEST_CASE("SettingsSearch scrolls the first hit into view and highlights it unti
     const facet::Motion& motion = facet::T().motion;
     session.Seconds((motion.feedbackHold + motion.durationSlow) * motion.scale + 0.2f);
     CHECK(highlight == 0);
+}
+
+TEST_CASE("The settings search highlight holds for feedbackHold times motion.scale, never a negative time")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    facet::Theme theme = saved;
+    theme.motion.scale = 2.0f;
+    facet::SetTheme(theme, false);
+    CHECK(facet::internal::FeedbackHoldSeconds() == doctest::Approx(theme.motion.feedbackHold * 2.0f));
+    theme.motion.scale = -1.0f;
+    facet::SetTheme(theme, false);
+    CHECK(facet::internal::FeedbackHoldSeconds() == 0.0);
+    // The highlight at scale 2 still shows past the unscaled hold.
+    theme.motion.scale = 2.0f;
+    facet::SetTheme(theme, false);
+    std::string filter;
+    int highlight = 0;
+    session.SetUi([&] {
+        facet::BeginSettingsSearch("hold reveal", {.filter = filter.c_str()});
+        if (facet::SettingsSearchMatch("Setting 1"))
+            ImGui::TextUnformatted("Setting 1");
+        facet::EndSettingsSearch();
+        const ImU32 fill = facet::ToU32(facet::T().colors.accentSubtle);
+        highlight = 0;
+        for (const ImDrawVert& v : ImGui::GetWindowDrawList()->VtxBuffer)
+            highlight += (v.col & IM_COL32_A_MASK) != 0 && (v.col | IM_COL32_A_MASK) == (fill | IM_COL32_A_MASK) ? 1 : 0;
+    });
+    session.Frames(2);
+    filter = "Setting 1";
+    session.Frames(3);
+    session.Seconds(theme.motion.feedbackHold + 0.2f);
+    CHECK(highlight > 0);
+    facet::SetTheme(saved, false);
 }
 
 TEST_CASE("Escape in the search field clears the query first, so every settings row shows again")
