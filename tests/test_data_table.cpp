@@ -538,6 +538,104 @@ TEST_CASE("DataTable: Left and Right move the focused cell along the columns in 
     CHECK(ui.State().focusColumn == 0);
 }
 
+namespace
+{
+
+// The vertices drawn this frame in the RGB of `color` at any alpha (so a mark fading in counts).
+std::vector<ImVec2> VerticesIn(ImU32 color)
+{
+    std::vector<ImVec2> found;
+    const ImDrawData* data = ImGui::GetDrawData();
+    if (data == nullptr)
+        return found;
+    for (const ImDrawList* list : data->CmdLists)
+        for (const ImDrawVert& v : list->VtxBuffer)
+            if ((v.col & ~IM_COL32_A_MASK) == (color & ~IM_COL32_A_MASK) && (v.col & IM_COL32_A_MASK) != 0)
+                found.push_back(v.pos);
+    return found;
+}
+
+// The ring color set to a color nothing else in the table draws, so every vertex in it is the
+// ring (or a mark in the ring color, such as a hovered resize divider).
+void SetDataTableProbeTheme()
+{
+    facet::Theme theme = facet::T();
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+}
+
+} // namespace
+
+TEST_CASE("DataTable: a click selects by fill with no ring; Right shows the cell cursor inside the cell")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetDataTableProbeTheme();
+    TableUi ui(20);
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(3);
+    const ImU32 ring = facet::ToU32(facet::T().colors.focusRing);
+    session.Click(session.ItemCenter("row2"));
+    // Away from the rows, so the selected row shows its selection fill alone.
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    CHECK(ui.selection.Size == 1);
+    CHECK(VerticesIn(ring).empty());
+    const ImRect row = ui.rowRect[2];
+    int selectionFill = 0;
+    for (const ImVec2& p : VerticesIn(facet::ToU32(facet::T().colors.accentSubtle)))
+        selectionFill += (p.y >= row.Min.y - 0.5f && p.y <= row.Max.y + 0.5f) ? 1 : 0;
+    CHECK(selectionFill > 0);
+
+    // Right puts the cell cursor on the first column: the ring shows, inside that cell and its row.
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frames(3);
+    REQUIRE(ui.State().focusColumn == 0);
+    const std::vector<ImVec2> cursor = VerticesIn(ring);
+    REQUIRE_FALSE(cursor.empty());
+    const ImGuiTableColumn& column = ui.Table()->Columns[0];
+    for (const ImVec2& p : cursor)
+    {
+        CHECK(p.x >= column.MinX - 0.5f);
+        CHECK(p.x <= column.MaxX + 0.5f);
+        CHECK(p.y >= row.Min.y - 0.5f);
+        CHECK(p.y <= row.Max.y + 0.5f);
+    }
+    // A click ends the keyboard modality, and the cursor goes with it.
+    session.Click(session.ItemCenter("row4"));
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    CHECK(VerticesIn(ring).empty());
+}
+
+TEST_CASE("DataTable: a hovered resize band recolors the divider and keeps its hairline width")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetDataTableProbeTheme();
+    TableUi ui(20);
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(3);
+    const ImRect header = ui.Header(1);
+    // On the band a little inside its edge, as the resize test grabs it; Dear ImGui's own border
+    // feedback waits a few hundredths of a second, so the pointer rests for a few frames.
+    const float band = facet::Px(facet::T().table.resizeBand) * 0.5f;
+    session.MouseMove(ImVec2(header.Max.x + band * 0.75f, header.GetCenter().y));
+    session.Frames(12);
+    const std::vector<ImVec2> line = VerticesIn(facet::ToU32(facet::T().colors.focusRing));
+    REQUIRE_FALSE(line.empty());
+    float minX = FLT_MAX;
+    float maxX = -FLT_MAX;
+    for (const ImVec2& p : line)
+    {
+        minX = std::min(minX, p.x);
+        maxX = std::max(maxX, p.x);
+    }
+    CHECK(maxX - minX == doctest::Approx(facet::HairlineThickness()).epsilon(0.01));
+}
+
 TEST_CASE("DataTable: F2 or Enter edit a cell; Enter commits and Escape cancels")
 {
     MotionGuard guard;

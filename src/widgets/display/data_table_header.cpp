@@ -12,10 +12,11 @@
 //     cut with an ellipsis (the whole label on hover and focus) and placed by the column's align;
 //     a sorted column shows an arrow for its direction (up ascending, down descending) and, while
 //     more than one column sorts, its place in the order; hover and press fill the cell inset by
-//     spacing.xs; the focus ring goes around that fill.
+//     spacing.xs; the focus ring (keyboard only) sits inside that fill.
 //   - Between columns a hairline divider; on the edge of a resizable column a band of the
 //     table.resizeBand token that resizes it by drag (a double click fits it to its content). The
-//     divider turns into a focusRing line while its band is hovered or dragged. The narrowest width
+//     divider runs the header height in the focusRing color, at the same hairline width, while its
+//     band is hovered or dragged. The narrowest width
 //     is the table.minColumnWidth token (BeginDataTable sets it for the layout).
 //   - The column menu (a right click on a header or after the last one, or the Menu key or
 //     Shift+F10 on a focused header): Strings::sortAscending and Strings::sortDescending for a
@@ -48,9 +49,6 @@ namespace facet::internal
 {
 namespace
 {
-
-// The line a hovered or dragged resize band shows, in hairlines.
-constexpr float kDataTableResizeLineHairlines = 2.0f;
 
 // What a header cell or the empty header area asked of the column menu this frame.
 struct DataTableMenuRequest
@@ -205,7 +203,7 @@ void DataTableHeaderCell(DataTableFrame& frame, int n, const DataTableColumn& de
         drawList->AddText(ImVec2(x, textY), color, shown.text);
         drawMark(x + shown.width + gap);
     }
-    DrawFocusRing(drawList, fill, radius, item.focusAmount);
+    DrawFocusRingInside(drawList, fill, radius, item.focusAmount);
     drawList->PopClipRect();
     CutTextTooltip(item, label, labelEnd, shown.truncated);
 
@@ -299,14 +297,15 @@ void DataTableResizeBand(DataTableFrame& frame, int n, float top, float bottom)
     ImRect clip = table->InnerClipRect;
     clip.Min.x = std::max(clip.Min.x, column.ClipRect.Min.x);
     drawList->PushClipRect(clip.Min, clip.Max, true);
+    // The divider's own hairline, at its x and width, recolored: the state changes the color and
+    // the length (the whole header height), never the width.
     const float hairline = HairlineThickness();
     const float x = std::round(column.MaxX);
     if (highlight > 0.0f)
     {
-        const float width = hairline * kDataTableResizeLineHairlines;
         const ImVec4& ring = theme.colors.focusRing;
-        FillRect(drawList, ImVec2(x - width * 0.5f, top), ImVec2(x + width * 0.5f, bottom),
-                 ToU32(WithAlpha(ring, ring.w * highlight)), 0.0f);
+        FillRect(drawList, ImVec2(x, top), ImVec2(x + hairline, bottom), ToU32(WithAlpha(ring, ring.w * highlight)),
+                 0.0f);
     }
     drawList->PopClipRect();
 }

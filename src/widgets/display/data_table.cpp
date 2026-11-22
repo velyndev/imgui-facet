@@ -123,13 +123,13 @@ bool CellEditable(const DataTableFrame& frame, int column)
 }
 
 // The cell of `column` in a row from `top` to `bottom`: the column's extent (its padding included),
-// the gap of a row fill kept above and below.
+// inside the row's fill (ListRowFillRect keeps one hairline above and below). The cell cursor ring
+// is drawn inside this rectangle, so it never reaches into a neighbouring cell or row.
 ImRect CellRect(const DataTableFrame& frame, int column, float top, float bottom)
 {
     const ImGuiTableColumn& c = frame.table->Columns[column];
-    const float outset = FocusRingOutset();
-    const float gap = HairlineThickness();
-    return ImRect(c.MinX + outset, top + gap, std::max(c.MinX + outset + 1.0f, c.MaxX - outset), bottom - gap);
+    const ImRect fill = ListRowFillRect(ImRect(c.MinX, top, c.MaxX, bottom));
+    return ImRect(fill.Min.x, fill.Min.y, std::max(fill.Min.x + 1.0f, fill.Max.x), fill.Max.y);
 }
 
 // Left and Right while a row has the focus: the focused cell moves along the enabled columns in
@@ -291,14 +291,14 @@ void FinishTable(DataTableFrame& frame)
     EndScrollAreaBars();
     DataTableApplyResize(frame);
 
-    // Over the rows: the frozen columns end in a hairline while columns scroll under them.
+    // Over the rows: the frozen columns end in a separator hairline while columns scroll under them.
     if (scrolledSideways && frozenEdge > innerRect.Min.x && frozenEdge < innerRect.Max.x)
     {
         ImDrawList* drawList = inner->DrawList;
         drawList->PushClipRect(innerRect.Min, innerRect.Max, true);
         const float hairline = HairlineThickness();
         FillRect(drawList, ImVec2(frozenEdge, innerRect.Min.y), ImVec2(frozenEdge + hairline, innerRect.Max.y),
-                 ToU32(T().colors.separatorOpaque), 0.0f);
+                 ToU32(T().colors.separator), 0.0f);
         drawList->PopClipRect();
     }
 
@@ -340,12 +340,11 @@ ImRect DataTableColumnClip(const DataTableFrame& frame, int column)
 {
     const ImGuiTable* table = frame.table;
     const ImGuiTableColumn& c = table->Columns[column];
-    const float outset = FocusRingOutset();
-    // Where the column is cut (by the frozen columns or the table edge) the clip stays at the
-    // cut; elsewhere it grows by the ring outset so a ring around the cell stays whole.
-    const float minX = c.ClipRect.Min.x > c.MinX ? c.ClipRect.Min.x : c.ClipRect.Min.x - outset;
-    const float maxX = c.ClipRect.Max.x < c.MaxX ? c.ClipRect.Max.x : c.ClipRect.Max.x + outset;
-    ImRect clip(minX, table->InnerClipRect.Min.y, maxX, table->InnerClipRect.Max.y);
+    // The column's own extent, cut where the frozen columns or the table edge cut it; rings inside
+    // a header or a cell stay within it.
+    const float minX = std::max(c.ClipRect.Min.x, c.MinX);
+    const float maxX = std::min(c.ClipRect.Max.x, c.MaxX);
+    ImRect clip(minX, table->InnerClipRect.Min.y, std::max(minX, maxX), table->InnerClipRect.Max.y);
     clip.ClipWithFull(table->InnerClipRect);
     return clip;
 }
@@ -434,8 +433,7 @@ bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, in
 
     // The grouped surface, behind the table's inner window.
     FillRect(window->DrawList, frameRect.Min, frameRect.Max, ToU32(theme.colors.bgSecondary), Px(theme.radii.card));
-    StrokeRect(window->DrawList, frameRect.Min, frameRect.Max, ToU32(theme.colors.separator), Px(theme.radii.card),
-               HairlineThickness());
+    DrawSurfaceOutline(window->DrawList, frameRect, Px(theme.radii.card));
 
     // 3. The Dear ImGui table: its inner window without stock bars or background, flattened into
     // the page's navigation so Tab reaches the headers and rows like any other item.
@@ -740,14 +738,15 @@ void EndDataTable()
         if (!frame.sortPending)
             state.anchor.Record(frame.selection, frame.focusScope, frame.rowCount);
     }
-    // The focus ring of the focused row, or of its focused cell, over every row.
+    // The focus ring of the focused row, or the cell cursor inside its focused cell, over every row.
+    // Both follow the row item's focusAmount, which is zero unless the keyboard modality is on.
     DataTableBeginBackground(frame);
     frame.group.End();
     if (frame.cellRing && frame.cellRingAmount > 0.0f)
     {
         ImDrawList* drawList = frame.window->DrawList;
         drawList->PushClipRect(frame.cellRingClip.Min, frame.cellRingClip.Max, true);
-        DrawFocusRing(drawList, frame.cellRingRect, Px(T().radii.control), frame.cellRingAmount);
+        DrawFocusRingInside(drawList, frame.cellRingRect, Px(T().radii.control), frame.cellRingAmount);
         drawList->PopClipRect();
     }
     DataTableEndBackground(frame);

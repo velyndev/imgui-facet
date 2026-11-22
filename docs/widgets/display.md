@@ -437,7 +437,7 @@ class DataTableScope;
 ```
 
 A Dear ImGui table (`BeginTableEx` with both scroll axes) on the grouped surface (`bgSecondary`, card
-radius, hairline), with a Facet header row that stays in view, virtualized rows and an optional
+radius, `separator` hairline), with a Facet header row that stays in view, virtualized rows and an optional
 selection. Column widths, order, visibility and sort are Dear ImGui's state of the table, kept under
 the id and in its ini file.
 
@@ -446,7 +446,7 @@ the id and in its ini file.
   and keyboard focus) and placed by the column's `align`. `align` places the header only; cells draw
   their own content (`StyledText` with `.align` and `.width = kFill` lines numbers up). Header cells
   are Tab stops in display order when the table sorts or has the column menu. Hover and press fill
-  the cell inset by `spacing.xs`; the focus ring goes around that fill.
+  the cell inset by `spacing.xs`; after keyboard input the focus ring sits inside that fill.
 - **Sorting** (`sortable`): a click, Enter or Space on a header sorts by its column and the next one
   turns the direction (Dear ImGui's `TableSetColumnSortDirection`); with `multiSort`, Shift adds the
   column to the sort. A sorted column shows an arrow (up ascending, down descending) and, while more
@@ -454,8 +454,9 @@ the id and in its ini file.
   End; its `SpecsDirty` is true once per change (and once for a new table), never on frames without
   one. `ImGuiTableColumnFlags_NoSort` and the other stock sort flags apply.
 - **Resizing** (`resizable`): a band of `table.resizeBand` on the right edge of a header cell resizes
-  the column by drag; a double click fits it to its content. A hairline divider sits between header
-  cells and turns into a `focusRing` line while its band is hovered or dragged. No column gets
+  the column by drag; a double click fits it to its content. A `separator` hairline divider sits
+  between header cells; while its band is hovered or dragged it runs the header height in `focusRing`
+  at the same hairline width. No column gets
   narrower than `table.minColumnWidth` (its padding included). Resizing has no keys.
 - **Reordering** (`reorderable`): dragging a header past a neighbour's edge moves the column there,
   never across the frozen columns (Dear ImGui's rule). There are no keys for it.
@@ -465,7 +466,7 @@ the id and in its ini file.
   submenu, whose rows show and hide columns. A column with `ImGuiTableColumnFlags_NoHide`, and the
   last column shown, cannot be hidden. Without `sortable` and `hideable` there is no menu.
 - **Frozen columns** (`frozenColumns`): the leading columns stay in place while the others scroll
-  sideways under them; a hairline marks their edge while the table is scrolled.
+  sideways under them; a `separator` hairline marks their edge while the table is scrolled.
 - **Rows:** `rowHeight`, or the list row height of the inherited control size (`PushControlSize`).
   Rows are virtualized by the row ranges of the list core: only the visible rows, the focused row and
   the start of a Shift range are handed out by `NextVisibleRows`, so a hundred thousand rows cost what
@@ -473,9 +474,10 @@ the id and in its ini file.
   height; content taller than the row is not supported. Text in cells is centered on the row.
 - **Row look:** `DataTableRow` submits one row item that spans every column, from the first column
   to the right edge of the visible table, also while the table is scrolled sideways. It draws in the
-  table's background channel, under the cells: the hover fill (`fill[2]`), the selection
-  (`accentSubtle`) and, after keyboard input, the focus ring inside the whole row, or around the
-  focused cell. A control in a cell takes the pointer before the row.
+  table's background channel, under the cells: the hover fill (`fill[2]`) and the selection
+  (`accentSubtle`), never an outline. A click selects by that fill alone. Only after keyboard input
+  does the focus ring show, inside the whole row, or as the cell cursor inside the focused cell, so it
+  never reaches into a neighbouring cell or row. A control in a cell takes the pointer before the row.
 - **Selection** (`selection` set): click, Ctrl, Shift, Shift with the arrows, Ctrl+A, Escape and box
   select through `ImGui::BeginMultiSelect` and the storage; `singleSelect` keeps one row. The start of
   a Shift range stays on its item when the caller sorts (the selection storage keys rows through
