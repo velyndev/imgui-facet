@@ -1004,6 +1004,53 @@ TEST_CASE("The range brush keeps its edges apart, drags its window and steps eac
     CHECK(writes >= 4);
 }
 
+TEST_CASE("The range brush window keeps its look under the pointer; only a grip shows hover")
+{
+    ChartGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    double low = 30.0;
+    double high = 70.0;
+    ImGuiID brushId = 0;
+    std::vector<ImDrawVert> drawn;
+    const facet::ChartSeries series[] = {{.label = "a", .values = kRamp}};
+    session.SetUi([&] {
+        brushId = ImGui::GetID("Range");
+        const int from = VertexCount();
+        (void)facet::ChartRangeBrush("Range", &low, &high, 0.0, 100.0, series, {.width = 400.0f});
+        session.Track("brush");
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawn.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+    });
+    // Reduced motion leaves no hover fade in between, so each state draws its final look.
+    facet::Theme theme = facet::T();
+    theme.motion.reduceMotion = true;
+    facet::SetTheme(theme, false);
+    const auto same = [](const std::vector<ImDrawVert>& a, const std::vector<ImDrawVert>& b) {
+        if (a.size() != b.size())
+            return false;
+        for (std::size_t i = 0; i < a.size(); ++i)
+            if (a[i].col != b[i].col || a[i].pos.x != b[i].pos.x || a[i].pos.y != b[i].pos.y)
+                return false;
+        return true;
+    };
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    const std::vector<ImDrawVert> rest = drawn;
+    REQUIRE_FALSE(rest.empty());
+    // Over the window body, half way between the edges and clear of both grips.
+    const ImRect rect = session.ItemRect("brush");
+    const ImRect lowGrip = fi::ChartBrushHandleRect(brushId, 0);
+    const ImRect highGrip = fi::ChartBrushHandleRect(brushId, 1);
+    session.MouseMove(ImVec2((lowGrip.Max.x + highGrip.Min.x) * 0.5f, rect.Min.y + 2.0f));
+    session.Frames(3);
+    CHECK(same(drawn, rest));
+    // Over a grip: the grip changes, so the draw differs.
+    session.MouseMove(lowGrip.GetCenter());
+    session.Frames(3);
+    CHECK_FALSE(same(drawn, rest));
+}
+
 TEST_CASE("The range brush zooms with Alt and the wheel, and a read-only brush writes nothing")
 {
     ChartGuard guard;

@@ -66,8 +66,9 @@ on both axes and the x axis title under them.
   the `ChartAxis` differ. Tick labels follow `formatter`, `format` or the shortest text the step
   needs, and are measured: along x fewer ticks are asked for until the widest label fits between
   its neighbours, and if it still does not, only every n-th tick is labelled, so labels never
-  overlap. `hideTicks` gives the room to the plot, `hideGrid` leaves out the grid lines; a linear
-  y axis through 0 draws its zero line stronger. A logarithmic axis leaves values at or below 0
+  overlap. `hideTicks` gives the room to the plot, `hideGrid` leaves out the grid lines (`separator`
+  hairlines); a linear y axis through 0 draws its zero line stronger (`separatorOpaque`), because it
+  is the baseline the bars and areas stand on. A logarithmic axis leaves values at or below 0
   out of its automatic range.
 - **Series:** `color` or the palette color of the series index; `hidden` series are not drawn and
   leave the range. NaN values and getter gaps break a line; a stretch of one sample is a dot.
@@ -78,7 +79,8 @@ on both axes and the x axis title under them.
   per series index (circle, square, diamond, triangle), so series stay apart without color.
 - **Readout:** the chart is one item and one Tab stop. With `crosshair`, the pointer over the plot
   picks the nearest x of the first visible series: a hairline marks it, each visible series gets
-  a dot at its sample nearest to that x, and a box beside it names the x and every series value
+  a dot at its sample nearest to that x, and a box beside it (the level 1 elevated surface with the
+  `separator` hairline of a floating surface) names the x and every series value
   (eight rows, then "+{count}"). Without `crosshair` the pointer picks the nearest point of any
   series and the box names that series alone. With keyboard focus, Left and Right step through
   the samples of the first visible series, Home and End go to the ends; the keys are taken from
@@ -247,8 +249,10 @@ bool ChartRangeBrush(const char* label, double* low, double* high, double min, d
 
 An overview of the visible `overview` series (lines without axes, over `min` to `max` on x) with a
 window from `*low` to `*high` over it: a wash outside the window, the accent wash inside, and the
-edges as lines in the focus ring color with a grip in the middle. The selected range then drives
-the x axis of a larger chart (see the usage below).
+edges as lines in the focus ring color with a grip in the middle (the level 1 surface with the
+`controlBorder` hairline, `controlBorderHover` and a stronger fill under the pointer). The window
+body keeps its look under the pointer and while it is dragged; only the grips show hover. The
+selected range then drives the x axis of a larger chart (see the usage below).
 
 - **Edges** are the two handles of the multi-handle block, as on RangeSlider: each its own item,
   Tab stop and focus ring around its grip. Dragging moves an edge; the window body drags both; a

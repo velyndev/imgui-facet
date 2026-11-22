@@ -13,6 +13,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/widgets/display.h"
+#include "internal/control.h"
 #include "internal/loading.h"
 #include "internal/reserve.h"
 #include "internal/state_storage.h"
@@ -600,7 +601,8 @@ void DrawChartReadout(ImDrawList* drawList, const ImRect& area, ImVec2 anchor, c
     drawList->PushClipRect(area.Min, area.Max, true);
     const float radius = Px(t.radii.element);
     FillRect(drawList, box.Min, box.Max, ToU32(c.ElevatedSurface(1)), radius);
-    StrokeRect(drawList, box.Min, box.Max, ToU32(c.separatorOpaque), radius, HairlineThickness());
+    // A floating surface: its elevated grey and the separator hairline.
+    DrawSurfaceOutline(drawList, box, radius);
     ImFont* font = ImGui::GetFont();
     const float fontSize = ImGui::GetFontSize();
     float rowTop = box.Min.y + padY;

@@ -217,8 +217,10 @@ bool ChartRangeBrush(const char* label, double* low, double* high, double min, d
         const ImVec4 rest = c.ElevatedSurface(1);
         const ImVec4 fill = disabled ? c.fill[3] : internal::StateFill(rest, Mix(rest, c.fill[1], 0.5f), c.fill[0], h);
         FillRect(drawList, grip.Min, grip.Max, ToU32(fill), gripRadius);
-        StrokeRect(drawList, grip.Min, grip.Max, ToU32(disabled ? c.labelTertiary : ControlBoundaryColor(c)), gripRadius,
-                   HairlineThickness());
+        // The grip is the control: its fill and outline color follow hover and press, at the one
+        // hairline width. The window body between the edges keeps its look under the pointer.
+        internal::DrawOutline(drawList, grip, gripRadius,
+                              internal::ControlOutlineColor({.hoverAmount = h.hoverAmount, .disabled = disabled}));
     }
     drawList->PopClipRect();
     for (int i = 0; i < 2; ++i)

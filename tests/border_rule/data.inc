@@ -9,7 +9,8 @@
 
 FACET_BORDER_EXCEPTION("src/widgets/composites/accent_picker.cpp", "hairline * kAccentPickerRingWidth",
                        "the chosen-color ring around the custom well: the selection mark of SwatchPalette's chosen swatch, outside the color it marks, not an outline")
-FACET_BORDER_PENDING("src/widgets/charts/chart_parts.cpp")
+FACET_BORDER_EXCEPTION("src/widgets/charts/chart_parts.cpp", "stroke",
+                       "the hollow marker and legend swatch of a hidden series: a glyph at a share of charts.lineWidth, not an outline")
 FACET_BORDER_PENDING("src/widgets/media/image_viewer.cpp")
 FACET_BORDER_PENDING("src/widgets/media/media_look.cpp")
 FACET_BORDER_PENDING("src/widgets/media/thumbnail_strip.cpp")
