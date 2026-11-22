@@ -230,12 +230,11 @@ FACET_DEMO_PAGE("fuzzy", "Fuzzy matching", "Blocks", 80, "default", "ranked", "e
                             "starts and in consecutive letters. The matched letters are highlighted.");
     facet::demo::SectionHeader("Icon names");
 
-    ImGui::AlignTextToFramePadding();
-    facet::IconGlyph(facet::Icon("search"), 0.0f, facet::ToU32(theme.colors.labelSecondary));
-    ImGui::SameLine();
     ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * kSearchWidthEm));
-    ImGui::InputTextWithHint("##query", "Type part of an icon name, such as cd or arrow", page.query,
-                             sizeof(page.query));
+    facet::TextFieldOptions queryOptions;
+    queryOptions.placeholder = "Type part of an icon name, such as cd or arrow";
+    queryOptions.icon = facet::Icon("search");
+    facet::TextField("##query", page.query, sizeof(page.query), queryOptions);
     ctx.Probe("fuzzy.query");
 
     const std::vector<const char*>& names = IconNames();

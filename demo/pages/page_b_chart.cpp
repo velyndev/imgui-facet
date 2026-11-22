@@ -439,16 +439,12 @@ FACET_DEMO_PAGE("chart-core", "Chart core", "Blocks", 100, "default", "crosshair
 
     facet::demo::SectionHeader("Logarithmic axis");
     facet::demo::Note("Generated: y = 10^(x/2) and y = 10^(x/4). On a logarithmic axis both are straight lines.");
-    facet::internal::BeginRow("Y axis");
+    // A labelled row whose control keeps the width of its two segments.
+    facet::demo::LabeledRow("Y axis");
     int axis = page.logAxis ? 1 : 0;
-    ImGui::RadioButton("Linear", &axis, 0);
-    facet::ItemCursor();
-    ctx.Probe("chart.linear");
-    ImGui::SameLine();
-    ImGui::RadioButton("Logarithmic", &axis, 1);
-    facet::ItemCursor();
-    ctx.Probe("chart.log");
-    facet::internal::EndRow();
+    static const char* const kAxisNames[] = {"Linear", "Logarithmic"};
+    facet::SegmentedControl("##axis", &axis, kAxisNames);
+    ctx.Probe("chart.axis");
     page.logAxis = axis == 1;
     {
         const SeriesView growth[] = {SeriesView{.x = data.growthX, .y = data.fast, .count = kGrowthSamples},
@@ -536,11 +532,19 @@ FACET_DEMO_SELFTEST("chart-core")
     test.KeyPress(ImGuiKey_Home);
     test.ExpectNear("Home goes back to the first sample", [] { return waveCrosshair.index; }, 0.0, 0.0);
 
-    // The axis switch.
-    test.Click("chart.linear");
+    // The axis switch: a click on a segment, then the arrows on the focused control.
+    test.MouseMove(T::Item("chart.axis", 0.1f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("the growth chart switches to a linear axis", [] { return !page.logAxis; });
-    test.Click("chart.log");
+    test.MouseMove(T::Item("chart.axis", 0.9f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("and back to a logarithmic one", [] { return page.logAxis; });
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Expect("Left on the focused control chooses the linear axis", [] { return !page.logAxis; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("Right chooses the logarithmic one again", [] { return page.logAxis; });
     test.MouseMove(T::Item("chart.growth", 0.999f, 0.5f));
     test.Wait(1);
     // The pointer position is whole pixels, so in a narrow chart the last pixel column can sit

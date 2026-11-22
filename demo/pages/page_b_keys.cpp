@@ -375,7 +375,9 @@ void DrawShortcutSection(const facet::Theme& theme, const facet::demo::PageCtx& 
 
     facet::internal::BeginRow("Type here");
     ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), ImGui::GetFontSize() * kFieldWidthEm));
-    ImGui::InputTextWithHint("##text", "R types an r here instead of resetting", page.text, sizeof(page.text));
+    facet::TextFieldOptions textOptions;
+    textOptions.placeholder = "R types an r here instead of resetting";
+    facet::TextField("##text", page.text, sizeof(page.text), textOptions);
     ctx.Probe("keys.text");
     facet::internal::EndRow();
 }
@@ -455,8 +457,8 @@ FACET_DEMO_PAGE("keys", "Keys and shortcuts", "Blocks", 90, "default", "listenin
 
     facet::demo::PageHeader("Keys and shortcuts",
                             "Key chords as text, a chord capture session, the shortcut registry with its scopes "
-                            "and conflicts, and key binds in their four modes. The page's controls are stock "
-                            "Dear ImGui widgets; the KeybindCapture and KeybindList widgets build on these blocks.");
+                            "and conflicts, and key binds in their four modes. The KeybindCapture and KeybindList "
+                            "widgets build on these blocks.");
     PollShortcuts();
     DrawCaptureSection(theme, ctx);
     DrawShortcutSection(theme, ctx);
@@ -577,7 +579,7 @@ FACET_DEMO_SELFTEST("keys")
     test.ExpectText("the Menu key is captured", [] { return ChordText(page.captured); }, "Menu");
     test.Click("keys.allowMouse");
 
-    // Text editing in the stock field: typed text (character input, no IME), Shift+Left
+    // Text editing in the text field: typed text (character input, no IME), Shift+Left
     // selection, copy and paste through the run's own clipboard, and a double click that
     // selects a word (the field's middle lies on or after the last word at every size).
     test.Do([] { page.text[0] = '\0'; });

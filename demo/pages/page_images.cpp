@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -334,30 +335,15 @@ constexpr RadiusChoice kRadii[] = {
     {"window", &facet::Radii::window},
 };
 
-// One setting as a labeled row of radio buttons. Buttons that do not fit wrap onto further
-// lines starting at the control column. Each button's probe is "<probe>.<lowercase name>".
-void ChoiceRow(facet::demo::PageCtx& ctx, const char* label, const char* probe, const char* const* names, int count,
+// One setting as a labeled row with a segmented control, probed as `probe`.
+void ChoiceRow(facet::demo::PageCtx& ctx, const char* label, const char* probe, std::span<const char* const> names,
                int& selected)
 {
-    const float right = facet::demo::ContentRight();
     facet::demo::LabeledRow(label);
-    const float column = ImGui::GetCursorPosX();
-    char probeName[64];
-    for (int i = 0; i < count; ++i)
-    {
-        if (i > 0 && !facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth(names[i])))
-            ImGui::SetCursorPosX(column);
-        ImGui::PushID(i);
-        if (ImGui::RadioButton(names[i], selected == i))
-            selected = i;
-        ImGui::PopID();
-        facet::ItemCursor();
-        int length = std::snprintf(probeName, sizeof(probeName), "%s.", probe);
-        for (const char* c = names[i]; *c != '\0' && length + 1 < static_cast<int>(sizeof(probeName)); ++c)
-            probeName[length++] = static_cast<char>(std::tolower(static_cast<unsigned char>(*c)));
-        probeName[length] = '\0';
-        ctx.Probe(probeName);
-    }
+    ImGui::PushID(probe);
+    facet::SegmentedControl("##choice", &selected, names);
+    ImGui::PopID();
+    ctx.Probe(probe);
 }
 
 } // namespace
@@ -407,14 +393,14 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
     {
         const char* const names[] = {"Contain", "Cover", "Fill"};
         int fit = static_cast<int>(ui.fit);
-        ChoiceRow(ctx, "Fit", "images.fit", names, static_cast<int>(std::size(names)), fit);
+        ChoiceRow(ctx, "Fit", "images.fit", names, fit);
         ui.fit = static_cast<facet::ImageFit>(fit);
     }
     {
         const char* names[std::size(kRadii)] = {};
         for (std::size_t i = 0; i < std::size(kRadii); ++i)
             names[i] = kRadii[i].name;
-        ChoiceRow(ctx, "Radius", "images.radius", names, static_cast<int>(std::size(names)), ui.radius);
+        ChoiceRow(ctx, "Radius", "images.radius", names, ui.radius);
     }
     facet::demo::LabeledRow("Tint");
     facet::Checkbox("Accent tint", &ui.tint);
@@ -523,26 +509,24 @@ FACET_DEMO_SELFTEST("images")
     static facet::ImageHandle before;
     test.Do([] { ui = ImagesUi{}; });
 
-    test.Click("images.fit.contain");
+    using T = facet::demo::Target;
+    test.MouseMove(T::Item("images.fit", 0.05f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("clicking Contain selects it", [] { return ui.fit == facet::ImageFit::Contain; });
-    // After mouse input the first Tab shows the keyboard cursor on the focused item, the
-    // next one moves on.
-    test.KeyPress(ImGuiKey_Tab);
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("images.fit.cover");
-    test.KeyPress(ImGuiKey_Space);
-    test.Expect("Space on the focused Cover button selects it", [] { return ui.fit == facet::ImageFit::Cover; });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("Right on the focused control selects Cover", [] { return ui.fit == facet::ImageFit::Cover; });
 
-    test.Click("images.radius.element");
+    test.MouseMove(T::Item("images.radius", 0.05f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("clicking element selects the smallest radius", [] { return ui.radius == 0; });
-    test.Click("images.radius.window");
+    test.MouseMove(T::Item("images.radius", 0.95f, 0.5f));
+    test.MouseDown();
+    test.MouseUp();
     test.Expect("clicking window selects the largest radius", [] { return ui.radius == 3; });
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("images.radius.card");
-    test.KeyPress(ImGuiKey_Space);
-    test.Expect("Space on the focused card button selects it", [] { return ui.radius == 2; });
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("images.radius.control");
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Expect("Left on the focused control selects card", [] { return ui.radius == 2; });
 
     test.Click("images.tint");
     test.Expect("clicking Accent tint turns it on", [] { return ui.tint; });
