@@ -901,8 +901,9 @@ The dose caps in Direction apply. The choices behind each effect:
   `facet::ApplyImGuiStyle`, so the stock controls used for page settings follow the theme and
   the scale. The pages of ready widget families set their own demos with Facet controls (a
   Toggle for a layer that shows or hides, a SegmentedControl for a data state, a Slider for a
-  value, a TextField), so a page reads as one product; a stock control stays only where the page
-  shows Facet working with stock Dear ImGui items, and its row label says so.
+  value, a TextField), so a page reads as one product; the Foundations pages and the Blocks pages
+  set their options with Facet buttons, checkboxes, sliders and fields too. A stock control stays
+  only where the page shows Facet working with stock Dear ImGui items, and its row label says so.
 - **Mixed sizes on one line.** Controls of different sizes in one row are centered on the
   tallest one, so their labels sit on one line instead of stepping down from a shared top. The
   row label is centered on that same line, so it lines up with the controls' text instead of
@@ -920,6 +921,6 @@ The dose caps in Direction apply. The choices behind each effect:
 - **Settings rows.** A page labels each setting in one fixed label column in footnote
   labelSecondary, with the control after it, so option rows line up; in narrow windows the
   label moves above its control. The Blocks pages use the row block instead (see Blocks), the
-  other pages keep this simpler row, so the Foundations and Media pages stay on stock controls.
+  other pages keep this simpler row.
 - **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
   caption names them, so nothing that cannot be operated looks like a control.

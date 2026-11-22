@@ -220,7 +220,7 @@ void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& c
     const float right = facet::demo::ContentRight();
     DrawCaptureField(theme, ctx);
     facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear"));
-    if (ImGui::Button("Clear"))
+    if (facet::Button("Clear"))
     {
         page.capture.Clear();
         page.captured = ImGuiKey_None;
@@ -228,22 +228,18 @@ void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& c
         if (ImGui::GetActiveID() == ImGui::GetID("##capture"))
             ImGui::ClearActiveID();
     }
-    facet::ItemCursor();
     ctx.Probe("keys.clear");
     facet::internal::EndRow();
 
     // A row that runs out of room continues under its first control, in the control column.
     facet::internal::BeginRow("Accept");
     const float rowRight = facet::demo::ContentRight();
-    ImGui::Checkbox("Mouse buttons", &page.captureOptions.allowMouse);
-    facet::ItemCursor();
+    facet::Checkbox("Mouse buttons", &page.captureOptions.allowMouse);
     ctx.Probe("keys.allowMouse");
     facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Gamepad buttons"));
-    ImGui::Checkbox("Gamepad buttons", &page.captureOptions.allowGamepad);
-    facet::ItemCursor();
+    facet::Checkbox("Gamepad buttons", &page.captureOptions.allowGamepad);
     facet::demo::SameLineIfFits(rowRight, facet::demo::CheckboxWidth("Modifiers alone"));
-    ImGui::Checkbox("Modifiers alone", &page.captureOptions.allowModifierOnly);
-    facet::ItemCursor();
+    facet::Checkbox("Modifiers alone", &page.captureOptions.allowModifierOnly);
     facet::internal::EndRow();
     facet::internal::EndRowGroup();
 
@@ -337,9 +333,8 @@ void DrawShortcutSection(const facet::Theme& theme, const facet::demo::PageCtx& 
             ImGui::TextUnformatted(ScopeName(info.scope));
             ImGui::TableNextColumn();
             bool enabled = info.enabled;
-            if (ImGui::Checkbox("##enabled", &enabled))
+            if (facet::Checkbox("##enabled", &enabled))
                 facet::SetShortcutEnabled(info.id, enabled);
-            facet::ItemCursor();
             ctx.Probe(std::string("keys.enabled.") + info.name);
             ImGui::PopID();
         }
@@ -347,14 +342,12 @@ void DrawShortcutSection(const facet::Theme& theme, const facet::demo::PageCtx& 
     }
 
     const float right = facet::demo::ContentRight();
-    if (ImGui::Button("Bind Decrease to Ctrl+I"))
+    if (facet::Button("Bind Decrease to Ctrl+I"))
         facet::SetShortcutChords(s.decrease, kIncreaseChord, ImGuiKey_None);
-    facet::ItemCursor();
     ctx.Probe("keys.makeConflict");
     facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Restore the chords"));
-    if (ImGui::Button("Restore the chords"))
+    if (facet::Button("Restore the chords"))
         ResetShortcuts();
-    facet::ItemCursor();
     ctx.Probe("keys.restore");
 
     // The conflict message names both entries and says which one wins.
@@ -433,8 +426,7 @@ void DrawBindSection(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     BindRow(theme, "Always", page.always, page.alwaysActive, "keys.bind.always", ctx);
     BindRow(theme, "Off", page.off, page.offActive, "keys.bind.off", ctx);
     facet::internal::BeginRow("Hold bind");
-    ImGui::Checkbox("Works while typing", &page.hold.whileTextInput);
-    facet::ItemCursor();
+    facet::Checkbox("Works while typing", &page.hold.whileTextInput);
     ctx.Probe("keys.whileTyping");
     facet::internal::EndRow();
     facet::internal::EndRowGroup();

@@ -84,9 +84,8 @@ void DrawEmptyState(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     facet::IconGlyph(facet::Icon("search"), facet::Px(theme.spacing.xxxl), facet::ToU32(c.labelSecondary));
     facet::Text(facet::TextStyle::Headline, "No icons match \"%s\"", icons.search);
     facet::demo::Paragraph("Icon names are lowercase words joined by hyphens, such as chevron-down.");
-    if (ImGui::Button("Clear search"))
+    if (facet::Button("Clear search"))
         icons.search[0] = '\0';
-    facet::ItemCursor();
     ctx.Probe("icons.clearSearch");
 }
 
@@ -181,7 +180,7 @@ FACET_DEMO_PAGE("icons", "Icons", "Media", 10, "default", "search", "empty")
     facet::IconGlyph(facet::Icon("search"), 0.0f, facet::ToU32(theme.colors.labelSecondary));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * kSearchWidthEm));
-    ImGui::InputTextWithHint("##search", "Search icons by name", icons.search, sizeof(icons.search));
+    facet::TextField("##search", icons.search, sizeof(icons.search), {.placeholder = "Search icons by name"});
     ctx.Probe("icons.search");
     // The option follows the field when it fits, otherwise it starts the next line.
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -190,8 +189,7 @@ FACET_DEMO_PAGE("icons", "Icons", "Media", 10, "default", "search", "empty")
     ImGui::SameLine();
     if (ImGui::GetContentRegionAvail().x < checkboxWidth)
         ImGui::NewLine();
-    ImGui::Checkbox("Accent tint", &icons.accentTint);
-    facet::ItemCursor();
+    facet::Checkbox("Accent tint", &icons.accentTint);
     ctx.Probe("icons.tint");
 
     const std::string_view query = Query();

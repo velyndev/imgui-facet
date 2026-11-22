@@ -70,18 +70,15 @@ void DrawControls(facet::demo::PageCtx& ctx)
     const float sliderWidth = ImGui::GetFontSize() * kSliderWidthEm;
     facet::demo::LabeledRow("Shadow strength");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
-    ImGui::SliderFloat("##strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, "%.2fx");
-    facet::ItemCursor();
+    facet::Slider("##strength", &effects.shadowStrength, kStrengthMin, kStrengthMax, {.format = "%.2fx"});
     ctx.Probe("effects.strength");
     facet::demo::LabeledRow("Blur radius");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
     BlurRadius();
-    ImGui::SliderFloat("##blur", &effects.blurRadius, kBlurMin, kBlurMax, "%.0f");
-    facet::ItemCursor();
+    facet::Slider("##blur", &effects.blurRadius, kBlurMin, kBlurMax, {.format = "%.0f"});
     ctx.Probe("effects.blur");
     facet::demo::LabeledRow("Glow");
-    ImGui::Checkbox("Accent glow", &effects.accentGlow);
-    facet::ItemCursor();
+    facet::Checkbox("Accent glow", &effects.accentGlow);
     ctx.Probe("effects.glow");
 }
 
@@ -376,35 +373,37 @@ FACET_DEMO_SELFTEST("effects")
     test.KeyPress(ImGuiKey_Space);
     test.Expect("Space on the checkbox toggles the accent glow", [] { return effects.accentGlow != before.accentGlow; });
 
-    // Tabbing onto a slider opens its value for typing with the text selected: typing a
+    // Enter on a focused slider opens its value for typing with the text selected: typing a
     // number and Enter sets it.
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.ExpectFocused("effects.blur");
-    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("12"); });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("12");
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("typing 12 and Enter sets the blur radius", [] { return effects.blurRadius == 12.0f; });
     test.Expect("the glass panel follows the typed radius",
                 [] { return effects.drawnBlurPixels == facet::Px(effects.blurRadius); });
 
-    // Space activates the focused slider for the arrow keys; Space again ends it (Escape
-    // would revert to the value before activation).
+    // The arrow keys move the focused slider.
     test.Do([] { before = effects; });
-    test.KeyPress(ImGuiKey_Space);
     test.KeyPress(ImGuiKey_LeftArrow);
     test.KeyPress(ImGuiKey_LeftArrow);
-    test.KeyPress(ImGuiKey_Space);
     test.Expect("the left arrow lowers the blur radius", [] { return effects.blurRadius < before.blurRadius; });
 
     // The strength slider by keyboard as well.
     test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.ExpectFocused("effects.strength");
-    test.Do([] { ImGui::GetIO().AddInputCharactersUTF8("2"); });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(2);
+    test.KeyPress(ImGuiKey_A | ImGuiMod_Ctrl);
+    test.Type("2");
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("typing 2 and Enter sets the shadow strength", [] { return effects.shadowStrength == 2.0f; });
     test.Do([] { before = effects; });
-    test.KeyPress(ImGuiKey_Space);
-    test.KeyPress(ImGuiKey_RightArrow);
-    test.KeyPress(ImGuiKey_Space);
+    // Ctrl steps coarser, so the shadow color changes by more than one 8-bit step in both themes.
+    test.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
     test.Expect("the right arrow raises the shadow strength",
                 [] { return effects.shadowStrength > before.shadowStrength; });
     test.Expect("the drawn shadow follows the keyboard change",

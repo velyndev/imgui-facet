@@ -94,31 +94,28 @@ void DrawControls(facet::demo::PageCtx& ctx)
     const float right = facet::demo::ContentRight();
     const float gap = facet::Px(facet::T().spacing.xl);
     // A fixed id: the label changes, the item (and its keyboard focus) stays.
-    if (ImGui::Button(motion.forward ? "Replay backward###replay" : "Replay forward###replay"))
+    if (facet::Button(motion.forward ? "Replay backward###replay" : "Replay forward###replay"))
         motion.forward = !motion.forward;
-    facet::ItemCursor();
     ctx.Probe("motion.replay");
 
     facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth("Reduce motion"), gap);
     bool reduce = facet::T().motion.reduceMotion;
-    if (ImGui::Checkbox("Reduce motion", &reduce))
+    if (facet::Checkbox("Reduce motion", &reduce))
     {
         facet::Theme theme = facet::T();
         theme.motion.reduceMotion = reduce;
         facet::SetTheme(theme, false);
     }
-    facet::ItemCursor();
     ctx.Probe("motion.reduce");
 
     facet::demo::SameLineIfFits(right, facet::demo::CheckboxWidth("Slow down 4x"), gap);
     bool slow = facet::T().motion.scale > 1.0f;
-    if (ImGui::Checkbox("Slow down 4x", &slow))
+    if (facet::Checkbox("Slow down 4x", &slow))
     {
         facet::Theme theme = facet::T();
         theme.motion.scale = slow ? 4.0f : 1.0f;
         facet::SetTheme(theme, false);
     }
-    facet::ItemCursor();
     ctx.Probe("motion.slow");
 
     Note("System animation setting: %s. %s", facet::SystemReduceMotion() ? "off" : "on",

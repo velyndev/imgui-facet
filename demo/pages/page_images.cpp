@@ -417,8 +417,7 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
         ChoiceRow(ctx, "Radius", "images.radius", names, static_cast<int>(std::size(names)), ui.radius);
     }
     facet::demo::LabeledRow("Tint");
-    ImGui::Checkbox("Accent tint", &ui.tint);
-    facet::ItemCursor();
+    facet::Checkbox("Accent tint", &ui.tint);
     ctx.Probe("images.tint");
     {
         facet::ImageOptions options;
@@ -487,9 +486,8 @@ FACET_DEMO_PAGE("images", "Images", "Media", 20, "default", "loading", "results"
                       StatusName(facet::GetImageStatus(assets.damaged)));
         Example(assets.damaged, ImVec2(tile, tile), options, caption);
     }
-    if (ImGui::Button("Load again"))
+    if (facet::Button("Load again"))
         StartAsyncLoads();
-    facet::ItemCursor();
     ctx.Probe("images.reload");
     if (ctx.captureState == kStateLoading)
         ctx.RevealInCapture(0.7f);

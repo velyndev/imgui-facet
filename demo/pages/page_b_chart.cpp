@@ -348,9 +348,8 @@ void DrawEmptyChart(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     facet::IconGlyph(facet::Icon("image-off"), facet::Px(theme.spacing.xxl), facet::ToU32(c.labelSecondary));
     facet::Text(facet::TextStyle::Headline, "No samples to show");
     facet::demo::Paragraph("A chart without data keeps its size and says so instead of drawing empty axes.");
-    if (ImGui::Button("Show the generated data"))
+    if (facet::Button("Show the generated data"))
         page.showEmpty = false;
-    facet::ItemCursor();
     ctx.Probe("chart.showData");
     ImGui::EndGroup();
     ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + height));
@@ -416,8 +415,7 @@ FACET_DEMO_PAGE("chart-core", "Chart core", "Blocks", 100, "default", "crosshair
     facet::demo::SectionHeader("Line and area");
     facet::demo::Note("Generated: y = sin x as an area, y = e^(-x/8) cos 2x as a line.");
     facet::internal::BeginRow("Data");
-    ImGui::Checkbox("Show the empty state", &page.showEmpty);
-    facet::ItemCursor();
+    facet::Checkbox("Show the empty state", &page.showEmpty);
     ctx.Probe("chart.empty");
     facet::internal::EndRow();
     if (page.showEmpty)

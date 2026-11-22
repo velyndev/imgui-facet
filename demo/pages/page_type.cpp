@@ -155,12 +155,11 @@ void DrawHighlight(facet::demo::PageCtx& ctx)
     const facet::Colors& c = theme.colors;
     const float right = facet::demo::ContentRight();
     ImGui::SetNextItemWidth(std::min(facet::Px(theme.spacing.xxxl * 6.0f), ImGui::GetContentRegionAvail().x));
-    ImGui::InputTextWithHint("##query", "Filter style names", type.query, sizeof(type.query));
+    facet::TextField("##query", type.query, sizeof(type.query), {.placeholder = "Filter style names"});
     ctx.Probe("type.query");
     facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear"));
-    if (ImGui::Button("Clear"))
+    if (facet::Button("Clear"))
         type.query[0] = '\0';
-    facet::ItemCursor();
     ctx.Probe("type.clear");
 
     if (type.query[0] == '\0')
@@ -215,8 +214,7 @@ FACET_DEMO_PAGE("type", "Type", "Foundations", 1, "default", "narrow")
     SectionHeader("Truncation");
     facet::demo::LabeledRow("Column width");
     ImGui::SetNextItemWidth(std::min(facet::Px(facet::T().spacing.xxxl * 6.0f), ImGui::GetContentRegionAvail().x));
-    ImGui::SliderFloat("##width", &type.widthFraction, kMinWidthFraction, kMaxWidthFraction, "%.2f");
-    facet::ItemCursor();
+    facet::Slider("##width", &type.widthFraction, kMinWidthFraction, kMaxWidthFraction, {.format = "%.2f"});
     ctx.Probe("type.width");
     const float width = ImGui::GetContentRegionAvail().x * type.widthFraction;
     DrawTruncated("End: for labels and titles", facet::internal::TruncateMode::End, width);

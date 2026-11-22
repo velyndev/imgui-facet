@@ -116,9 +116,8 @@ void DrawEmptyState(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
     facet::demo::Paragraph("Every letter of the query has to appear in the name, in the same order. "
                            "Try fewer letters, or the first letters of the words, such as cd for "
                            "chevron-down.");
-    if (ImGui::Button("Clear search"))
+    if (facet::Button("Clear search"))
         page.query[0] = '\0';
-    facet::ItemCursor();
     ctx.Probe("fuzzy.clear");
 }
 
@@ -186,7 +185,7 @@ void DrawSpeedRun(const facet::demo::PageCtx& ctx)
     facet::demo::SectionHeader("10000 candidates");
     facet::demo::Paragraph("The same query against 10000 generated names (two icon names and a number "
                            "each), filtered and sorted the way a long list would be on every key press.");
-    if (ImGui::Button("Filter 10000 generated names"))
+    if (facet::Button("Filter 10000 generated names"))
     {
         GeneratedNames& generated = Generated();
         const auto start = std::chrono::steady_clock::now();
@@ -197,7 +196,6 @@ void DrawSpeedRun(const facet::demo::PageCtx& ctx)
         page.runMatches = total;
         page.runMilliseconds = std::chrono::duration<double, std::milli>(end - start).count();
     }
-    facet::ItemCursor();
     ctx.Probe("fuzzy.run");
     if (!page.runDone)
     {

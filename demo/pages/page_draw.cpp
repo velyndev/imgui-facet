@@ -55,13 +55,12 @@ void DrawCorners(facet::demo::PageCtx& ctx)
     const facet::Theme& theme = facet::T();
     const facet::Colors& c = theme.colors;
     bool continuous = theme.radii.continuousCorners;
-    if (ImGui::Checkbox("Continuous corners in FillRect", &continuous))
+    if (facet::Checkbox("Continuous corners in FillRect", &continuous))
     {
         facet::Theme changed = theme;
         changed.radii.continuousCorners = continuous;
         facet::SetTheme(changed, false);
     }
-    facet::ItemCursor();
     ctx.Probe("draw.continuous");
 
     const struct
@@ -248,23 +247,19 @@ void DrawGroupDemo(facet::demo::PageCtx& ctx)
 
     facet::demo::LabeledRow("Alpha");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
-    ImGui::SliderFloat("##alpha", &draw.alpha, 0.0f, 1.0f, "%.2f");
-    facet::ItemCursor();
+    facet::Slider("##alpha", &draw.alpha, 0.0f, 1.0f, {.format = "%.2f"});
     ctx.Probe("draw.alpha");
     facet::demo::LabeledRow("Scale");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
-    ImGui::SliderFloat("##scale", &draw.scale, 0.8f, 1.1f, "%.2f");
-    facet::ItemCursor();
+    facet::Slider("##scale", &draw.scale, 0.8f, 1.1f, {.format = "%.2f"});
     ctx.Probe("draw.scale");
     facet::demo::LabeledRow("Slide");
     ImGui::SetNextItemWidth(std::min(sliderWidth, ImGui::GetContentRegionAvail().x));
-    ImGui::SliderFloat("##offset", &draw.offset, -1.0f, 1.0f, "%.2f");
-    facet::ItemCursor();
+    facet::Slider("##offset", &draw.offset, -1.0f, 1.0f, {.format = "%.2f"});
     ctx.Probe("draw.offset");
     // A fixed id: the label changes, the item (and its keyboard focus) stays.
-    if (ImGui::Button(draw.shown ? "Hide card###toggle" : "Show card###toggle"))
+    if (facet::Button(draw.shown ? "Hide card###toggle" : "Show card###toggle"))
         draw.shown = !draw.shown;
-    facet::ItemCursor();
     ctx.Probe("draw.toggle");
     draw.toggleHoverDelay = ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal);
 
@@ -379,35 +374,40 @@ FACET_DEMO_SELFTEST("draw")
     test.Wait(30);
     test.Expect("Space on the button shows it again", [] { return draw.shown && draw.appear == 1.0f; });
 
-    test.Click("draw.alpha");
-    test.Expect("clicking the middle of the alpha slider sets about 0.5",
-                [] { return draw.alpha > 0.4f && draw.alpha < 0.6f; });
-    test.Click("draw.offset");
-    test.Expect("clicking the middle of the slide slider centers the card",
-                [] { return draw.offset > -0.15f && draw.offset < 0.15f; });
-
     using facet::demo::Target;
+    // The sliders are Facet sliders: the track comes first and the value column after it, so a
+    // click in the first fifth of the item lands early on the track.
+    test.MouseMove(Target::Item("draw.alpha", 0.2f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click early on the alpha slider's track lowers the alpha",
+                [] { return draw.alpha > 0.0f && draw.alpha < 0.5f; });
+    test.MouseMove(Target::Item("draw.offset", 0.05f));
+    test.MouseDown();
+    test.MouseUp();
+    test.Expect("a click at the start of the slide slider moves the card to the left",
+                [] { return draw.offset < -0.5f; });
+
     // A drag through intermediate points: the value follows the pointer to the last point.
     test.Drag({Target::Item("draw.alpha", 0.1f), Target::Item("draw.alpha", 0.9f), Target::Item("draw.alpha", 0.3f)},
               0.5f);
-    test.ExpectNear("dragging the alpha slider out to 0.9 and back to 0.3 leaves about 0.3",
-                    [] { return static_cast<double>(draw.alpha); }, 0.3, 0.06);
+    // 0.3 of the item lies a little further along the track, which ends before the value column.
+    test.Expect("dragging the alpha slider out and back leaves the value under the last point",
+                [] { return draw.alpha > 0.25f && draw.alpha < 0.55f; });
     // A drag that leaves the window: the slider follows to the end of its range.
     test.Drag({Target::Item("draw.offset"), Target::Display(1.3f, 0.5f)}, 0.25f);
     test.ExpectNear("dragging the slide slider out of the window ends at the maximum",
                     [] { return static_cast<double>(draw.offset); }, 1.0, 1e-6);
 
-    // A held key repeats: one second of the right arrow moves the activated slider many steps.
-    // The first Tab after a click opens the slider's text input on the clicked slider; Enter
-    // leaves it unchanged, and Space then lets the arrow keys move the value.
+    // A held key repeats: one second of the right arrow moves the focused slider many steps.
+    // After a click the first Tab only shows the keyboard focus on the clicked slider.
+    test.Do([] { draw.alpha = 0.2f; });
     test.Click("draw.alpha");
     test.KeyPress(ImGuiKey_Tab);
     test.ExpectFocused("draw.alpha");
-    test.KeyPress(ImGuiKey_Enter);
-    test.KeyPress(ImGuiKey_Space);
+    test.KeyPress(ImGuiKey_Home);
     test.Do([] { alphaBefore = draw.alpha; });
     test.HoldKey(ImGuiKey_RightArrow, 1.0f);
-    test.KeyPress(ImGuiKey_Space);
     test.Expect("holding the right arrow for 1 s raises the alpha by many steps",
                 [] { return draw.alpha > alphaBefore + 0.1f; });
 
