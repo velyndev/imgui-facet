@@ -17,6 +17,7 @@
 
 #include "gallery.h"
 #include "pages/pages.h"
+#include "internal/popup_host.h"
 #include "selftest.h"
 #include "widgets/composites/editors_frame.h"
 
@@ -40,6 +41,8 @@ enum CaptureState
     kGridFiltered,
     kGridNoResults,
     kGridColumn,
+    kGradientOpen,
+    kGradientFocused,
 };
 
 // Placeholder data: names like "Layer 1" and property values that only show the widgets working.
@@ -48,8 +51,19 @@ struct EditorsUi
     ImVec2 curve[8] = {{0.0f, 0.0f}, {0.5f, 0.7f}, {1.0f, 1.0f}};
     int curveCount = 3;
     facet::CubicBezier easing{{0.25f, 0.1f}, {0.25f, 1.0f}};
-    facet::GradientStop stops[8] = {{0.0f, {0.0f, 0.0f, 0.0f, 1.0f}}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
-    int stopCount = 2;
+    // Gradients: seeded from the chart palette of the theme on the first frame (data colors).
+    bool gradientSeeded = false;
+    facet::GradientStop stops[8] = {};
+    int stopCount = 0;
+    facet::GradientStop alphaStops[8] = {};
+    int alphaCount = 0;
+    facet::GradientStop fullStops[2] = {};
+    int fullCount = 0;
+    facet::GradientStop fixedStops[2] = {};  // the read-only and disabled examples
+    int gradientWrites = 0;
+    ImGuiID gradientId = 0;
+    bool gradientPopover = false;
+    float savedPosition = 0.0f;   // a value a selftest step compares with
     facet::CanvasElementState element{facet::CanvasAnchor::TopLeft, {64.0f, 64.0f}, {480.0f, 120.0f}};
     facet::LayerItem layers[3] = {{"Layer 1"}, {"Layer 2", {}, 1}, {"Layer 3", {}, 0, false}};
     int layer = 0;
@@ -83,6 +97,96 @@ void NoteChange(bool changed, const char* row)
         return;
     ++ui.changes;
     std::snprintf(ui.lastEdited, sizeof(ui.lastEdited), "%s", row);
+}
+
+void SeedGradients()
+{
+    if (ui.gradientSeeded)
+        return;
+    ui.gradientSeeded = true;
+    const facet::Colors& c = facet::T().colors;
+    ui.stops[0] = {0.0f, c.chart[0]};
+    ui.stops[1] = {0.5f, c.chart[1]};
+    ui.stops[2] = {1.0f, c.chart[2]};
+    ui.stopCount = 3;
+    ui.alphaStops[0] = {0.0f, facet::WithAlpha(c.chart[3], 0.0f)};
+    ui.alphaStops[1] = {1.0f, c.chart[3]};
+    ui.alphaCount = 2;
+    ui.fullStops[0] = {0.0f, c.chart[4]};
+    ui.fullStops[1] = {1.0f, c.chart[5]};
+    ui.fullCount = 2;
+    ui.fixedStops[0] = {0.0f, c.chart[0]};
+    ui.fixedStops[1] = {1.0f, c.chart[2]};
+}
+
+// A probe for the bar and for each marker of the gradient editor `id`.
+void ProbeGradient(facet::demo::PageCtx& ctx, ImGuiID id, const char* prefix, int count)
+{
+    const ImRect bar = facet::internal::GradientEditorBarRect(id);
+    char name[64];
+    std::snprintf(name, sizeof(name), "%s.bar", prefix);
+    facet::demo::ProbeRect(ctx, name, ImHashStr("##bar", 0, id), bar.Min, bar.Max);
+    for (int i = 0; i < count; ++i)
+    {
+        ImGuiID itemId = 0;
+        const ImRect stop = facet::internal::GradientEditorStopRect(id, i, &itemId);
+        std::snprintf(name, sizeof(name), "%s.stop%d", prefix, i);
+        facet::demo::ProbeRect(ctx, name, itemId, stop.Min, stop.Max);
+    }
+}
+
+void GradientSection(facet::demo::PageCtx& ctx)
+{
+    using namespace facet;
+    const bool capture = ctx.capture;
+    SeedGradients();
+    SectionHeader("Gradient editor");
+    Paragraph("A click on the bar adds a stop with the color shown there. Drag a stop along the row under the bar; it "
+              "passes the others, and dragged far above or below the editor it is removed on release. Each stop is a "
+              "Tab stop: the arrows move it, Insert adds one half way to its neighbour, Delete removes it. A click or "
+              "Enter on a stop opens its color picker; Escape closes it and restores the color.");
+    Note("Placeholder colors from the chart palette of the theme.");
+    LabeledRow("Opaque");
+    if (capture && ctx.captureState == kGradientOpen)
+        ctx.ForceNextItemState(demo::ForcedItemState::Open, 1);
+    if (capture && ctx.captureState == kGradientFocused)
+        ctx.ForceNextItemState(demo::ForcedItemState::Focused, 1);
+    ui.gradientId = ImGui::GetID("Gradient");
+    if (GradientEditor("Gradient", ui.stops, &ui.stopCount, {.width = demo::DemoWidth(480.0f)}))
+        ++ui.gradientWrites;
+    ctx.Probe("composites.gradient");
+    ProbeGradient(ctx, ui.gradientId, "composites.gradient", ui.stopCount);
+    ui.gradientPopover = internal::IsPopupLevelOpen(internal::GradientEditorPopoverLevel(ui.gradientId));
+    if (capture && (ctx.captureState == kGradientOpen || ctx.captureState == kGradientFocused))
+    {
+        ctx.RevealInCapture(0.2f);
+        if (ctx.captureFramesLeft == 0 && ctx.captureState == kGradientOpen && !ui.gradientPopover)
+            ctx.captureError = "the gradient stop popover did not open";
+    }
+    {
+        char positions[96] = "";
+        int used = 0;
+        for (int i = 0; i < ui.stopCount && used < static_cast<int>(sizeof(positions)) - 8; ++i)
+            used += std::snprintf(positions + used, sizeof(positions) - static_cast<std::size_t>(used), "%s%.0f %%",
+                                  i == 0 ? "" : ", ", ui.stops[i].position * 100.0f);
+        LabeledRow("");
+        Note("%d stops at %s.", ui.stopCount, positions);
+    }
+    LabeledRow("With alpha");
+    GradientEditor("Translucent", ui.alphaStops, &ui.alphaCount, {.alpha = true, .width = demo::DemoWidth(480.0f)});
+    LabeledRow("Storage full");
+    GradientEditor("Two stops at most", ui.fullStops, &ui.fullCount, {.width = demo::DemoWidth(480.0f)});
+    ctx.Probe("composites.gradientFull");
+    ProbeGradient(ctx, ImGui::GetItemID(), "composites.gradientFull", ui.fullCount);
+    LabeledRow("");
+    Note("The storage holds two stops: a click on the bar adds nothing.");
+    int fixedCount = 2;
+    LabeledRow("Read-only");
+    GradientEditor("Read-only gradient", ui.fixedStops, &fixedCount, {.width = demo::DemoWidth(480.0f), .readOnly = true});
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    GradientEditor("Disabled gradient", ui.fixedStops, &fixedCount, {.width = demo::DemoWidth(480.0f)});
+    ImGui::EndDisabled();
 }
 
 void PropertyGridSection(facet::demo::PageCtx& ctx)
@@ -223,7 +327,7 @@ void PropertyGridSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "default", "grid-filtered",
-                "grid-no-results", "grid-column")
+                "grid-no-results", "grid-column", "gradient-open", "gradient-focused")
 {
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
@@ -236,9 +340,8 @@ FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "def
     ctx.Probe("composites.curve");
     LabeledRow("Bezier editor");
     facet::BezierEditor("Easing", &ui.easing);
-    LabeledRow("Gradient editor");
-    facet::GradientEditor("Gradient", ui.stops, &ui.stopCount, {.alpha = true});
 
+    GradientSection(ctx);
     PropertyGridSection(ctx);
 
     SectionHeader("Canvas and layers");
@@ -262,6 +365,47 @@ FACET_DEMO_SELFTEST("composites-editors")
     // The curve editor placeholder writes nothing.
     test.DoubleClick("composites.curve");
     test.Expect("a double click on the curve editor placeholder adds no point", [] { return ui.curveCount == 3; });
+
+    // ---- Gradient editor ----
+    test.Reveal("composites.gradient");
+    test.WaitSeconds(0.4f);
+    test.Click("composites.gradient.bar");  // the middle of the bar
+    test.Expect("a click on the bar adds a stop", [] { return ui.stopCount == 4; });
+    test.KeyPress(ImGuiKey_Delete);  // the new stop has the focus
+    test.Expect("Delete removes the focused new stop",
+                [] { return ui.stopCount == 3 && ui.stops[1].position == 0.5f && ui.stops[2].position == 1.0f; });
+    // A stop dragged past its neighbour passes it and keeps its drag.
+    test.Drag({T::Item("composites.gradient.stop0"), T::Item("composites.gradient.stop1"),
+               T::Item("composites.gradient.stop2").Offset(-40.0f, 0.0f)},
+              0.4f);
+    test.Expect("the dragged first stop passed the middle one and the stops stay sorted", [] {
+        return ui.stopCount == 3 && ui.stops[0].position == 0.5f && ui.stops[1].position > 0.5f &&
+               ui.stops[1].position < ui.stops[2].position;
+    });
+    // Keyboard: the arrows move the focused stop, Insert adds one, Delete removes it.
+    test.KeyPress(ImGuiKey_Tab);  // shows the focus the drag gave the stop
+    test.ExpectFocused("composites.gradient.stop1");
+    test.Do([] { ui.savedPosition = ui.stops[1].position; });
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.Expect("Left moves the focused stop", [] { return ui.stops[1].position < ui.savedPosition && ui.stopCount == 3; });
+    test.KeyPress(ImGuiKey_Insert);
+    test.Expect("Insert adds a stop", [] { return ui.stopCount == 4; });
+    test.KeyPress(ImGuiKey_Delete);
+    test.Expect("Delete removes it again", [] { return ui.stopCount == 3; });
+    // A click on a stop opens its color popover; Escape closes it and writes nothing.
+    test.Do([] { ui.gradientWrites = 0; });
+    test.Click("composites.gradient.stop2");
+    test.WaitSeconds(0.3f);
+    test.Expect("a click on a stop opens its color popover", [] { return ui.gradientPopover; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.WaitSeconds(0.3f);
+    test.Expect("Escape closes it without a change", [] { return !ui.gradientPopover && ui.gradientWrites == 0; });
+    // A stop dragged far below the editor is removed on release.
+    test.Drag({T::Item("composites.gradient.stop1"), T::Item("composites.gradient.stop1").Offset(0.0f, 90.0f)}, 0.3f);
+    test.Expect("a stop dragged off the editor is removed", [] { return ui.stopCount == 2; });
+    // The storage of two stops is full.
+    test.Click("composites.gradientFull.bar");
+    test.Expect("a full storage takes no new stop", [] { return ui.fullCount == 2; });
 
     // ---- Property grid ----
     // Each control edits through the finished widget and reports one change per edit.

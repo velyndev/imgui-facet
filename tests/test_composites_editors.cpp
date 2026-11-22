@@ -5,9 +5,11 @@
 // pattern. The API checks, and the placeholder checks of the widgets that are still planned, are in
 // tests/test_api_composites_editors.cpp.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -15,6 +17,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/focus.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
 #include "support/session.h"
@@ -305,6 +308,222 @@ TEST_CASE("Property grid: a shown grid allocates nothing per frame")
     REQUIRE(session.Ready());
     GridUi ui;
     session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    const int states = facet::internal::GlobalStateStore().Count();
+    CHECK(CountImGuiAllocations(session, 10) == 0);
+    CHECK(facet::internal::GlobalStateStore().Count() == states);
+}
+
+// ---- GradientEditor ----------------------------------------------------------------------------------
+
+
+namespace
+{
+
+// Geometry of a gradient editor of the default height whose frame is `r`: the stop markers on their
+// row under the bar, and points on the bar.
+float GradientBarInset()
+{
+    return std::round(std::round(facet::Px(facet::T().composites.gradientStopSize)) * 0.5f);
+}
+
+ImVec2 GradientStopAt(const ImRect& r, float position)
+{
+    const float inset = GradientBarInset();
+    const float row = std::round(std::max(std::round(facet::Px(facet::T().composites.gradientStopSize)),
+                                          facet::Px(facet::T().metrics.minHitTarget)));
+    return ImVec2(r.Min.x + inset + position * (r.GetWidth() - inset * 2.0f), r.Max.y - row * 0.5f);
+}
+
+ImVec2 GradientBarAt(const ImRect& r, float position)
+{
+    const float inset = GradientBarInset();
+    return ImVec2(r.Min.x + inset + position * (r.GetWidth() - inset * 2.0f), r.Min.y + facet::Px(8.0f));
+}
+
+struct GradientUi
+{
+    facet::GradientStop stops[4] = {{0.0f, {0.0f, 0.0f, 0.0f, 1.0f}}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
+    int count = 2;
+    int writes = 0;
+    facet::GradientEditorOptions options;
+    bool popoverOpen = false;
+    ImGuiID id = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        id = ImGui::GetID("Gradient");
+        writes += facet::GradientEditor("Gradient", stops, &count, options) ? 1 : 0;
+        session.Track("gradient");
+        popoverOpen = facet::internal::IsPopupLevelOpen(ImHashStr("##stop", 0, id));
+    }
+};
+
+bool GradientSorted(const facet::GradientStop* stops, int count)
+{
+    for (int i = 1; i < count; ++i)
+        if (stops[i - 1].position > stops[i].position)
+            return false;
+    return true;
+}
+
+} // namespace
+
+TEST_CASE("Gradient editor: a click on the bar adds a stop with the color shown there and focuses it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    session.Click(GradientBarAt(r, 0.5f));
+    REQUIRE(ui.count == 3);
+    CHECK(ui.writes == 1);
+    CHECK(GradientSorted(ui.stops, ui.count));
+    CHECK(ui.stops[1].position == doctest::Approx(0.5f).epsilon(0.02));
+    // The bar interpolates in gamma-encoded sRGB: half way from black to white is 0.5 per channel.
+    CHECK(ui.stops[1].color.x == doctest::Approx(0.5f).epsilon(0.03));
+    CHECK(ui.stops[1].color.w == doctest::Approx(1.0f));
+    // The new stop has the keyboard focus: Delete removes it again.
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(ui.count == 2);
+}
+
+TEST_CASE("Gradient editor: a stop dragged past another passes it and keeps its drag")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    ui.stops[1] = {0.5f, {1.0f, 0.0f, 0.0f, 1.0f}};
+    ui.stops[2] = {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}};
+    ui.count = 3;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    // The black stop at 0 goes to 0.75: past the red one, which becomes the first stop.
+    session.Drag({GradientStopAt(r, 0.0f), GradientStopAt(r, 0.3f), GradientStopAt(r, 0.6f), GradientStopAt(r, 0.75f)}, 4);
+    session.Frames(2);
+    REQUIRE(ui.count == 3);
+    CHECK(GradientSorted(ui.stops, ui.count));
+    CHECK(ui.stops[0].color.x == doctest::Approx(1.0f));  // red first
+    CHECK(ui.stops[1].color.x == doctest::Approx(0.0f));  // the dragged black one, still with its drag
+    CHECK(ui.stops[1].position == doctest::Approx(0.75f).epsilon(0.02));
+}
+
+TEST_CASE("Gradient editor: keys move, add and remove stops, never the last one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    // Focus the first stop by keyboard: a click on it, then Tab shows the focus.
+    session.MouseMove(GradientStopAt(r, 0.0f));
+    session.MouseDown();
+    session.MouseUp();
+    session.KeyPress(ImGuiKey_Escape);  // closes the popover the click opened; the focus returns to the stop
+    session.Frames(2);
+    facet::internal::SetKeyboardModality(true);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.stops[0].position == doctest::Approx(0.01f));
+    session.KeyPress(ImGuiKey_Insert);  // half way to the next stop
+    REQUIRE(ui.count == 3);
+    CHECK(ui.stops[1].position == doctest::Approx(0.505f).epsilon(0.01));
+    CHECK(GradientSorted(ui.stops, ui.count));
+    // Storage full: Insert adds nothing.
+    session.KeyPress(ImGuiKey_Insert);
+    CHECK(ui.count == 4);
+    session.KeyPress(ImGuiKey_Insert);
+    CHECK(ui.count == 4);
+    // Delete removes the focused stop, down to one.
+    for (int i = 0; i < 6; ++i)
+        session.KeyPress(ImGuiKey_Delete);
+    CHECK(ui.count == 1);
+}
+
+TEST_CASE("Gradient editor: a stop dragged far off the bar is removed on release")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    ui.stops[1] = {0.5f, {1.0f, 0.0f, 0.0f, 1.0f}};
+    ui.stops[2] = {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}};
+    ui.count = 3;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    const ImVec2 from = GradientStopAt(r, 0.5f);
+    session.Drag({from, ImVec2(from.x, r.Max.y + facet::Px(facet::T().composites.stopRemoveDistance) + facet::Px(20.0f))}, 4);
+    session.Frames(2);
+    CHECK(ui.count == 2);
+    CHECK(ui.stops[0].color.x == doctest::Approx(0.0f));
+    CHECK(ui.stops[1].color.x == doctest::Approx(1.0f));
+    CHECK(ui.stops[1].color.y == doctest::Approx(1.0f));
+}
+
+TEST_CASE("Gradient editor: a click on a stop opens its color popover and Escape closes it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    session.Click(GradientStopAt(r, 1.0f));
+    session.Frames(2);
+    CHECK(ui.popoverOpen);
+    CHECK(ui.count == 2);
+    CHECK(ui.stops[1].position == doctest::Approx(1.0f));
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(10);
+    CHECK_FALSE(ui.popoverOpen);
+    CHECK(ui.writes == 0);
+}
+
+TEST_CASE("Gradient editor: read-only shows the stops and writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    ui.options.readOnly = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    session.Click(GradientBarAt(r, 0.5f));
+    session.Drag({GradientStopAt(r, 0.0f), GradientStopAt(r, 0.5f)}, 4);
+    CHECK(ui.count == 2);
+    CHECK(ui.stops[0].position == 0.0f);
+    CHECK(ui.writes == 0);
+}
+
+TEST_CASE("Gradient editor: the vector form grows its vector when a stop is added")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<facet::GradientStop> stops = {{0.0f, {0.0f, 0.0f, 0.0f, 1.0f}}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
+    stops.shrink_to_fit();
+    session.SetUi([&] {
+        facet::GradientEditor("Gradient", &stops);
+        session.Track("gradient");
+    });
+    session.Frames(2);
+    session.Click(GradientBarAt(session.ItemRect("gradient"), 0.25f));
+    REQUIRE(stops.size() == 3);
+    CHECK(stops[1].position == doctest::Approx(0.25f).epsilon(0.03));
+    CHECK(stops[1].color.x == doctest::Approx(0.25f).epsilon(0.05));
+}
+
+TEST_CASE("Gradient editor: a shown editor allocates nothing per frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    GradientUi ui;
+    ui.options.alpha = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    session.MouseMove(GradientStopAt(session.ItemRect("gradient"), 0.0f));  // a hovered stop
     session.Frames(10);
     const int states = facet::internal::GlobalStateStore().Count();
     CHECK(CountImGuiAllocations(session, 10) == 0);

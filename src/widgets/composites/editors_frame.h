@@ -34,4 +34,15 @@ const PropertyGridDividerRecord& LastPropertyGridDivider();
 int LastPropertyGridRowCount();
 void ClearPropertyGridStacks();
 
+// ---- Gradient editor -------------------------------------------------------------------------------
+
+// Where the gradient editor `id` (its label hashed in its window) drew its bar and the marker of stop
+// `index` (an index into the caller's sorted stops) in the last frame, screen pixels; an empty rect
+// for an editor not drawn or a stop without a marker. The item id of that marker's handle in *itemId
+// (may be null). For tests and demo probes.
+ImRect GradientEditorBarRect(ImGuiID id);
+ImRect GradientEditorStopRect(ImGuiID id, int index, ImGuiID* itemId = nullptr);
+// The id of the popover level of the gradient editor `id`.
+ImGuiID GradientEditorPopoverLevel(ImGuiID id);
+
 } // namespace facet::internal

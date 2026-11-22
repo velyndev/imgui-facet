@@ -81,20 +81,6 @@ void EditorCalls()
     const Snapshot curveBefore(curve);
     Check("BezierEditor", Expect::Item, "Easing", [&] { CHECK_FALSE(BezierEditor("Easing", &curve)); });
     CHECK(curveBefore.Unchanged());
-
-    GradientStop stops[3] = {{0.0f}, {1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}};
-    int stopCount = 2;
-    const Snapshot stopsBefore(stops);
-    Check("GradientEditor", Expect::Item, "Gradient", [&] {
-        CHECK_FALSE(GradientEditor("Gradient", stops, &stopCount, {.alpha = true}));
-    });
-    CHECK(stopCount == 2);
-    CHECK(stopsBefore.Unchanged());
-    std::vector<GradientStop> stopVector = {{0.0f}, {1.0f}};
-    Check("GradientEditor, vector", Expect::Item, "Gradient 2", [&] {
-        CHECK_FALSE(GradientEditor("Gradient 2", &stopVector));
-    });
-    CHECK(stopVector.size() == 2);
 }
 
 void CanvasCalls()

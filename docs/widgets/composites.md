@@ -555,7 +555,33 @@ bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count
 bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options = {});
 ```
 
-Gradient bar with draggable color stops. Status: planned.
+A gradient bar over a row of color stop markers, built on the multi-handle block with free handles
+and on `ColorPicker`. The bar draws the gradient as the stored values read: each channel, alpha
+included, interpolated linearly between neighbouring stops in gamma-encoded sRGB (the space the
+color pickers draw in), the first and last color held out to the ends; with `alpha`, over the
+checkerboard. The default width fills the available width; the default height is twice the control
+height, of which the markers row takes at least the minimum hit target.
+
+A click on the bar adds a stop with the color shown at that point and gives it the keyboard focus.
+A press on a marker grabs it; a press beside the markers moves the nearest one there. A stop
+dragged past another passes it: the widget keeps the caller's stops sorted by position and carries
+the moved stop's drag, focus and open popover along. A marker dragged more than
+`composites.stopRemoveDistance` above or below the editor fades and is removed on release. Each
+marker is a Tab stop: the arrows move it (Shift finer, Ctrl coarser), Home and End send it to the
+ends, Insert adds a stop half way to its right neighbour (its left one for the last stop), Delete or
+Backspace removes it, and Escape during a drag or key press puts every stop back. The last stop is
+never removed. A click on a marker that does not move it, or Enter or Space on a focused one, opens
+a popover with the stop's `ColorPicker`, its position in percent (`NumberInput`, `Strings::position`)
+and a `Strings::remove` button, titled `Strings::colorStop`; the stop it edits keeps an accent
+outline. Escape closes it and restores the color from before it opened; a click outside keeps the
+edit.
+
+Adding needs room in the caller's storage: a full span takes no new stop, and the vector overload
+grows its vector (the only time it allocates). At most 16 stops (the multi-handle block's limit)
+are shown and edited; stops beyond that in the caller's storage are left as they are. `readOnly`
+shows the stops, lets them take the focus and opens the popover with a read-only picker, and writes
+nothing. Disabled draws the gradient and the markers at the pickers' disabled opacity. The label is
+the tooltip on hover and keyboard focus. Status: ready.
 
 ### PropertyGrid
 
