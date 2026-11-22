@@ -1,12 +1,12 @@
 // The declared API of the inventory, card and people composites and the public drag and drop calls
-// (facet/widgets/composites.h) while they are placeholders: every function is called once inside a
-// real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each call the id,
-// window, group and Facet scope stacks must be as before, a widget must have submitted one item of
-// non-zero size with the id of its label, the neutral result must come back and no value argument
-// may have changed. Every options struct is checked against the conventions at compile time. The
-// other composites have files of their own (tests/test_api_composites_settings.cpp and
-// test_api_composites_editors.cpp); the behaviour tests of these widgets go into
-// tests/test_composites_cards.cpp.
+// (facet/widgets/composites.h): every function is called once inside a real Dear ImGui frame, in a
+// window and again inside ImGui::BeginDisabled. After each call the id, window, group and Facet
+// scope stacks must be as before, a widget must have submitted one item of non-zero size with the
+// id of its label (the item queries describe the whole widget), the neutral result must come back
+// without input and no value argument may have changed. Every options struct is checked against the
+// conventions at compile time. The other composites have files of their own
+// (tests/test_api_composites_settings.cpp and test_api_composites_editors.cpp); the behaviour tests
+// of these widgets are in tests/test_composites_cards.cpp.
 
 #include <string>
 
@@ -111,7 +111,7 @@ void CardCalls()
 
 } // namespace
 
-TEST_CASE("The inventory, card and drag and drop stubs submit one item each and keep every stack")
+TEST_CASE("The inventory, card and drag and drop calls submit one item each, keep every stack and return the neutral result without input")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -119,56 +119,6 @@ TEST_CASE("The inventory, card and drag and drop stubs submit one item each and 
     RunFrame(session, &runs, &CardCalls);
     CHECK(runs == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
-TEST_CASE("Card stubs follow kFill and widths relative to the available width")
-{
-    // Rule 6: kFill is the available width, any other negative width the available width minus
-    // that many units.
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const auto fills = [&](const char* widget, float units, auto&& call) {
-            INFO("widget: " << std::string(widget) << ", width " << units);
-            const float expected = ImGui::GetContentRegionAvail().x + (units == kFill ? 0.0f : Px(units));
-            call(units);
-            CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
-            ++checked;
-        };
-        for (const float units : {kFill, -10.0f})
-        {
-            fills("InventoryDetailCard", units, [](float w) { InventoryDetailCard("Item", ImageHandle{}, {.width = w}); });
-            fills("MediaCard", units, [](float w) { MediaCard("Card", ImageHandle{}, {.width = w}); });
-        }
-    });
-    session.Frame();
-    CHECK(checked == 4);
-}
-
-TEST_CASE("Content-sized inventory and people stubs are wide enough to name the widget and say planned")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const auto wide = [&](const char* widget, auto&& call) {
-            INFO("widget: " << std::string(widget));
-            call();
-            char text[64];
-            ImFormatString(text, sizeof(text), "%s: planned", widget);
-            CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
-            ++checked;
-        };
-        const InventoryItem item{"Item"};
-        wide("InventoryTile", [&] { InventoryTile("tile", item); });
-        wide("InventorySlot", [&] { InventorySlot("A", item); });
-        wide("UserChip", [] { UserChip("A", ImageHandle{}, {.compact = true}); });
-    });
-    session.Frame();
-    CHECK(checked == 3);
 }
 
 TEST_CASE("A drag and drop End without its Begin is reported and changes no Dear ImGui stack")
