@@ -280,7 +280,7 @@ FACET_DEMO_PAGE("pickers-color", "Color pickers", "Widgets", 50, "default", "wel
     // ---- SwatchPalette ----
     SectionHeader("Swatch palette");
     Paragraph("One Tab stop; the arrow keys move between the swatches in both directions and Enter picks. The chosen "
-              "swatch has a ring and a check mark. The recent row keeps the colors picked here.");
+              "swatch has the accent outline and a check mark. The recent row keeps the colors picked here.");
     LabeledRow("Accent presets");
     facet::SwatchPalette("Accent presets", &ui.color, palette, &ui.history);
     ctx.Probe("pickers.swatches");
