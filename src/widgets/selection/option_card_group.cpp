@@ -189,7 +189,7 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
             if (card.image.IsValid())
             {
                 DrawImage(drawList, card.image, ImVec2(innerLeft, y), ImVec2(innerRight, y + layout.imageHeight),
-                          {.fit = ImageFit::Cover, .radius = Px(t.radii.control), .tint = off ? ScaleAlpha(IM_COL32_WHITE, c.labelTertiary.w) : IM_COL32_WHITE});
+                          {.fit = ImageFit::Cover, .radius = Px(t.radii.control), .tint = off ? ScaleAlpha(IM_COL32_WHITE, internal::kDisabledPictureOpacity) : IM_COL32_WHITE});
                 y += layout.imageHeight + layout.padding;
             }
             // The mark in the top-right corner of the text area: a radio mark for one choice, a

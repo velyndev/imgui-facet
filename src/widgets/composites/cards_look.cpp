@@ -22,9 +22,6 @@ namespace facet::internal
 namespace
 {
 
-// The picture of a disabled tile is drawn at this opacity, so it reads as off next to the
-// labelTertiary text; the theme has no disabled image token.
-constexpr float kInventoryDisabledPicture = 0.4f;
 // The accent ring of a selected tile is this many hairlines thick, as the selected avatar ring.
 constexpr float kInventorySelectedRingHairlines = 2.0f;
 // The cooldown sweep is drawn as two convex halves, each an arc of at most half a turn.
@@ -137,7 +134,7 @@ InventoryTileDrawn InventoryDrawTile(ImDrawList* drawList, const ImRect& rect, c
             MediaDrawOptions options;
             options.fit = ImageFit::Contain;
             options.radius = Px(t.radii.element);
-            options.opacity = look.disabled ? kInventoryDisabledPicture : 1.0f;
+            options.opacity = look.disabled ? kDisabledPictureOpacity : 1.0f;
             MediaDrawImageSlot(drawList, MediaImageOf(item.image), picture, options, "");
         }
         else if (item.icon.IsValid())

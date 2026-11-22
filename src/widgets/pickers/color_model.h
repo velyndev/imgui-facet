@@ -19,6 +19,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "internal/control.h"
+
 namespace facet::internal
 {
 
@@ -114,7 +116,7 @@ void DrawColorSwatch(ImDrawList* drawList, const ImRect& rect, const ImVec4& col
 void DrawColorMixedSwatch(ImDrawList* drawList, const ImRect& rect, float radius);
 
 // The share of their normal opacity that the gradients and swatches of a disabled picker keep: the
-// color stays visible as information, and the dimmer look says that it cannot be changed.
-inline constexpr float kColorDisabledOpacity = 0.35f;
+// disabled picture opacity every family shares (control.h).
+inline constexpr float kColorDisabledOpacity = kDisabledPictureOpacity;
 
 } // namespace facet::internal

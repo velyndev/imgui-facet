@@ -350,8 +350,31 @@ Control anatomy (`src/internal/control.h`), the parts every widget family shares
 - **One disabled look** for every variant of a control: fill[3], a separator hairline where the
   control has a surface, labelTertiary content, no hover or press feedback, so a disabled primary
   action no longer claims the accent.
+- **Disabled pictures and colors** (images in tiles, thumbnails and option cards, swatches and
+  gradients) keep 35 % of their opacity in every family: the content stays visible as information
+  while it reads as unavailable, and the theme has no disabled image token to differ by.
 - **Fill feedback.** Hover blends the rest fill toward the hover fill and a press toward the
   pressed fill over durationFast, so the feedback is the same in every widget.
+
+### One state, one look
+
+The same state looks the same in every family because one helper draws it; a widget never draws
+these parts itself:
+
+| State or part | Helper | Rule |
+|---|---|---|
+| Hover and press | `ItemBehavior` (item.h) and `StateFill` | The fill blends toward the hover and the pressed fill over durationFast |
+| Keyboard focus | `DrawItemFocusRing` and `DrawFocusRing` (focus.h) | focusRing color and width, one hairline of surface between control and ring, shown after keyboard input only |
+| Disabled | `ControlLabelColor`, `NeutralFill`, `kDisabledPictureOpacity` (control.h) | fill[3], a separator hairline, labelTertiary content, pictures and colors at 35 % |
+| Read-only | `FieldFrameLook::readOnly` and each family's read-only marks | No fill, the boundary hairline; selections in labelSecondary instead of the accent |
+| Help and error line | `DrawControlMessage` (control.h) | Footnote spacing.xs under the control; an error in destructive with the error icon |
+| Labels in front and above | `MeasureFrontLabel`, `MeasureAboveLabel` (control.h) | The label column of a settings row in front, spacing.xs above |
+| Popup surfaces | The popup host by level kind (popup_host.h) | Radius, elevation and padding by kind, open and close motion from the motion tokens |
+| Selection | The selection pill (selection_pill.h) | accentSubtle pill on the standard spring, semibold label |
+| Pointer | `ItemBehavior` | The hand cursor on interactive items, the not-allowed cursor on disabled ones |
+
+Intended differences keep their reason line in the family sections below (for example the
+destructive close button of the title bar, or the drag cursors of fields that drag).
 
 ### Prototype controls
 
@@ -777,8 +800,8 @@ Composites, inventory and cards:
   came from while the ghost carries it.
 - **Selected tile and selected media card.** An accent ring two hairlines thick inside the edge, so
   the selection does not rest on the fill color alone.
-- **A disabled tile's picture** is drawn at 40 % opacity next to labelTertiary text, because no
-  disabled image token exists.
+- **A disabled tile's picture** takes the disabled picture opacity of Control anatomy next to
+  labelTertiary text.
 - **Detail card stat differences.** success when better, destructive when worse, with the sign
   giving the direction, so the comparison does not rest on color alone.
 - **ProfileSwitcher current profile.** A check in accentText plus a semibold name, not color alone.

@@ -12,6 +12,7 @@
 #include <facet/facet.h>
 
 #include "internal/control.h"
+#include "widgets/pickers/color_model.h"
 #include "support/session.h"
 
 TEST_CASE("Control metrics follow the control size and the tokens")
@@ -138,6 +139,14 @@ TEST_CASE("A label in front takes the label column, or its text for a compact co
     CHECK(narrow.width == doctest::Approx(shortText.width));
     CHECK(fitFree == facet::internal::FrontLabelFit::Text);
     CHECK(fitSet == facet::internal::FrontLabelFit::Column);
+}
+
+TEST_CASE("Disabled pictures and colors share one opacity in every family")
+{
+    // The pickers' constant is the shared one, and it keeps the content visible but dimmer.
+    static_assert(facet::internal::kColorDisabledOpacity == facet::internal::kDisabledPictureOpacity);
+    CHECK(facet::internal::kDisabledPictureOpacity > 0.0f);
+    CHECK(facet::internal::kDisabledPictureOpacity < 0.5f);
 }
 
 TEST_CASE("A drawn error message is reported to the next frame with its window and item")

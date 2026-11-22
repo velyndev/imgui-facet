@@ -88,7 +88,7 @@ void ThumbnailDraw(void* user, const internal::PickerGridTile& tile)
         image.fit = ImageFit::Cover;
         image.radius = radius;
         if (tile.disabled)
-            image.tint = ToU32(WithAlpha(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), colors.labelTertiary.w));
+            image.tint = ScaleAlpha(IM_COL32_WHITE, kDisabledPictureOpacity);
         DrawImage(drawList, item.image, picture.Min, picture.Max, image);
     }
     else

@@ -105,6 +105,12 @@ private:
 
 // ---- Colors and feedback ----------------------------------------------------------------------
 
+// The share of their opacity that pictures and colors shown as content keep while their control
+// is disabled (images in tiles and option cards, swatches, gradients): the content stays visible as
+// information, and the dimmer look next to labelTertiary text says that it cannot be used. One
+// value for every family, because the theme has no disabled image token.
+inline constexpr float kDisabledPictureOpacity = 0.35f;
+
 // Text of a control: label, or labelTertiary while disabled.
 ImVec4 ControlLabelColor(bool disabled);
 // Secondary text and glyphs (placeholders, units, leading icons of fields): labelSecondary, or
