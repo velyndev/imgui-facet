@@ -201,11 +201,14 @@ bool CurveEditorImpl(const char* label, ImVec2* data, int capacity, int* count, 
 
     ImDrawList* drawList = window->DrawList;
     const bool visible = ImGui::IsRectVisible(canvas.frame.Min, canvas.frame.Max);
-    // The points go on a channel above the frame and the curve, which are drawn after them.
+    // The points go on a channel above the frame and the curve, which are drawn after them. A splitter of
+    // its own, not the draw list's channels, so the editor also works where a table or another widget has
+    // split the draw list; one editor draws at a time, so one splitter serves all and allocates once.
+    static ImDrawListSplitter splitter;
     if (visible)
     {
-        drawList->ChannelsSplit(2);
-        drawList->ChannelsSetCurrent(1);
+        splitter.Split(drawList, 2);
+        splitter.SetCurrentChannel(drawList, 1);
     }
 
     bool written = false;
@@ -327,7 +330,7 @@ bool CurveEditorImpl(const char* label, ImVec2* data, int capacity, int* count, 
     // ---- Draw: the frame, the grid, the curve and the marker under the points ----
     if (visible)
     {
-        drawList->ChannelsSetCurrent(0);
+        splitter.SetCurrentChannel(drawList, 0);
         internal::DrawCurveCanvas(drawList, canvas, sx, sy, options.grid, canvasItem, readOnly);
         drawList->PushClipRect(canvas.frame.Min, canvas.frame.Max, true);
         DrawCurve(drawList, data, n, sx, sy, options.interpolation, internal::CurveLineColor(disabled), canvas.frame);
@@ -353,7 +356,7 @@ bool CurveEditorImpl(const char* label, ImVec2* data, int capacity, int* count, 
                               ToU32(internal::ControlSecondaryColor(disabled)), text);
         }
         drawList->PopClipRect();
-        drawList->ChannelsMerge();
+        splitter.Merge(drawList);
     }
 
     // The label is not drawn beside the editor: it is the tooltip on hover and keyboard focus.

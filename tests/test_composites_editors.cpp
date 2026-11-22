@@ -715,6 +715,28 @@ TEST_CASE("Curve editor: read-only shows the points and writes nothing")
     CHECK(ui.writes == 0);
 }
 
+TEST_CASE("Curve editor: works in a table cell, where the table has split the draw list")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    session.SetUi([&] {
+        if (ImGui::BeginTable("table", 2))
+        {
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("cell");
+            ImGui::TableNextColumn();
+            ui.Draw(session);
+            ImGui::EndTable();
+        }
+    });
+    session.Frames(3);
+    CHECK(session.ItemRect("curve").GetWidth() > 0.0f);
+    const ImVec2 from = ui.At(ui.points[1]);
+    session.Drag({from, ImVec2(from.x, from.y - facet::Px(20.0f))}, 4);
+    CHECK(ui.points[1].y > 0.5f);
+}
+
 TEST_CASE("Curve editor: a shown editor allocates nothing per frame")
 {
     facet::test::Session session;
