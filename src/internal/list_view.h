@@ -135,6 +135,9 @@ struct ListViewDesc
 struct ListRowOptions
 {
     bool disabled = false;  // in addition to ListEntryInfo::disabled and ImGui::BeginDisabled
+    // Shows the selected row look (accentSubtle) on a row of a view without a selection or choice:
+    // the chosen value in the list of a dropdown, whose rows the field drives.
+    bool selected = false;
 };
 
 struct ListRowState

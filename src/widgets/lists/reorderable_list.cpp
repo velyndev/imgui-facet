@@ -241,12 +241,13 @@ bool ReorderableListImpl(const char* id, ReorderMove* move, const internal::List
         if (i == lifted || !row.visible)
             continue;
         const ImRect rect(rows.slots[i].Min.x, y, rows.slots[i].Max.x, y + rowHeight);
-        const float feedback = row.disabled || dragging ? 0.0f : std::max(row.hoverAmount, row.pressAmount);
-        if (feedback > 0.0f)
-        {
-            const ImVec4 tint = Mix(c.fill[2], c.fill[1], row.pressAmount);
-            FillRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-        }
+        // The shared row look, so a reorderable row hovers and presses like every other list row.
+        const ImRect fill = ListRowFillRect(rect);
+        ListRowLook rowLook;
+        rowLook.hoverAmount = dragging ? 0.0f : row.hoverAmount;
+        rowLook.pressAmount = dragging ? 0.0f : row.pressAmount;
+        rowLook.disabled = row.disabled;
+        DrawListRowFill(drawList, fill, radius, rowLook);
         float x = rect.Min.x + pad;
         if (!readOnly)
         {
@@ -259,7 +260,7 @@ bool ReorderableListImpl(const char* id, ReorderMove* move, const internal::List
         const ImRect content(x, rect.Min.y, std::max(x, rect.Max.x - pad), rect.Max.y);
         ListsRowLook look;
         const bool truncated = DrawListsRowContent(content, row, item, look, size);
-        DrawFocusRing(drawList, rect, radius, row.focusAmount);
+        DrawFocusRingInside(drawList, fill, radius, row.focusAmount);
         CutTextTooltip(row.id, rect, row.hovered, row.focusVisible, item.label, ImGui::FindRenderedTextEnd(item.label),
                        truncated);
     }

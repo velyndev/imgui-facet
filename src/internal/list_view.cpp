@@ -1151,7 +1151,7 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
     const bool disabled = options.disabled || info.disabled;
     const ImGuiID id = RowId(frame, KeyOf(desc, info, index));
     const bool selected = frame.multi ? IsListEntrySelected(desc.selection, index)
-                                      : (desc.choice != nullptr && *desc.choice == index);
+                                      : (desc.choice != nullptr ? *desc.choice == index : options.selected);
     bool tabStop = false;
     if (frame.tabStop >= 0)
         tabStop = index == frame.tabStop;

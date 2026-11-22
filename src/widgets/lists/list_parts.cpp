@@ -727,8 +727,12 @@ ListsPopupResult ListsPopupList(const ListsPopupDesc& desc)
         {
             for (int i = range.first; i < range.last; ++i)
             {
-                const ListRowState row = ListViewRow(i);
                 const int value = state.rows.rows[i];
+                // The chosen value of a single choice shows the selected row look with its check
+                // mark; the row under the pointer or the keys shows the hover fill.
+                ListRowOptions rowOptions;
+                rowOptions.selected = !desc.multi && value >= 0 && value == desc.chosen;
+                const ListRowState row = ListViewRow(i, rowOptions);
                 if (value == kListsSelectAllRow)
                 {
                     DrawListsSelectAllRow(row, SelectAllState(desc.source, state.rows, desc.checked), desc.readOnly,
