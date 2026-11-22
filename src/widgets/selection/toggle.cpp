@@ -188,10 +188,10 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         }
         else if (item.readOnly)
         {
-            // Read-only: labelTertiary instead of the accent, so it does not look like a choice; a
-            // mid grey that keeps the white knob clearly separate from the on track in both themes.
+            // Read-only: labelSecondary instead of the accent, so it does not look like a choice; it
+            // stays 3:1 from an off track on every surface, and the white knob keeps its hairline.
             outlineLook.hoverAmount = 0.0f;
-            trackColor = Mix(c.fill[0], c.labelTertiary, onT);
+            trackColor = Mix(c.fill[0], c.labelSecondary, onT);
         }
         else
         {

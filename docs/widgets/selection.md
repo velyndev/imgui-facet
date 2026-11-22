@@ -38,7 +38,7 @@ after it; returns true on the frame it wrote `*value`.
 - **States.** Disabled (`ImGui::BeginDisabled`): an off track in fill[3], an on track in the accent
   mark at the disabled picture opacity (so on and off still differ by color), the knob at that
   opacity, a labelTertiary label, the not-allowed cursor, no Tab stop. `readOnly` (or a null
-  `value`): an on track in labelTertiary instead of the accent, focusable, never written, and the
+  `value`): an on track in labelSecondary instead of the accent, focusable, never written, and the
   arrow cursor. `loading`: a spinner in the knob and no
   input, but it stays a Tab stop. `mixed`: the knob in the middle of a neutral track until the
   first edit, which writes on; after that the toggle shows its value until `mixed` is switched off

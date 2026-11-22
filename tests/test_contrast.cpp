@@ -112,6 +112,24 @@ TEST_CASE("The state marks reach 3:1: the ring, a filled track, an on switch, a 
     }
 }
 
+TEST_CASE("A read-only on switch track reaches 3:1 against an off track on every surface")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        for (const Named& surface : Surfaces(c))
+        {
+            CAPTURE(surface.name);
+            // The read-only on track is labelSecondary over the surface, the off track fill[0].
+            const ImVec4 on = facet::FromU32(facet::ToU32(facet::Over(c.labelSecondary, surface.color)));
+            const ImVec4 off = facet::FromU32(facet::ToU32(facet::Over(c.fill[0], surface.color)));
+            CHECK(facet::ContrastRatio(on, off) >= kNonTextContrast);
+            CHECK(facet::ContrastRatio(on, surface.color) >= kNonTextContrast);
+        }
+    }
+}
+
 TEST_CASE("labelTertiary and labelQuaternary stay below body text contrast as documented")
 {
     for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})

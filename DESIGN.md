@@ -505,8 +505,9 @@ Buttons and selection:
   and off differ in fill, edge and knob position, not only in hue. The knob moves with the quick
   spring, because it is a small state change.
 - **Disabled and read-only toggles.** A disabled on toggle keeps its accent track at the disabled
-  picture opacity; a read-only on toggle uses labelTertiary. Reason: on and off must differ by more
-  than the knob position, and a read-only value must not claim the accent.
+  picture opacity; a read-only on toggle uses labelSecondary. Reason: on and off must differ by more
+  than the knob position (labelSecondary keeps 3:1 against an off track on every surface), and a
+  read-only value must not claim the accent.
 - **Checkbox and radio marks.** Unchecked is a quiet box: the neutral fill with the controlBorder
   hairline, controlBorderHover under the pointer; checked is the accent. Mixed is a minus instead of a check, so the three states differ by shape.
   Box corners are at most a quarter of the side, so a box never reads as a radio circle. The radio

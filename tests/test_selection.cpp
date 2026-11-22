@@ -1560,7 +1560,7 @@ int RingColorVertices(const std::vector<ImDrawVert>& vertices)
 
 } // namespace
 
-TEST_CASE("A disabled on toggle keeps a dim accent track and a read-only on toggle a mid grey one")
+TEST_CASE("A disabled on toggle keeps a dim accent track and a read-only on toggle a labelSecondary one")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -1571,7 +1571,7 @@ TEST_CASE("A disabled on toggle keeps a dim accent track and a read-only on togg
         facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
         const facet::Colors& c = facet::T().colors;
         const ImU32 dimOn = facet::ToU32(facet::WithAlpha(c.focusRing, c.focusRing.w * facet::internal::kDisabledPictureOpacity));
-        const ImU32 readOnlyOn = facet::ToU32(c.labelTertiary);
+        const ImU32 readOnlyOn = facet::ToU32(c.labelSecondary);
         int disabledOn = 0;
         int disabledOff = 0;
         int readOnly = 0;
