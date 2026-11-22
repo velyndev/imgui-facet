@@ -229,3 +229,256 @@ TEST_CASE("Inventory tile: a disabled tile does not activate and a locked one st
     CHECK_FALSE(dragging);
     session.MouseUp();
 }
+
+// ---- InventoryGrid ------------------------------------------------------------------------------
+
+TEST_CASE("Inventory grid: the columns fit the width, reflow when it changes, and the tiles keep the slot size")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    bag.options.columns = 0;
+    bag.width = 600.0f;
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    const float outset = fi::FocusRingOutset();
+    // Six slots in one row at 600 pixels.
+    CHECK(session.ItemRect("grid").GetWidth() == doctest::Approx(6.0f * 68.0f - 4.0f + outset * 2.0f));
+    // At 160 pixels two columns: slot 2 is the first of the second row.
+    bag.width = 160.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetWidth() == doctest::Approx(2.0f * 68.0f - 4.0f + outset * 2.0f));
+    session.Click(Bag::Tile(session, 2, 2));
+    CHECK(bag.selected == 2);
+    // Narrower than one slot: one column, and the tiles shrink to the width.
+    bag.width = 40.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetWidth() == doctest::Approx(40.0f));
+}
+
+TEST_CASE("Inventory grid: no slots show the empty state, one slot is one tile")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag;
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetHeight() > 0.0f);
+    session.Click(session.ItemCenter("grid"));
+    CHECK(bag.selected == -1);
+    bag.slots = {Item("Item 1")};
+    session.Seconds(0.5f);  // so the next click is not a double click
+    session.Click(Bag::Tile(session, 0, 1));
+    CHECK(bag.selected == 0);
+    CHECK(bag.actions == 0);
+}
+
+TEST_CASE("Inventory grid: ten thousand slots draw what a hundred draw")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag;
+    bag.options.columns = 8;
+    bag.slots.assign(100, Item("Item", 2));
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(3);
+    const ImDrawData* data = ImGui::GetDrawData();
+    const int few = data != nullptr ? data->TotalVtxCount : 0;
+    bag.slots.assign(10000, Item("Item", 2));
+    session.Frames(3);
+    data = ImGui::GetDrawData();
+    const int many = data != nullptr ? data->TotalVtxCount : 0;
+    REQUIRE(few > 0);
+    // The same rows are visible; only the scroll bar thumb may differ.
+    CHECK(std::abs(many - few) < few / 10);
+}
+
+TEST_CASE("Inventory grid: a click, Ctrl+click and Shift+click select, and *selected follows the focused slot")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    session.Click(Bag::Tile(session, 0, 3));
+    CHECK(bag.selected == 0);
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Click(Bag::Tile(session, 2, 3));
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(bag.selected == 2);
+    session.KeyDown(ImGuiMod_Shift);
+    session.Click(Bag::Tile(session, 4, 3));
+    session.KeyUp(ImGuiMod_Shift);
+    CHECK(bag.selected == 4);
+    // The caller sets the selection: the grid takes it.
+    bag.selected = 1;
+    session.Frames(2);
+    CHECK(bag.selected == 1);
+    CHECK(bag.actions == 0);
+}
+
+TEST_CASE("Inventory grid: the arrow keys move the selection in two dimensions, Enter and a double click activate")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    session.Click(Bag::Tile(session, 0, 3));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(bag.selected == 1);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(bag.selected == 4);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(bag.last.action == InventoryAction::Activated);
+    CHECK(bag.last.to == 4);
+    session.DoubleClick(Bag::Tile(session, 1, 3));
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Activated);
+    CHECK(bag.last.to == 1);
+}
+
+TEST_CASE("Inventory grid: Ctrl+arrow moves the focused item to an empty slot, swaps, and refuses a locked slot")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    // Item 2 (slot 1) to the empty slot 2; the selection and the focus go with it.
+    session.Click(Bag::Tile(session, 1, 3));
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_RightArrow);
+    CHECK(bag.last.action == InventoryAction::Moved);
+    CHECK(LabelOf(bag.slots[2]) == "Item 2");
+    CHECK(bag.slots[1].label == nullptr);
+    CHECK(bag.selected == 2);
+    // Slot 5 below is locked: nothing moves.
+    const int before = bag.actions;
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_DownArrow);
+    CHECK(bag.actions == before);
+    // Back to the empty slot 1, then a swap with Item 1 in slot 0.
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_LeftArrow);
+    CHECK(bag.last.action == InventoryAction::Swapped);
+    CHECK(LabelOf(bag.slots[0]) == "Item 2");
+    CHECK(LabelOf(bag.slots[1]) == "Item 1");
+}
+
+TEST_CASE("Inventory grid: a pointer drag moves, swaps and merges, and Shift splits half a stack")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    // Item 2 onto the empty slot 4.
+    session.Drag({Bag::Tile(session, 1, 3), Bag::Tile(session, 2, 3), Bag::Tile(session, 4, 3)}, 6);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Moved);
+    CHECK(bag.last.from == 1);
+    CHECK(bag.last.to == 4);
+    CHECK(LabelOf(bag.slots[4]) == "Item 2");
+    // Item 1 (4 of key 7) onto Item 3 (2 of key 7, at most 10): all four merge.
+    session.Drag({Bag::Tile(session, 0, 3), Bag::Tile(session, 1, 3), Bag::Tile(session, 3, 3)}, 6);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Merged);
+    CHECK(bag.last.count == 4);
+    CHECK(bag.slots[3].count == 6);
+    CHECK(bag.slots[0].label == nullptr);
+    // Item 3 onto Item 2: a swap.
+    session.Drag({Bag::Tile(session, 3, 3), Bag::Tile(session, 4, 3)}, 6);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Swapped);
+    CHECK(LabelOf(bag.slots[4]) == "Item 3");
+    // Shift held: half of the six onto the empty slot 0.
+    session.KeyDown(ImGuiMod_Shift);
+    session.Drag({Bag::Tile(session, 4, 3), Bag::Tile(session, 1, 3), Bag::Tile(session, 0, 3)}, 6);
+    session.KeyUp(ImGuiMod_Shift);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Split);
+    CHECK(bag.last.count == 3);
+    CHECK(bag.slots[0].count == 3);
+    CHECK(bag.slots[4].count == 3);
+}
+
+TEST_CASE("Inventory grid: a locked slot refuses a drop, and Escape cancels a pointer drag")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    session.Drag({Bag::Tile(session, 1, 3), Bag::Tile(session, 4, 3), Bag::Tile(session, 5, 3)}, 6);
+    session.Frames(2);
+    CHECK(bag.actions == 0);
+    session.MouseMove(Bag::Tile(session, 1, 3));
+    session.MouseDown();
+    session.MouseMove(Bag::Tile(session, 2, 3));
+    session.Frames(2);
+    CHECK(bag.dragging);
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    session.Frames(2);
+    CHECK(bag.actions == 0);
+    CHECK(LabelOf(bag.slots[1]) == "Item 2");
+}
+
+TEST_CASE("Inventory grid: Space picks a slot up for a keyboard drag, the arrows carry it, Space drops, Escape puts it back")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    session.Click(Bag::Tile(session, 1, 3));
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(bag.dragging);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(bag.actions == 0);
+    CHECK_FALSE(bag.dragging);
+    // Again, and drop it one slot to the right (the empty slot 2).
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Moved);
+    CHECK(bag.last.from == 1);
+    CHECK(bag.last.to == 2);
+    CHECK(bag.selected == 2);
+}
+
+TEST_CASE("Inventory grid: read-only shows the selection and writes nothing, starts no drag and accepts no drop")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    bag.selected = 0;
+    bag.options.readOnly = true;
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    session.Click(Bag::Tile(session, 2, 3));
+    CHECK(bag.selected == 0);
+    session.Drag({Bag::Tile(session, 1, 3), Bag::Tile(session, 2, 3)}, 6);
+    session.Frames(2);
+    CHECK(bag.actions == 0);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(bag.actions == 0);
+}
+
+TEST_CASE("Inventory grid: while loading or failed the slots take no input")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    for (const facet::DataState state : {facet::DataState::Loading, facet::DataState::Error})
+    {
+        bag.options.state = state;
+        session.SetUi([&] { bag.Ui(session); });
+        session.Frames(2);
+        CHECK(session.ItemRect("grid").GetHeight() > 0.0f);
+        session.Click(session.ItemCenter("grid"));
+        CHECK(bag.selected == -1);
+    }
+}
