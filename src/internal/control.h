@@ -34,10 +34,19 @@
 // (MeasureAboveLabel, DrawAboveLabel), as rule 6 of docs/api-conventions.md sorts them.
 //
 // Colors come from the theme only: label text in label (labelTertiary when disabled), secondary
-// text and glyphs in labelSecondary, fills from the fill tokens through StateFill, outlines from
-// ControlBoundaryColor, focusRing and destructive. The disabled look is the same for every
-// variant of a control: fill[3] and labelTertiary, no hover or press feedback. Lengths are pixels
-// here (the helpers apply Px() to the tokens).
+// text and glyphs in labelSecondary, fills from the fill tokens through StateFill, outlines through
+// the outline helpers below (ControlOutlineColor, DrawOutline, DrawSurfaceOutline). The disabled
+// look is the same for every variant of a control: fill[3] and labelTertiary, no hover or press
+// feedback. Lengths are pixels here (the helpers apply Px() to the tokens).
+//
+// The border rule: every outline in the library is one stroke of HairlineThickness() (draw.h) in a
+// border token: controlBorder for the edge of a control or a tile, separator for the edge of a
+// surface (card, panel, popup, table) and for dividing lines. A state changes the color or the fill,
+// never the width: hover takes controlBorderHover, a focused field and a selected tile or card take
+// the accent (colors.focusRing, the accent at 3:1), an error takes destructive. Strokes that are not
+// outlines (chart lines, glyphs, check marks, slider tracks, arcs, the focus ring) keep their own
+// weights, each from a named token. tests/test_border_rule.cpp scans the sources for outline strokes
+// of any other width.
 
 #include <cstddef>
 #include <span>
@@ -125,21 +134,49 @@ ImVec4 StateFill(const ImVec4& rest, const ImVec4& hover, const ImVec4& pressed,
 // The neutral control fill: fill[2] at rest, fill[1] hovered, fill[0] pressed, fill[3] disabled.
 ImVec4 NeutralFill(const ItemState& item);
 
+// ---- Outlines ---------------------------------------------------------------------------------
+
+// What the outline of a control or a tile shows. The states are listed by precedence: an error
+// wins over everything, disabled over the rest.
+struct OutlineLook
+{
+    float hoverAmount = 0.0f;  // 0 to 1: controlBorder toward controlBorderHover (item.hoverAmount)
+    bool focused = false;      // a field that has the keyboard (pointer or keyboard) or listens: the accent
+    bool selected = false;     // a selected tile, card or latch: the accent
+    bool disabled = false;     // separator
+    bool error = false;        // destructive, also while disabled
+};
+
+// The color of a control's outline for `look`: controlBorder blended toward controlBorderHover by
+// hoverAmount, the accent outline (colors.focusRing) while focused or selected, separator while
+// disabled, destructive for an error.
+ImVec4 ControlOutlineColor(const OutlineLook& look);
+
+// Strokes the one outline of the border rule: a hairline (HairlineThickness) of `color` inside
+// `rect` (screen pixels) with the corners of facet::StrokeRect, so a capsule or a circle gets
+// circular ends. `corners` takes ImDrawFlags_RoundCorners* as in draw.h. Use it for every outline
+// of a control or a tile.
+void DrawOutline(ImDrawList* drawList, const ImRect& rect, float radius, const ImVec4& color, ImDrawFlags corners = 0);
+
+// The outline of a surface (card, panel, popup, table, code view): one separator hairline inside
+// `rect`.
+void DrawSurfaceOutline(ImDrawList* drawList, const ImRect& rect, float radius, ImDrawFlags corners = 0);
+
 // ---- Field frame ------------------------------------------------------------------------------
 
 // What the frame of a field-like control (text, number and drag fields, dropdown fields, key
 // bind capture, cycle selectors) shows.
 struct FieldFrameLook
 {
-    float hoverAmount = 0.0f;  // 0 to 1: fill[2] at rest toward fill[1] on hover
-    bool active = false;       // has the keyboard or listens: a focusRing hairline instead of the boundary
+    float hoverAmount = 0.0f;  // 0 to 1: fill[2] at rest toward fill[1], the outline toward controlBorderHover
+    bool active = false;       // has the keyboard or listens: the accent outline instead of controlBorder
     bool disabled = false;     // fill[3] and a separator hairline
-    bool readOnly = false;     // no fill, the boundary hairline only
+    bool readOnly = false;     // no fill, the controlBorder hairline only
     bool error = false;        // a destructive hairline, also while disabled
 };
 
-// Draws the frame (fill and hairline, radii.control) of a field-like control into `drawList`.
-// The keyboard focus ring is drawn separately (focus.h), after keyboard input only.
+// Draws the frame (fill and the one outline, radii.control) of a field-like control into
+// `drawList`. The keyboard focus ring is drawn separately (focus.h), after keyboard input only.
 void DrawFieldFrame(ImDrawList* drawList, const ImRect& frame, const FieldFrameLook& look);
 
 // ---- Text that fits ---------------------------------------------------------------------------

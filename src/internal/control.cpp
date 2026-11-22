@@ -147,6 +147,32 @@ ImVec4 NeutralFill(const ItemState& item)
     return StateFill(c.fill[2], c.fill[1], c.fill[0], item);
 }
 
+// ---- Outlines ---------------------------------------------------------------------------------
+
+ImVec4 ControlOutlineColor(const OutlineLook& look)
+{
+    const Colors& c = T().colors;
+    if (look.error)
+        return c.destructive;
+    if (look.disabled)
+        return c.separator;
+    if (look.focused || look.selected)
+        return c.focusRing;
+    // At rest the color is controlBorder exactly (a blend by 0 would round through OKLab).
+    return look.hoverAmount > 0.0f ? Mix(c.controlBorder, c.controlBorderHover, std::min(look.hoverAmount, 1.0f))
+                                   : c.controlBorder;
+}
+
+void DrawOutline(ImDrawList* drawList, const ImRect& rect, float radius, const ImVec4& color, ImDrawFlags corners)
+{
+    StrokeRect(drawList, rect.Min, rect.Max, ToU32(color), radius, HairlineThickness(), corners);
+}
+
+void DrawSurfaceOutline(ImDrawList* drawList, const ImRect& rect, float radius, ImDrawFlags corners)
+{
+    DrawOutline(drawList, rect, radius, T().colors.separator, corners);
+}
+
 // ---- Field frame ------------------------------------------------------------------------------
 
 void DrawFieldFrame(ImDrawList* drawList, const ImRect& frame, const FieldFrameLook& look)
@@ -156,12 +182,12 @@ void DrawFieldFrame(ImDrawList* drawList, const ImRect& frame, const FieldFrameL
     const float radius = Px(t.radii.control);
     ImVec4 fill = look.disabled ? c.fill[3] : (look.readOnly ? WithAlpha(c.fill[3], 0.0f) : Mix(c.fill[2], c.fill[1], look.hoverAmount));
     FillRect(drawList, frame.Min, frame.Max, ToU32(fill), radius);
-    ImVec4 outline = look.disabled ? c.separator : ControlBoundaryColor(c);
-    if (look.active && !look.disabled)
-        outline = c.focusRing;
-    if (look.error)
-        outline = c.destructive;
-    StrokeRect(drawList, frame.Min, frame.Max, ToU32(outline), radius, HairlineThickness());
+    OutlineLook outline;
+    outline.hoverAmount = look.readOnly ? 0.0f : look.hoverAmount;
+    outline.focused = look.active;
+    outline.disabled = look.disabled;
+    outline.error = look.error;
+    DrawOutline(drawList, frame, radius, ControlOutlineColor(outline));
 }
 
 // ---- Text that fits ---------------------------------------------------------------------------

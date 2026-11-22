@@ -12,6 +12,7 @@
 #include "facet/core/draw.h"
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
+#include "internal/control.h"
 
 namespace facet::internal
 {
@@ -244,7 +245,9 @@ void DragDropDrawTarget(ImDrawList* drawList, const ImRect& rect, float radius)
         return;
     const Colors& c = T().colors;
     FillRect(drawList, rect.Min, rect.Max, ToU32(c.accentSubtle), radius);
-    StrokeRect(drawList, rect.Min, rect.Max, ToU32(c.focusRing), radius, Px(T().metrics.focusRingWidth));
+    // The accent outline of a selection at the one border width: a drop target is chosen, it does
+    // not have the keyboard focus.
+    DrawOutline(drawList, rect, radius, c.focusRing);
 }
 
 } // namespace facet::internal
