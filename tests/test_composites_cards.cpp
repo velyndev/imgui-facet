@@ -604,6 +604,39 @@ TEST_CASE("Inventory detail card and media card follow kFill and widths relative
     CHECK(checked == 4);
 }
 
+// ---- MediaCard ----------------------------------------------------------------------------------
+
+TEST_CASE("Media card: a click, Space and Enter activate it, and a narrow card puts the cover beside the text")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int presses = 0;
+    static const char* const badges[] = {"Badge"};
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::MediaCard("Title", facet::ImageHandle{}, {.description = "Placeholder text", .badges = badges}))
+            ++presses;
+        session.Track("wide");
+        (void)facet::MediaCard("Narrow title", facet::ImageHandle{}, {.description = "Placeholder text", .width = 180.0f});
+        session.Track("narrow");
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("wide"));
+    CHECK(presses == 1);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == session.ItemId("wide"));
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(presses == 3);
+    // The wide card's cover is 9/16 of its width, on top; the narrow card is a short row.
+    CHECK(session.ItemRect("wide").GetHeight() > facet::Px(256.0f) * 0.5625f);
+    CHECK(session.ItemRect("narrow").GetHeight() < session.ItemRect("wide").GetHeight());
+    CHECK(session.ItemRect("narrow").GetWidth() == doctest::Approx(facet::Px(180.0f)));
+}
+
 // ---- Public drag and drop -----------------------------------------------------------------------
 
 namespace
