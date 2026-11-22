@@ -22,12 +22,14 @@ constexpr float kUiScaleMax = 2.0f;
 // track does not move under the pointer.
 bool ThemeEditorMovesLayout(ThemeEditGroup group)
 {
-    return group == ThemeEditGroup::Spacing || group == ThemeEditGroup::Type || group == ThemeEditGroup::Heights;
+    // Lines move it too: the focus ring width sets the padding of scroll areas.
+    return group == ThemeEditGroup::Spacing || group == ThemeEditGroup::Type || group == ThemeEditGroup::Heights ||
+           group == ThemeEditGroup::Lines;
 }
 
 // Probe names per group, in ThemeEditGroup order.
-constexpr const char* kThemeEditorGroupProbes[kThemeEditGroupCount] = {"radii",  "spacing", "type", "heights",
-                                                                        "motion", "blur",    "shadow"};
+constexpr const char* kThemeEditorGroupProbes[kThemeEditGroupCount] = {"radii", "spacing", "type",   "heights",
+                                                                        "motion", "blur",  "shadow", "lines"};
 
 bool ThemeEditorGroupModified(const ThemeEdits& edits, ThemeEditGroup group)
 {
@@ -220,11 +222,19 @@ void DrawThemeEditor(GalleryState& state, PageCtx& ctx)
     GalleryUiScaleControl(state, "##scale", facet::kFill);
     ctx.Probe("editor.scale");
 
+    // The variant that lifts every outline and divider to 3:1. The switch sits at the label column,
+    // where the toggles further down put theirs.
+    facet::ToggleOptions contrastToggle;
+    contrastToggle.width = facet::kFill;
+    facet::Toggle("Increased contrast", &state.edits.increasedContrast, contrastToggle);
+    ctx.Probe("editor.increased-contrast");
+
     // ---- The token groups ----
     held = ThemeEditorTokenGroup(state, ctx, ThemeEditGroup::Radii) || held;
     held = ThemeEditorTokenGroup(state, ctx, ThemeEditGroup::Spacing) || held;
     held = ThemeEditorTokenGroup(state, ctx, ThemeEditGroup::Type) || held;
     held = ThemeEditorTokenGroup(state, ctx, ThemeEditGroup::Heights) || held;
+    held = ThemeEditorTokenGroup(state, ctx, ThemeEditGroup::Lines) || held;
 
     // ---- Motion ----
     ImGui::PushID("motion");

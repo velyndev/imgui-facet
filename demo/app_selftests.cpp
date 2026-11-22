@@ -205,6 +205,18 @@ FACET_DEMO_APP_SELFTEST("theme-editor", "showcase")
     test.Wait(2);
     test.Expect("the shadow factor strengthens the shadows",
                 [] { return facet::T().elevation.levels[1].opacity > base.elevation.levels[1].opacity; });
+    test.Drag({Target::Item("editor.lines.factor", 0.6f), Target::Item("editor.lines.factor", 0.95f)}, 0.3f);
+    test.Wait(2);
+    test.Expect("the lines factor widens the border and the focus ring on release", [] {
+        return facet::T().metrics.hairline > base.metrics.hairline &&
+               facet::T().metrics.focusRingWidth > base.metrics.focusRingWidth;
+    });
+    test.Click("editor.increased-contrast");
+    test.Wait(2);
+    test.Expect("the switch turns on the increased contrast variant", [] {
+        const facet::Colors& c = facet::T().colors;
+        return facet::IncreasedContrast() && facet::ContrastRatio(c.controlBorder, c.bg) >= 3.0f;
+    });
 
     // The keyboard: a focused factor slider steps with the arrows.
     test.Click("editor.radii.reset");
@@ -233,7 +245,9 @@ FACET_DEMO_APP_SELFTEST("theme-editor", "showcase")
     test.Expect("Copy as C++ puts the edited tokens on the clipboard", [] {
         return ClipboardHas("inline void ApplyThemeEdits(facet::Theme& theme)") && ClipboardHas("theme.radii.element = ") &&
                ClipboardHas("theme.spacing.md = ") && ClipboardHas("theme.metrics.controlHeight = ") &&
-               ClipboardHas("theme.motion.reduceMotion = true;") && ClipboardHas("theme.glass.blurRadius = ");
+               ClipboardHas("theme.motion.reduceMotion = true;") && ClipboardHas("theme.glass.blurRadius = ") &&
+               ClipboardHas("theme.metrics.hairline = ") && ClipboardHas("theme.metrics.focusRingWidth = ") &&
+               ClipboardHas("facet::SetIncreasedContrast(true);");
     });
     test.Expect("the export text equals what the editor builds",
                 [] { return std::string(ImGui::GetClipboardText()) == facet::demo::ThemeEditorExportText(Gallery()); });
@@ -252,7 +266,8 @@ FACET_DEMO_APP_SELFTEST("theme-editor", "showcase")
     test.Expect("and the live theme to the preset", [] {
         return std::fabs(facet::T().spacing.md - base.spacing.md) < 0.01f &&
                std::fabs(facet::T().metrics.controlHeight - base.metrics.controlHeight) < 0.01f &&
-               !facet::T().motion.reduceMotion && !facet::HasCustomAccent();
+               !facet::T().motion.reduceMotion && !facet::HasCustomAccent() && !facet::IncreasedContrast() &&
+               std::fabs(facet::T().metrics.hairline - base.metrics.hairline) < 0.01f;
     });
     test.Click("editor.copy");
     test.Expect("an unedited theme exports no token", [] { return !ClipboardHas("    theme."); });

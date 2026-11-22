@@ -165,3 +165,28 @@ TEST_CASE("Theme edits apply factors and per-token values to the preset")
     CHECK(edited.dark);
     CHECK(edited.colors.accent.x == doctest::Approx(base.colors.accent.x));
 }
+
+TEST_CASE("Theme export names the border and ring widths and the increased contrast switch")
+{
+    const facet::Theme base = facet::Theme::Dark();
+    ThemeEdits edits;
+    edits.factor[static_cast<int>(ThemeEditGroup::Lines)] = 2.0f;
+    edits.increasedContrast = true;
+    const std::string text = BuildThemeExport(base, edits, "Dark", 1.0f);
+    const std::vector<std::string> paths = AssignedPaths(text);
+    CHECK(Contains(paths, "metrics.hairline"));
+    CHECK(Contains(paths, "metrics.focusRingWidth"));
+    CHECK(text.find("theme.metrics.hairline = 2.0f;") != std::string::npos);
+    CHECK(text.find("theme.metrics.focusRingWidth = 4.0f;") != std::string::npos);
+    // A library switch, not a token: a comment with the call, outside the function.
+    CHECK(text.find("// Increased contrast (not a theme token): facet::SetIncreasedContrast(true);") != std::string::npos);
+    CHECK_FALSE(Contains(paths, "radii.card"));
+    const facet::Theme edited = facet::demo::ApplyThemeEdits(base, edits);
+    CHECK(edited.metrics.hairline == doctest::Approx(2.0f));
+    CHECK(edited.metrics.focusRingWidth == doctest::Approx(4.0f));
+    // The switch alone exports no token.
+    ThemeEdits contrastOnly;
+    contrastOnly.increasedContrast = true;
+    CHECK(AssignedPaths(BuildThemeExport(base, contrastOnly, "Dark", 1.0f)).empty());
+    CHECK_FALSE(contrastOnly == ThemeEdits{});
+}

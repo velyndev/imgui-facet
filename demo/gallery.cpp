@@ -200,6 +200,9 @@ void ApplyGalleryLook(GalleryState& state, const PageCtx& ctx)
         }
         if (modeChanged)
             facet::SetThemeMode(mode, animate);
+        // The increased contrast variant is a switch of the library, not a theme token.
+        if (first || target.increasedContrast != facet::IncreasedContrastEnabled())
+            facet::SetIncreasedContrast(target.increasedContrast);
         facet::SetTheme(ApplyThemeEdits(ThemeEditorPreset(dark), target), animate);
         state.appliedEdits = target;
         state.appliedDark = dark;

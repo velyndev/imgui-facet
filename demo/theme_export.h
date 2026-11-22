@@ -28,8 +28,9 @@ enum class ThemeEditGroup
     Motion,
     Blur,
     Shadow,
+    Lines,
 };
-inline constexpr int kThemeEditGroupCount = 7;
+inline constexpr int kThemeEditGroupCount = 8;
 
 struct ThemeEditGroupInfo
 {
@@ -52,6 +53,7 @@ inline const ThemeEditGroupInfo& ThemeEditGroupOf(ThemeEditGroup group)
         {"Motion scale", 0.25f, 4.0f, 0.25, false},
         {"Blur strength", 0.0f, 2.0f, 0.1, false},
         {"Shadow strength", 0.0f, 2.0f, 0.1, false},
+        {"Lines", 0.5f, 2.0f, 0.1, true},
     };
     return kGroups[static_cast<int>(group)];
 }
@@ -75,7 +77,7 @@ struct ThemeEditToken
         #member, label, ThemeEditGroup::group, [](Theme& t) -> float& { return t.member; }, lo, hi \
     }
 
-inline constexpr int kThemeEditTokenCount = 29;
+inline constexpr int kThemeEditTokenCount = 31;
 
 inline const std::array<ThemeEditToken, kThemeEditTokenCount>& ThemeEditTokens()
 {
@@ -109,6 +111,8 @@ inline const std::array<ThemeEditToken, kThemeEditTokenCount>& ThemeEditTokens()
         FACET_DEMO_THEME_TOKEN(Shadow, elevation.levels[0].opacity, "Level 1", 0.0f, 1.0f),
         FACET_DEMO_THEME_TOKEN(Shadow, elevation.levels[1].opacity, "Level 2", 0.0f, 1.0f),
         FACET_DEMO_THEME_TOKEN(Shadow, elevation.levels[2].opacity, "Level 3", 0.0f, 1.0f),
+        FACET_DEMO_THEME_TOKEN(Lines, metrics.hairline, "Border width", 0.5f, 3.0f),
+        FACET_DEMO_THEME_TOKEN(Lines, metrics.focusRingWidth, "Focus ring width", 1.0f, 4.0f),
     };
     return kTokens;
 }
@@ -118,19 +122,21 @@ inline const std::array<ThemeEditToken, kThemeEditTokenCount>& ThemeEditTokens()
 // Everything the editor changed. The default value changes nothing.
 struct ThemeEdits
 {
-    std::array<float, kThemeEditGroupCount> factor = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    std::array<float, kThemeEditGroupCount> factor = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     std::array<bool, kThemeEditTokenCount> overridden = {};
     std::array<float, kThemeEditTokenCount> value = {};  // used where overridden
     bool reduceMotion = false;
     bool themeDefaultAccent = true;  // each preset's own accent
     ImVec4 accent = AccentPresets()[0].color;  // used while themeDefaultAccent is false; the custom well shows it
+    // The increased contrast variant (facet::SetIncreasedContrast): a library switch, not a theme token.
+    bool increasedContrast = false;
 
     bool operator==(const ThemeEdits& other) const
     {
         return factor == other.factor && overridden == other.overridden && value == other.value &&
                reduceMotion == other.reduceMotion && themeDefaultAccent == other.themeDefaultAccent &&
                accent.x == other.accent.x && accent.y == other.accent.y && accent.z == other.accent.z &&
-               accent.w == other.accent.w;
+               accent.w == other.accent.w && increasedContrast == other.increasedContrast;
     }
 };
 
@@ -225,6 +231,8 @@ inline std::string BuildThemeExport(const Theme& base, const ThemeEdits& edits, 
     out += "}\n";
     if (ThemeEditValuesDiffer(uiScale, 1.0f))
         out += "// UI scale (not a theme token): facet::SetUiScale(" + ThemeExportFloat(uiScale) + ");\n";
+    if (edits.increasedContrast)
+        out += "// Increased contrast (not a theme token): facet::SetIncreasedContrast(true);\n";
     return out;
 }
 
