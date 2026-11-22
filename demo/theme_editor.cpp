@@ -312,8 +312,8 @@ void DrawThemeEditor(GalleryState& state, PageCtx& ctx)
     }
     ImGui::EndDisabled();
     ctx.Probe("editor.reset-all");
-    Note("Reset all returns every token, the accent and the UI scale to the preset; the theme and window "
-         "mode stay.");
+    Note("Reset all returns every token, the accent, the UI scale and the contrast switch to the preset; the "
+         "theme and window mode stay.");
 
     state.editsHeld = held;
 }
