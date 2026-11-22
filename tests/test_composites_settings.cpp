@@ -960,6 +960,15 @@ TEST_CASE("KeybindList with a height lays its rows out under the column headings
     const facet::internal::KeybindListLayout inner = facet::internal::KeybindListMeasure(list.GetWidth(), true, true);
     CHECK(inner.inset > 0.0f);
     CHECK(inner.width == doctest::Approx(list.GetWidth() - inner.inset * 2.0f));
+    // The reset button ends before the overlay scroll bar at its hovered thickness, so the bar
+    // never lies over it; without a height nothing is kept free.
+    const facet::ScrollTokens& bar = facet::T().scroll;
+    const float barLeft = list.Max.x - facet::Px(bar.barInset) - facet::Px(bar.barThicknessHover);
+    const float resetRight = list.Min.x + inner.inset + inner.resetX + inner.button;
+    CHECK(resetRight <= barLeft + 0.5f);
+    const facet::internal::KeybindListLayout plain = facet::internal::KeybindListMeasure(list.GetWidth(), true, false);
+    CHECK(plain.barReserve == 0.0f);
+    CHECK(plain.resetX + plain.button == doctest::Approx(plain.width));
 }
 
 TEST_CASE("KeybindList captures a chord, and Escape while it listens cancels")

@@ -11,7 +11,8 @@
 // Lengths are pixels at the current scale; x positions are from the left edge of the rows, which
 // is the list's left edge plus `inset`. A list with a height lays its rows out inside a scroll
 // area, whose padding is the inset; the column headings above the area take the same inset, so
-// each heading stands over its column.
+// each heading stands over its column. With a height the rows also keep `barReserve` free at their
+// end, where the overlay scroll bar of the area lies, so the bar never covers a reset button.
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -31,6 +32,7 @@ struct KeybindListLayout
     float primaryX = 0.0f;
     float alternateX = 0.0f;
     float resetX = 0.0f;
+    float barReserve = 0.0f;   // with a height: kept free at the row end for the overlay scroll bar
     float rowHeight = 0.0f;    // the fields: one control height
     float labelLine = 0.0f;    // stacked: the label line, one Body line
     float headingHeight = 0.0f;  // the column headings line with its spacing

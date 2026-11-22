@@ -203,16 +203,20 @@ KeybindListLayout KeybindListMeasure(float outerWidth, bool alternate, bool scro
     layout.labelLine = MeasureText(TextStyle::Body, "").y;
     layout.headingHeight = MeasureText(TextStyle::Footnote, "").y + layout.spacing;
     layout.groupHeight = MeasureText(TextStyle::Headline, "").y + layout.spacing;
+    // With a height the overlay scroll bar lies over the end of the rows: the trailing reset button
+    // and the fields end before the bar at its hovered thickness and inset, so the bar never covers them.
+    layout.barReserve = scrolling ? std::round(Px(t.scroll.barThicknessHover + t.scroll.barInset)) : 0.0f;
+    const float rowEnd = std::max(1.0f, width - layout.barReserve);
     const float columns = alternate ? 2.0f : 1.0f;
     const float minColumn = std::round(m.height * kKeybindListMinColumnControls);
-    const float room = width - layout.button - layout.gap * (columns + 1.0f);
+    const float room = rowEnd - layout.button - layout.gap * (columns + 1.0f);
     // Side by side while the label column keeps its minimum next to columns of their minimum.
     layout.stacked = room - minColumn * columns < std::round(Px(t.composites.propertyLabelMinWidth));
     if (layout.stacked)
     {
-        const float fields = width - layout.button - layout.gap * columns;
+        const float fields = rowEnd - layout.button - layout.gap * columns;
         layout.column = std::max(1.0f, std::floor(fields / columns));
-        layout.labelWidth = width;
+        layout.labelWidth = rowEnd;
         layout.primaryX = 0.0f;
     }
     else
@@ -224,7 +228,7 @@ KeybindListLayout KeybindListMeasure(float outerWidth, bool alternate, bool scro
         layout.primaryX = layout.labelWidth + layout.gap;
     }
     layout.alternateX = layout.primaryX + layout.column + layout.gap;
-    layout.resetX = width - layout.button;
+    layout.resetX = rowEnd - layout.button;
     return layout;
 }
 

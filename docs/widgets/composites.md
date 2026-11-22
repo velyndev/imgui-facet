@@ -312,7 +312,8 @@ other items.
 filter is set and `Strings::empty` otherwise. Loading shows skeleton rows, Error the error state.
 Width: the available width by default; the chord columns are `composites.keybindColumnWidth` wide
 and a narrow list shrinks the label column first (labels cut with an ellipsis and a tooltip), then
-the chord columns. Height: the rows by default; a set `height` scrolls the rows under the headings.
+the chord columns. Height: the rows by default; a set `height` scrolls the rows under the headings,
+and the rows then end before the overlay scroll bar, so it never covers a reset button.
 Every listed row is submitted each frame, also the rows scrolled out of sight, and the conflict
 search compares each row with every other, so the list is made for the tens to few hundred binds
 of an app's settings.
@@ -735,7 +736,8 @@ Ordered layer rows, topmost first: the icon, the label (indented by `depth`, in 
 selected, in labelSecondary while the layer is hidden) and, at the end of the row, a visibility
 toggle (eye, eye-off) and a lock toggle (lock, unlock), each the glyph alone with its name
 (`Strings::hide`, `show`, `lock`, `unlock`) as its tooltip. The default width fills the available
-width; rows have the list row height, and with `height` set the rows scroll in a scroll area.
+width; rows have the list row height, and with `height` set the rows scroll in a scroll area and
+end before its overlay scroll bar, so the bar never covers the toggles.
 
 The rows are one Tab stop (the focused row, else the selected one, else the first): a click
 selects a row, Up and Down move the selection and the focus, Home and End go to the first and the

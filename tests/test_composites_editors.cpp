@@ -960,6 +960,25 @@ TEST_CASE("Layer list: a click selects a row and the arrows move the selection")
     CHECK(ui.selected == 0);
 }
 
+TEST_CASE("Layer list: with a height the toggles stay clear of the overlay scroll bar")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    ui.options.height = 60.0f;  // less than the four rows, so they scroll
+    ImGuiID listId = 0;
+    session.SetUi([&] {
+        listId = ImGui::GetID("layers");
+        ui.Draw(session);
+    });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    const ImRect lock = facet::internal::LayerListRowRect(listId, 0, 2);
+    REQUIRE(lock.GetWidth() > 0.0f);
+    const facet::ScrollTokens& bar = facet::T().scroll;
+    CHECK(lock.Max.x <= r.Max.x - facet::Px(bar.barInset + bar.barThicknessHover) + 0.5f);
+}
+
 TEST_CASE("Layer list: the rows are one Tab stop, then the focused row's toggles")
 {
     facet::test::Session session;

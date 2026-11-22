@@ -797,6 +797,9 @@ Composites, search and app controls:
 - **KeybindList conflict.** A shared chord shows the warning icon in the warning token plus "Also
   bound to" and the other action's name on both rows; below propertyLabelMinWidth the label
   stacks above the fields instead of vanishing.
+- **KeybindList and LayerList with a height** end their rows before the overlay scroll bar at its
+  hovered width, so the bar never lies over a reset button or a layer toggle and both stay easy to
+  hit.
 - **ConsoleView candidates.** Completion candidates and "No results" show as one Footnote
   labelSecondary line above the field, so they do not cover the log.
 - **Onboarding footer.** The current step is an accent dot plus "Step x of n", so progress is told

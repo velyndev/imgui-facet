@@ -203,7 +203,10 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
     }
     ImDrawList* drawList = window->DrawList;
     const ImVec2 rowsStart = window->DC.CursorPos;
-    const float rowWidth = scrolled ? ImGui::GetContentRegionAvail().x : width;
+    // While the rows scroll, the overlay bar lies over their end: the rows, and the visibility and
+    // lock toggles at their end, stop before the bar at its hovered width.
+    const float barReserve = scrolled ? std::round(Px(theme.scroll.barThicknessHover + theme.scroll.barInset)) : 0.0f;
+    const float rowWidth = scrolled ? std::max(1.0f, ImGui::GetContentRegionAvail().x - barReserve) : width;
     state.rowsOrigin = rowsStart;
     state.rowWidth = rowWidth;
     state.rowHeight = rowHeight;
