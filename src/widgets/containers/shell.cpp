@@ -381,7 +381,10 @@ void DrawShellGrip(ImDrawList* drawList, const ImRect& r, const ShellMetrics& m,
     constexpr float kGripInset = 0.3f;
     const float inset = std::floor(m.radius * kGripInset) + m.band * 0.5f;
     const ImVec2 corner(r.Max.x - inset, r.Max.y - inset);
-    const float thickness = HairlineThickness() * 1.5f;
+    // A glyph, not an outline: its two short diagonal strokes are half a hairline heavier than the
+    // window's edge, so they stay visible after antialiasing at a slant.
+    constexpr float kGripStrokeInHairlines = 1.5f;
+    const float thickness = HairlineThickness() * kGripStrokeInHairlines;
     for (int i = 1; i <= 2; ++i)
     {
         const float len = m.band * static_cast<float>(i);

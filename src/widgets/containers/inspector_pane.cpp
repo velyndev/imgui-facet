@@ -275,7 +275,8 @@ bool InspectorPaneNext()
         if (item.hovered || item.active)
         {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-            FillRect(drawList, pane.Min, ImVec2(pane.Min.x + thickness * 2.0f, pane.Max.y), ToU32(t.colors.focusRing), 0.0f);
+            // The edge takes the accent at its own width: a state changes the color, never the width.
+            FillRect(drawList, pane.Min, ImVec2(pane.Min.x + thickness, pane.Max.y), ToU32(t.colors.focusRing), 0.0f);
         }
         if (item.activated)
         {

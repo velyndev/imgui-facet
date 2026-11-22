@@ -10,8 +10,8 @@
 // cost of a frame does not grow with the tile count.
 //
 // Every tile runs through the row block of the list view (ListRowGroup): the hover fill, the
-// selection fill (accentSubtle while the grid has the keyboard focus, fill[1] otherwise), the focus
-// ring over every tile, and activation by a double click or Enter. With a selection the tiles live in
+// selected tile look (the accentSubtle fill and the accent hairline), the focus ring inside the
+// tile after keyboard input only, and activation by a double click or Enter. With a selection the tiles live in
 // ImGui::BeginMultiSelect with two-dimensional box selection: click, Ctrl, Shift, Ctrl+A and Escape
 // as in every Facet list, and the arrows move in two dimensions and wrap at the line ends. The grid
 // is one Tab stop: without a selection the focused tile (else the first) is the only tile Tab stops
@@ -234,6 +234,7 @@ bool ItemGridTile(int index)
     }
     desc.tabStop = index == e.tabStop;
     desc.part = index;
+    desc.tile = true;  // a selected tile: accentSubtle and the accent hairline (DESIGN.md, Quiet layers)
     const internal::ListRowState row = e.group.Row(ItemGridTileId(e, index), rect, desc);
     if (row.focused)
         internal::GetState<ItemGridMemory>(e.id).focusIndex = index;

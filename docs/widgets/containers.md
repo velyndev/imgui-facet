@@ -447,7 +447,8 @@ width and `height` units tall (0: the available height).
   motion); its content keeps the full pane width and is clipped while it slides, and the main content
   takes the room it leaves.
 - **Width.** `paneWidth` is the first width (0: `containers.inspectorWidth`); with `resizable` the
-  band of `containers.resizeBorder` along the pane's leading edge drags it, within `minPaneWidth`
+  band of `containers.resizeBorder` along the pane's leading edge drags it (the edge hairline takes
+  the accent while the band is hovered or dragged, at the same width), within `minPaneWidth`
   (0: `containers.inspectorMinWidth`) and `maxPaneWidth` (0: half the region). The width is kept in
   units under the id and saved in the ini file.
 - **Compact.** In a Compact width (`core/layout.h`) the main content keeps the whole region and the

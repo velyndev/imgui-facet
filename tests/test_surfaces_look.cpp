@@ -165,3 +165,78 @@ TEST_CASE("Navigation look: a sidebar item shows no ring after a click and an in
     CHECK(ring.Min.y >= first.Min.y - 0.5f);
     CHECK(ring.Max.y <= first.Max.y + 0.5f);
 }
+
+TEST_CASE("Layout look: a tile selected by a click shows the selected tile look and no ring")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    ImGuiSelectionBasicStorage selection;
+    session.SetUi([&] {
+        if (facet::BeginItemGrid("##tiles", 6, &selection, {.minTileWidth = 60.0f, .height = 200.0f}))
+        {
+            facet::RowRange range;
+            while (facet::NextVisibleRows(&range))
+                for (int i = range.first; i < range.last; ++i)
+                {
+                    (void)facet::ItemGridTile(i);
+                    if (i == 0)
+                        session.Track("tile0");
+                }
+            facet::EndItemGrid();
+        }
+    });
+    session.Frames(2);
+    const ImRect tile = session.ItemRect("tile0");
+    // Unselected tiles draw nothing in the accent (the grid may have taken a first selection).
+    selection.Clear();
+    session.Frames(2);
+    CHECK(ColorCount(RingColor(), false) == 0);
+    session.Click(tile.GetCenter());
+    session.Frames(3);
+    REQUIRE(selection.Contains(0));
+    CHECK(ColorCount(facet::ToU32(facet::T().colors.accentSubtle), true) > 0);
+    // The accent outline of the selected tile, and nothing more in the accent: it lies within the
+    // tile (a ring outside would reach past it), one hairline wide along each edge.
+    REQUIRE(ColorCount(RingColor(), false) > 0);
+    const ImRect accent = ColorBounds(RingColor());
+    CHECK(accent.Min.x >= tile.Min.x - 0.5f);
+    CHECK(accent.Max.x <= tile.Max.x + 0.5f);
+    CHECK(accent.Min.y >= tile.Min.y - 0.5f);
+    CHECK(accent.Max.y <= tile.Max.y + 0.5f);
+}
+
+TEST_CASE("Containers look: the inspector pane edge keeps its width under the pointer")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    session.SetUi([&] {
+        facet::BeginInspectorPane("Details", nullptr, {.height = 200.0f});
+        ImGui::TextUnformatted("Main");
+        if (facet::InspectorPaneNext())
+        {
+            ImGui::TextUnformatted("Pane");
+            session.Track("pane-text");
+        }
+        facet::EndInspectorPane();
+    });
+    session.Frames(3);
+    CHECK(ColorCount(RingColor(), false) == 0);
+    // The pane's leading edge sits left of its content by the content padding; walk toward it until
+    // the edge takes the accent.
+    const ImRect text = session.ItemRect("pane-text");
+    bool lit = false;
+    for (float x = text.Min.x; x > text.Min.x - 60.0f && !lit; x -= 1.0f)
+    {
+        session.MouseMove(ImVec2(x, text.GetCenter().y));
+        session.Frames(1);
+        lit = ColorCount(RingColor(), false) > 0;
+    }
+    REQUIRE(lit);
+    const ImRect edge = ColorBounds(RingColor());
+    // One hairline wide, as at rest: a state changes the color of an edge, not its width.
+    CHECK(edge.GetWidth() <= facet::HairlineThickness() + 0.01f);
+}
