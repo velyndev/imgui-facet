@@ -665,6 +665,106 @@ TEST_CASE("User chip: it activates, compact is a circle of the control height, a
     CHECK(session.ItemRect("chip").GetHeight() > facet::ControlHeight(facet::ControlSize::Regular));
 }
 
+// ---- ProfileSwitcher ----------------------------------------------------------------------------
+
+namespace
+{
+
+struct Profiles
+{
+    facet::AvatarItem items[3] = {{"Profile 1", {}, "Placeholder"}, {"Profile 2"}, {"Profile 3"}};
+    int current = 0;
+    facet::ProfileSwitcherAction last = facet::ProfileSwitcherAction::None;
+    int actions = 0;
+    facet::ProfileSwitcherOptions options{.addLabel = "Add", .manageLabel = "Manage"};
+    ImRect level;  // the open list's popup level in the last frame
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        const facet::ProfileSwitcherAction a = facet::ProfileSwitcher("profiles", &current, items, options);
+        session.Track("switcher");
+        ImGui::PushID("profiles");
+        level = fi::PopupLevelRect(ImGui::GetID("##profiles"));
+        ImGui::PopID();
+        if (a != facet::ProfileSwitcherAction::None)
+        {
+            last = a;
+            ++actions;
+        }
+    }
+};
+
+} // namespace
+
+TEST_CASE("Profile switcher: Enter on the button opens the list, Down and Enter switch, and the focus returns to the button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Profiles p;
+    session.SetUi([&] { p.Ui(session); });
+    session.Frame();
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("switcher"));
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(6);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(12);
+    CHECK(p.last == facet::ProfileSwitcherAction::Switched);
+    CHECK(p.current == 1);
+    CHECK(ImGui::GetFocusID() == session.ItemId("switcher"));
+    // Escape closes without switching, and the focus comes back too.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(6);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(12);
+    CHECK(p.current == 1);
+    CHECK(p.actions == 1);
+    CHECK(ImGui::GetFocusID() == session.ItemId("switcher"));
+}
+
+TEST_CASE("Profile switcher: a click on a row switches to it, and the focus goes back to the button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Profiles p;
+    session.SetUi([&] { p.Ui(session); });
+    session.Frame();
+    session.Click(session.ItemCenter("switcher"));
+    session.Frames(8);
+    REQUIRE(p.level.GetWidth() > 0.0f);
+    // Rows start under the popover padding and the list's scroll area padding.
+    const float top = p.level.Min.y + facet::Px(12.0f) + fi::FocusRingOutset();
+    const float row = facet::Px(40.0f);
+    session.Click(ImVec2(p.level.GetCenter().x, top + row * 2.5f));
+    session.Frames(12);
+    CHECK(p.current == 2);
+    CHECK(p.last == facet::ProfileSwitcherAction::Switched);
+    CHECK(ImGui::GetFocusID() == session.ItemId("switcher"));
+}
+
+TEST_CASE("Profile switcher: read-only opens the list but never switches")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Profiles p;
+    p.options.readOnly = true;
+    session.SetUi([&] { p.Ui(session); });
+    session.Frame();
+    session.Click(session.ItemCenter("switcher"));
+    session.Frames(6);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(6);
+    CHECK(p.current == 0);
+    CHECK(p.actions == 0);
+}
+
 // ---- Public drag and drop -----------------------------------------------------------------------
 
 namespace
