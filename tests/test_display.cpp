@@ -1526,11 +1526,12 @@ TEST_CASE("Display tones keep AA contrast on every content surface in both theme
                 CHECK(facet::ContrastRatio(facet::internal::DisplayProgressColor(tone), surface) >= 3.0f);
             }
         }
-        // Key caps and inline code: label on the cap fill; the cap boundary at 3:1.
+        // Key caps and inline code: label on the cap fill; the cap outline visible but quiet (it
+        // reaches 3:1 in the increased contrast variant, which test_contrast.cpp checks).
         for (const ImVec4& surface : surfaces)
         {
             CHECK(facet::ContrastRatio(c.label, facet::Over(c.fill[2], surface)) >= 4.5f);
-            CHECK(facet::ContrastRatio(facet::ControlBoundaryColor(c), surface) >= 3.0f);
+            CHECK(facet::ContrastRatio(facet::Over(facet::ControlBoundaryColor(c), surface), surface) > 1.2f);
         }
         // Code view and stat tile text on their bgSecondary surface.
         for (const ImVec4& tint : {c.codeKeyword, c.codeString, c.codeNumber, c.labelSecondary, c.label})

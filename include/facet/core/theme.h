@@ -71,8 +71,12 @@ struct Colors
     ImVec4 labelTertiary;
     ImVec4 labelQuaternary;
 
-    ImVec4 separator;        // translucent hairlines over any surface
-    ImVec4 separatorOpaque;  // hairlines where translucency would double up
+    // Dividing lines and the edge of a surface (card, panel, popup, table): one hairline of
+    // `separator`, translucent so it reads the same over every surface; separatorOpaque where
+    // translucency would double up (crossing table borders). The edge of a control or a tile uses
+    // controlBorder (below) instead.
+    ImVec4 separator;
+    ImVec4 separatorOpaque;
 
     // The accent marks selection, the primary action and focus. Theme::ApplyAccent derives
     // every color below from `accent`.
@@ -93,8 +97,9 @@ struct Colors
 
     // The keyboard focus ring: the accent hue with its lightness moved until it reaches 3:1
     // (WCAG non-text contrast) on bg, bgSecondary, bgTertiary, bgElevated and every
-    // bgElevatedLevels surface. Accent marks that must stay visible on any surface without
-    // being text (drop indicators) use it too.
+    // bgElevatedLevels surface, and against fill[0] drawn over each of them. Accent marks that
+    // carry a state and must stay visible on any surface without being text use it too: the filled
+    // part of a track, an on switch, the accent outline of a selected tile, drop indicators.
     ImVec4 focusRing;
 
     ImVec4 shadow;     // shadow color; its strength comes from the Elevation tokens
@@ -144,6 +149,17 @@ struct Colors
     // wells, alpha tracks, the image viewer), opaque, a light and a darker grey of the theme. They
     // only show alpha, so they need no contrast with anything. (since 0.1)
     ImVec4 checker[2];
+    // The edge of a control or a tile (a field, a secondary button, an off switch, an empty slot):
+    // one hairline, quiet on purpose, so a control is shaped by its fill and the edge only
+    // completes it. controlBorderHover is the same edge under the pointer. In the standard presets
+    // they stay below the 3:1 non-text contrast; the increased contrast variant
+    // (SetIncreasedContrast) resolves them, and separator, to colors that reach 3:1 on every
+    // surface. (since 0.1)
+    ImVec4 controlBorder;
+    ImVec4 controlBorderHover;
+    // The face of slider and toggle knobs, solid in both themes; the knob takes the controlBorder
+    // hairline and the level 1 shadow. (since 0.1)
+    ImVec4 knob;
 
     // The surface of elevation level 1 to 3; the level is clamped into that range.
     const ImVec4& ElevatedSurface(int level) const
@@ -165,8 +181,9 @@ struct Spacing
     float xxxl = 32.0f;
 };
 
-// Corner radii by layer. A pill shape (radius = half the height) is used only by toggles
-// and chips and is not a token.
+// Corner radii by layer. A capsule (a radius of half the shorter side or more) is not a token:
+// toggle tracks, chips, badges, scroll thumbs and thin tracks ask for it, and the drawing helpers
+// (draw.h) give it circular ends whatever the corner settings below say.
 struct Radii
 {
     float element = 6.0f;  // small parts inside controls: checkboxes, tags, swatches
@@ -196,8 +213,8 @@ struct Metrics
     float sliderTrackHeight = 4.0f;
     float sliderKnobSize = 18.0f;
 
-    float focusRingWidth = 3.0f;
-    float hairline = 1.0f;       // rendered as at least one physical pixel
+    float focusRingWidth = 2.0f;  // the keyboard focus ring, the one stroke wider than a hairline around a control
+    float hairline = 1.0f;        // every outline and divider; rendered as at least one physical pixel
     float minHitTarget = 24.0f;  // smallest clickable area, even for smaller visuals
 
     // Default sizes of larger controls, used when a widget's options leave the size at 0.
@@ -513,7 +530,8 @@ struct Theme
     // accentText, accentTextVisited, focusRing and the chart palette from it in OKLCH. onAccent is
     // white or black, whichever is more readable, and hover and pressed move the lightness away
     // from it, so text on every accent state reaches at least 4.5:1. accentText (4.5:1), focusRing
-    // and the chart colors (3:1) depend on the surface colors, so call this after changing them.
+    // and the chart colors (3:1) depend on the surface colors (focusRing also on fill[0]), so call
+    // this after changing them.
     // It also derives the states of the status colors the same way (destructiveHover,
     // destructivePressed, onDestructive, onSuccess, onWarning and the three *Subtle washes), so
     // call it after changing destructive, success or warning too. The accent alpha is ignored.
@@ -521,14 +539,19 @@ struct Theme
 };
 
 // The current theme. Valid at any time, also before Init; Theme::Light() until SetTheme.
-// During an animated switch it is the blend of the previous and the new theme.
+// During an animated switch it is the blend of the previous and the new theme. While the
+// increased contrast variant is on (IncreasedContrast), its separator, controlBorder and
+// controlBorderHover are the 3:1 colors of that variant.
 const Theme& T();
 
 // Makes `theme` current. With `animate`, while Facet is initialized and motion is not
 // reduced, the switch is spread over motion.durationStandard (times motion.scale) of the
 // new theme: colors blend in OKLab and lengths linearly, one blend step per facet::NewFrame;
 // switches (dark, weights, flags) change at the halfway point. Without `animate` the theme
-// changes at once. Either way the library modules are notified of every change.
+// changes at once. Either way the library modules are notified of every change. `theme` holds
+// the standard border colors; while the increased contrast variant is on, a border color passed
+// back unchanged from T() counts as the standard one it replaced, so `Theme t = T(); ...;
+// SetTheme(t);` never makes the variant's colors the standard ones.
 void SetTheme(const Theme& theme, bool animate = true);
 
 // Applies a new accent to the current theme (see Theme::ApplyAccent). A running transition
@@ -601,10 +624,31 @@ struct AccentPreset
 // SetAccent, so each theme shows its own blue.
 std::span<const AccentPreset> AccentPresets();
 
-// The color for the outline of a stock control (a checkbox, a text field): separatorOpaque
-// mixed toward label until it reaches the 3:1 non-text contrast on bg, bgSecondary and
-// bgTertiary. Translucent fills alone stay far below that.
+// The color for the outline of a control (a checkbox, a text field, the frames of stock Dear ImGui
+// widgets): colors.controlBorder. It is quiet in the standard presets and reaches 3:1 on every
+// surface in the increased contrast variant, where T() carries the variant's colors.
 ImVec4 ControlBoundaryColor(const Colors& colors);
+
+// The increased contrast variant. While it is on, T() resolves colors.separator,
+// colors.controlBorder and colors.controlBorderHover to colors that reach the 3:1 non-text contrast
+// on every surface of the theme (separatorOpaque mixed toward label until it does; the hover color a
+// step further), so every outline and divider can be seen at 3:1. The standard presets keep them
+// quiet. The variant applies to the presets, to every theme passed to SetTheme, to each step of an
+// animated switch and inside PushAccent scopes, and ApplyImGuiStyle writes it into the stock style.
+// Switching it changes the current theme at once and notifies the library modules.
+void SetIncreasedContrast(bool enabled);
+// The application's own switch (default off).
+bool IncreasedContrastEnabled();
+// True while the variant applies: the application's switch is on, or the Windows high contrast
+// setting is on while Facet follows it.
+bool IncreasedContrast();
+// The Windows high contrast setting (SPI_GETHIGHCONTRAST) is on. Read at Init and again about once
+// per second of frame time, so a change applies without a restart.
+bool SystemIncreasedContrast();
+// Whether IncreasedContrast() follows the Windows high contrast setting. Off by default: the
+// application decides whether the system setting may change its look.
+void SetFollowSystemContrast(bool follow);
+bool FollowsSystemContrast();
 
 // Writes the current theme and scale into a Dear ImGui style (the current context's style
 // when null): every color, and every size, padding, rounding and border from the tokens,

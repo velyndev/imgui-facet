@@ -77,8 +77,8 @@ void ApplyColors(ImGuiStyle& style, const Theme& theme)
     colors[ImGuiCol_WindowBg] = c.bg;
     colors[ImGuiCol_ChildBg] = clear;
     colors[ImGuiCol_PopupBg] = c.bgElevated;
-    // Window and frame borders share this color in Dear ImGui. Frames get a hairline border
-    // so controls keep a visible boundary on every surface.
+    // Window and frame borders share this color in Dear ImGui: the quiet control outline (3:1 in
+    // the increased contrast variant), one hairline, like every Facet control.
     colors[ImGuiCol_Border] = ControlBoundaryColor(c);
     colors[ImGuiCol_BorderShadow] = clear;
 

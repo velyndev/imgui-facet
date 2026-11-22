@@ -1648,8 +1648,15 @@ TEST_CASE("Text field: a read-only field reports caret and selection in the fram
 }
 TEST_CASE("Text field: text that continues past an edge fades out there, and only glyphs fade")
 {
+    TextFieldThemeGuard guard;
     facet::test::Session session;
     REQUIRE(session.Ready());
+    // The frame's outline is the label color at a low alpha in the presets; a grey outline keeps
+    // its vertices apart from the glyphs this test measures.
+    facet::Theme theme = facet::Theme::Light();
+    theme.colors.controlBorder = facet::Rgb(0x808080, 0.5f);
+    theme.colors.controlBorderHover = facet::Rgb(0x808080, 0.6f);
+    facet::SetTheme(theme, false);
     TestField field;
     field.text = "a sample line that is much longer than the narrow field it is shown in";
     field.params.width = 120.0f;

@@ -385,9 +385,10 @@ TEST_CASE("The checkerboard cells differ in both presets and stay in the range o
         const facet::Colors& c = theme.colors;
         CHECK(c.checker[0].w == 1.0f);
         CHECK(c.checker[1].w == 1.0f);
-        // The cells are told apart, so alpha shows, but they never compete with the color on them.
+        // The cells are told apart, so alpha shows, but they never compete with the color on them
+        // (the dark pair, #2A2A2D and #19191C, sits near the near-black surfaces at about 1.2:1).
         const float between = facet::ContrastRatio(c.checker[0], c.checker[1]);
-        CHECK(between >= 1.3f);
+        CHECK(between >= 1.2f);
         CHECK(between <= 2.0f);
         // A light grey pair in light, a dark one in dark: both cells on the theme's side of mid grey.
         for (const ImVec4& cell : c.checker)
@@ -529,4 +530,95 @@ TEST_CASE("ApplyImGuiStyle maps tokens and scale onto a Dear ImGui style")
     facet::SetScaleMode(savedMode);
     facet::SetDpiScale(savedDpi);
     facet::SetUiScale(savedUi);
+}
+
+TEST_CASE("The dark preset steps near-black greys up from black and keeps its edges faint")
+{
+    const facet::Colors c = facet::Theme::Dark().colors;
+    CHECK(facet::ToU32(c.bg) == facet::ToU32(facet::Rgb(0x000000)));
+    CHECK(facet::ToU32(c.bgSecondary) == facet::ToU32(facet::Rgb(0x111113)));
+    CHECK(facet::ToU32(c.bgTertiary) == facet::ToU32(facet::Rgb(0x19191C)));
+    CHECK(facet::ToU32(c.bgElevated) == facet::ToU32(facet::Rgb(0x1E1E21)));
+    CHECK(facet::ToU32(c.bgElevatedLevels[0]) == facet::ToU32(facet::Rgb(0x18181B)));
+    CHECK(facet::ToU32(c.bgElevatedLevels[2]) == facet::ToU32(facet::Rgb(0x26262A)));
+    // Fills, dividers and control edges are white at low opacity, never an opaque light grey.
+    for (const ImVec4& translucent : {c.fill[0], c.fill[1], c.fill[2], c.fill[3], c.separator, c.controlBorder,
+                                      c.controlBorderHover})
+    {
+        CHECK(translucent.x == 1.0f);
+        CHECK(translucent.w <= 0.22f + 1e-6f);
+    }
+    CHECK(c.fill[0].w == doctest::Approx(0.14f));
+    CHECK(c.separator.w == doctest::Approx(0.08f));
+    CHECK(c.controlBorder.w == doctest::Approx(0.14f));
+    CHECK(c.controlBorderHover.w == doctest::Approx(0.22f));
+    CHECK(facet::ToU32(c.knob) == facet::ToU32(facet::Rgb(0xFFFFFF)));
+
+    const facet::Colors light = facet::Theme::Light().colors;
+    CHECK(light.separator.x == 0.0f);
+    CHECK(light.separator.w == doctest::Approx(0.10f));
+    CHECK(light.controlBorder.w == doctest::Approx(0.14f));
+    CHECK(light.controlBorderHover.w == doctest::Approx(0.22f));
+    CHECK(facet::ToU32(light.separatorOpaque) == facet::ToU32(facet::Rgb(0xE5E5E7)));
+    CHECK(facet::ToU32(light.knob) == facet::ToU32(facet::Rgb(0xFFFFFF)));
+    CHECK(facet::Theme::Light().metrics.focusRingWidth == 2.0f);
+    CHECK(facet::Theme::Light().metrics.hairline == 1.0f);
+}
+
+TEST_CASE("Increased contrast resolves the outlines of T() and leaves the theme as set alone")
+{
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Dark(), false);
+    const facet::Colors standard = facet::T().colors;
+    CHECK_FALSE(facet::IncreasedContrast());
+
+    facet::SetIncreasedContrast(true);
+    CHECK(facet::IncreasedContrastEnabled());
+    CHECK(facet::IncreasedContrast());
+    const facet::Colors strong = facet::T().colors;
+    CHECK_FALSE(SameColor(strong.controlBorder, standard.controlBorder));
+    CHECK_FALSE(SameColor(strong.separator, standard.separator));
+    CHECK(facet::ContrastRatio(strong.controlBorder, strong.bgTertiary) >= 3.0f);
+    // Everything but the three outline colors stays.
+    CHECK(SameColor(strong.bg, standard.bg));
+    CHECK(SameColor(strong.fill[0], standard.fill[0]));
+    CHECK(SameColor(strong.accent, standard.accent));
+    CHECK(SameColor(strong.separatorOpaque, standard.separatorOpaque));
+
+    // A theme read from T(), changed and set again keeps the standard outlines underneath.
+    facet::Theme edited = facet::T();
+    edited.spacing.md = 14.0f;
+    facet::SetTheme(edited, false);
+    CHECK(SameColor(facet::T().colors.controlBorder, strong.controlBorder));
+    facet::SetIncreasedContrast(false);
+    CHECK(SameColor(facet::T().colors.controlBorder, standard.controlBorder));
+    CHECK(SameColor(facet::T().colors.separator, standard.separator));
+    CHECK(facet::T().spacing.md == 14.0f);
+
+    // A scoped accent keeps the variant's outlines.
+    facet::SetIncreasedContrast(true);
+    facet::PushAccent(facet::AccentPresets()[2].color);
+    CHECK(SameColor(facet::T().colors.controlBorder, strong.controlBorder));
+    facet::PopAccent();
+
+    // The stock style takes the variant's outline for its frames.
+    ImGuiStyle style;
+    facet::ApplyImGuiStyle(&style);
+    CHECK(facet::ToU32(style.Colors[ImGuiCol_Border]) == facet::ToU32(strong.controlBorder));
+    facet::SetIncreasedContrast(false);
+    facet::ApplyImGuiStyle(&style);
+    CHECK(facet::ToU32(style.Colors[ImGuiCol_Border]) == facet::ToU32(standard.controlBorder));
+}
+
+TEST_CASE("MixThemes blends the outline and knob colors")
+{
+    const facet::Theme light = facet::Theme::Light();
+    const facet::Theme dark = facet::Theme::Dark();
+    const facet::Theme mid = facet::MixThemes(light, dark, 0.5f);
+    CHECK(SameColor(mid.colors.controlBorder, facet::Mix(light.colors.controlBorder, dark.colors.controlBorder, 0.5f)));
+    CHECK(SameColor(mid.colors.controlBorderHover,
+                    facet::Mix(light.colors.controlBorderHover, dark.colors.controlBorderHover, 0.5f)));
+    CHECK(SameColor(mid.colors.knob, facet::Mix(light.colors.knob, dark.colors.knob, 0.5f)));
+    CHECK(SameColor(facet::MixThemes(light, dark, 0.0f).colors.controlBorder, light.colors.controlBorder));
+    CHECK(SameColor(facet::MixThemes(light, dark, 1.0f).colors.controlBorder, dark.colors.controlBorder));
 }

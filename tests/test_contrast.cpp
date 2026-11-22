@@ -51,6 +51,8 @@ void CheckAccentDerivation(const facet::Theme& theme)
         CHECK(facet::ContrastRatio(c.accentText, surface.color) >= kTextContrast);
         CHECK(facet::ContrastRatio(c.accentTextVisited, surface.color) >= kTextContrast);
         CHECK(facet::ContrastRatio(ring, surface.color) >= kNonTextContrast);
+        // The same color marks a state next to the unfilled part of a track or an off switch.
+        CHECK(facet::ContrastRatio(ring, facet::Over(c.fill[0], surface.color)) >= kNonTextContrast);
         for (int i = 0; i < facet::kChartPaletteSize; ++i)
         {
             CAPTURE(i);
@@ -64,7 +66,7 @@ void CheckAccentDerivation(const facet::Theme& theme)
 
 } // namespace
 
-TEST_CASE("label and labelSecondary reach 4.5:1 on every surface and control fill")
+TEST_CASE("label and labelSecondary reach 4.5:1 on every surface and every fill over every surface")
 {
     for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
     {
@@ -75,14 +77,38 @@ TEST_CASE("label and labelSecondary reach 4.5:1 on every surface and control fil
             CAPTURE(surface.name);
             CHECK(facet::ContrastRatio(c.label, surface.color) >= kTextContrast);
             CHECK(facet::ContrastRatio(c.labelSecondary, surface.color) >= kTextContrast);
-            // Text on a control: each fill drawn over the surface.
+            // Text on a control or a row: each fill drawn over the surface, the translucent label
+            // drawn over that.
             for (int i = 0; i < 4; ++i)
             {
                 CAPTURE(i);
                 const ImVec4 control = facet::Over(c.fill[i], surface.color);
                 CHECK(facet::ContrastRatio(c.label, control) >= kTextContrast);
+                CHECK(facet::ContrastRatio(facet::Over(c.labelSecondary, control), control) >= kTextContrast);
             }
         }
+    }
+}
+
+TEST_CASE("The state marks reach 3:1: the ring, a filled track, an on switch, a selected tile outline")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Colors& c = theme.colors;
+        const ImVec4 mark = facet::FromU32(facet::ToU32(c.focusRing));
+        for (const Named& surface : Surfaces(c))
+        {
+            CAPTURE(surface.name);
+            // The ring and the accent outline of a selected tile on the surface.
+            CHECK(facet::ContrastRatio(mark, surface.color) >= kNonTextContrast);
+            // The filled part of a track and an on switch against the unfilled part and an off switch.
+            CHECK(facet::ContrastRatio(mark, facet::Over(c.fill[0], surface.color)) >= kNonTextContrast);
+            // The outline of a selected tile against the selection fill inside it.
+            CHECK(facet::ContrastRatio(mark, facet::Over(c.accentSubtle, surface.color)) >= kNonTextContrast);
+        }
+        // A check mark on its fill is text-like: 4.5:1 (onAccent on the accent states).
+        CHECK(facet::ContrastRatio(c.onAccent, c.accent) >= kTextContrast);
     }
 }
 
@@ -186,18 +212,62 @@ TEST_CASE("Visited links and code tints reach 4.5:1 on every surface")
     }
 }
 
-TEST_CASE("The control boundary color reaches 3:1 on the content surfaces")
+TEST_CASE("In the standard presets the control outline is visible and quiet")
 {
+    // Both ends are locked: an outline below the lower bound vanishes, one above the upper bound
+    // turns into the light frame the dark theme must not have. Measured as drawn over each surface.
+    constexpr float kQuietMin = 1.25f;
+    constexpr float kQuietMax = 1.8f;
     for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
     {
         CAPTURE(theme.dark);
-        const ImVec4 boundary = facet::ControlBoundaryColor(theme.colors);
-        for (const Named& surface : ContentSurfaces(theme.colors))
+        const facet::Colors& c = theme.colors;
+        CHECK(facet::ToU32(facet::ControlBoundaryColor(c)) == facet::ToU32(c.controlBorder));
+        for (const Named& surface : Surfaces(c))
         {
             CAPTURE(surface.name);
-            CHECK(facet::ContrastRatio(boundary, surface.color) >= kNonTextContrast);
+            const float rest = facet::ContrastRatio(facet::Over(c.controlBorder, surface.color), surface.color);
+            const float hover = facet::ContrastRatio(facet::Over(c.controlBorderHover, surface.color), surface.color);
+            const float divider = facet::ContrastRatio(facet::Over(c.separator, surface.color), surface.color);
+            CHECK(rest >= kQuietMin);
+            CHECK(rest <= kQuietMax);
+            CHECK(hover > rest);
+            CHECK(hover < kNonTextContrast);
+            // A divider is quieter than a control's edge, and still there.
+            CHECK(divider > 1.05f);
+            CHECK(divider < rest);
+        }
+        // The knob face is solid.
+        CHECK(c.knob.w == doctest::Approx(1.0f));
+    }
+}
+
+TEST_CASE("In the increased contrast variant every outline reaches 3:1 for every accent preset")
+{
+    facet::SetIncreasedContrast(true);
+    for (const bool dark : {false, true})
+    {
+        for (const facet::AccentPreset& preset : facet::AccentPresets())
+        {
+            CAPTURE(dark);
+            CAPTURE(preset.name);
+            facet::Theme theme = dark ? facet::Theme::Dark() : facet::Theme::Light();
+            theme.ApplyAccent(preset.color);
+            facet::SetTheme(theme, false);
+            const facet::Colors& c = facet::T().colors;
+            for (const Named& surface : Surfaces(c))
+            {
+                CAPTURE(surface.name);
+                CHECK(facet::ContrastRatio(facet::Over(c.controlBorder, surface.color), surface.color) >= kNonTextContrast);
+                CHECK(facet::ContrastRatio(facet::Over(c.controlBorderHover, surface.color), surface.color) >=
+                      facet::ContrastRatio(facet::Over(c.controlBorder, surface.color), surface.color));
+                CHECK(facet::ContrastRatio(facet::Over(c.separator, surface.color), surface.color) >= kNonTextContrast);
+                CHECK(facet::ContrastRatio(facet::ControlBoundaryColor(c), surface.color) >= kNonTextContrast);
+            }
         }
     }
+    facet::SetIncreasedContrast(false);
+    facet::SetTheme(facet::Theme::Light(), false);
 }
 
 TEST_CASE("The scrollbar thumbs reach 3:1 on every surface")

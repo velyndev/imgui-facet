@@ -57,10 +57,15 @@ constexpr float kTextContrast = 4.5f;
 // Lightness step (OKLCH L) of the accentText and focusRing searches.
 constexpr float kTextLightnessStep = 0.01f;
 
-// WCAG 2 non-text contrast for the boundary of a control, the focus ring and the chart colors,
-// and the mix step of the boundary search.
+// WCAG 2 non-text contrast for the focus ring, the state marks, the chart colors and the outlines
+// of the increased contrast variant, and the mix step of the variant's outline search.
 constexpr float kBoundaryContrast = 3.0f;
 constexpr float kBoundaryMixStep = 0.05f;
+// Mix steps the variant's hover outline goes past its rest outline toward label.
+constexpr int kBoundaryHoverSteps = 3;
+
+// How often the Windows high contrast setting is read, in seconds of frame time.
+constexpr float kSystemContrastReadInterval = 1.0f;
 
 // Chart palette: the chroma of every series, the lightness each theme starts from, and the hue
 // offsets from the accent hue in degrees, ordered so that consecutive series differ by at least
@@ -92,18 +97,38 @@ float MinSurfaceContrast(const Colors& c, const ImVec4& text)
     return lowest;
 }
 
+// The lowest contrast of a state mark: on the surfaces, and against fill[0] (the unfilled part of
+// a track, an off switch) drawn over each of them.
+float MinMarkContrast(const Colors& c, const ImVec4& mark)
+{
+    const ImVec4 surfaces[] = {c.bg,
+                               c.bgSecondary,
+                               c.bgTertiary,
+                               c.bgElevated,
+                               c.bgElevatedLevels[0],
+                               c.bgElevatedLevels[1],
+                               c.bgElevatedLevels[2]};
+    float lowest = MinSurfaceContrast(c, mark);
+    for (const ImVec4& surface : surfaces)
+        lowest = std::min(lowest, ContrastRatio(mark, Over(c.fill[0], surface)));
+    return lowest;
+}
+
 // The color rounded to 8 bits per channel, as Dear ImGui draws it.
 ImVec4 AsDrawn(const ImVec4& color)
 {
     return FromU32(ToU32(color));
 }
 
+using ContrastMeasure = float (*)(const Colors& c, const ImVec4& color);
+
 // `color` (made opaque) with its lightness moved away from the surfaces (darker on light
-// surfaces, lighter on dark ones) in small steps until it reaches `contrast` on all of them. With `drawn`, each
-// candidate is rounded to 8 bits per channel first, so the contrast holds for the color exactly
+// surfaces, lighter on dark ones) in small steps until `measure` reaches `contrast`. With `drawn`,
+// each candidate is rounded to 8 bits per channel first, so the contrast holds for the color exactly
 // as it is drawn. Black and white end the search, and one of them always reaches 4.5:1 on the
 // preset surfaces.
-ImVec4 MoveUntilContrast(const Colors& c, const ImVec4& color, bool darkSurfaces, float contrast, bool drawn)
+ImVec4 MoveUntilContrast(const Colors& c, const ImVec4& color, bool darkSurfaces, float contrast, bool drawn,
+                         ContrastMeasure measure = &MinSurfaceContrast)
 {
     const Oklch lch = ToOklch(color);
     const float direction = darkSurfaces ? 1.0f : -1.0f;
@@ -115,10 +140,39 @@ ImVec4 MoveUntilContrast(const Colors& c, const ImVec4& color, bool darkSurfaces
         // Step 0 is the color itself, so one that already reaches the contrast stays exact.
         const ImVec4 exact = step == 0 ? WithAlpha(color, 1.0f) : FromOklch({L, lch.C, lch.h});
         const ImVec4 candidate = drawn ? AsDrawn(exact) : exact;
-        if (MinSurfaceContrast(c, candidate) >= contrast)
+        if (measure(c, candidate) >= contrast)
             return candidate;
     }
     return darkSurfaces ? Rgb(0xFFFFFF) : Rgb(0x000000);
+}
+
+// The outline colors of the increased contrast variant: separatorOpaque mixed toward label until
+// the color, as drawn, reaches 3:1 on every surface; the hover outline kBoundaryHoverSteps further.
+// The divider takes the rest outline, so every line of the variant reads at 3:1.
+void ApplyIncreasedContrastColors(Colors& c)
+{
+    int found = -1;
+    for (int step = 0; static_cast<float>(step) * kBoundaryMixStep <= 1.0f; ++step)
+    {
+        const ImVec4 candidate = AsDrawn(Mix(c.separatorOpaque, c.label, static_cast<float>(step) * kBoundaryMixStep));
+        if (MinSurfaceContrast(c, candidate) >= kBoundaryContrast)
+        {
+            found = step;
+            break;
+        }
+    }
+    if (found < 0)
+    {
+        c.controlBorder = c.label;
+        c.controlBorderHover = c.label;
+        c.separator = c.label;
+        return;
+    }
+    const float rest = static_cast<float>(found) * kBoundaryMixStep;
+    const float hover = std::min(1.0f, static_cast<float>(found + kBoundaryHoverSteps) * kBoundaryMixStep);
+    c.controlBorder = AsDrawn(Mix(c.separatorOpaque, c.label, rest));
+    c.controlBorderHover = AsDrawn(Mix(c.separatorOpaque, c.label, hover));
+    c.separator = c.controlBorder;
 }
 
 // The chart palette: kChartPaletteSize hues around the accent hue at one chroma, each starting
@@ -253,6 +307,9 @@ Colors MixColors(const Colors& a, const Colors& b, float t)
     out.codeNumber = Mix(a.codeNumber, b.codeNumber, t);
     for (int i = 0; i < 2; ++i)
         out.checker[i] = Mix(a.checker[i], b.checker[i], t);
+    out.controlBorder = Mix(a.controlBorder, b.controlBorder, t);
+    out.controlBorderHover = Mix(a.controlBorderHover, b.controlBorderHover, t);
+    out.knob = Mix(a.knob, b.knob, t);
     return out;
 }
 
@@ -423,7 +480,10 @@ CompositeTokens MixComposites(const CompositeTokens& a, const CompositeTokens& b
 
 struct ThemeState
 {
+    // What T() returns: `shown` with the increased contrast variant applied while it is on.
     Theme current = Theme::Light();
+    // The theme on screen as it was set (a blend step during a switch), standard border colors.
+    Theme shown = Theme::Light();
     Theme from;
     Theme to;
     float elapsed = 0.0f;
@@ -440,6 +500,13 @@ struct ThemeState
     // Change notification of the app mode registry value, armed while initialized.
     HKEY personalizeKey = nullptr;
     HANDLE personalizeEvent = nullptr;
+
+    // The increased contrast variant: the application's switch, whether the Windows high contrast
+    // setting counts, its last reading, and the time until the next one.
+    bool increasedContrast = false;
+    bool followSystemContrast = false;
+    bool systemContrast = false;
+    float systemContrastTimer = 0.0f;
 };
 
 ThemeState& State()
@@ -492,6 +559,54 @@ void Changed()
     internal::NotifyThemeChanged();
 }
 
+bool ContrastVariantOn(const ThemeState& state)
+{
+    return state.increasedContrast || (state.followSystemContrast && state.systemContrast);
+}
+
+// Builds what T() returns from the theme on screen.
+void Resolve()
+{
+    ThemeState& state = State();
+    state.current = state.shown;
+    if (ContrastVariantOn(state))
+        ApplyIncreasedContrastColors(state.current.colors);
+}
+
+bool ReadSystemContrast()
+{
+    HIGHCONTRASTW contrast = {};
+    contrast.cbSize = sizeof(contrast);
+    if (!SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0))
+        return false;
+    return (contrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
+}
+
+bool SameColor(const ImVec4& a, const ImVec4& b)
+{
+    return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+}
+
+// A theme passed to SetTheme while the variant is on: border colors that equal what T() shows
+// came back from T() and stand for the standard colors they replaced.
+Theme WithStandardBorders(const Theme& theme)
+{
+    const ThemeState& state = State();
+    Theme standard = theme;
+    if (!ContrastVariantOn(state))
+        return standard;
+    const Colors& shown = state.current.colors;
+    const Colors& original = state.shown.colors;
+    Colors& c = standard.colors;
+    if (SameColor(c.separator, shown.separator))
+        c.separator = original.separator;
+    if (SameColor(c.controlBorder, shown.controlBorder))
+        c.controlBorder = original.controlBorder;
+    if (SameColor(c.controlBorderHover, shown.controlBorderHover))
+        c.controlBorderHover = original.controlBorderHover;
+    return standard;
+}
+
 bool ReadSystemDark()
 {
     DWORD value = 1;
@@ -512,7 +627,7 @@ Theme PresetFor(ThemeMode mode)
     if (mode == ThemeMode::System)
         dark = state.systemDark;
     const Theme preset = dark ? Theme::Dark() : Theme::Light();
-    Theme theme = state.blending ? state.to : state.current;
+    Theme theme = state.blending ? state.to : state.shown;
     theme.dark = preset.dark;
     theme.colors = preset.colors;
     theme.elevation = preset.elevation;
@@ -527,7 +642,8 @@ void FinishTransition()
     if (!state.blending)
         return;
     state.blending = false;
-    state.current = state.to;
+    state.shown = state.to;
+    Resolve();
 }
 
 void ApplyTheme(const Theme& theme, bool animate)
@@ -538,12 +654,13 @@ void ApplyTheme(const Theme& theme, bool animate)
     if (!animate || !IsInitialized() || reduced || duration <= 0.0f)
     {
         state.blending = false;
-        state.current = theme;
+        state.shown = theme;
+        Resolve();
         Changed();
         return;
     }
     // A new switch during a running one starts from what is on screen now.
-    state.from = state.current;
+    state.from = state.shown;
     state.to = theme;
     state.elapsed = 0.0f;
     state.duration = duration;
@@ -567,6 +684,14 @@ bool ThemeInit()
 {
     ThemeState& state = State();
     state.systemDark = ReadSystemDark();
+    const bool contrastBefore = ContrastVariantOn(state);
+    state.systemContrast = ReadSystemContrast();
+    state.systemContrastTimer = kSystemContrastReadInterval;
+    if (ContrastVariantOn(state) != contrastBefore)
+    {
+        Resolve();
+        Changed();
+    }
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kPersonalizeKey, 0, KEY_NOTIFY | KEY_QUERY_VALUE, &state.personalizeKey) !=
         ERROR_SUCCESS)
     {
@@ -617,18 +742,35 @@ void AdvanceTransition()
     if (progress >= 1.0f)
     {
         state.blending = false;
-        state.current = state.to;
+        state.shown = state.to;
     }
     else
     {
-        state.current = MixThemes(state.from, state.to, EaseValue(Ease::InOutCubic, progress));
+        state.shown = MixThemes(state.from, state.to, EaseValue(Ease::InOutCubic, progress));
     }
+    Resolve();
+    Changed();
+}
+
+void PollSystemContrast()
+{
+    ThemeState& state = State();
+    state.systemContrastTimer -= std::max(0.0f, internal::DeltaTime());
+    if (state.systemContrastTimer > 0.0f)
+        return;
+    state.systemContrastTimer = kSystemContrastReadInterval;
+    const bool before = ContrastVariantOn(state);
+    state.systemContrast = ReadSystemContrast();
+    if (ContrastVariantOn(state) == before)
+        return;
+    Resolve();
     Changed();
 }
 
 void ThemeNewFrame()
 {
     PollSystemMode();
+    PollSystemContrast();
     AdvanceTransition();
 }
 
@@ -654,8 +796,11 @@ Theme Theme::Light()
     c.labelSecondary = Rgb(0x000000, 0.60f);
     c.labelTertiary = Rgb(0x000000, 0.30f);
     c.labelQuaternary = Rgb(0x000000, 0.16f);
-    c.separator = Rgb(0x3C3C43, 0.29f);
-    c.separatorOpaque = Rgb(0xC6C6C8);
+    c.separator = Rgb(0x000000, 0.10f);
+    c.separatorOpaque = Rgb(0xE5E5E7);
+    c.controlBorder = Rgb(0x000000, 0.14f);
+    c.controlBorderHover = Rgb(0x000000, 0.22f);
+    c.knob = Rgb(0xFFFFFF);
     c.destructive = Rgb(0xC4000F);
     c.success = Rgb(0x146C2E);
     c.warning = Rgb(0x8A5300);
@@ -679,37 +824,41 @@ Theme Theme::Dark()
     Theme theme;
     theme.dark = true;
     Colors& c = theme.colors;
+    // Near-black greys stepping up from black: depth comes from the lighter surface, not from an edge.
     c.bg = Rgb(0x000000);
-    c.bgSecondary = Rgb(0x1C1C1E);
-    c.bgTertiary = Rgb(0x2C2C2E);
-    c.bgElevated = Rgb(0x3A3A3C);
+    c.bgSecondary = Rgb(0x111113);
+    c.bgTertiary = Rgb(0x19191C);
+    c.bgElevated = Rgb(0x1E1E21);
     // A black shadow cannot darken the black background, so height shows as a lighter surface.
-    c.bgElevatedLevels[0] = Rgb(0x2C2C2E);
+    c.bgElevatedLevels[0] = Rgb(0x18181B);
     c.bgElevatedLevels[1] = c.bgElevated;
-    c.bgElevatedLevels[2] = Rgb(0x444446);
-    c.fill[0] = Rgb(0x787880, 0.36f);
-    c.fill[1] = Rgb(0x787880, 0.32f);
-    c.fill[2] = Rgb(0x787880, 0.24f);
-    c.fill[3] = Rgb(0x787880, 0.18f);
+    c.bgElevatedLevels[2] = Rgb(0x26262A);
+    c.fill[0] = Rgb(0xFFFFFF, 0.14f);
+    c.fill[1] = Rgb(0xFFFFFF, 0.10f);
+    c.fill[2] = Rgb(0xFFFFFF, 0.07f);
+    c.fill[3] = Rgb(0xFFFFFF, 0.04f);
     c.label = Rgb(0xFFFFFF);
     c.labelSecondary = Rgb(0xFFFFFF, 0.60f);
-    c.labelTertiary = Rgb(0xFFFFFF, 0.30f);
-    c.labelQuaternary = Rgb(0xFFFFFF, 0.16f);
-    c.separator = Rgb(0x545458, 0.60f);
-    c.separatorOpaque = Rgb(0x38383A);
+    c.labelTertiary = Rgb(0xFFFFFF, 0.32f);
+    c.labelQuaternary = Rgb(0xFFFFFF, 0.18f);
+    c.separator = Rgb(0xFFFFFF, 0.08f);
+    c.separatorOpaque = Rgb(0x242426);
+    c.controlBorder = Rgb(0xFFFFFF, 0.14f);
+    c.controlBorderHover = Rgb(0xFFFFFF, 0.22f);
+    c.knob = Rgb(0xFFFFFF);
     c.destructive = Rgb(0xFF6B5F);
     c.success = Rgb(0x32D74B);
     c.warning = Rgb(0xFFD60A);
     c.shadow = Rgb(0x000000);
-    c.glassTint = Rgb(0x1C1C1E);
-    c.scrim = Rgb(0x000000, 0.48f);
+    c.glassTint = Rgb(0x111113);
+    c.scrim = Rgb(0x000000, 0.55f);
     c.scrollThumb = Rgb(0xFFFFFF, 0.45f);
     c.scrollThumbHover = Rgb(0xFFFFFF, 0.62f);
     c.codeKeyword = Rgb(0xD7A8FF);
     c.codeString = Rgb(0x7EE08F);
     c.codeNumber = Rgb(0xFFB86B);
-    c.checker[0] = Rgb(0x48484A);
-    c.checker[1] = Rgb(0x2C2C2E);
+    c.checker[0] = Rgb(0x2A2A2D);
+    c.checker[1] = Rgb(0x19191C);
     SetElevation(theme.elevation, 0.36f, 0.44f, 0.56f);
     theme.ApplyAccent(kDarkAccent);
     return theme;
@@ -730,8 +879,9 @@ void Theme::ApplyAccent(const ImVec4& accent)
                                             dark, kTextContrast, false);
     c.accentSubtle = WithAlpha(c.accent, dark ? kSubtleAlphaDark : kSubtleAlphaLight);
     // The ring sits beside the control on whatever surface holds it, so it needs the non-text
-    // contrast on every surface, not only on the one the accent was chosen for.
-    c.focusRing = MoveUntilContrast(c, c.accent, dark, kBoundaryContrast, true);
+    // contrast on every surface, not only on the one the accent was chosen for. The same color marks
+    // the filled part of a track and an on switch next to fill[0], so it reaches 3:1 against that too.
+    c.focusRing = MoveUntilContrast(c, c.accent, dark, kBoundaryContrast, true, &MinMarkContrast);
     DeriveChartPalette(c);
     DeriveStatusStates(c);
 }
@@ -906,7 +1056,7 @@ void PopAccent()
 
 void SetTheme(const Theme& theme, bool animate)
 {
-    ApplyTheme(theme, animate);
+    ApplyTheme(WithStandardBorders(theme), animate);
 }
 
 void SetAccent(const ImVec4& accent)
@@ -915,7 +1065,8 @@ void SetAccent(const ImVec4& accent)
     FinishTransition();
     state.hasUserAccent = true;
     state.userAccent = WithAlpha(accent, 1.0f);
-    state.current.ApplyAccent(accent);
+    state.shown.ApplyAccent(accent);
+    Resolve();
     Changed();
 }
 
@@ -967,17 +1118,48 @@ std::span<const AccentPreset> AccentPresets()
 
 ImVec4 ControlBoundaryColor(const Colors& c)
 {
-    const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary};
-    for (int step = 0; static_cast<float>(step) * kBoundaryMixStep <= 1.0f; ++step)
-    {
-        const ImVec4 candidate = Mix(c.separatorOpaque, c.label, static_cast<float>(step) * kBoundaryMixStep);
-        bool readable = true;
-        for (const ImVec4& surface : surfaces)
-            readable = readable && ContrastRatio(candidate, surface) >= kBoundaryContrast;
-        if (readable)
-            return candidate;
-    }
-    return c.label;
+    return c.controlBorder;
+}
+
+void SetIncreasedContrast(bool enabled)
+{
+    State().increasedContrast = enabled;
+    Resolve();
+    Changed();
+}
+
+bool IncreasedContrastEnabled()
+{
+    return State().increasedContrast;
+}
+
+bool IncreasedContrast()
+{
+    return ContrastVariantOn(State());
+}
+
+bool SystemIncreasedContrast()
+{
+    return State().systemContrast;
+}
+
+void SetFollowSystemContrast(bool follow)
+{
+    ThemeState& state = State();
+    const bool before = ContrastVariantOn(state);
+    state.followSystemContrast = follow;
+    // Before Init nothing reads the setting; read it now.
+    if (follow && !IsInitialized())
+        state.systemContrast = ReadSystemContrast();
+    if (ContrastVariantOn(state) == before)
+        return;
+    Resolve();
+    Changed();
+}
+
+bool FollowsSystemContrast()
+{
+    return State().followSystemContrast;
 }
 
 namespace internal
