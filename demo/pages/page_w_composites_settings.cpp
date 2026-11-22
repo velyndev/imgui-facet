@@ -6,8 +6,10 @@
 // it (the accent in a preview button under PushAccent). The inventory and cards and the editors
 // have pages of their own (page_w_composites_cards.cpp and page_w_composites_editors.cpp).
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <iterator>
 #include <string>
 
@@ -17,6 +19,7 @@
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "pages/pages.h"
 #include "selftest.h"
@@ -45,7 +48,15 @@ constexpr float kScaleWidth = 320.0f;
 // Placeholder data: names like "Preset 1", nothing real.
 const facet::LogEntry kConsoleLines[] = {{"Output line 1"}, {"Output line 2", facet::LogLevel::Warning}};
 const char* const kCommands[] = {"command-1", "command-2"};
-const facet::PresetItem kPresets[] = {{"Preset 1", false, true}, {"Preset 2", true}, {"Preset 3"}};
+// The page's presets: placeholder names, at most kMaxPresets, so creating one never allocates.
+constexpr int kMaxPresets = 8;
+struct DemoPreset
+{
+    char name[48] = "";
+    bool modified = false;
+    bool builtIn = false;
+    ImGuiID id = 0;
+};
 
 // The capture states, in the order of the FACET_DEMO_PAGE line below.
 enum CaptureState
@@ -55,6 +66,7 @@ enum CaptureState
     kAccentOpen,  // the accent picker's custom color well with its popover open
     kSearchFocus, // the search filter bar's field focused
     kSettingsHits,  // a settings search query with one hit far down, revealed and highlighted
+    kPresetMenu,    // the preset list's menu open
 };
 
 // Frames before the end of a capture's warm-up at which the settings search capture types its
@@ -86,7 +98,15 @@ struct SettingsUi
         {"Action 1", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
         {"Action 2", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
     };
+
+    // PresetList
+    DemoPreset presets[kMaxPresets] = {{"Preset 1", false, true, 1}, {"Preset 2", true, false, 2}, {"Preset 3", false, false, 3}};
+    int presetCount = 3;
     int preset = 0;
+    ImGuiID nextPresetId = 4;
+    int presetState = 0;  // DataState
+    facet::PresetAction presetLast = facet::PresetAction::None;
+
 
     // ThemeModeControl
     facet::ThemeMode themeMode = facet::ThemeMode::System;
@@ -488,10 +508,145 @@ void SettingsSearchSection(facet::demo::PageCtx& ctx)
     }
 }
 
+const char* PresetActionName(facet::PresetAction action)
+{
+    switch (action)
+    {
+    case facet::PresetAction::None: return "none";
+    case facet::PresetAction::Selected: return "selected";
+    case facet::PresetAction::Create: return "create";
+    case facet::PresetAction::Save: return "save";
+    case facet::PresetAction::Rename: return "rename";
+    case facet::PresetAction::Duplicate: return "duplicate";
+    case facet::PresetAction::Delete: return "delete";
+    case facet::PresetAction::Import: return "import (the demo has no files)";
+    case facet::PresetAction::Export: return "export (the demo has no files)";
+    }
+    return "";
+}
+
+// A name for a copy of preset `index`: its name with the first free number.
+void DemoPresetCopyName(int index, char* out, std::size_t size)
+{
+    for (int n = 2; n < 100; ++n)
+    {
+        std::snprintf(out, size, "%s %d", ui.presets[index].name, n);
+        bool taken = false;
+        for (int i = 0; i < ui.presetCount; ++i)
+            taken = taken || std::strcmp(ui.presets[i].name, out) == 0;
+        if (!taken)
+            return;
+    }
+}
+
+// Applies what the preset list reported to the demo's presets, as an application would.
+void ApplyPresetResult(const facet::PresetListResult& r)
+{
+    if (r.action != facet::PresetAction::None)
+        ui.presetLast = r.action;
+    switch (r.action)
+    {
+    case facet::PresetAction::Create:
+        if (ui.presetCount < kMaxPresets && r.name != nullptr)
+        {
+            DemoPreset& p = ui.presets[ui.presetCount];
+            p = DemoPreset{};
+            std::snprintf(p.name, sizeof(p.name), "%s", r.name);
+            p.id = ui.nextPresetId++;
+            ui.preset = ui.presetCount++;
+        }
+        break;
+    case facet::PresetAction::Save: ui.presets[r.index].modified = false; break;
+    case facet::PresetAction::Rename: std::snprintf(ui.presets[r.index].name, sizeof(DemoPreset::name), "%s", r.name); break;
+    case facet::PresetAction::Duplicate:
+        if (ui.presetCount < kMaxPresets)
+        {
+            DemoPreset copy = ui.presets[r.index];
+            DemoPresetCopyName(r.index, copy.name, sizeof(copy.name));
+            copy.builtIn = false;
+            copy.id = ui.nextPresetId++;
+            for (int i = ui.presetCount; i > r.index + 1; --i)
+                ui.presets[i] = ui.presets[i - 1];
+            ui.presets[r.index + 1] = copy;
+            ++ui.presetCount;
+        }
+        break;
+    case facet::PresetAction::Delete:
+        for (int i = r.index; i + 1 < ui.presetCount; ++i)
+            ui.presets[i] = ui.presets[i + 1];
+        --ui.presetCount;
+        if (ui.preset >= r.index)
+            ui.preset = std::max(0, ui.preset - 1);
+        if (ui.presetCount == 0)
+            ui.preset = -1;
+        break;
+    default: break;
+    }
+}
+
+void PresetListSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("PresetList");
+    Paragraph("Named presets with the active one marked. Enter or a click chooses, F2 renames in place, Delete asks "
+              "first; the menu button holds create, save, rename, duplicate, import, export and delete. The page "
+              "applies every reported action to its own placeholder presets.");
+    static const char* const kStates[] = {"Ready", "Loading", "Error"};
+    LabeledRow("Data state");
+    facet::SegmentedControl("##preset state", &ui.presetState, kStates);
+    LabeledRow("Unsaved change");
+    if (facet::Button("Change a setting") && ui.preset >= 0 && ui.preset < ui.presetCount)
+        ui.presets[ui.preset].modified = true;
+    ctx.Probe("comp.presets.change");
+    ImGui::SameLine();
+    facet::demo::NoteBeside("Marks the active preset modified; Save in the menu clears it.");
+
+    facet::PresetItem items[kMaxPresets];
+    for (int i = 0; i < ui.presetCount; ++i)
+        items[i] = {ui.presets[i].name, ui.presets[i].modified, ui.presets[i].builtIn, ui.presets[i].id};
+    LabeledRow("Presets");
+    if (ctx.capture && ctx.captureState == kPresetMenu)
+        ctx.ForceNextItemState(ForcedItemState::Open, ui.presetCount);
+    const facet::PresetListResult result =
+        facet::PresetList("presets", &ui.preset, std::span<const facet::PresetItem>(items, static_cast<std::size_t>(ui.presetCount)),
+                          {.importExport = true, .state = static_cast<facet::DataState>(ui.presetState),
+                           .width = DemoWidth(kScaleWidth)});
+    ctx.Probe("comp.presets");
+    if (ctx.probes != nullptr)
+    {
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const float row = facet::internal::ListRowHeight(facet::ControlSize::Inherit);
+        char name[48];
+        for (int i = 0; i < ui.presetCount; ++i)
+        {
+            std::snprintf(name, sizeof(name), "comp.presets.row.%d", i);
+            facet::demo::ProbeRect(ctx, name, 0, ImVec2(min.x, min.y + row * static_cast<float>(i)),
+                                   ImVec2(max.x, min.y + row * static_cast<float>(i + 1)));
+        }
+        const float button = facet::ControlHeight(facet::ControlSize::Inherit);
+        facet::demo::ProbeRect(ctx, "comp.presets.menu", 0, ImVec2(max.x - button, max.y - button), max);
+    }
+    if (ctx.capture && ctx.captureState == kPresetMenu)
+    {
+        ctx.RevealInCapture(0.3f);
+        const ImGuiID level = ImHashStr("##menu level", 0, ImGui::GetID("presets"));
+        if (ctx.captureFramesLeft == 0 && !facet::internal::IsPopupLevelOpen(level))
+            ctx.captureError = "the preset menu did not open";
+    }
+    ApplyPresetResult(result);
+    LabeledRow("Last action");
+    facet::StyledText(PresetActionName(ui.presetLast), {.secondary = true});
+    LabeledRow("Read-only");
+    int readOnlyActive = 1;
+    facet::PresetList("presets read-only", &readOnlyActive,
+                      std::span<const facet::PresetItem>(items, static_cast<std::size_t>(std::min(2, ui.presetCount))),
+                      {.width = DemoWidth(kScaleWidth), .readOnly = true});
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover", "search focused", "settings hits")
+                "accent popover", "search focused", "settings hits", "preset menu")
 {
     const facet::Theme& theme = facet::T();
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
@@ -508,11 +663,11 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
     SearchFilterBarSection(ctx);
     SettingsSearchSection(ctx);
 
-    SectionHeader("Key binds and presets");
+    PresetListSection(ctx);
+
+    SectionHeader("Key binds");
     LabeledRow("Key bind list");
     facet::KeybindList("binds", ui.binds);
-    LabeledRow("Preset list");
-    facet::PresetList("presets", &ui.preset, kPresets, {.importExport = true});
 
     SectionHeader("Onboarding");
     LabeledRow("Onboarding");
@@ -652,4 +807,47 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.Expect("the field still has the keyboard", [] { return ImGui::GetActiveID() != 0; });
     test.KeyPress(ImGuiKey_Escape);
     test.Expect("the second Escape leaves the field", [] { return ImGui::GetActiveID() == 0; });
+
+    // PresetList: choose, rename, delete declined and confirmed, create from the menu.
+    test.Click("comp.presets.row.2");
+    test.Expect("a click chooses Preset 3", [] { return ui.preset == 2; });
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.Expect("Up moves only the focus", [] { return ui.preset == 2; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter chooses Preset 2", [] { return ui.preset == 1; });
+    test.KeyPress(ImGuiKey_F2);
+    test.Wait(2);
+    test.Type("Renamed");
+    test.KeyPress(ImGuiKey_Enter);
+    test.ExpectText("F2, typing and Enter rename it", [] { return std::string(ui.presets[1].name); }, "Renamed");
+    test.KeyPress(ImGuiKey_F2);
+    test.Wait(2);
+    test.Type("Dropped");
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape keeps the name", [] { return std::string(ui.presets[1].name); }, "Renamed");
+    test.KeyPress(ImGuiKey_Delete);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_Escape);
+    test.WaitSeconds(0.3f);
+    test.Expect("Escape in the confirmation keeps the preset", [] { return ui.presetCount == 3; });
+    test.KeyPress(ImGuiKey_Delete);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.Expect("Delete confirmed removes it", [] {
+        return ui.presetCount == 2 && std::strcmp(ui.presets[1].name, "Preset 3") == 0;
+    });
+    // Tab leaves the rows for the menu button; Enter opens the menu with its first row focused.
+    test.Click("comp.presets.row.0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Wait(3);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("New preset in the menu creates one with the default name", [] {
+        return ui.presetCount == 3 && std::strcmp(ui.presets[2].name, facet::GetStrings().newPreset) == 0 &&
+               ui.preset == 2;
+    });
 }

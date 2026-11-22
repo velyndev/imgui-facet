@@ -298,7 +298,36 @@ registry. Status: planned.
 PresetListResult PresetList(const char* id, int* active, std::span<const PresetItem> presets, const PresetListOptions& options = {});
 ```
 
-Preset manager with create, save, rename, duplicate, delete, import and export. Status: planned.
+The presets as list rows (the list view block: one row per preset, the list row height of the
+regular size) with the active preset on the selection pill and its name in semibold, then a "more"
+`IconButton` (`Strings::more`) at the end of the line under the rows that opens the menu. A row
+shows the name, cut with an ellipsis and a tooltip, and at its end `Strings::builtIn` and
+`Strings::modified` in Footnote labelSecondary for `builtIn` and `modified` presets.
+
+Keys: the rows are one Tab stop and the menu button another. The arrows, Home, End and typeahead
+move the keyboard focus without choosing; Enter, a double click or a single click chooses (writes
+`*active`, result `Selected`). F2 renames the focused preset in place with `InlineRename`: Enter or
+focus loss commits (result `Rename` with `name`), Escape drops the edit. Delete asks with a
+destructive `ConfirmDialog` (`Strings::deletePresetTitle`, `deletePresetMessage` with the name,
+confirm `Strings::deleteAction`, focus on Cancel): confirming returns `Delete`, Escape or Cancel
+returns nothing. Built-in presets are never renamed or deleted. After a rename, a create or a
+declined delete the keyboard focus is back on its row.
+
+Menu (on the row that last had the keyboard focus, else the active preset): `Strings::newPreset`
+adds an inline field in a new row at the end, prefilled with the default name; Enter returns `Create`
+with `name` and `index` -1, Escape adds nothing. Then `Strings::save` (`Save`), `rename`,
+`duplicate` (`Duplicate`; the caller names the copy), with `importExport` `importAction` (`Import`,
+index -1) and `exportAction` (`Export`), and `deleteAction` (the same confirmation). A name entered
+for a new or renamed preset is trimmed; an empty one keeps the old name (a new preset takes
+`Strings::newPreset`), and a name another preset already has, ASCII case ignored, gets the first free
+number (`"Preset 3 2"`). `name` stays valid until the next call.
+
+Width: the available width by default. Height: the rows by default (at least one row), or
+`options.height`. States: Loading shows skeleton lines in the place of the rows, Error the error
+state and an empty list the empty text (`emptyText`, else `Strings::empty`); the menu keeps
+create and import in each of them. `readOnly` (and a null `active`) shows the list and the active
+preset, takes no input that writes and has no menu button; `ImGui::BeginDisabled` the same with the
+disabled colors. Not done yet: reordering presets (the result has no move to report). Status: ready.
 
 ### ThemeModeControl
 

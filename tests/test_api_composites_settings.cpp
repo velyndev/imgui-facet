@@ -99,15 +99,6 @@ void SettingsCalls()
     Check("KeybindList, items", Expect::Item, "binds 2", [&] { CHECK_FALSE(KeybindList("binds 2", binds)); });
     CHECK(bindsBefore.Unchanged());
 
-    static const PresetItem presets[] = {{"Preset 1"}, {"Preset 2", true}};
-    int active = 1;
-    Check("PresetList", Expect::Item, "presets", [&] {
-        const PresetListResult result = PresetList("presets", &active, presets);
-        CHECK(result.action == PresetAction::None);
-        CHECK(result.index == -1);
-        CHECK(result.name == nullptr);
-    });
-    CHECK(active == 1);
 
     // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
     bool open = true;

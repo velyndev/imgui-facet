@@ -16,6 +16,8 @@
 
 #include <facet/facet.h>
 
+#include "internal/list_view.h"
+#include "internal/popup_host.h"
 #include "support/session.h"
 
 namespace
@@ -642,5 +644,214 @@ TEST_CASE("Escape in the search field clears the query first, so every settings 
     CHECK(ImGui::GetActiveID() == session.ItemId("search"));
     session.KeyPress(ImGuiKey_Escape);
     CHECK(ImGui::GetActiveID() == 0);
+}
+
+// ---- PresetList ----------------------------------------------------------------------------
+
+namespace
+{
+
+// A preset list over three presets (the first built in) that records the last action.
+struct PresetHarness
+{
+    facet::PresetItem presets[3] = {{"Preset 1", false, true}, {"Preset 2", true}, {"Preset 3"}};
+    int active = 0;
+    facet::PresetListResult last;
+    std::string lastName;
+    int actions = 0;
+    facet::PresetListOptions options;
+
+    void Run(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        const facet::PresetListResult result = facet::PresetList("presets", &active, presets, options);
+        session.Track("presets");
+        if (result.action != facet::PresetAction::None)
+        {
+            last = result;
+            lastName = result.name != nullptr ? result.name : "";
+            ++actions;
+        }
+    }
+
+    // The center of row `index` of the list in the latest frame.
+    static ImVec2 Row(facet::test::Session& session, int index)
+    {
+        const ImRect rect = session.ItemRect("presets");
+        const float row = facet::internal::ListRowHeight(facet::ControlSize::Inherit);
+        return ImVec2(rect.Min.x + facet::Px(40.0f), rect.Min.y + row * (static_cast<float>(index) + 0.5f));
+    }
+};
+
+} // namespace
+
+TEST_CASE("PresetList chooses a preset by click and by Enter, and the arrows only move the focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(PresetHarness::Row(session, 2));
+    CHECK(h.active == 2);
+    CHECK(h.last.action == facet::PresetAction::Selected);
+    CHECK(h.last.index == 2);
+    CHECK(h.actions == 1);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(h.active == 2);
+    CHECK(h.actions == 1);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(h.active == 1);
+    CHECK(h.actions == 2);
+}
+
+TEST_CASE("PresetList renames with F2: Enter commits the name, Escape cancels, a taken name gets a number")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(PresetHarness::Row(session, 1));
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(2);
+    session.Type("Renamed");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(h.last.action == facet::PresetAction::Rename);
+    CHECK(h.last.index == 1);
+    CHECK(h.lastName == "Renamed");
+    const int actions = h.actions;
+    // Escape drops the edit.
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(2);
+    session.Type("Dropped");
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(2);
+    CHECK(h.actions == actions);
+    // A name another preset has gets the first free number.
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(2);
+    session.Type("preset 3");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(h.last.action == facet::PresetAction::Rename);
+    CHECK(h.lastName == "preset 3 2");
+    // A built-in preset is never renamed.
+    session.Click(PresetHarness::Row(session, 0));
+    const int before = h.actions;
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(2);
+    session.Type("x");
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(h.actions == before);
+    CHECK(h.active == 0);
+}
+
+TEST_CASE("PresetList asks before a delete: confirming reports it, declining does nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(PresetHarness::Row(session, 2));
+    const int afterClick = h.actions;
+    session.KeyPress(ImGuiKey_Delete);
+    session.Frames(10);
+    // The dialog is destructive: the focus starts on Cancel and Escape declines.
+    session.KeyPress(ImGuiKey_Escape);
+    session.Frames(10);
+    CHECK(h.actions == afterClick);
+    session.KeyPress(ImGuiKey_Delete);
+    session.Frames(10);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(10);
+    CHECK(h.last.action == facet::PresetAction::Delete);
+    CHECK(h.last.index == 2);
+    // A built-in preset is never offered for deletion: no dialog opens.
+    session.Click(PresetHarness::Row(session, 0));
+    session.KeyPress(ImGuiKey_Delete);
+    session.Frames(10);
+    CHECK(facet::internal::TopPopupLevel() == 0);
+}
+
+TEST_CASE("PresetList creates a preset from its menu with a free default name")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    h.presets[2].label = facet::GetStrings().newPreset;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    // Tab leaves the rows for the menu button; Enter opens the menu with its first row focused, and
+    // that row creates.
+    session.Click(PresetHarness::Row(session, 0));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(10);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(3);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frame();
+    CHECK(h.last.action == facet::PresetAction::Create);
+    CHECK(h.last.index == -1);
+    CHECK(h.lastName == std::string(facet::GetStrings().newPreset) + " 2");
+}
+
+TEST_CASE("PresetList read-only or disabled writes nothing and offers no menu")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    h.options.readOnly = true;
+    bool disabled = false;
+    session.SetUi([&] {
+        ImGui::BeginDisabled(disabled);
+        h.Run(session);
+        ImGui::EndDisabled();
+    });
+    session.Frame();
+    const float rows = facet::internal::ListRowHeight(facet::ControlSize::Inherit) * 3.0f;
+    CHECK(session.ItemRect("presets").GetHeight() == doctest::Approx(rows).epsilon(0.02));
+    session.Click(PresetHarness::Row(session, 2));
+    session.KeyPress(ImGuiKey_Delete);
+    session.KeyPress(ImGuiKey_F2);
+    session.Frames(3);
+    CHECK(h.active == 0);
+    CHECK(h.actions == 0);
+    h.options.readOnly = false;
+    disabled = true;
+    session.Frame();
+    session.Click(PresetHarness::Row(session, 1));
+    CHECK(h.active == 0);
+    CHECK(h.actions == 0);
+}
+
+TEST_CASE("PresetList shows its loading, error and empty states without taking a choice")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PresetHarness h;
+    h.options.state = facet::DataState::Loading;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(PresetHarness::Row(session, 1));
+    CHECK(h.actions == 0);
+    h.options.state = facet::DataState::Error;
+    session.Frame();
+    CHECK(session.ItemRect("presets").GetHeight() > 0.0f);
+    // An empty list keeps its height for the empty text.
+    h.options.state = facet::DataState::Ready;
+    session.SetUi([&] {
+        const facet::PresetListResult r = facet::PresetList("empty", &h.active, std::span<const facet::PresetItem>());
+        session.Track("empty");
+        CHECK(r.action == facet::PresetAction::None);
+    });
+    session.Frame();
+    CHECK(session.ItemRect("empty").GetHeight() >= facet::internal::ListRowHeight(facet::ControlSize::Inherit));
 }
 
