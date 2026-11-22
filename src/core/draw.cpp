@@ -66,7 +66,7 @@ bool Overlaps(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax)
 
 void FillRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius, ImDrawFlags corners)
 {
-    if (internal::UsesContinuousCorners(radius))
+    if (internal::UsesContinuousCorners(pMin, pMax, radius))
         FillContinuousRect(drawList, pMin, pMax, color, radius, corners);
     else
         FillRoundRect(drawList, pMin, pMax, color, radius, corners);
@@ -75,7 +75,7 @@ void FillRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float
 void StrokeRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius, float thickness,
                 ImDrawFlags corners)
 {
-    if (internal::UsesContinuousCorners(radius))
+    if (internal::UsesContinuousCorners(pMin, pMax, radius))
         StrokeContinuousRect(drawList, pMin, pMax, color, radius, thickness, corners);
     else
         StrokeRoundRect(drawList, pMin, pMax, color, radius, thickness, corners);
@@ -86,6 +86,17 @@ void FillRoundRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, 
 {
     if (drawList == nullptr || (color & IM_COL32_A_MASK) == 0)
         return;
+    if (internal::IsCapsule(pMin, pMax, radius) && internal::ResolveCorners(corners) != 0)
+    {
+        // Dear ImGui keeps a rounding a pixel short of half the side, which leaves a capsule's ends
+        // flat in the middle; the shared outline gives them full half circles.
+        if (pMax.x <= pMin.x || pMax.y <= pMin.y)
+            return;
+        ImVec2 points[internal::kMaxOutlinePoints];
+        const int count = internal::RoundRectOutline(pMin, pMax, radius, corners, false, points);
+        drawList->AddConvexPolyFilled(points, count, color);
+        return;
+    }
     drawList->AddRectFilled(pMin, pMax, color, radius, corners);
 }
 
@@ -94,6 +105,18 @@ void StrokeRoundRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color
 {
     if (drawList == nullptr || (color & IM_COL32_A_MASK) == 0 || thickness <= 0.0f)
         return;
+    if (internal::IsCapsule(pMin, pMax, radius) && internal::ResolveCorners(corners) != 0)
+    {
+        if (pMax.x <= pMin.x || pMax.y <= pMin.y)
+            return;
+        const float halfMin = std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f;
+        ImVec2 points[internal::kMaxOutlinePoints];
+        const int count = internal::RoundRectOutline(pMin, pMax, radius, corners, false, points);
+        // The outline is clockwise, so the inside stroke lies within the rectangle, like AddRect.
+        drawList->_AddPolyline(points, count, color, std::min(thickness, halfMin),
+                               ImDrawFlags_Closed | ImDrawFlags_StrokeInside, halfMin);
+        return;
+    }
     drawList->AddRect(pMin, pMax, color, radius, thickness, corners | ImDrawFlags_StrokeInside);
 }
 
@@ -161,7 +184,7 @@ void FillCheckerboard(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 colo
         return;
 
     // The outline, and the boxes at the rounded corners inside which cells need clipping.
-    const bool continuous = internal::UsesContinuousCorners(radius);
+    const bool continuous = internal::UsesContinuousCorners(pMin, pMax, radius);
     const float halfMin = std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f;
     const float extent =
         std::min(std::max(0.0f, radius) * (continuous ? internal::kContinuousExtent : 1.0f), halfMin);

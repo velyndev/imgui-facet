@@ -1,6 +1,7 @@
 // Drawing helpers that work without a frame: continuous corners, gradients, checkerboards,
 // arcs, DrawGroup vertex and clip transforms, and the text helpers.
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstring>
@@ -115,8 +116,9 @@ TEST_CASE("A continuous rect stays inside its bounds and is symmetric")
         CHECK(maxX == doctest::Approx(pMax.x));
         CHECK(minY == doctest::Approx(pMin.y));
         CHECK(maxY == doctest::Approx(pMax.y));
-        // Point i of the top-left corner mirrors point i of the top-right corner.
-        const int perCorner = count / 4;
+        // Point i of the top-left corner mirrors point i of the top-right corner. (A capsule, radius
+        // 30 and more here, shares the points where its corners meet; the capsule test covers it.)
+        const int perCorner = facet::internal::IsCapsule(pMin, pMax, radius) ? 0 : count / 4;
         for (int i = 0; i < perCorner; ++i)
         {
             const ImVec2 left = points[i];
@@ -415,4 +417,78 @@ TEST_CASE("FindMatches and DrawHighlightedText mark every occurrence")
     const float width = facet::internal::DrawHighlightedText(nullptr, fonts.font, kFontSize, ImVec2(0.0f, 0.0f), text,
                                                              nullptr, std::span(ranges, 3), style);
     CHECK(width == doctest::Approx(plain).epsilon(0.01));
+}
+
+namespace
+{
+
+// The distance of `p` from the capsule's spine (the segment between the centers of its ends).
+float CapsuleSpineDistance(ImVec2 p, ImVec2 pMin, ImVec2 pMax)
+{
+    const float r = std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f;
+    const bool horizontal = pMax.x - pMin.x >= pMax.y - pMin.y;
+    const ImVec2 a = horizontal ? ImVec2(pMin.x + r, pMin.y + r) : ImVec2(pMin.x + r, pMin.y + r);
+    const ImVec2 b = horizontal ? ImVec2(pMax.x - r, pMin.y + r) : ImVec2(pMin.x + r, pMax.y - r);
+    const float t = horizontal ? std::clamp(p.x, a.x, b.x) : std::clamp(p.y, a.y, b.y);
+    const ImVec2 q = horizontal ? ImVec2(t, a.y) : ImVec2(a.x, t);
+    return std::sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+}
+
+} // namespace
+
+TEST_CASE("Capsules: a radius of half the height gives circular ends, with continuous corners on as well")
+{
+    facet::Theme theme = facet::Theme::Light();
+    theme.radii.continuousCorners = true;
+    facet::SetTheme(theme, false);
+    // A toggle-sized track (radius 11 lies above continuousFrom), a tall one and a circle.
+    const ImVec2 shapes[][2] = {{ImVec2(10.0f, 10.0f), ImVec2(48.0f, 32.0f)},
+                                {ImVec2(10.0f, 40.0f), ImVec2(30.0f, 120.0f)},
+                                {ImVec2(60.0f, 60.0f), ImVec2(84.0f, 84.0f)}};
+    for (const auto& shape : shapes)
+    {
+        const ImVec2 pMin = shape[0];
+        const ImVec2 pMax = shape[1];
+        const float r = std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f;
+        CAPTURE(pMin.x);
+        CAPTURE(pMin.y);
+        CHECK(facet::internal::IsCapsule(pMin, pMax, r));
+        CHECK(facet::internal::IsCapsule(pMin, pMax, r * 3.0f));
+        CHECK_FALSE(facet::internal::UsesContinuousCorners(pMin, pMax, r));
+
+        // The outline: every point lies on the capsule, and no point repeats its neighbour.
+        ImVec2 points[facet::internal::kMaxOutlinePoints];
+        const int count = facet::internal::RoundRectOutline(pMin, pMax, r, 0, true, points);
+        REQUIRE(count > 8);
+        for (int i = 0; i < count; ++i)
+        {
+            CHECK(CapsuleSpineDistance(points[i], pMin, pMax) == doctest::Approx(r).epsilon(0.001));
+            const ImVec2 next = points[(i + 1) % count];
+            CHECK((std::fabs(next.x - points[i].x) > kEpsilon || std::fabs(next.y - points[i].y) > kEpsilon));
+        }
+
+        // The fill and the stroke of the shared helpers draw exactly that shape.
+        for (const bool stroke : {false, true})
+        {
+            ScratchDrawList scratch;
+            if (stroke)
+                facet::StrokeRect(scratch.list, pMin, pMax, IM_COL32_WHITE, r, 2.0f);
+            else
+                facet::FillRect(scratch.list, pMin, pMax, IM_COL32_WHITE, r);
+            REQUIRE(scratch.list->VtxBuffer.Size > 8);
+            for (const ImDrawVert& vertex : scratch.list->VtxBuffer)
+            {
+                const float d = CapsuleSpineDistance(vertex.pos, pMin, pMax);
+                // A fill lies on the outline; a stroke inside it is the outline or two pixels in.
+                const bool onOutline = std::fabs(d - r) < 0.01f;
+                // (The inner points sit on chords offset inward, a few hundredths off the circle.)
+                const bool onInner = stroke && std::fabs(d - (r - 2.0f)) < 0.3f;
+                CHECK((onOutline || onInner));
+            }
+        }
+    }
+    // A radius below half the shorter side keeps the theme's continuous corners.
+    CHECK_FALSE(facet::internal::IsCapsule(ImVec2(0.0f, 0.0f), ImVec2(100.0f, 40.0f), 12.0f));
+    CHECK(facet::internal::UsesContinuousCorners(ImVec2(0.0f, 0.0f), ImVec2(100.0f, 40.0f), 12.0f));
+    facet::SetTheme(facet::Theme::Light(), false);
 }

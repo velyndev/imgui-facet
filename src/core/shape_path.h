@@ -29,8 +29,14 @@ const ImVec2* ContinuousCornerTable(int segments);
 // ImDrawFlags corner flags made explicit: 0 means every corner, as in ImDrawList.
 ImDrawFlags ResolveCorners(ImDrawFlags flags);
 
+// True when `radius` is half the shorter side of the rectangle or more: the shape is a capsule (a
+// circle when square) and gets circular ends whatever corner type is asked for.
+bool IsCapsule(ImVec2 pMin, ImVec2 pMax, float radius);
+
 // Writes the clockwise outline of a rounded rectangle into `out` (room for
-// kMaxOutlinePoints) and returns the number of points. `continuous` selects the corner type.
+// kMaxOutlinePoints) and returns the number of points. `continuous` selects the corner type; a
+// capsule (IsCapsule) always takes circular arcs. Points that would repeat their neighbour (where
+// two corners of a capsule meet) are left out.
 int RoundRectOutline(ImVec2 pMin, ImVec2 pMax, float radius, ImDrawFlags corners, bool continuous, ImVec2* out);
 
 // Room for a convex polygon clipped against an outline: four corners plus one point per edge.
@@ -44,5 +50,7 @@ int ClipToConvex(const ImVec2* in, int inCount, const ImVec2* clip, int clipCoun
 // The radius at which FillRect switches to continuous corners, in pixels, and whether a
 // radius uses them with the current theme.
 bool UsesContinuousCorners(float radius);
+// The same for a rectangle: never for a capsule, whose ends are circular.
+bool UsesContinuousCorners(ImVec2 pMin, ImVec2 pMax, float radius);
 
 } // namespace facet::internal

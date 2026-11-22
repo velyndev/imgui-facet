@@ -34,6 +34,11 @@ enum class GradientDir
 // Rectangles with corners chosen by the theme: continuous corners when
 // T().radii.continuousCorners is on and the radius is at least Px(T().radii.continuousFrom),
 // circular arcs otherwise. Use these unless a shape needs one specific corner type.
+//
+// Capsules: a radius of half the shorter side or more makes a capsule (a circle when the
+// rectangle is square), and every rectangle helper below, the continuous ones included, draws it
+// with exact half-circle ends. Toggle tracks, chips, badges, scroll thumbs and thin tracks need no
+// corner choice of their own.
 void FillRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius = 0.0f,
               ImDrawFlags corners = 0);
 void StrokeRect(ImDrawList* drawList, ImVec2 pMin, ImVec2 pMax, ImU32 color, float radius = 0.0f,

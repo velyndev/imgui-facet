@@ -18,6 +18,11 @@ namespace
 
 constexpr float kHalfPi = 1.57079632679f;
 constexpr int kMinCornerSegments = 4;
+// A radius this close below half the shorter side (pixels) still makes a capsule, so a rounding
+// error in a caller's half height never turns its ends into flat-sided arcs.
+constexpr float kCapsuleTolerance = 0.01f;
+// Two outline points closer than this (pixels) are one point.
+constexpr float kSamePoint = 1e-3f;
 
 struct CornerTables
 {
@@ -129,10 +134,18 @@ ImDrawFlags ResolveCorners(ImDrawFlags flags)
     return corners;
 }
 
+bool IsCapsule(ImVec2 pMin, ImVec2 pMax, float radius)
+{
+    const float halfMin = std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f;
+    return radius > 0.0f && halfMin > 0.0f && radius + kCapsuleTolerance >= halfMin;
+}
+
 int RoundRectOutline(ImVec2 pMin, ImVec2 pMax, float radius, ImDrawFlags flags, bool continuous, ImVec2* out)
 {
     const float halfMin = std::max(0.0f, std::min(pMax.x - pMin.x, pMax.y - pMin.y) * 0.5f);
     const ImDrawFlags corners = ResolveCorners(flags);
+    if (IsCapsule(pMin, pMax, radius))
+        continuous = false;
     const float extent = std::min(std::max(0.0f, radius) * (continuous ? kContinuousExtent : 1.0f), halfMin);
     int count = 0;
     if (extent < 0.5f || corners == 0)
@@ -166,9 +179,17 @@ int RoundRectOutline(ImVec2 pMin, ImVec2 pMax, float radius, ImDrawFlags flags, 
                 unit = ImVec2(std::cos(angle), std::sin(angle));
             }
             const ImVec2 offset = Rotate(unit, frame.quarter);
-            out[count++] = ImVec2(center.x + offset.x * extent, center.y + offset.y * extent);
+            const ImVec2 point(center.x + offset.x * extent, center.y + offset.y * extent);
+            // Where two corners meet without an edge between them (the ends of a capsule) the next
+            // corner starts on the last point; a repeated point would upset the anti-aliased fill.
+            if (count > 0 && std::fabs(point.x - out[count - 1].x) < kSamePoint &&
+                std::fabs(point.y - out[count - 1].y) < kSamePoint)
+                continue;
+            out[count++] = point;
         }
     }
+    if (count > 1 && std::fabs(out[0].x - out[count - 1].x) < kSamePoint && std::fabs(out[0].y - out[count - 1].y) < kSamePoint)
+        --count;
     return count;
 }
 
@@ -219,6 +240,11 @@ bool UsesContinuousCorners(float radius)
 {
     const Radii& radii = T().radii;
     return radii.continuousCorners && radius > 0.0f && radius >= Px(radii.continuousFrom);
+}
+
+bool UsesContinuousCorners(ImVec2 pMin, ImVec2 pMax, float radius)
+{
+    return UsesContinuousCorners(radius) && !IsCapsule(pMin, pMax, radius);
 }
 
 } // namespace internal
