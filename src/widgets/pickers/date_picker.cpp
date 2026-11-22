@@ -11,7 +11,7 @@
 // clears the segment; a field whose segments are all cleared writes no date.
 //
 // A click, Enter, Space or Alt+Down opens the calendar (date_picker_parts.h, CalendarPanel) in a
-// popover of the popup host below the field; the keyboard focus moves to the date, a pick writes
+// popover of the popup host beside the field; the keyboard focus moves to the date, a pick writes
 // and closes it, and the focus returns to the field.
 
 #include "facet/widgets/pickers.h"
@@ -458,7 +458,7 @@ bool DatePicker(const char* label, Date* date, const DatePickerOptions& options)
     const float messageBottom =
         DrawControlMessage(message, ImVec2(frame.Min.x, frame.Max.y), frame.GetWidth(), item.disabled, id, frame);
 
-    // 5. The calendar: in place, or in a popover below the field.
+    // 5. The calendar: in place, or in a popover beside the field (PanelAnchor).
     if (options.inlineCalendar)
     {
         const float gap = PxSnapped(t.spacing.sm);
@@ -478,7 +478,7 @@ bool DatePicker(const char* label, Date* date, const DatePickerOptions& options)
     }
     else
     {
-        const PopupAnchor anchor{.rect = frame, .side = PopupSide::Below, .align = PopupAlign::Start};
+        const PopupAnchor anchor = PanelAnchor(frame);
         PopupOptions popup;
         popup.glass = true;
         if (openNow && !readOnly)

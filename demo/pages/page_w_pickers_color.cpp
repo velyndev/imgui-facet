@@ -125,7 +125,7 @@ FACET_DEMO_PAGE("pickers-color", "Color pickers", "Widgets", 50, "default", "wel
 
     // ---- ColorWell ----
     SectionHeader("Color well");
-    Paragraph("A click, Enter, Space or Alt+Down opens the picker below the well. Escape closes it and restores the "
+    Paragraph("A click, Enter, Space or Alt+Down opens the picker beside the well. Escape closes it and restores the "
               "color from before it opened; a click outside keeps the change. Ctrl+C and Ctrl+V copy and paste the "
               "color as hex text, and the well takes colors dropped from another well.");
     LabeledRow("With hex text");

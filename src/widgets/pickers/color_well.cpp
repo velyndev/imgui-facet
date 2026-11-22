@@ -167,10 +167,7 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, ImGuiInputFlags_None, id))
             openNow = true;
     }
-    internal::PopupAnchor anchor;
-    anchor.rect = frame;
-    anchor.side = internal::PopupSide::Below;
-    anchor.align = internal::PopupAlign::Start;
+    const internal::PopupAnchor anchor = internal::PanelAnchor(frame);
     internal::PopupOptions popup;
     popup.takeFocus = true;
     // While the popover is closed, the compare color follows the well, so the opening (and the

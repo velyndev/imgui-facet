@@ -8,8 +8,11 @@ the page Color pickers and the others on the page Other pickers.
 Colors are `ImVec4` in gamma-encoded sRGB with straight alpha everywhere (see `core/color.h`): the
 edited value, swatches, history and the compare color. Without `alpha` the alpha channel is never
 written; without `hdr` channels are clamped to 0 to 1. Fields that open a popover open on a click,
-Enter, Space or Alt+Down and close on Escape or a click outside. Every widget here returns true on
-the frame it wrote its value.
+Enter, Space or Alt+Down and close on Escape or a click outside. Such a popover opens beside its
+field and centered on it, so it does not cover the rows under the field: on the trailing side, on
+the leading side when only that one has room, and under the field (over it when there is no room
+below) when it fits on neither side, as with a field that fills its row. Every widget here returns
+true on the frame it wrote its value.
 
 ## Color pickers
 
@@ -35,8 +38,8 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
 
 A field-like swatch button: the label in front, then a field frame with the swatch (a checkerboard
 under translucent colors, the opaque color in its left half) and, with `showHex`, the `#RRGGBB` or
-`#RRGGBBAA` text. A click, Enter, Space or Alt+Down opens a ColorPicker in a popover below the well
-(flipped above when there is no room), with the color from before the opening as its compare color
+`#RRGGBBAA` text. A click, Enter, Space or Alt+Down opens a ColorPicker in a popover beside the well
+(placed as the top of this page describes), with the color from before the opening as its compare color
 and `swatches` under it. The popover follows the well while it scrolls. Escape closes it and
 restores the color from before it opened; a click outside closes it and keeps the edit; the focus
 goes back to the well. Ctrl+C on the focused well copies the color as hex text, Ctrl+V pastes any
@@ -219,7 +222,7 @@ parts. Backspace or Delete clears the focused segment, and a field whose segment
 writes no date. A typed commit is reported by the result and `ImGui::IsItemEdited`, not by
 `IsItemEditCommitted`, because typing is not an edit session of Dear ImGui.
 
-A click, Enter, Space or Alt+Down opens the calendar below the field (above when there is no room),
+A click, Enter, Space or Alt+Down opens the calendar beside the field (under it when no side has room),
 on the blurred popover surface. It shows the month of the date (or of today) with the weekday
 headings from `Strings::weekdayMonday` to `weekdaySunday` starting at `firstWeekday`, today with the
 accent hairline and the day number in the accent text color, the picked day on the accent fill in
@@ -249,10 +252,10 @@ bool DateRangePicker(const char* label, Date* start, Date* end, const DateRangeP
 
 A field showing the range, `2026-03-09`, an arrow and `2026-03-13` (dashes for a missing end, the
 placeholder while both are missing), with a calendar icon at its end; a field widget with the label
-in front and the available width by default. A click, Enter, Space or Alt+Down opens a popover below
-the field with the calendar of DatePicker, two months side by side (one when the display is too
-narrow for two) under one pair of previous and next buttons; it starts at the month of *start (or
-of today). The first pick writes *start and clears *end; from then on the band between the start and
+in front and the available width by default. A click, Enter, Space or Alt+Down opens a popover beside
+the field (under it when no side has room) with the calendar of DatePicker, two months side by side
+(one when the display is too narrow for two) under one pair of previous and next buttons; it starts
+at the month of *start (or of today). The first pick writes *start and clears *end; from then on the band between the start and
 the day under the pointer (or the keyboard cursor) shows in accentSubtle, and the second pick writes
 both ends in order, earlier first, in the same frame, and closes. The ends of a completed range are
 on the accent fill; pressing one and dragging moves it (writing while dragging), and an end dragged
@@ -289,7 +292,7 @@ digit hour fills it alone) and move on; `:`, `.` and a space move on too; A or P
 the day. Typed parts are written on Enter, Tab or focus loss when they make a valid time; an
 invalid one (hour 25) stays shown as typed until corrected, and Escape drops them.
 
-A click, Enter, Space or Alt+Down opens a popover below the field with one scrolling column per
+A click, Enter, Space or Alt+Down opens a popover beside the field with one scrolling column per
 unit (hours, minutes in slots, seconds, AM and PM), each `picker.timeColumnWidth` wide and five
 rows tall, the chosen entry on the selection pill. The focus starts on the chosen hour; Tab moves
 between the columns. A click or an arrow key in a column writes at once; Enter or a double click
@@ -342,7 +345,7 @@ bool IconPicker(const char* label, Icon* icon, std::span<const ChoiceItem> icons
 A field that shows the icon and its name (the item label, or the registered name in the first form;
 the placeholder or `Strings::select` while there is none) with a chevron, like a Dropdown field: the
 label in front, the available width by default. A click, Enter, Space, Down or Alt+Down opens a
-popover below it (above when there is no room) with a search field (`searchable`) over a grid of
+popover beside it (under it when no side has room) with a search field (`searchable`) over a grid of
 icon tiles one Large control height square. The recently picked icons come first under
 `Strings::recent` (`showRecent`, up to eight, kept under the id while the widget is shown), then
 every icon, in sections under their `ChoiceItem::group` text; the first form offers every

@@ -208,7 +208,7 @@ bool DateRangePicker(const char* label, Date* start, Date* end, const DateRangeP
         panel.months = 1;
     const bool presetsAbove = presetsWidth > 0.0f && CalendarPanelSize(panel).x > room;
 
-    const PopupAnchor anchor{.rect = frame, .side = PopupSide::Below, .align = PopupAlign::Start};
+    const PopupAnchor anchor = PanelAnchor(frame);
     PopupOptions popup;
     popup.glass = true;
     if (openNow)

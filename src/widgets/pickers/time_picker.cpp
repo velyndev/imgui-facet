@@ -577,7 +577,7 @@ bool TimePicker(const char* label, TimeOfDay* time, const TimePickerOptions& opt
         DrawControlMessage(message, ImVec2(frame.Min.x, frame.Max.y), frame.GetWidth(), item.disabled, id, frame);
     const TimeOfDay shown = time != nullptr ? TimeFromSeconds(TimeToSeconds(*time)) : TimeOfDay{};
 
-    // 5. The columns: in place, or in a popover below the field.
+    // 5. The columns: in place, or in a popover beside the field (PanelAnchor).
     if (options.inlineColumns)
     {
         ImGui::SetCursorScreenPos(ImVec2(frame.Min.x, messageBottom + PxSnapped(t.spacing.sm)));
@@ -596,7 +596,7 @@ bool TimePicker(const char* label, TimeOfDay* time, const TimePickerOptions& opt
     }
     else
     {
-        const PopupAnchor anchor{.rect = frame, .side = PopupSide::Below, .align = PopupAlign::Start};
+        const PopupAnchor anchor = PanelAnchor(frame);
         // A solid surface: the columns' edge fades blend into bgElevated, which a blurred backdrop is not.
         PopupOptions popup;
         if (openNow && !readOnly)

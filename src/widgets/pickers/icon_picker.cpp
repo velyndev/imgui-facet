@@ -316,7 +316,7 @@ bool IconPickerImpl(const char* label, Icon* icon, const IconSource& source, con
     columns = std::max(1, std::min(columns, static_cast<int>((room + gap) / step)));
     const float gridWidth = columns * step - gap;
 
-    const PopupAnchor anchor = ListsFieldAnchor(result.frame);
+    const PopupAnchor anchor = PanelAnchor(result.frame);
     PopupOptions popup;
     if (openNow)
     {

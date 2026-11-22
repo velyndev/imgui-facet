@@ -621,8 +621,10 @@ TEST_CASE("ColorWell opens its picker, follows it, and Escape restores the color
     session.Click(ImVec2(wellRect.Max.x - 8.0f, wellRect.GetCenter().y));
     session.Frames(2);
     CHECK(open);
-    // The level sits below the well.
-    CHECK(levelRect.Min.y >= session.ItemRect("well").Max.y);
+    // The level sits beside the well, after it, and is centered on it as far as the display allows.
+    CHECK(levelRect.Min.x >= wellRect.Max.x);
+    CHECK(levelRect.Min.y <= wellRect.GetCenter().y);
+    CHECK(levelRect.Max.y >= wellRect.GetCenter().y);
     // The focus went into the picker: the square takes the arrows.
     session.KeyPress(ImGuiKey_RightArrow);
     session.KeyPress(ImGuiKey_RightArrow);
