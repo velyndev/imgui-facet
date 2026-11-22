@@ -4,8 +4,7 @@ Every visual choice in Facet with a one-line reason. Values are the starting tok
 `include/facet/core/theme.h` and `src/core/theme.cpp`, in design units (pixels at scale 1).
 Widgets read them from `facet::T()` and pass lengths through `facet::Px()`.
 
-This document sets the rules for the planned widgets (the composites) as well as for the parts
-that exist; README.md lists what exists today.
+This document sets the rules for every part of Facet; README.md lists what exists today.
 
 ## Direction
 
@@ -754,6 +753,65 @@ Media:
 - **Glide.** Strips and carousels hand the drag's speed to a spring (standard motion) on release,
   so they glide and snap without a jump; with reduced motion they jump.
 
+Composites, inventory and cards:
+
+- **Inventory slot surface.** fill[2] with a ControlBoundaryColor hairline, so an empty slot is
+  seen at 3:1.
+- **Count and lock chips** sit on bgElevated with a separator hairline, so they read over any
+  picture in both themes.
+- **Cooldown.** A pie in scrim over the picture, clockwise from the top, so it reads as a clock
+  running down.
+- **A lifted item's place** is drawn at 1 minus drag.ghostOpacity, so the user sees where the item
+  came from while the ghost carries it.
+- **Selected tile and selected media card.** An accent ring two hairlines thick inside the edge, so
+  the selection does not rest on the fill color alone.
+- **A disabled tile's picture** is drawn at 40 % opacity next to labelTertiary text, because no
+  disabled image token exists.
+- **Detail card stat differences.** success when better, destructive when worse, with the sign
+  giving the direction, so the comparison does not rest on color alone.
+- **ProfileSwitcher current profile.** A check in accentText plus a semibold name, not color alone.
+- **Narrow media card cover.** A square of metrics.slotSize, at most half the inner width, so a
+  narrow card stays one compact row.
+- **Extra drag preview content** sits in a floating layer on the level 2 elevated surface under
+  the ghost, so it reads as part of the lifted item and never lands in the caller's window.
+
+Composites, search and app controls:
+
+- **AccentPicker custom well.** A custom accent gets the same selection ring as a chosen swatch, so
+  the choice reads as one mark across swatches and well.
+- **SettingsSearch reveal.** The revealed hit gets an accentSubtle fill behind its row for
+  motion.feedbackHold, then fades over durationSlow, so the eye finds where the search landed;
+  reduced motion ends it without a fade.
+- **PresetList marks.** Built-in and Modified are words in Footnote labelSecondary at the row end,
+  so a preset's state is never told by color alone.
+- **KeybindList conflict.** A shared chord shows the warning icon in the warning token plus "Also
+  bound to" and the other action's name on both rows; below propertyLabelMinWidth the label
+  stacks above the fields instead of vanishing.
+- **ConsoleView candidates.** Completion candidates and "No results" show as one Footnote
+  labelSecondary line above the field, so they do not cover the log.
+- **Onboarding footer.** The current step is an accent dot plus "Step x of n", so progress is told
+  in words as well as color.
+- **SearchFilterBar count.** The result count sits in Footnote labelSecondary between field and
+  chips, close to the query it counts.
+- **UiScaleControl** applies a dragged scale on release, because applying it during the drag moves
+  the track under the pointer.
+
+Composites, editors and canvas:
+
+- **Property grid column edge.** Its divider shows only while hovered, dragged or focused: a
+  permanent line would cut every row in two.
+- **Gradient stop with its popover open** keeps a focusRing outline, so it is clear which stop the
+  picker edits.
+- **Gradient stops dragged off the editor** fade to 35 % before they go, so the removal is visible
+  before the release.
+- **Curve and easing editors** draw their curve in the first chart series color and their points
+  in the slider knob look: the curve is data, the points are controls.
+- **Layer toggles** are glyphs alone in labelSecondary (a set lock in label), named by their
+  tooltip: a row of buttons per layer would outweigh the layer names.
+- **Canvas snap guides and the selected element's outline** use focusRing, which reaches 3:1 on
+  every surface; the center lines and the dashed safe area frame are labelTertiary because they
+  are reference lines, not controls.
+
 ## Effects
 
 The dose caps in Direction apply. The choices behind each effect:
@@ -806,7 +864,8 @@ The dose caps in Direction apply. The choices behind each effect:
   sitting a few pixels above it.
 - **Split family pages.** A family with two distinct groups of widgets shows each group on a page
   of its own (Text inputs and Value inputs, Color pickers and Other pickers, Display and Data
-  table), so a page stays short enough to scan and each page's note speaks for what it shows.
+  table, and the composites on three pages: Inventory and cards, Search and app controls, Editors
+  and canvas), so a page stays short enough to scan and each page's note speaks for what it shows.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
   page holds at a large scale in a small window.
 - **Title strip.** The window background with a hairline below it; the title in the headline
@@ -827,20 +886,3 @@ The dose caps in Direction apply. The choices behind each effect:
   other pages keep this simpler row, so the Foundations and Media pages stay on stock controls.
 - **Samples.** Shapes that only show a token or an effect carry no text and no knob, and their
   caption names them, so nothing that cannot be operated looks like a control.
-- **Planned widgets.** A declared widget without its implementation draws a dashed separator
-  hairline with square corners at the size the widget will take, with "Name: planned" in
-  footnote labelSecondary; it is not focusable, so a page of placeholders never looks operable.
-  Every widget group draws this one look: real controls are solid and rounded, so no
-  placeholder can be taken for one, and a container placeholder reads as a frame around the
-  caller's content.
-- **Placeholder captions.** Every placeholder group shares one caption rule: a box too narrow
-  for "Name: planned (label)" shows the label alone, shortened with an ellipsis when needed,
-  and the whole text on hover; a box without a label shows "Name: planned" or the name. A
-  labelled box never falls back to the name, because boxes side by side in a row differ by
-  their labels, while the box look and the row already say that the widget is planned. The
-  caption sits on the first line of a tall box, level with the row label beside it.
-- **Field messages.** The FieldValidation placeholder is spacing.xs taller than its text, so its
-  hairline never crosses the text.
-- **Placeholder sizes.** Pads, cell rows and the inline calendar shrink to the available width
-  by default, so a placeholder never runs under the scrollbar; content placeholders are at
-  least a small control tall, so a box around one line of text does not cut its descenders.
