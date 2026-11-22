@@ -479,7 +479,7 @@ struct InventoryGridOptions
 
 // A fixed grid of slots. Drag an item onto an empty slot to move it, onto another item to swap
 // or merge; Shift+drag moves half a stack. One Tab stop: arrows move the selection, Enter
-// activates, Ctrl+arrows move the selected item. *selected -1 means none and is written when
+// activates, Alt+arrows move the focused item. *selected -1 means none and is written when
 // the selection moves. The caller applies the returned action to its slots.
 InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots,
                               const InventoryGridOptions& options = {});

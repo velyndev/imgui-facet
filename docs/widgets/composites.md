@@ -66,9 +66,11 @@ moves half the stack (`Split`, or `Merged` with half). A locked item cannot be d
 drops (no highlight, the not-allowed cursor). Escape, a right click or a release outside any slot
 cancels; the place an item came from stays faded while it is carried, and the ghost is the tile
 itself at `drag.ghostOpacity`. While a keyboard drag is in progress the lines just above and below
-the visible tiles also take it, so it can move on into rows scrolled out of view. Ctrl and an arrow
-move the focused item to its neighbour at once by the same rules. The selection and the keyboard
-focus follow a moved item. Drags cross into other grids, `InventorySlot` and `InventoryTile` of the
+the visible tiles also take it, so it can move on into rows scrolled out of view. Alt and an arrow
+move the focused item to its neighbour at once by the same rules, the key `ReorderableList` and
+`LayerList` move a row with; Ctrl and an arrow move the focus without changing the selection, and
+Ctrl+Space then adds the focused slot to it. The selection and the keyboard focus follow a moved
+item. Drags cross into other grids, `InventorySlot` and `InventoryTile` of the
 same payload type. The item's stack data is read from the source widget during the drag, so a
 payload of this type from a custom source moves and swaps but never merges.
 

@@ -351,7 +351,7 @@ void InventorySection(facet::demo::PageCtx& ctx)
     SectionHeader("Inventory grid");
     Paragraph("Slots of placeholder items. Drag an item onto an empty slot to move it, onto the same kind to merge, onto "
               "another item to swap; hold Shift to move half a stack. A locked item stays put. The arrows move the "
-              "selection, Ctrl and Shift extend it, Ctrl and an arrow move the item, Space picks it up for a keyboard "
+              "selection, Ctrl and Shift extend it, Alt and an arrow move the item, Space picks it up for a keyboard "
               "drag that the arrows carry and Space drops (Escape puts it back), Enter activates.");
     LabeledRow("Columns");
     facet::SegmentedControl("##columns", &ui.columns, kColumns, {.width = DemoWidth(300.0f)});
@@ -718,7 +718,7 @@ FACET_DEMO_SELFTEST("composites-cards")
         ui.columns = 2;  // six columns, so the rows are known at every size
     });
 
-    // The bag: click, arrows in two dimensions, Ctrl and an arrow, Enter.
+    // The bag: click, arrows in two dimensions, Alt and an arrow, Enter.
     test.Reveal("composites.bag");
     test.WaitSeconds(0.4f);
     test.Click("composites.bag.0");
@@ -728,8 +728,8 @@ FACET_DEMO_SELFTEST("composites-cards")
     test.KeyPress(ImGuiKey_DownArrow);
     test.Expect("Down moves the selection one row down", [] { return ui.selected == 1 + ui.bagColumns; });
     test.Click("composites.bag.1");
-    test.KeyPress(ImGuiMod_Ctrl | ImGuiKey_RightArrow);
-    test.Expect("Ctrl+Right moves item 2 into the empty third slot",
+    test.KeyPress(ImGuiMod_Alt | ImGuiKey_RightArrow);
+    test.Expect("Alt+Right moves item 2 into the empty third slot",
                 [] { return ui.bag[2].label != nullptr && ui.bag[1].label == nullptr && ui.selected == 2; });
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Enter activates the slot", [] { return ui.actions == 2; });

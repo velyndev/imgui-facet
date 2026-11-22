@@ -6,7 +6,7 @@
 // the focused selected slot, else the first selected one. Each tile is drawn with the module's tile
 // look (cards_look.h) and is both a drag source (pointer, or Space for a keyboard drag) and a drop
 // target of its own, so items move between slots of this grid, other grids and InventorySlot and
-// InventoryTile widgets through the drag and drop core. Ctrl and an arrow key move the focused
+// InventoryTile widgets through the drag and drop core. Alt and an arrow key move the focused
 // item to the neighbouring slot at once. Enter or a double click activates a slot.
 //
 // Size: the columns are options.columns, or as many slots as the width allows; the tiles keep the
@@ -102,11 +102,13 @@ void InventoryGridSelectOnly(ImGuiSelectionBasicStorage& selection, int index)
         selection.SetItemSelected(static_cast<ImGuiID>(index), true);
 }
 
-// The neighbour of `index` for a Ctrl+arrow move, or -1.
+// The neighbour of `index` for an Alt+arrow move (the key ReorderableList and LayerList move a row
+// with), -1 at the edge, or -2 without such a press. Ctrl+arrow stays with the list core, which
+// moves the focus without changing the selection.
 int InventoryGridNeighbour(int index, int columns, int count)
 {
     const ImGuiIO& io = ImGui::GetIO();
-    if (!io.KeyCtrl || io.KeyShift || io.KeyAlt)
+    if (!io.KeyAlt || io.KeyShift || io.KeyCtrl)
         return -2;
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
         return index % columns > 0 ? index - 1 : -1;
@@ -311,7 +313,7 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
                 result.source = gridId;
                 result.to = i;
             }
-            // Ctrl and an arrow move the focused item to its neighbour at once.
+            // Alt and an arrow move the focused item to its neighbour at once.
             if (focused && !dragging && item.label != nullptr && !item.locked)
             {
                 const int to = InventoryGridNeighbour(i, l.columns, count);

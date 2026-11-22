@@ -338,7 +338,7 @@ TEST_CASE("Inventory grid: the arrow keys move the selection in two dimensions, 
     CHECK(bag.last.to == 1);
 }
 
-TEST_CASE("Inventory grid: Ctrl+arrow moves the focused item to an empty slot, swaps, and refuses a locked slot")
+TEST_CASE("Inventory grid: Alt+arrow moves the focused item to an empty slot, swaps, and refuses a locked slot")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -347,21 +347,47 @@ TEST_CASE("Inventory grid: Ctrl+arrow moves the focused item to an empty slot, s
     session.Frames(2);
     // Item 2 (slot 1) to the empty slot 2; the selection and the focus go with it.
     session.Click(Bag::Tile(session, 1, 3));
-    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiMod_Alt | ImGuiKey_RightArrow);
     CHECK(bag.last.action == InventoryAction::Moved);
     CHECK(LabelOf(bag.slots[2]) == "Item 2");
     CHECK(bag.slots[1].label == nullptr);
     CHECK(bag.selected == 2);
     // Slot 5 below is locked: nothing moves.
     const int before = bag.actions;
-    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiMod_Alt | ImGuiKey_DownArrow);
     CHECK(bag.actions == before);
     // Back to the empty slot 1, then a swap with Item 1 in slot 0.
-    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_LeftArrow);
-    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiMod_Alt | ImGuiKey_LeftArrow);
+    session.KeyPress(ImGuiMod_Alt | ImGuiKey_LeftArrow);
     CHECK(bag.last.action == InventoryAction::Swapped);
     CHECK(LabelOf(bag.slots[0]) == "Item 2");
     CHECK(LabelOf(bag.slots[1]) == "Item 1");
+}
+
+TEST_CASE("Inventory grid: Ctrl+arrow moves only the focus, and Ctrl+Space adds the focused slot")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    // Item 1 in slot 0 is selected; Ctrl+Right focuses slot 1 (Item 2) and moves no item.
+    session.Click(Bag::Tile(session, 0, 3));
+    const int before = bag.actions;
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_RightArrow);
+    CHECK(bag.actions == before);
+    CHECK(LabelOf(bag.slots[0]) == "Item 1");
+    CHECK(LabelOf(bag.slots[1]) == "Item 2");
+    CHECK(bag.selected == 0);
+    // Ctrl+Space selects the focused slot as well: *selected is now the focused selected slot.
+    // Ctrl goes down first, as a hand presses it: while no modifier is held the tile owns Space
+    // for the keyboard pick-up.
+    session.KeyDown(ImGuiMod_Ctrl);
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Space);
+    session.KeyUp(ImGuiMod_Ctrl);
+    CHECK(bag.selected == 1);
+    CHECK(bag.actions == before);
 }
 
 TEST_CASE("Inventory grid: a pointer drag moves, swaps and merges, and Shift splits half a stack")
