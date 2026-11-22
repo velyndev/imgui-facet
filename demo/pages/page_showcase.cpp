@@ -391,7 +391,7 @@ void AppState(PageCtx& ctx)
         {
             ThemeEdits edits;
             edits.factor[static_cast<int>(ThemeEditGroup::Radii)] = 1.5f;
-            edits.factor[static_cast<int>(ThemeEditGroup::Spacing)] = 1.25f;
+            edits.factor[static_cast<int>(ThemeEditGroup::Spacing)] = 1.2f;
             edits.factor[static_cast<int>(ThemeEditGroup::Type)] = 1.1f;
             edits.factor[static_cast<int>(ThemeEditGroup::Heights)] = 1.15f;
             edits.factor[static_cast<int>(ThemeEditGroup::Shadow)] = 1.5f;
