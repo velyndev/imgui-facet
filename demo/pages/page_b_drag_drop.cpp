@@ -1011,7 +1011,11 @@ FACET_DEMO_SELFTEST("drag-drop")
     test.KeyPress(ImGuiKey_Escape);
     test.Expect("Escape puts a keyboard drag back", [] { return ListKey(page.list, 2) == 2; });
 
-    // Two lists: the last row of A into the first gap of B, then back with the keyboard.
+    // Two lists: the last row of A into the first gap of B, then back with the keyboard. In a small
+    // window the last row of A can sit in the edge band at the bottom of the view, where the held
+    // drag would scroll the page under the pointer: the reveal puts the row above it in the middle,
+    // which keeps both rows and the first row of B clear of the bands.
+    test.Reveal("dd.a.2");
     test.DragAndHold({T::Item("dd.a.3"), T::Item("dd.b.0", 0.5f, 0.2f)}, 0.5f, 0.1f);
     test.Expect("Item 4 moves to the top of B", [] {
         return page.left.count == 3 && page.right.count == 3 && ListKey(page.right, 0) == 4;
