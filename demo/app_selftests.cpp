@@ -117,6 +117,13 @@ FACET_DEMO_APP_SELFTEST("navigation", "showcase")
         const float units = ImGui::GetIO().DisplaySize.x / facet::Scale();
         return Gallery().navRail == (units - facet::T().spacing.sm < facet::T().layout.expandedFrom);
     });
+    // In either form a click opens a page and the arrows and Space open the next one.
+    test.Click("nav.type");
+    test.ExpectPage("type");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectFocused("nav.tokens");
+    test.KeyPress(ImGuiKey_Space);
+    test.ExpectPage("tokens");
     test.Do([] { Gallery().navExpanded = true; });
     test.Wait(10);
     test.Expect("the labels show on request", [] { return !Gallery().navRail; });
