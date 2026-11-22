@@ -20,7 +20,8 @@ group in the navigation:
     sit side by side in a wide window and one above the other in a narrow one.
 - Foundations
   - Tokens: every color token with its live contrast ratios, the border tokens and the knob face
-    marked quiet or increased contrast with an "Increased contrast" switch, the accent presets,
+    marked quiet or increased contrast with an "Increased contrast" switch (the same value as the
+    theme editor's switch), the accent presets,
     spacing, radii, control heights and the elevation levels.
   - Type: the text styles and weights, truncation, wrapping and match highlighting.
   - Motion: smoothing, a spring and a tween side by side with replay, reduce motion and

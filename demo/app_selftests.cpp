@@ -273,6 +273,34 @@ FACET_DEMO_APP_SELFTEST("theme-editor", "showcase")
     test.Expect("an unedited theme exports no token", [] { return !ClipboardHas("    theme."); });
 }
 
+FACET_DEMO_APP_SELFTEST("increased-contrast", "tokens")
+{
+    // The Tokens page switch and the editor's switch are one value: switched on the page, it
+    // survives a theme change and shows in the editor and its export.
+    test.Do([] {
+        Gallery().edits = ThemeEdits{};
+        Gallery().dark = true;
+        Gallery().followSystem = false;
+    });
+    test.Wait(2);
+    test.Click("tokens.contrast");
+    test.Wait(2);
+    test.Expect("the Tokens switch turns the variant on", [] { return facet::IncreasedContrast(); });
+    test.Do([] { Gallery().dark = false; });
+    test.Wait(2);
+    test.Expect("a theme change keeps the variant on", [] { return !facet::T().dark && facet::IncreasedContrast(); });
+    test.Expect("the editor toggle shows it", [] { return Gallery().edits.increasedContrast; });
+    test.Expect("the export contains it", [] {
+        return facet::demo::ThemeEditorExportText(Gallery()).find("facet::SetIncreasedContrast(true);") != std::string::npos;
+    });
+    test.Click("tokens.contrast");
+    test.Wait(2);
+    test.Do([] { Gallery().dark = true; });
+    test.Wait(2);
+    test.Expect("off on the page, it stays off after a theme change",
+                [] { return facet::T().dark && !facet::IncreasedContrast() && !Gallery().edits.increasedContrast; });
+}
+
 FACET_DEMO_APP_SELFTEST("overlay", "showcase")
 {
     test.Do([] {

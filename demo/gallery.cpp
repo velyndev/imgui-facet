@@ -170,6 +170,14 @@ void ApplyGalleryLook(GalleryState& state, const PageCtx& ctx)
         }
     }
 
+    // The increased contrast variant is one switch of the library that the Tokens page can flip
+    // too: a change made outside the editor becomes the editor's value, so the editor toggle and
+    // the export show it and the next theme change keeps it.
+    if (!first && facet::IncreasedContrastEnabled() != state.appliedEdits.increasedContrast)
+    {
+        state.edits.increasedContrast = facet::IncreasedContrastEnabled();
+        state.appliedEdits.increasedContrast = state.edits.increasedContrast;
+    }
     const facet::ThemeMode mode = ModeOf(state);
     const bool dark = mode == facet::ThemeMode::System ? facet::SystemPrefersDarkTheme() : state.dark;
     const ThemeEdits& target = state.editsHeld ? state.appliedEdits : state.edits;
