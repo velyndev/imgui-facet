@@ -82,9 +82,11 @@ void SettingsCalls()
     CHECK(command == "text");
     CHECK(std::strcmp(buffer, "text") == 0);
 
+    // The settings search is ready; it submits no item of its own and keeps every stack.
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
         BeginSettingsSearch("settings", {.filter = "query"});
-        CHECK(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));
+        CHECK_FALSE(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));
+        CHECK(SettingsSearchMatch("Query row", {.section = "Section"}));
         EndSettingsSearch();
     });
     Check("SettingsSearchScope", Expect::NoItem, nullptr, [] { SettingsSearchScope search("settings 2"); });

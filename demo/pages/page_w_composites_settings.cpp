@@ -54,7 +54,14 @@ enum CaptureState
     kAppFocus,    // the theme mode control focused, the accent swatches hovered
     kAccentOpen,  // the accent picker's custom color well with its popover open
     kSearchFocus, // the search filter bar's field focused
+    kSettingsHits,  // a settings search query with one hit far down, revealed and highlighted
 };
+
+// Frames before the end of a capture's warm-up at which the settings search capture types its
+// query: the reveal scroll settles and the highlight still holds when the image is taken.
+constexpr int kSettingsCaptureFrames = 30;
+// Height of the scrolling area of example settings rows, in design units.
+constexpr float kSettingsAreaHeight = 150.0f;
 
 struct SettingsUi
 {
@@ -69,7 +76,12 @@ struct SettingsUi
     int filterClickChip = 2;  // the chip under the probe "comp.filter.chipclick", set every frame
     ImGuiID filterClickChipId = 0;
 
+
+    // SettingsSearch
     std::string settingsQuery;
+    bool settingsFlags[10] = {true, false, false, false, true, false, false, false, false, true};
+    float settingsValues[10] = {0.5f, 0.5f, 0.5f, 0.8f, 0.5f, 0.5f, 0.5f, 0.4f, 0.5f, 0.5f};
+
     facet::KeybindListItem binds[2] = {
         {"Action 1", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
         {"Action 2", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
@@ -395,10 +407,91 @@ void SearchFilterBarSection(facet::demo::PageCtx& ctx)
     ImGui::EndDisabled();
 }
 
+// Example settings rows for the settings search. They change only the demo values in ui.
+struct ExampleSetting
+{
+    const char* label;
+    const char* keywords;
+    const char* section;
+};
+
+const ExampleSetting kExampleSettings[] = {
+    {"Vertical sync", "vsync tearing", "Display"},
+    {"Brightness", "gamma light", "Display"},
+    {"Show frame counter", "fps overlay", "Display"},
+    {"Master volume", "sound level", "Audio"},
+    {"Mute when inactive", "sound background focus", "Audio"},
+    {"Subtitles", "captions text", "Audio"},
+    {"Invert vertical axis", "mouse look", "Controls"},
+    {"Mouse sensitivity", "speed pointer", "Controls"},
+    {"Reduce motion", "animation accessibility", "General"},
+    {"Confirm before quitting", "exit dialog", "General"},
+};
+const char* const kExampleSections[] = {"Display", "Audio", "Controls", "General"};
+constexpr const char* kSettingsSearchName = "demo settings";
+
+void SettingsSearchSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SettingsSearch");
+    Paragraph("Decides which settings rows are submitted. The example rows below change only this page. When the "
+              "query changes, the first hit is scrolled into view and highlighted for a moment; the counts per "
+              "section come from the last frame, so a navigation drawn before the rows can show them.");
+    // The capture state types a query near the end of the warm-up, so the highlight still shows.
+    if (ctx.capture && ctx.captureState == kSettingsHits)
+        ui.settingsQuery = ctx.captureFramesLeft > kSettingsCaptureFrames ? "" : "sens";
+    LabeledRow("Search");
+    facet::SearchField("##settings search", &ui.settingsQuery, {.width = DemoWidth(kScaleWidth)});
+    ctx.Probe("comp.settings.field");
+
+    LabeledRow("Hits per section");
+    {
+        char text[160];
+        int length = 0;
+        for (const char* section : kExampleSections)
+            length += std::snprintf(text + length, sizeof(text) - static_cast<std::size_t>(length), "%s%s %d",
+                                    length > 0 ? ", " : "", section, facet::SettingsSearchHitCount(kSettingsSearchName, section));
+        facet::StyledText(text, {.secondary = true, .wrap = true});
+    }
+
+    LabeledRow("Rows");
+    if (facet::BeginScrollArea("##settings rows", {.width = DemoWidth(kScaleWidth + 160.0f), .height = kSettingsAreaHeight}))
+    {
+        facet::BeginSettingsSearch(kSettingsSearchName, {.filter = ui.settingsQuery.c_str()});
+        int shown = 0;
+        for (int i = 0; i < static_cast<int>(std::size(kExampleSettings)); ++i)
+        {
+            const ExampleSetting& row = kExampleSettings[i];
+            if (!facet::SettingsSearchMatch(row.label, {.keywords = row.keywords, .section = row.section}))
+                continue;
+            ++shown;
+            facet::BeginSettingsRow(row.label);
+            if (i % 3 == 1)
+                facet::Slider("##value", &ui.settingsValues[i], 0.0f, 1.0f);
+            else
+                facet::Toggle("##value", &ui.settingsFlags[i]);
+            facet::EndSettingsRow();
+            char probe[48];
+            std::snprintf(probe, sizeof(probe), "comp.settings.row.%d", i);
+            ctx.Probe(probe);
+        }
+        if (shown == 0)
+            facet::StyledText(facet::GetStrings().noResults, {.secondary = true});
+        ctx.Probe("comp.settings.empty");
+        facet::EndSettingsSearch();
+        facet::EndScrollArea();
+    }
+    if (ctx.capture && ctx.captureState == kSettingsHits)
+    {
+        ctx.RevealInCapture(0.3f);
+        if (ctx.captureFramesLeft == 0 && facet::SettingsSearchHitCount(kSettingsSearchName, nullptr) != 1)
+            ctx.captureError = "the settings search did not find the one row the query names";
+    }
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover", "search focused")
+                "accent popover", "search focused", "settings hits")
 {
     const facet::Theme& theme = facet::T();
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
@@ -413,15 +506,9 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
     UiScaleSection(ctx);
 
     SearchFilterBarSection(ctx);
+    SettingsSearchSection(ctx);
 
-    SectionHeader("Search and settings");
-    LabeledRow("Settings search");
-    ImGui::BeginGroup();
-    facet::BeginSettingsSearch("settings", {.filter = ui.settingsQuery.c_str()});
-    if (facet::SettingsSearchMatch("Setting 1", {.keywords = "placeholder"}))
-        facet::StyledText("Setting 1", {.secondary = true});
-    facet::EndSettingsSearch();
-    ImGui::EndGroup();
+    SectionHeader("Key binds and presets");
     LabeledRow("Key bind list");
     facet::KeybindList("binds", ui.binds);
     LabeledRow("Preset list");
@@ -545,4 +632,24 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Enter turns Group A off again", [] { return !ui.filters[0].active; });
     test.Expect("six writes in the bar: a key, Escape and four chips", [] { return ui.filterWrites == 6; });
+
+    // SettingsSearch: one hit far down the rows, no hits, every row, and the Escape order.
+    test.Click("comp.settings.field");
+    test.Type("sens");
+    test.WaitSeconds(0.2f);
+    test.Expect("sens has one hit, in Controls", [] {
+        return facet::SettingsSearchHitCount(kSettingsSearchName, nullptr) == 1 &&
+               facet::SettingsSearchHitCount(kSettingsSearchName, "Controls") == 1;
+    });
+    test.Reveal("comp.settings.row.7");
+    test.ExpectVisible("comp.settings.row.7");
+    test.Type("zz");
+    test.Expect("sensz has no hits", [] { return facet::SettingsSearchHitCount(kSettingsSearchName, nullptr) == 0; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("the first Escape clears the query, so every row is a hit", [] {
+        return ui.settingsQuery.empty() && facet::SettingsSearchHitCount(kSettingsSearchName, nullptr) == 10;
+    });
+    test.Expect("the field still has the keyboard", [] { return ImGui::GetActiveID() != 0; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.Expect("the second Escape leaves the field", [] { return ImGui::GetActiveID() == 0; });
 }

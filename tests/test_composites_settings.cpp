@@ -480,3 +480,167 @@ TEST_CASE("SearchFilterBar read-only or disabled writes neither the query nor th
     CHECK_FALSE(chips[0].active);
 }
 
+// ---- SettingsSearch ------------------------------------------------------------------------
+
+namespace
+{
+
+// Rows of a settings search test: label, keywords and section.
+struct SearchRow
+{
+    const char* label;
+    const char* keywords;
+    const char* section;
+};
+
+const SearchRow kSearchRows[] = {
+    {"Vertical sync", "vsync tearing", "Display"},
+    {"Resolution", "size pixels", "Display"},
+    {"Master volume", "sound level", "Audio"},
+    {"Mute when inactive", "sound focus", "Audio"},
+    {"Language", "locale", "General"},
+};
+
+// Submits the rows through the search and returns how many were let through.
+int SubmitSearchRows(const char* search, const char* filter, const facet::FilterSettings* settings = nullptr)
+{
+    int shown = 0;
+    facet::BeginSettingsSearch(search, {.filter = filter, .filterSettings = settings});
+    for (const SearchRow& row : kSearchRows)
+    {
+        if (facet::SettingsSearchMatch(row.label, {.keywords = row.keywords, .section = row.section}))
+        {
+            ImGui::TextUnformatted(row.label);
+            ++shown;
+        }
+    }
+    facet::EndSettingsSearch();
+    return shown;
+}
+
+} // namespace
+
+TEST_CASE("SettingsSearch lets matching rows through and counts the hits per section of the last frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const char* filter = "";
+    int shown = 0;
+    session.SetUi([&] { shown = SubmitSearchRows("test settings", filter); });
+    session.Frame();
+    // An empty filter lets every row through, and every row counts.
+    CHECK(shown == 5);
+    CHECK(facet::SettingsSearchHitCount("test settings", nullptr) == 5);
+    CHECK(facet::SettingsSearchHitCount("test settings", "Display") == 2);
+    filter = "sound";
+    session.Frame();
+    CHECK(shown == 2);
+    CHECK(facet::SettingsSearchHitCount("test settings", nullptr) == 2);
+    CHECK(facet::SettingsSearchHitCount("test settings", "Audio") == 2);
+    CHECK(facet::SettingsSearchHitCount("test settings", "Display") == 0);
+    // Fuzzy: the characters in order, in the label, the description or the keywords.
+    filter = "vsnc";
+    session.Frame();
+    CHECK(shown == 1);
+    filter = "no such setting";
+    session.Frame();
+    CHECK(shown == 0);
+    CHECK(facet::SettingsSearchHitCount("test settings", nullptr) == 0);
+    // Unknown names and sections count 0.
+    CHECK(facet::SettingsSearchHitCount("another search", nullptr) == 0);
+    CHECK(facet::SettingsSearchHitCount("test settings", "Network") == 0);
+}
+
+TEST_CASE("SettingsSearch outside a search lets every row through and counts nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool shown = false;
+    session.SetUi([&] { shown = facet::SettingsSearchMatch("Row", {.section = "Section"}); });
+    session.Frame();
+    CHECK(shown);
+    CHECK(facet::SettingsSearchHitCount("", "Section") == 0);
+}
+
+TEST_CASE("SettingsSearch with filter settings matches whole query words")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::FilterSettings whole{.wholeWord = true};
+    const char* filter = "sync";
+    int shown = 0;
+    session.SetUi([&] { shown = SubmitSearchRows("test words", filter, &whole); });
+    session.Frame();
+    CHECK(shown == 1);
+    filter = "syn";
+    session.Frame();
+    CHECK(shown == 0);
+}
+
+TEST_CASE("SettingsSearch scrolls the first hit into view and highlights it until the flash ends")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string filter;
+    int highlight = 0;
+    session.SetUi([&] {
+        ImGui::BeginChild("rows", ImVec2(300.0f, 120.0f));
+        facet::BeginSettingsSearch("test reveal", {.filter = filter.c_str()});
+        // Content the search does not filter (headings, notes) keeps the hit far down.
+        for (int i = 0; i < 40; ++i)
+            ImGui::TextUnformatted("Always shown");
+        char label[32];
+        for (int i = 0; i < 60; ++i)
+        {
+            std::snprintf(label, sizeof(label), "Setting %d", i);
+            if (facet::SettingsSearchMatch(label))
+            {
+                ImGui::TextUnformatted(label);
+                if (i == 50)
+                    session.Track("row 50");
+            }
+        }
+        facet::EndSettingsSearch();
+        // The highlight is an accentSubtle fill in the window's draw list.
+        const ImU32 fill = facet::ToU32(facet::T().colors.accentSubtle);
+        highlight = 0;
+        for (const ImDrawVert& v : ImGui::GetWindowDrawList()->VtxBuffer)
+            highlight += (v.col & IM_COL32_A_MASK) != 0 && (v.col | IM_COL32_A_MASK) == (fill | IM_COL32_A_MASK) ? 1 : 0;
+        ImGui::EndChild();
+    });
+    session.Frames(2);
+    CHECK(highlight == 0);
+    CHECK_FALSE(session.ItemVisible("row 50"));  // far below the visible part
+    filter = "Setting 50";
+    session.Frames(3);
+    CHECK(session.ItemVisible("row 50"));
+    CHECK(highlight > 0);
+    // The flash holds for motion.feedbackHold, then fades.
+    const facet::Motion& motion = facet::T().motion;
+    session.Seconds((motion.feedbackHold + motion.durationSlow) * motion.scale + 0.2f);
+    CHECK(highlight == 0);
+}
+
+TEST_CASE("Escape in the search field clears the query first, so every settings row shows again")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    int shown = 0;
+    session.SetUi([&] {
+        facet::SearchField("##search", &query);
+        session.Track("search");
+        shown = SubmitSearchRows("test escape", query.c_str());
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("search"));
+    session.Type("mute");
+    CHECK(shown == 1);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(query.empty());
+    CHECK(shown == 5);
+    CHECK(ImGui::GetActiveID() == session.ItemId("search"));
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(ImGui::GetActiveID() == 0);
+}
+

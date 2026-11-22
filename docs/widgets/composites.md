@@ -260,7 +260,27 @@ int SettingsSearchHitCount(const char* id, const char* section);
 class SettingsSearchScope;
 ```
 
-Search over settings rows with hit counts per section. Status: planned.
+Decides which of the caller's settings rows are submitted. `SettingsSearchMatch` returns true for a
+row when no search is open, when the filter is empty or only spaces, or when the filter matches the
+label, the description or the keywords, each on its own: with the fuzzy matcher (every query
+character in order, case and Latin diacritics ignored) or, when `filterSettings` is set, with
+`PassesFilter` (every query word, as `FilterField` matches). Every row it returns true for counts as
+a hit, for its section and for the whole search, so an empty filter counts every row.
+`SettingsSearchHitCount` reads the counts of the last completed frame (a frame hook closes them),
+keyed by the search name with seed 0 and the section name; an unknown name or section gives 0, and a
+search that was not submitted in the last frame counts 0.
+
+Reveal: on the frame the filter changes to a non-empty text, the first row that matches is scrolled
+into view (`ImGui::SetScrollHereY`) when it lies outside its window's visible part, and an
+`accentSubtle` fill marks it from one frame later (the row's height is measured in the frame it is
+submitted): it holds for `motion.feedbackHold` and fades out over `motion.durationSlow`, through the
+animation store, so with reduced motion it disappears at once after the hold. The fill is drawn
+behind the row's content. Escape belongs to the search field the caller uses: with `SearchField`
+the first Escape clears the query (every row shows again) and the next one leaves the field.
+
+Up to four searches can be open inside each other; a deeper one lets every row through. Begin pushes
+nothing on the id stack and submits no item. Not done yet: a list of the hits that jumps to a chosen
+row (see "Planned, not declared yet"). Status: ready.
 
 ### KeybindList
 
