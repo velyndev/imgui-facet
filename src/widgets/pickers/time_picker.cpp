@@ -30,6 +30,7 @@
 #include "internal/item.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
+#include "internal/scroll.h"
 #include "internal/selection_pill.h"
 #include "internal/state_storage.h"
 #include "internal/value_drag.h"
@@ -256,6 +257,9 @@ TimeColumnsResult TimeColumns(ImGuiID id, const TimeLayout& layout, const TimeOf
     const float rowHeight = ListRowHeight(options.size);
     const float pad = FocusRingOutset();
     const ImVec2 area(std::round(Px(t.picker.timeColumnWidth)), std::round(rowHeight * kTimeColumnRows + pad * 2.0f));
+    // A column with more entries than it shows scrolls: it is wider by the gutter of its bar, so
+    // the pill keeps the column width beside the bar.
+    const float barRoom = std::max(0.0f, ScrollBarGutter() - pad);
     ImGui::PushOverrideID(id);
     for (int i = 0; i < layout.count; ++i)
     {
@@ -267,7 +271,7 @@ TimeColumnsResult TimeColumns(ImGuiID id, const TimeLayout& layout, const TimeOf
         ListViewDesc view;
         view.rowCount = source.Count();
         view.size = options.size;
-        view.areaSize = area;
+        view.areaSize = ImVec2(area.x + (view.rowCount > kTimeColumnRows ? barRoom : 0.0f), area.y);
         view.fadeSurface = fadeSurface;
         view.choice = &choice;
         view.pill = true;

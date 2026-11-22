@@ -334,12 +334,17 @@ bool IconPickerImpl(const char* label, Icon* icon, const IconSource& source, con
     {
         const bool live = !item.open;
         IconBuildTiles(state, source, columns, options.showRecent);
+        // A grid with more lines than the area shows scrolls: the popover is wider by the gutter of
+        // the bar then, so the tiles keep their columns beside it.
+        const int gridLines = (source.count + columns - 1) / columns + (state.recentTiles > 0 ? 2 : 0);
+        const float barRoom = gridLines > kIconVisibleLines ? std::max(0.0f, ScrollBarGutter() - pad) : 0.0f;
+        const float areaWidth = gridWidth + pad * 2.0f + barRoom;
         if (options.searchable)
         {
             // Typing goes to the search field from the moment the popover opens.
             if (state.opened && live)
                 ImGui::SetKeyboardFocusHere();
-            SearchField("##search", state.query, sizeof(state.query), {.width = (gridWidth + pad * 2.0f) / Scale()});
+            SearchField("##search", state.query, sizeof(state.query), {.width = areaWidth / Scale()});
             const ImGuiID searchId = ImGui::GetItemID();
             if (live && ImGui::IsItemFocused())
             {
@@ -358,7 +363,7 @@ bool IconPickerImpl(const char* label, Icon* icon, const IconSource& source, con
         // The grid area keeps the height of the unfiltered grid, so typing does not resize the popover.
         const int allLines = (source.count + columns - 1) / columns + (state.recentTiles > 0 ? 2 : 0);
         const int lines = std::clamp(allLines, 1, kIconVisibleLines);
-        const ImVec2 areaSize(gridWidth + pad * 2.0f, lines * step - gap + pad * 2.0f);
+        const ImVec2 areaSize(areaWidth, lines * step - gap + pad * 2.0f);
         if (state.tiles.Size == 0)
         {
             const ImVec2 at = ImGui::GetCursorScreenPos();

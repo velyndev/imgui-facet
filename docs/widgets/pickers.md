@@ -294,7 +294,8 @@ invalid one (hour 25) stays shown as typed until corrected, and Escape drops the
 
 A click, Enter, Space or Alt+Down opens a popover beside the field with one scrolling column per
 unit (hours, minutes in slots, seconds, AM and PM), each `picker.timeColumnWidth` wide and five
-rows tall, the chosen entry on the selection pill. The focus starts on the chosen hour; Tab moves
+rows tall, the chosen entry on the selection pill. A column with more than five entries is wider by
+the gutter of its scroll bar, so the pill keeps the column width beside the bar. The focus starts on the chosen hour; Tab moves
 between the columns. A click or an arrow key in a column writes at once; Enter or a double click
 writes and closes, and the focus returns to the field; Escape or a click outside closes. With
 `inlineColumns` the columns stay under the field and scroll to the time whenever it changes
@@ -351,7 +352,9 @@ icon tiles one Large control height square. The recently picked icons come first
 every icon, in sections under their `ChoiceItem::group` text; the first form offers every
 registered icon (`IconCount`, `IconNameAt`), sorted by name. `columns` sets the columns; 0 fits as
 many as the wider of the field and six tiles allow, at most the display width. The grid shows six
-lines at most and scrolls; only its visible lines are submitted, and the tiles are rebuilt only when
+lines at most and scrolls; a set with more lines makes the popover wider by the gutter of the
+scroll bar, so the bar stands beside the last column instead of over it. Only the visible lines
+are submitted, and the tiles are rebuilt only when
 the filter, the item count, the columns or the recent icons change, so a set of any size costs the
 same per frame.
 
