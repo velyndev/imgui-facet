@@ -157,6 +157,7 @@ TEST_CASE("A toggle fits label and switch, keeps a set width and cuts a long lab
     REQUIRE(session.Ready());
     bool value = false;
     bool cutTip = false;
+    bool longTip = false;
     float labelWidth = 0.0f;
     session.SetUi([&] {
         labelWidth = facet::MeasureText(facet::TextStyle::Body, "Wi-Fi").x;
@@ -169,9 +170,16 @@ TEST_CASE("A toggle fits label and switch, keeps a set width and cuts a long lab
         cutTip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
         facet::Toggle("Small##small", &value, {.size = facet::ControlSize::Small});
         session.Track("small");
+        // A label longer than the switch: a toggle that fits its content shows it whole.
+        facet::Toggle("A longer label##long", &value);
+        session.Track("long");
+        longTip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(ImGui::GetItemID()));
     });
     session.Frame();
     const facet::Theme& t = facet::T();
+    session.MouseMove(session.ItemCenter("long"));
+    session.Seconds(t.overlay.tooltipDelay + 0.2f);
+    CHECK_FALSE(longTip);
     CHECK(session.ItemRect("fit").GetWidth() ==
           doctest::Approx(std::ceil(labelWidth + std::round(facet::Px(t.spacing.sm)) + facet::PxSnapped(t.metrics.toggleWidth))));
     CHECK(session.ItemRect("fit").GetHeight() == doctest::Approx(facet::ControlHeight(facet::ControlSize::Regular)));

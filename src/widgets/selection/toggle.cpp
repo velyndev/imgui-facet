@@ -63,7 +63,10 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
     const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(options.width, next);
     const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX, fit);
     const float width = internal::ResolveItemWidth(options.width, next, std::ceil(natural.width + track.x));
-    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width, fit);
+    // A toggle as wide as its content keeps the whole label; a narrower or a set width measures again.
+    const internal::FrontLabel front = width + 0.5f >= std::ceil(natural.width + track.x)
+                                           ? natural
+                                           : internal::MeasureFrontLabel(label, m.size, width, fit);
     const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     const bool grouped = message.IsSet();
 
