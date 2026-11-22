@@ -3,9 +3,11 @@
 // One test case per behaviour of an implemented widget; docs/writing-a-widget.md describes the
 // pattern. The API checks are in tests/test_api_selection.cpp.
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -1403,4 +1405,95 @@ TEST_CASE("A toggle outside a frame returns false")
     bool value = false;
     CHECK_FALSE(facet::Toggle("Toggle", &value));
     CHECK_FALSE(value);
+}
+
+TEST_CASE("The toggle is a capsule with a solid round knob in every size and state")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::Theme theme = facet::Theme::Light();
+    theme.radii.continuousCorners = true;
+    facet::SetTheme(theme, false);
+    const facet::Colors& c = facet::T().colors;
+    bool off = false;
+    bool on = true;
+    struct Shot
+    {
+        ImRect rect;
+        std::vector<ImVec2> track;
+        std::vector<ImVec2> knob;
+    };
+    Shot shots[4];
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        int index = 0;
+        for (const facet::ControlSize size : {facet::ControlSize::Small, facet::ControlSize::Large})
+        {
+            for (bool* value : {&off, &on})
+            {
+                Shot& shot = shots[index++];
+                ImGui::PushID(index);
+                const int from = drawList->VtxBuffer.Size;
+                facet::Toggle("##toggle", value, {.size = size});
+                ImGui::PopID();
+                shot.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+                shot.track.clear();
+                shot.knob.clear();
+                const ImU32 trackColor = facet::ToU32(*value ? c.focusRing : c.fill[0]) & ~IM_COL32_A_MASK;
+                const ImU32 knobColor = facet::ToU32(c.knob) & ~IM_COL32_A_MASK;
+                for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+                {
+                    const ImDrawVert& v = drawList->VtxBuffer[i];
+                    const ImU32 rgb = v.col & ~IM_COL32_A_MASK;
+                    // Opaque vertices only: the anti-aliased fringe sits half a pixel outside.
+                    if ((v.col >> IM_COL32_A_SHIFT) == 0)
+                        continue;
+                    if (rgb == trackColor)
+                        shot.track.push_back(v.pos);
+                    else if (rgb == knobColor)
+                        shot.knob.push_back(v.pos);
+                }
+            }
+        }
+    });
+    session.Frames(3);
+    for (const Shot& shot : shots)
+    {
+        REQUIRE_FALSE(shot.knob.empty());
+        // The knob: a circle around the centre of its vertices.
+        ImVec2 lo(FLT_MAX, FLT_MAX);
+        ImVec2 hi(-FLT_MAX, -FLT_MAX);
+        for (const ImVec2& p : shot.knob)
+        {
+            lo = ImMin(lo, p);
+            hi = ImMax(hi, p);
+        }
+        const ImVec2 center((lo.x + hi.x) * 0.5f, (lo.y + hi.y) * 0.5f);
+        const float radius = (hi.x - lo.x) * 0.5f;
+        CHECK((hi.y - lo.y) * 0.5f == doctest::Approx(radius).epsilon(0.02));
+        for (const ImVec2& p : shot.knob)
+            CHECK(std::sqrt((p.x - center.x) * (p.x - center.x) + (p.y - center.y) * (p.y - center.y)) ==
+                  doctest::Approx(radius).epsilon(0.05));
+    }
+    // The track of the on toggles: every opaque fill vertex lies on a capsule of its height.
+    for (const int index : {1, 3})
+    {
+        const Shot& shot = shots[index];
+        REQUIRE_FALSE(shot.track.empty());
+        ImVec2 lo(FLT_MAX, FLT_MAX);
+        ImVec2 hi(-FLT_MAX, -FLT_MAX);
+        for (const ImVec2& p : shot.track)
+        {
+            lo = ImMin(lo, p);
+            hi = ImMax(hi, p);
+        }
+        const float r = (hi.y - lo.y) * 0.5f;
+        for (const ImVec2& p : shot.track)
+        {
+            const float x = std::clamp(p.x, lo.x + r, hi.x - r);
+            const float d = std::sqrt((p.x - x) * (p.x - x) + (p.y - (lo.y + r)) * (p.y - (lo.y + r)));
+            CHECK(d == doctest::Approx(r).epsilon(0.06));
+        }
+    }
 }

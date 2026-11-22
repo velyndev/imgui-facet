@@ -12,6 +12,7 @@
 #include "facet/core/anim.h"
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
+#include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
@@ -163,7 +164,9 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
                               ToU32(internal::ControlLabelColor(item.disabled)), shown.text);
         }
 
-        // Track: the neutral fill with the 3:1 boundary while off, the accent while on.
+        // Track: a capsule (the shared helpers give a radius of half the height circular ends).
+        // Off is fill[0] with the controlBorder hairline, on the accent mark (focusRing, which
+        // reaches 3:1 against an off track on every surface) without an outline.
         internal::ItemState look = item;
         if (options.loading)
         {
@@ -172,39 +175,45 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         }
         const float radius = track.y * 0.5f;
         ImVec4 trackColor;
-        ImVec4 knobColor;
-        ImVec4 outline;
+        internal::OutlineLook outlineLook;
+        outlineLook.hoverAmount = look.hoverAmount;
+        outlineLook.disabled = item.disabled;
         if (item.disabled)
         {
             trackColor = c.fill[3];
-            knobColor = c.labelTertiary;
-            outline = c.separator;
         }
         else if (item.readOnly)
         {
             // Read-only: labelSecondary instead of the accent, so it does not look like a choice.
-            const ImVec4 clear = WithAlpha(c.fill[2], 0.0f);
-            trackColor = Mix(clear, c.labelSecondary, onT);
-            knobColor = Mix(c.labelSecondary, c.bg, onT);
-            outline = Mix(ControlBoundaryColor(c), c.labelSecondary, onT);
+            outlineLook.hoverAmount = 0.0f;
+            trackColor = Mix(c.fill[0], c.labelSecondary, onT);
         }
         else
         {
-            const ImVec4 off = internal::NeutralFill(look);
-            const ImVec4 onFill = internal::StateFill(c.accent, c.accentHover, c.accentPressed, look);
+            const ImVec4 off = internal::StateFill(c.fill[0], Over(c.fill[3], c.fill[0]), Over(c.fill[2], c.fill[0]), look);
+            const ImVec4 onFill = internal::StateFill(c.focusRing, c.accentHover, c.accentPressed, look);
             trackColor = onT <= 0.0f ? off : (onT >= 1.0f ? onFill : Mix(off, onFill, onT));
-            knobColor = Mix(c.labelSecondary, c.onAccent, onT);
-            outline = Mix(ControlBoundaryColor(c), c.focusRing, onT);
         }
         FillRect(drawList, trackRect.Min, trackRect.Max, ToU32(trackColor), radius);
-        StrokeRect(drawList, trackRect.Min, trackRect.Max, ToU32(outline), radius, HairlineThickness());
+        // The outline belongs to the off track and fades out as the accent comes in.
+        const ImVec4 outline = internal::ControlOutlineColor(outlineLook);
+        internal::DrawOutline(drawList, trackRect, radius, WithAlpha(outline, outline.w * (1.0f - onT)));
 
-        // Knob: a disc in labelSecondary while off and onAccent while on.
+        // Knob: a solid disc in the knob token with the controlBorder hairline and the level 1
+        // shadow, the same in every size and state; disabled it keeps the disabled picture opacity.
         const ImVec2 center(trackRect.Min.x + inset + knob * 0.5f + knobT * travel, trackRect.GetCenter().y);
-        drawList->AddCircleFilled(center, knob * 0.5f, ToU32(knobColor));
+        const ImRect knobRect(center.x - knob * 0.5f, center.y - knob * 0.5f, center.x + knob * 0.5f,
+                              center.y + knob * 0.5f);
+        const float knobRadius = knob * 0.5f;
+        const float knobAlpha = item.disabled ? internal::kDisabledPictureOpacity : 1.0f;
+        if (!item.disabled)
+            DrawElevation(drawList, knobRect.Min, knobRect.Max, knobRadius, 1);
+        FillRect(drawList, knobRect.Min, knobRect.Max, ToU32(WithAlpha(c.knob, c.knob.w * knobAlpha)), knobRadius);
+        internal::DrawOutline(drawList, knobRect, knobRadius,
+                              item.disabled ? c.separator : c.controlBorder);
         if (options.loading)
             internal::DrawControlSpinner(drawList, center, knob * kSpinnerShare,
-                                         ToU32(on && !mixedShown ? c.accent : c.bg));
+                                         ToU32(on && !mixedShown ? c.accent : ReadableOn(c.knob)));
         internal::DrawFocusRing(drawList, trackRect, radius, item.focusAmount, 0, internal::RingShape::Round);
     }
 
