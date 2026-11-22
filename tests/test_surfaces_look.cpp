@@ -271,6 +271,47 @@ TEST_CASE("Layout look: a tile selected by a click shows the selected tile look 
     CHECK(accent.Max.y <= tile.Max.y + 0.5f);
 }
 
+TEST_CASE("Layout look: the ring follows the keys to an earlier tile at once, never the fading tile")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    session.SetUi([&] {
+        if (facet::BeginItemGrid("##tiles", 6, nullptr, {.minTileWidth = 60.0f, .height = 200.0f}))
+        {
+            facet::RowRange range;
+            while (facet::NextVisibleRows(&range))
+                for (int i = range.first; i < range.last; ++i)
+                {
+                    (void)facet::ItemGridTile(i);
+                    if (i == 3)
+                        session.Track("tile3");
+                }
+            facet::EndItemGrid();
+        }
+    });
+    session.Frames(2);
+    // A click on tile 3, then Right: tile 4 has the focus and its ring at full strength.
+    session.Click(session.ItemCenter("tile3"));
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frames(12);
+    REQUIRE(ColorCount(RingColor(), false) > 0);
+    const ImRect before = ColorBounds(RingColor());
+    REQUIRE((before.Min.x > session.ItemRect("tile3").Max.x - 0.5f || before.Min.y > session.ItemRect("tile3").Max.y - 0.5f));
+    // Left moves the focus to tile 3 while the ring of tile 4, submitted after it, fades out: the
+    // ring is drawn in tile 3 while tile 4 still fades (two frames, well inside durationFast).
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Frames(2);
+    const ImRect tile = session.ItemRect("tile3");
+    REQUIRE(ColorCount(RingColor(), false) > 0);
+    const ImRect ring = ColorBounds(RingColor());
+    CHECK(ring.Min.x >= tile.Min.x - 0.5f);
+    CHECK(ring.Max.x <= tile.Max.x + 0.5f);
+    CHECK(ring.Min.y >= tile.Min.y - 0.5f);
+    CHECK(ring.Max.y <= tile.Max.y + 0.5f);
+}
+
 TEST_CASE("Containers look: the inspector pane edge keeps its width under the pointer")
 {
     SurfacesLookGuard guard;

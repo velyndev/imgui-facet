@@ -172,8 +172,13 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
         look.tile = placement.tile;
         DrawListRowFill(window->DrawList, fill, Px(theme.radii.control), look);
     }
+    // A row whose ring is still fading out takes the ring only while no current row (focused or
+    // highlighted) holds it, so a later fading row never paints over the row the focus moved to.
+    const bool currentRow = item.focused || highlighted;
+    const bool ringHeld = env.ring != nullptr && *env.hasRing &&
+                          (env.ring->focused || (env.ringFromHighlight != nullptr && *env.ringFromHighlight));
     if (env.ring != nullptr && !placement.ownRing &&
-        (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
+        (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)) && (currentRow || !ringHeld))
     {
         // The current row of a driven list may show the ring the keyboard focus would, when the keys
         // put it there; the owner decides with ringFromHighlight. The ring sits inside the fill.
