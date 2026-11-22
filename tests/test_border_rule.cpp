@@ -1,7 +1,8 @@
 // The border rule of DESIGN.md: every outline is one hairline. A source scan over the outline
 // strokes of the library and the test app (StrokeRect, StrokeRoundRect, StrokeContinuousRect,
-// ImDrawList::AddRect and AddCircle) checks that each one takes HairlineThickness() or a variable
-// that holds it, so a 2 px border here and a 3 px border there cannot creep back in.
+// StrokeArc, ImDrawList::AddRect and AddCircle, and PathStroke and AddPolyline of a closed path)
+// checks that each one takes HairlineThickness() or a variable the same file assigns exactly that,
+// so a 2 px border here and a 3 px border there cannot creep back in.
 //
 // Strokes that are not outlines keep their own weights (the focus ring, glyphs): they are listed as
 // exceptions with their reason. Files that still break the rule are listed as pending until their
@@ -67,14 +68,18 @@ struct StrokeCall
     const char* name;  // the call as written, up to and with the opening parenthesis
     int width;         // index of the width argument; a call that leaves it out uses a 1 px default
     bool member;       // an ImDrawList member, written after "->"
+    int closedFlags;   // index of the flags argument: only a closed path is an outline; -1: always
 };
 
 constexpr StrokeCall kCalls[] = {
-    {"StrokeRect(", 5, false},
-    {"StrokeRoundRect(", 5, false},
-    {"StrokeContinuousRect(", 5, false},
-    {"AddRect(", 4, true},
-    {"AddCircle(", 4, true},
+    {"StrokeRect(", 5, false, -1},
+    {"StrokeRoundRect(", 5, false, -1},
+    {"StrokeContinuousRect(", 5, false, -1},
+    {"StrokeArc(", 6, false, -1},
+    {"AddRect(", 4, true, -1},
+    {"AddCircle(", 4, true, -1},
+    {"PathStroke(", 1, true, 2},
+    {"AddPolyline(", 3, true, 4},
 };
 
 std::string ReadFile(const std::filesystem::path& path)
@@ -157,20 +162,53 @@ std::vector<std::string> Arguments(const std::string& source, std::size_t open)
     return args;
 }
 
-// A width that follows the rule: HairlineThickness() itself, or one identifier that names a
-// hairline (a variable holding HairlineThickness()).
-bool IsHairline(const std::string& argument)
+bool IsHairlineCall(const std::string& text)
 {
-    if (argument == "HairlineThickness()" || argument == "facet::HairlineThickness()")
+    return text == "HairlineThickness()" || text == "facet::HairlineThickness()" || text == "internal::HairlineThickness()" ||
+           text == "facet::internal::HairlineThickness()";
+}
+
+// A width that follows the rule: HairlineThickness() itself, or one identifier (a variable or a
+// member, the part after the last '.') that `source` assigns HairlineThickness() and nothing else:
+// "name = HairlineThickness();" or ".name = HairlineThickness()," in an initializer.
+bool IsHairline(const std::string& argument, const std::string& source)
+{
+    if (IsHairlineCall(argument))
         return true;
-    std::string lower;
+    if (argument.empty())
+        return false;
     for (const char c : argument)
-    {
         if (std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_' && c != '.')
             return false;
-        lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    const std::size_t dot = argument.rfind('.');
+    const std::string name = argument.substr(dot == std::string::npos ? 0 : dot + 1);
+    if (name.empty() || std::isdigit(static_cast<unsigned char>(name[0])) != 0)
+        return false;
+    std::size_t at = 0;
+    while ((at = source.find(name, at)) != std::string::npos)
+    {
+        const std::size_t start = at;
+        at += name.size();
+        if (start > 0 && (std::isalnum(static_cast<unsigned char>(source[start - 1])) != 0 || source[start - 1] == '_'))
+            continue;
+        std::size_t i = at;
+        while (i < source.size() && source[i] == ' ')
+            ++i;
+        if (i >= source.size() || source[i] != '=' || (i + 1 < source.size() && source[i + 1] == '='))
+            continue;
+        ++i;
+        while (i < source.size() && source[i] == ' ')
+            ++i;
+        const std::size_t end = source.find_first_of(";,}", i);
+        if (end == std::string::npos)
+            continue;
+        std::string value = source.substr(i, end - i);
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())) != 0)
+            value.pop_back();
+        if (IsHairlineCall(value))
+            return true;
     }
-    return lower.find("hairline") != std::string::npos;
+    return false;
 }
 
 struct Violation
@@ -206,9 +244,12 @@ std::vector<Violation> ScanFile(const std::string& relative, const std::string& 
             if (before.find("void ") != std::string::npos)
                 continue;
             const std::vector<std::string> args = Arguments(source, start + name.size() - 1);
+            if (call.closedFlags >= 0 && (static_cast<int>(args.size()) <= call.closedFlags ||
+                                          args[static_cast<std::size_t>(call.closedFlags)].find("Closed") == std::string::npos))
+                continue;  // an open path: a line or a curve, not an outline
             const std::string width =
                 static_cast<int>(args.size()) > call.width ? args[static_cast<std::size_t>(call.width)] : "(default 1 px)";
-            if (IsHairline(width))
+            if (IsHairline(width, source))
                 continue;
             bool excepted = false;
             for (const BorderRuleException& exception : kExceptions)
@@ -270,20 +311,30 @@ TEST_CASE("Border rule: every outline stroke in the library and the test app is 
 
 TEST_CASE("Border rule: the scan recognises hairline widths and finds other widths")
 {
-    CHECK(IsHairline("HairlineThickness()"));
-    CHECK(IsHairline("hairline"));
-    CHECK(IsHairline("m.hairline"));
-    CHECK_FALSE(IsHairline("hairline * 2.0f"));
-    CHECK_FALSE(IsHairline("2.0f"));
-    CHECK_FALSE(IsHairline("Px(T().metrics.focusRingWidth)"));
+    const std::string defined = "const float hairline = HairlineThickness();\nlook.edge = facet::HairlineThickness();\n"
+                                "const float twoHairlines = HairlineThickness() * 2.0f;\n";
+    CHECK(IsHairline("HairlineThickness()", ""));
+    CHECK(IsHairline("hairline", defined));
+    CHECK(IsHairline("look.edge", defined));
+    CHECK_FALSE(IsHairline("hairline", ""));
+    CHECK_FALSE(IsHairline("twoHairlines", defined));
+    CHECK_FALSE(IsHairline("hairline * 2.0f", defined));
+    CHECK_FALSE(IsHairline("2.0f", defined));
+    CHECK_FALSE(IsHairline("Px(T().metrics.focusRingWidth)", defined));
     const std::string source =
         "void F()\n{\n    StrokeRect(dl, a, b, c, r, HairlineThickness());\n    StrokeRect(dl, a, b, c, r, 2.0f);\n"
         "    // StrokeRect(dl, a, b, c, r, 3.0f);\n    dl->AddRect(a, b, c, r, Px(2.0f), 0);\n    dl->AddRectFilled(a, b, c);\n"
-        "    StrokeRect(dl, a, b, Color(1, 2), r);\n}\n";
+        "    StrokeRect(dl, a, b, Color(1, 2), r);\n    StrokeArc(dl, p, r, 0.0f, kTurn, c, HairlineThickness() * 2.0f, false);\n"
+        "    dl->PathStroke(c, 3.0f, ImDrawFlags_Closed);\n    dl->PathStroke(c, 3.0f);\n"
+        "    dl->AddPolyline(p, n, c, 2.0f, ImDrawFlags_Closed);\n    dl->AddPolyline(p, n, c, 2.0f);\n}\n";
     const std::vector<Violation> found = ScanFile("example.cpp", source);
-    REQUIRE(found.size() == 3);
+    REQUIRE(found.size() == 6);
+    // ScanFile reports by call kind in the order of kCalls.
     CHECK(found[0].argument == "2.0f");
     CHECK(found[0].line == 4);
     CHECK(found[1].argument == "(default 1 px)");
-    CHECK(found[2].argument == "Px(2.0f)");
+    CHECK(found[2].argument == "HairlineThickness() * 2.0f");
+    CHECK(found[3].argument == "Px(2.0f)");
+    CHECK(found[4].argument == "3.0f");
+    CHECK(found[5].argument == "2.0f");
 }
