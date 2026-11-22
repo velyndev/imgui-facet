@@ -44,10 +44,10 @@
 //     test.DragAndHold({T::Item("row.2"), T::Item("row.0")}, 0.3f, 0.7f);  // rests 0.7 s on the target
 //     test.ExpectNear("value is about 0.3", [] { return value; }, 0.3, 0.05);
 //     test.ExpectText("the field holds hi", [] { return std::string(text); }, "hi");
-//     test.ExpectVisible("nav.composites");                      // scrolled into view
+//     test.ExpectVisible("nav.composites-editors");              // scrolled into view
 //     test.ExpectNotVisible("nav.tokens");                       // scrolled out of view
-//     test.SelectPage("composites");                             // as --page would
-//     test.ExpectPage("composites");                             // the page shown
+//     test.SelectPage("composites-editors");                     // as --page would
+//     test.ExpectPage("composites-editors");                     // the page shown
 //
 // The clipboard: every run gets a clipboard of its own, empty at the start, so Ctrl+C and
 // Ctrl+V in a script never read or change the system clipboard.

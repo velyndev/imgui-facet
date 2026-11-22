@@ -542,16 +542,16 @@ FACET_DEMO_SELFTEST("tokens")
     // The page list scrolls. A page far down the list is scrolled into view when it is
     // selected (as by --page), and the keyboard reaches every page: from the first row,
     // holding Down walks to the last one, and Enter opens it.
-    test.SelectPage("composites");
-    test.ExpectVisible("nav.composites");
+    test.SelectPage("composites-editors");
+    test.ExpectVisible("nav.composites-editors");
     test.ExpectNotVisible("nav.tokens");  // the top of the list is scrolled out of view
     test.Click("nav.tokens");
     test.ExpectPage("tokens");
     test.HoldKey(ImGuiKey_DownArrow, 3.0f);
-    test.ExpectFocused("nav.composites");
-    test.ExpectVisible("nav.composites");
+    test.ExpectFocused("nav.composites-editors");
+    test.ExpectVisible("nav.composites-editors");
     test.KeyPress(ImGuiKey_Enter);
-    test.ExpectPage("composites");
+    test.ExpectPage("composites-editors");
     // Back up: Up walks to the first page, which is scrolled into view under its heading.
     test.HoldKey(ImGuiKey_UpArrow, 3.0f);
     test.ExpectFocused("nav.tokens");
