@@ -394,6 +394,66 @@ TEST_CASE("A thumbnail strip chooses by click and by the arrows, Home and End, a
     CHECK(other == 1);
 }
 
+TEST_CASE("A chosen thumbnail shows accentSubtle and a hairline accent outline; only keys show the ring")
+{
+    ReducedMotion reduced;
+    facet::Theme theme = facet::T();
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::ImageItem items[] = {{"Image 1"}, {"Image 2"}, {"Image 3"}, {"Image 4"}};
+    int selected = -1;
+    session.SetUi([&] {
+        (void)facet::ThumbnailStrip("strip", &selected, items, {.thumbnailHeight = 40.0f});
+        session.Track("strip");
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("strip");
+    const float inset = std::ceil(facet::internal::FocusRingOutset());
+    const float thumb = facet::PxSnapped(40.0f);
+    const float stride = thumb + facet::PxSnapped(facet::T().spacing.sm);
+    const auto tileOf = [&](int i) {
+        const float x = r.Min.x + inset + stride * static_cast<float>(i);
+        return ImRect(x, r.Min.y + inset, x + thumb, r.Min.y + inset + thumb);
+    };
+    const ImU32 accent = facet::ToU32(facet::T().colors.focusRing);
+    // The vertices in the ring color (any alpha above 0) inside a tile.
+    const auto accentCount = [&](const ImRect& tile) {
+        ImRect grown = tile;
+        grown.Expand(0.5f);
+        int count = 0;
+        for (const ImDrawList* list : ImGui::GetDrawData()->CmdLists)
+            for (const ImDrawVert& v : list->VtxBuffer)
+                count += (v.col & ~IM_COL32_A_MASK) == (accent & ~IM_COL32_A_MASK) && (v.col & IM_COL32_A_MASK) != 0 &&
+                                 grown.Contains(v.pos)
+                             ? 1
+                             : 0;
+        return count;
+    };
+    session.Click(tileOf(1).GetCenter());
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(2);
+    REQUIRE(selected == 1);
+    CHECK_FALSE(facet::internal::KeyboardModality());
+    // The accent outline alone, no ring.
+    const int outline = accentCount(tileOf(1));
+    CHECK(outline > 0);
+    CHECK(accentCount(tileOf(2)) == 0);
+    int wash = 0;
+    const ImU32 subtle = facet::ToU32(facet::T().colors.accentSubtle);
+    for (const ImDrawList* list : ImGui::GetDrawData()->CmdLists)
+        for (const ImDrawVert& v : list->VtxBuffer)
+            wash += v.col == subtle && tileOf(1).Contains(v.pos) ? 1 : 0;
+    CHECK(wash > 0);
+    // The arrow moves the choice and turns the ring on: more geometry in the ring color in the new
+    // tile than its outline alone.
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.Frames(2);
+    REQUIRE(selected == 2);
+    CHECK(accentCount(tileOf(2)) > outline);
+}
+
 TEST_CASE("A thumbnail strip scrolls by drag and by the wheel without choosing")
 {
     ReducedMotion reduced;

@@ -35,10 +35,6 @@ constexpr float kMediaSquircleShare = 0.3f;
 constexpr float kMediaInitialsShare = 0.42f;
 // The user icon of an avatar without initials covers this share of its side.
 constexpr float kMediaAvatarIconShare = 0.55f;
-// The selection ring of an avatar is this many hairlines wide, and the image keeps one hairline of
-// gap inside it, so the ring reads apart from the picture at every scale.
-constexpr float kMediaSelectedRingHairlines = 2.0f;
-
 // The speed of a held position is smoothed at this rate per second (about two frames at 60 Hz),
 // so one uneven frame does not decide a flick.
 constexpr float kMediaVelocitySmoothing = 30.0f;
@@ -251,13 +247,12 @@ void MediaDrawAvatar(ImDrawList* drawList, const ImRect& rect, const char* name,
     const float side = box.GetWidth();
     if (look.selected)
     {
-        const float ring = std::max(1.0f, std::round(HairlineThickness() * kMediaSelectedRingHairlines));
-        const ImVec4 color = look.disabled ? c.labelTertiary : c.accent;
-        if (look.squircle)
-            StrokeRect(drawList, box.Min, box.Max, ToU32(color), MediaAvatarRadius(side, true), ring);
-        else
-            StrokeRoundRect(drawList, box.Min, box.Max, ToU32(color), side * 0.5f, ring);
-        box.Expand(-(ring + HairlineThickness()));
+        // The accent outline at the one border width on the edge (a circle gets circular arcs from
+        // the shared stroke helper), a hairline of gap, then the picture.
+        const float hairline = HairlineThickness();
+        DrawOutline(drawList, box, MediaAvatarRadius(side, look.squircle),
+                    ControlOutlineColor({.selected = true, .disabled = look.disabled}));
+        box.Expand(-(hairline * 2.0f));
     }
     const float inner = box.GetWidth();
     if (inner <= 0.0f)
@@ -357,7 +352,7 @@ void MediaDrawCaption(ImDrawList* drawList, const ImRect& area, MediaCorner corn
     const ImVec2 max(min.x + size.x, min.y + size.y);
     const float radius = Px(t.radii.element);
     FillRect(drawList, min, max, ToU32(c.bgElevated), radius);
-    StrokeRect(drawList, min, max, ToU32(c.separator), radius, HairlineThickness());
+    DrawSurfaceOutline(drawList, ImRect(min, max), radius);
     drawList->AddText(ImVec2(min.x + padX, min.y + padY), ToU32(ControlLabelColor(disabled)), shown.text);
 }
 

@@ -129,7 +129,7 @@ bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHand
         const float line = std::max(1.0f, PxSnapped(t.media.playheadWidth));
         const float hair = HairlineThickness();
         const float lineStart = std::round(at - line * 0.5f);
-        const ImU32 edge = ToU32(disabled ? c.labelTertiary : ControlBoundaryColor(c));
+        const ImU32 edge = ToU32(internal::ControlOutlineColor({.disabled = disabled}));
         drawList->PushClipRect(rect.Min, rect.Max, true);
         if (vertical)
         {

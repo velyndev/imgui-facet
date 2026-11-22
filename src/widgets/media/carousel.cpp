@@ -401,7 +401,9 @@ bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, 
             {
                 const float cx = dotsLeft + (static_cast<float>(i) + 0.5f) * dotStride;
                 const bool on = i == (target >= 0 ? target : current);
-                const ImVec4 color = body.disabled ? c.labelTertiary : (on ? c.accent : ControlBoundaryColor(c));
+                // The current page in the accent mark (3:1 on every surface), the others in the quiet
+                // controlBorder; disabled dots take separator, never lighter than enabled ones.
+                const ImVec4 color = body.disabled ? c.separator : (on ? c.focusRing : c.controlBorder);
                 drawList->AddCircleFilled(ImVec2(std::round(cx), std::round(row.GetCenter().y)), dot * 0.5f, ToU32(color));
             }
         }

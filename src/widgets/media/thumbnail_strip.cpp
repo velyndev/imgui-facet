@@ -20,6 +20,7 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/list_view.h"
 #include "internal/loading.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
@@ -34,9 +35,6 @@ using internal::ForcedItemState;
 
 // The default thumbnail side, in xxxl spacing steps (the header promises four).
 constexpr float kStripSpans = 4.0f;
-// The selection ring is this many hairlines wide, inside the thumbnail, with one hairline of gap
-// to the picture, so it reads as a ring at every scale and needs no extra room.
-constexpr float kStripRingHairlines = 2.0f;
 
 struct MediaStripState
 {
@@ -261,7 +259,10 @@ bool ThumbnailStripImpl(const char* label, int* selected, const StripSource& sou
             const int first = std::max(0, static_cast<int>((scroll - inset) / stride));
             const int last = std::min(count - 1, static_cast<int>((scroll + width) / stride));
             const int focusIndex = shownSelection >= 0 && shownSelection < count ? shownSelection : first;
-            const float ring = std::max(1.0f, std::round(HairlineThickness() * kStripRingHairlines));
+            // The chosen thumbnail: the selected tile look (accentSubtle and the accent outline at the
+            // one border width), the picture a hairline of gap inside the outline.
+            const float hairline = HairlineThickness();
+            const float ring = hairline * 2.0f;
             const internal::ControlTextScope text(TextStyle::Footnote);
             for (int i = first; i <= last; ++i)
             {
@@ -274,13 +275,14 @@ bool ThumbnailStripImpl(const char* label, int* selected, const StripSource& sou
                 ImRect picture = tile;
                 if (chosen)
                 {
-                    StrokeRect(drawList, tile.Min, tile.Max, ToU32(item.disabled ? c.labelTertiary : c.accent), radius, ring);
-                    picture.Expand(-(ring + HairlineThickness()));
+                    internal::DrawListRowFill(drawList, tile, radius,
+                                              {.selected = true, .disabled = item.disabled, .tile = true});
+                    picture.Expand(-ring);
                 }
                 const internal::MediaText name = internal::MediaVisibleText(entry.label);
                 internal::MediaDrawOptions draw;
                 draw.fit = ImageFit::Cover;
-                draw.radius = std::max(0.0f, radius - (chosen ? ring + HairlineThickness() : 0.0f));
+                draw.radius = std::max(0.0f, radius - (chosen ? ring : 0.0f));
                 internal::MediaDrawImageSlot(drawList, internal::MediaImageOf(entry.image), picture, draw, name.text);
                 if (i == hovered && !item.disabled)
                 {
@@ -295,8 +297,10 @@ bool ThumbnailStripImpl(const char* label, int* selected, const StripSource& sou
                     drawList->AddText(ImVec2(std::round(tile.GetCenter().x - shown.width * 0.5f), tile.Max.y + PxSnapped(t.spacing.xs)),
                                       ToU32(color), shown.text);
                 }
+                // Keyboard focus only (focusAmount stays 0 without the keyboard modality), inside
+                // the thumbnail, as on every tile of a strip or grid.
                 if (i == focusIndex)
-                    internal::DrawFocusRing(drawList, tile, radius, item.focusAmount);
+                    internal::DrawFocusRingInside(drawList, tile, radius, item.focusAmount);
                 if (i == hovered)
                     hoveredItem = entry;
                 if (chosen)

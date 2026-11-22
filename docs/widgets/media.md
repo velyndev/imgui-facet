@@ -63,7 +63,8 @@ the circle (Cover); while it loads, a round skeleton; without a ready image, the
 visible label part (the first letter of the first and of the last word) in label on `fill[1]`,
 or the user icon when the label has no word. `squircle` gives a continuous-corner square,
 `showStatus` a status dot in the tone's glyph color on the lower right with a ring of the surface
-color, and `selected` an accent ring inside the edge. With `activatable` it is a Tab stop with
+color, and `selected` the accent outline at the one hairline width on the edge, with a hairline of
+gap to the picture. With `activatable` it is a Tab stop with
 hover and press washes and the focus ring. The name is the tooltip on hover and keyboard focus.
 Status: ready.
 
@@ -89,9 +90,11 @@ bool ThumbnailStrip(const char* label, int* selected, int itemCount, ImageItemGe
 ```
 
 A horizontally scrolling row of square thumbnails (`thumbnailHeight` units, four times
-`spacing.xxxl` by default) in Cover fit, the chosen one with an accent ring inside its edge and its
-caption in label. One item and one Tab stop: a click that does not move chooses, Left and Right
-move the selection, Home and End jump, and the focus ring sits on the chosen thumbnail. A drag
+`spacing.xxxl` by default) in Cover fit, the chosen one with the selected tile look (`accentSubtle`
+and the accent outline at the one hairline width, the picture a hairline inside it) and its caption
+in label. One item and one Tab stop: a click that does not move chooses, Left and Right move the
+selection, Home and End jump; after keyboard input the focus ring sits inside the chosen thumbnail,
+and a click never shows it. A drag
 scrolls the row and a released drag glides on for `drag.inertiaTime` before it settles; the wheel
 (also a sideways one) scrolls while there is more row than fits. A new selection is scrolled into
 view. The row settles on the standard spring, and jumps while motion is reduced. Read-only shows the
@@ -107,7 +110,8 @@ bool Carousel(const char* label, int* index, std::span<const ImageItem> slides, 
 ```
 
 One slide at a time (9/16 of the width by default) with round previous and next buttons over its
-sides on the elevated surface, page dots under it (the page text from `Strings::pageOf` when the
+sides on the elevated surface, page dots under it (the current one in the accent mark `focusRing`,
+the others in `controlBorder`; the page text from `Strings::pageOf` when the
 dots do not fit) and, with `autoplay`, a pause button at the end of that row. The slides are one
 Tab stop: Left and Right page, Home and End jump; the buttons are Tab stops of their own and a dot
 takes a click. A drag moves the slide with the pointer (with resistance past the ends) and the
@@ -145,7 +149,7 @@ bool ImageCompare(const char* label, float* split, ImageHandle before, ImageHand
 
 Two images in one box (from the first image's aspect ratio), the first before the divider and the
 second after it, each with its own loading and failed look. The divider is a line of the surface
-color between boundary hairlines, so it shows over any picture, with a slider knob in its middle,
+color between `controlBorder` hairlines, so it shows over any picture, with a slider knob in its middle,
 and is one handle of the multi-handle block: drag it, press anywhere to move it there, or focus it
 and use the arrows (Shift fine, Ctrl coarse), Page Up and Down, Home and End; Escape during a drag
 restores it. Vertical moves the divider up and down with the first image on top. `beforeLabel` and
@@ -159,9 +163,12 @@ bool TimelineScrubber(const char* label, double* playhead, double* loopIn, doubl
 ```
 
 A ruler with tick labels (minutes and seconds by default, hours from an hour on, tenths or
-hundredths when zoomed in that far; `format` or `formatter` replace them) over a track that shows
-the whole duration, the `buffered` part in a lighter fill and the part before the playhead in the
-accent. A press anywhere moves the playhead there and drags it, and gives it the keyboard focus. The
+hundredths when zoomed in that far; `format` or `formatter` replace them; the ticks in the quiet
+`controlBorder`) over a track that shows the whole duration in `fill[0]`, the `buffered` part in a
+lighter fill and the part before the playhead in the accent mark (`focusRing`, 3:1 against the
+track). The loop markers are narrow solid knobs in the `knob` token with the level 1 shadow and the
+`controlBorder` hairline (`controlBorderHover` under the pointer); the playhead knob is the slider
+knob. A press anywhere moves the playhead there and drags it, and gives it the keyboard focus. The
 playhead and, in the second form, the loop markers are Tab stops: the arrows step by `step` (a
 hundredth of the duration by default; Shift a tenth, Ctrl ten steps), Home and End go to the ends a
 handle may reach; the loop markers never cross and the region between them is tinted. The wheel
@@ -176,7 +183,8 @@ DropZoneAction DropZone(const char* label, std::span<const char* const> acceptTy
 const ImGuiPayload* DropZonePayload();
 ```
 
-A dashed area (`media.dashLength` and `media.dashGap` in the boundary color) with the icon over the
+A dashed area (`media.dashLength` and `media.dashGap` at the hairline width in the quiet
+`controlBorder`) with the icon over the
 hint. While a payload of an accepted type is over it, it takes the drop target look of the drag and
 drop core; a payload of another type gets no highlight and the not-allowed cursor. A drop returns
 `Dropped` and `DropZonePayload` gives the payload until the end of the frame. With `activatable` it

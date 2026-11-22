@@ -38,7 +38,8 @@ using internal::ForcedItemState;
 constexpr float kViewerZoomStep = 1.25f;
 // The minimap is at most this share of the viewport's width.
 constexpr float kViewerMinimapShare = 0.25f;
-// The visible region on the minimap is outlined this many hairlines wide.
+// The visible region on the minimap is marked this many hairlines wide: a mark of the view's place
+// drawn over a picture, where a hairline would vanish in its detail, not the outline of a control.
 constexpr float kViewerMinimapRingHairlines = 2.0f;
 // The pan speed is smoothed at this rate per second (about two frames at 60 Hz), so one uneven
 // frame does not decide the glide.
@@ -285,8 +286,8 @@ bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, c
                     FillRect(drawList, ImVec2(mapMin.x - frame, mapMin.y - frame), ImVec2(mapMax.x + frame, mapMax.y + frame),
                              ToU32(c.bgElevated));
                     internal::MediaDrawTexture(drawList, picture, ImRect(mapMin, mapMax), draw);
-                    StrokeRect(drawList, ImVec2(mapMin.x - frame, mapMin.y - frame), ImVec2(mapMax.x + frame, mapMax.y + frame),
-                               ToU32(c.separator), 0.0f, frame);
+                    internal::DrawSurfaceOutline(
+                        drawList, ImRect(ImVec2(mapMin.x - frame, mapMin.y - frame), ImVec2(mapMax.x + frame, mapMax.y + frame)), 0.0f);
                     const ImVec2 half(width * 0.5f / scale, height * 0.5f / scale);
                     ImVec2 a(mapMin.x + (center.x - half.x) * mapScale, mapMin.y + (center.y - half.y) * mapScale);
                     ImVec2 b(mapMin.x + (center.x + half.x) * mapScale, mapMin.y + (center.y + half.y) * mapScale);
@@ -297,7 +298,7 @@ bool ImageViewer(const char* label, ImageHandle image, ImageViewerState* view, c
                 }
             }
         }
-        StrokeRect(drawList, rect.Min, rect.Max, ToU32(c.separator), radius, HairlineThickness());
+        internal::DrawSurfaceOutline(drawList, rect, radius);
         internal::DrawItemFocusRing(item, radius);
     }
 

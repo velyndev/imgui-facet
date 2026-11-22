@@ -15,6 +15,7 @@
 
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
+#include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
@@ -49,10 +50,6 @@ constexpr double kTimelineCoarseFactor = 10.0;
 // Tick intervals in seconds, from the finest; the first one whose labels have room is used.
 constexpr double kTimelineIntervals[] = {0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0,
                                          60.0, 120.0, 300.0, 600.0, 900.0, 1800.0, 3600.0, 7200.0, 18000.0, 36000.0};
-// A marker's outline darkens this far toward label on hover, and is this many hairlines wide, as
-// the slider knob's is.
-constexpr float kTimelineMarkerHoverShare = 0.5f;
-constexpr float kTimelineMarkerOutlineHairlines = 1.5f;
 // Part indices for forced states.
 constexpr int kTimelinePartPlayhead = 0;
 constexpr int kTimelinePartLoopIn = 1;
@@ -310,7 +307,9 @@ bool TimelineImpl(const char* label, double* playhead, double* loopIn, double* l
             }
         }
         const ImU32 ink = ToU32(internal::ControlSecondaryColor(disabled));
-        const ImU32 tickColor = ToU32(disabled ? c.labelTertiary : ControlBoundaryColor(c));
+        // Ticks mark the time scale under their labels: the quiet controlBorder, separator while
+        // disabled (never lighter than the enabled ticks).
+        const ImU32 tickColor = ToU32(disabled ? c.separator : c.controlBorder);
         if (length > 0.0)
         {
             const long long firstTick = static_cast<long long>(std::floor(state.start / interval));
@@ -340,7 +339,9 @@ bool TimelineImpl(const char* label, double* playhead, double* loopIn, double* l
         const float radius = trackThickness * 0.5f;
         const float x0 = std::max(rect.Min.x, toX(0.0));
         const float x1 = std::min(rect.Max.x, toX(length));
-        FillRect(drawList, ImVec2(x0, top), ImVec2(std::max(x0, x1), top + trackThickness), ToU32(disabled ? c.fill[3] : c.fill[1]), radius);
+        // The track rule: the unfilled track fill[0], the played part the accent mark (focusRing,
+        // 3:1 against it and the surface).
+        FillRect(drawList, ImVec2(x0, top), ImVec2(std::max(x0, x1), top + trackThickness), ToU32(disabled ? c.fill[3] : c.fill[0]), radius);
         if (!std::isnan(options.buffered) && options.buffered > 0.0 && length > 0.0)
         {
             const float xb = std::min(rect.Max.x, toX(std::min(options.buffered, length)));
@@ -358,7 +359,7 @@ bool TimelineImpl(const char* label, double* playhead, double* loopIn, double* l
         const float xp = std::round(toX(values[0]));
         if (xp > x0)
             FillRect(drawList, ImVec2(x0, top), ImVec2(std::min(xp, x1), top + trackThickness),
-                     ToU32(disabled ? c.labelTertiary : (readOnly ? c.labelSecondary : c.accent)), radius);
+                     ToU32(disabled ? c.labelTertiary : (readOnly ? c.labelSecondary : c.focusRing)), radius);
 
         // The loop markers: narrow knobs over the band, in the look of a slider knob.
         const internal::SliderLook look = internal::PickSliderLook(disabled, readOnly);
@@ -367,10 +368,14 @@ bool TimelineImpl(const char* label, double* playhead, double* loopIn, double* l
             const internal::ItemState& h = handles[i].item;
             const float x = std::round(toX(values[i]) - markerWidth * 0.5f);
             const ImRect r(x, band.Min.y, x + markerWidth, band.Max.y);
-            const ImVec4 outline = disabled ? c.labelTertiary : Mix(ControlBoundaryColor(c), c.label, h.hoverAmount * kTimelineMarkerHoverShare);
+            // The knob rule: a solid face in the knob token with the level 1 shadow and the
+            // controlBorder hairline (controlBorderHover under the pointer); disabled fill[3].
             const float rr = std::min(Px(t.radii.element), markerWidth * 0.5f);
-            FillRect(drawList, r.Min, r.Max, ToU32(c.bg), rr);
-            StrokeRect(drawList, r.Min, r.Max, ToU32(outline), rr, HairlineThickness() * kTimelineMarkerOutlineHairlines);
+            if (!disabled)
+                DrawElevation(drawList, r.Min, r.Max, rr, 1);
+            FillRect(drawList, r.Min, r.Max, ToU32(disabled ? c.fill[3] : c.knob), rr);
+            internal::DrawOutline(drawList, r, rr,
+                                  internal::ControlOutlineColor({.hoverAmount = h.hoverAmount, .disabled = disabled}));
             internal::DrawFocusRing(drawList, r, rr, h.focusAmount);
         }
         // The playhead: a line through ruler and band, and a knob on the track.
