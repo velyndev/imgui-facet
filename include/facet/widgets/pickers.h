@@ -224,7 +224,7 @@ struct AnimatedColor
 
 // The color of `animated` at `seconds` (any running clock, for example ImGui::GetTime()). While
 // facet::ReduceMotion() is true (the theme token or the system animation setting) it is `color`.
-// No allocation. Until Phase 2 implements it, it returns `color`, the reduced motion result.
+// No allocation.
 ImVec4 SampleAnimatedColor(const AnimatedColor& animated, double seconds);
 
 struct ColorModeEditorOptions

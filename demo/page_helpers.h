@@ -49,7 +49,7 @@ ImRect LastLabeledRowBox();
 
 // Prototype controls for the Blocks pages, built only from the interaction blocks in
 // src/internal (item behaviour, focus ring, value drag core, multi-handle model, selection
-// pill). They are not the Phase 2 widgets: each draws the plainest look that shows its block
+// pill). They are not the finished widgets: each draws the plainest look that shows its block
 // working, and the pages label them as prototypes. Every one records probes for selftests:
 // `probe` for the whole control, and for sliders "<probe>.track" (the line the knob centres
 // travel along, so a target fraction is a value fraction) and "<probe>.h<i>" per handle.

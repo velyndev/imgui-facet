@@ -3,7 +3,7 @@
 // List and selection core: the visible row ranges of long lists, grids and tables (virtualized
 // through ImGuiListClipper) and the selection storage of the frozen list and table signatures.
 //
-// This header holds what the other blocks and the Phase 2 containers call: facet::NextVisibleRows
+// This header holds what the other blocks and the containers call: facet::NextVisibleRows
 // (common.h) reads the row ranges opened here, and VirtualList, ItemGrid, DataTable and the list
 // widgets open them and drive their selection through it. The rows themselves (placement, look,
 // keyboard, typeahead, the selection pill, data states) and trees are in list_view.h, built on

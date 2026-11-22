@@ -6,7 +6,7 @@
 // scroll areas under a drag (through the scroll core, scroll.h), and a keyboard path that works
 // with the same zones.
 //
-// The list core reorders rows through this header, and Phase 2 builds the public drag and drop
+// The list core reorders rows through this header, and on it are built the public drag and drop
 // calls of composites.h, the reorderable list, the tree view, the transfer list, the layer list,
 // the inventory grid and slots, the swatch palette, the media DropZone and tab reordering on it.
 // Every name here starts with DragDrop, so none of them is mistaken for the public widgets

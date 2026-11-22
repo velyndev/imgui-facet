@@ -356,7 +356,7 @@ Control anatomy (`src/internal/control.h`), the parts every widget family shares
 ### Prototype controls
 
 The Blocks pages operate the blocks through prototype controls in `demo/`. They are not the
-Phase 2 widgets; their look is the starting point for them:
+finished widgets; their look was the starting point for the widget families:
 
 - **Fills** step fill[2], fill[1], fill[0] for rest, hover and press with a 3:1 boundary
   hairline, so the states differ in more than one subtle shade and the edge stays visible.

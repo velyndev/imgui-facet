@@ -35,7 +35,7 @@ namespace
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 
 // A bare value control built from the item behaviour and the value drag core, as the sliders
-// of Phase 2 will be: a 200 x 24 pixel track whose knob centre runs from its left to its right
+// of the sliders family is: a 200 x 24 pixel track whose knob centre runs from its left to its right
 // edge.
 struct TestSlider
 {

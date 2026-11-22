@@ -96,8 +96,8 @@ FACET_DEMO_PAGE("item", "Item behaviour", "Blocks", 10, "default", "hovered", "p
                             "The hover, press, focus and disabled logic every Facet widget shares. One call lays "
                             "out a control, registers it with Dear ImGui and returns its state, with animated "
                             "amounts for hover, press and focus.");
-    Note("Prototype controls: built only from this block and the focus ring, to show the behaviour. The widgets "
-         "themselves come in Phase 2.");
+    Note("Prototype controls: built only from this block and the focus ring, to show the behaviour. The finished "
+         "widgets are on the pages of the widget families.");
 
     SectionHeader("Push button");
     ForceOnButton(ctx);

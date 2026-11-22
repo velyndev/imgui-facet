@@ -171,8 +171,8 @@ FACET_DEMO_PAGE("text-field", "Text field core", "Blocks", 150, "default", "focu
                             "Dear ImGui edits the text, so typing, the IME, undo, the clipboard, selection and word "
                             "moves work as in every field; Facet draws the frame, the adornments and the messages "
                             "around it, and adds number editing on top.");
-    Note("Prototype fields built only from the text field core, the item behaviour and the focus ring; they are not "
-         "the Phase 2 widgets. The texts are samples. Tab moves between fields, Escape restores the text from when "
+    Note("Prototype fields built only from the text field core, the item behaviour and the focus ring; the finished "
+         "fields are on the Text inputs and Value inputs pages. The texts are samples. Tab moves between fields, Escape restores the text from when "
          "the field took the keyboard, Enter ends the edit. In the number field Up and Down step (Shift finer, Ctrl "
          "coarser); drag it or its label sideways, or click it to type.");
 

@@ -2,7 +2,7 @@
 // interaction blocks (item behaviour, focus ring, selection pill): a dropdown-like list, a menu
 // with two levels of submenus, a context menu, a glass popover with controls, tooltips, a modal
 // with a confirm level over it, and placement samples at the display edges. They show the block
-// working; the widgets themselves come in Phase 2.
+// working; the finished menus, popovers and dialogs are on the Navigation and Overlays pages.
 
 #include <algorithm>
 #include <cstdio>
@@ -833,8 +833,8 @@ FACET_DEMO_PAGE("popup", "Popup host", "Blocks", 110, "default", "dropdown", "me
                             "Every floating layer goes through one host: it places the layer next to its anchor, keeps "
                             "the stack of nested levels, closes them on Escape and on a click outside, moves the focus "
                             "in and back, draws the surface and plays the open and close motion.");
-    Note("Prototypes: built on the popup host and the item behaviour, focus ring and selection pill blocks. The widgets "
-         "themselves come in Phase 2.");
+    Note("Prototypes: built on the popup host and the item behaviour, focus ring and selection pill blocks. The finished "
+         "menus, popovers and dialogs are on the Navigation and Overlays pages.");
     StatusLine();
     DropdownSection(ctx);
     MenuSection(ctx);
