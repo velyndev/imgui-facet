@@ -1,6 +1,6 @@
 # Facet
 
-[![build](https://github.com/velyndev/imgui-design-framework/actions/workflows/build.yml/badge.svg)](https://github.com/velyndev/imgui-design-framework/actions/workflows/build.yml)
+[![build](https://github.com/velyndev/imgui-facet/actions/workflows/build.yml/badge.svg)](https://github.com/velyndev/imgui-facet/actions/workflows/build.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Facet is a design framework for Dear ImGui applications on Windows with Direct3D 11. It adds
