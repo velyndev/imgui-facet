@@ -520,7 +520,9 @@ TEST_CASE("A range minimum gap larger than the range, a range of zero and a rang
     }
     // Logarithmic with a minimum of zero falls back to linear and stays finite.
     const ImRect log = session.ItemRect("log");
-    session.Drag({ImVec2(log.Min.x + 60.0f, log.GetCenter().y), ImVec2(log.Max.x - 60.0f, log.GetCenter().y)});
+    // The track starts after the label column.
+    const float track = log.Min.x + facet::Px(facet::T().layout.labelColumn);
+    session.Drag({ImVec2(track + 10.0f, log.GetCenter().y), ImVec2(log.Max.x - 60.0f, log.GetCenter().y)});
     CHECK(std::isfinite(lowD));
     CHECK(std::isfinite(highD));
     CHECK(highD > 0.0f);
@@ -2019,4 +2021,31 @@ TEST_CASE("A histogram range stands on its bars and its handles follow the range
     session.Drag({ImVec2(rect.GetCenter().x, rect.Min.y + 4.0f), ImVec2(rect.Max.x - 60.0f, rect.Min.y + 4.0f)});
     CHECK(low == 50);
     CHECK(high == 100);
+}
+TEST_CASE("Sliders stacked in a column start and end their tracks at one x whatever their labels and values")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float level = 0.0f;
+    float gain = 0.0f;
+    session.SetUi([&] {
+        facet::Slider("Level", &level, 0.0f, 1.0f, {.format = "%.2f", .width = 500.0f});
+        session.Track("level");
+        facet::Slider("A label far longer than the label column", &gain, 0.0f, 1.0f,
+                      {.format = "%.3f units", .width = 500.0f});
+        session.Track("gain");
+    });
+    session.Frames(2);
+    const ImRect levelRect = session.ItemRect("level");
+    const ImRect gainRect = session.ItemRect("gain");
+    // One click at the same x on each: the same share of the track, so the same value.
+    for (const float offset : {200.0f, 330.0f})
+    {
+        const float x = levelRect.Min.x + facet::Px(offset);
+        session.Click(ImVec2(x, levelRect.GetCenter().y));
+        session.Click(ImVec2(x, gainRect.GetCenter().y));
+        CHECK(level > 0.0f);
+        CHECK(level < 1.0f);
+        CHECK(gain == doctest::Approx(level).epsilon(0.001));
+    }
 }

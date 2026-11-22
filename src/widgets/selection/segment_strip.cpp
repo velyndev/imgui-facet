@@ -89,7 +89,7 @@ float SegmentStripContentWidth(const char* label, const SelectionItems& items, C
     const ControlMetrics m = GetControlMetrics(size);
     ControlTextScope text(m);
     const float iconSize = text.IconSize();
-    float total = MeasureFrontLabel(label != nullptr ? label : "", m.size, 1.0e9f).width;
+    float total = MeasureFrontLabel(label != nullptr ? label : "", m.size, 1.0e9f, FrontLabelFit::Text).width;
     PushPillLabelStyle(m.textStyle, true);
     const int count = std::min(items.Count(), kSegmentStripMax);
     float labelWidth = 0.0f;
@@ -140,10 +140,11 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
     PopTextStyle();
 
     // ---- Width (rule 6): the content, at most the available width ----
-    const FrontLabel wide = MeasureFrontLabel(label, m.size, 1.0e9f);
+    const FrontLabelFit labelFit = CompactFrontLabelFit(desc.width, next);
+    const FrontLabel wide = MeasureFrontLabel(label, m.size, 1.0e9f, labelFit);
     const float available = std::max(1.0f, ImGui::GetContentRegionAvail().x);
     const float width = ResolveItemWidth(desc.width, next, std::min(wide.width + naturalTotal, available));
-    const FrontLabel front = MeasureFrontLabel(label, m.size, width);
+    const FrontLabel front = MeasureFrontLabel(label, m.size, width, labelFit);
     const ImVec2 origin(std::round(window->DC.CursorPos.x), std::round(window->DC.CursorPos.y));
     const ImRect track(origin.x + front.width, origin.y, origin.x + width, origin.y + m.height);
     const float trackWidth = track.GetWidth();

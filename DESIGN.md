@@ -330,9 +330,18 @@ Control anatomy (`src/internal/control.h`), the parts every widget family shares
   height and every size looks equally balanced.
 - **Icons beside text** are as large as the font size, whole pixels, spacing.sm from the text, so
   an icon reads as part of its label at every size.
-- **Labels in front** take their text width and spacing.sm, at most half the widget; a longer
-  label ends in an ellipsis and shows in full on hover and keyboard focus, so the control always
-  keeps half the row.
+- **Labels in front** take the label column of a settings row (layout.labelColumn, the gap
+  included) whatever the label says; a longer label ends in an ellipsis and shows in full on hover
+  and keyboard focus. So a column of sliders, toggles, dropdowns and fields starts every control at
+  one x, the same x as the controls of settings rows. A widget narrower than the label column plus
+  layout.minRowControl, where a settings row stacks, gives its label only its text width and
+  spacing.sm, at most half the widget, so the control keeps room to be operated. A compact control
+  that fits its content (a segmented control, a color well) keeps its label at its text width too,
+  because it sits inline among other controls where a column would only open a gap.
+- **Trailing columns** (a slider's value, the number field beside a slider) are shared by the
+  controls of one window that end at one x and show the same kind of value, at the widest of them,
+  so the tracks of a column end at one x too and keep one length; a shared column that would leave
+  a track shorter than layout.minRowControl gives way to the slider's own.
 - **Labels above** a group or a tall control use the control text style and stand spacing.xs above
   it, the same gap as the message line below, so label, control and message read as one block.
 - **One message line** for every control: Footnote, spacing.xs under it, help text in
@@ -429,8 +438,9 @@ Sliders:
 
 - **Knob size.** sliderKnobSize scaled by the control height of the size and kept even, so Small,
   Regular and Large differ and the knob centre sits on a whole pixel.
-- **Value column.** As wide as the widest value shown so far, giving way below
-  layout.minRowControl, so the value never jitters and the track keeps a usable length.
+- **Value column.** As wide as the widest value shown so far by any slider of its column (the
+  trailing column rule under Control anatomy), giving way below layout.minRowControl, so the value
+  never jitters, the tracks of a column keep one length, and each track keeps a usable length.
 - **Range values** read low, a short drawn bar, high, so the pair reads as a range without a word
   to translate.
 - **Value bubble.** An inverted pill (label fill, bg text) above the knob while it is held or

@@ -14,6 +14,7 @@
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
 #include "internal/focus.h"
+#include "internal/row_layout.h"
 #include "internal/state_storage.h"
 #include "internal/text_field.h"
 
@@ -94,7 +95,7 @@ SliderLook PickSliderLook(bool disabled, bool readOnly)
 }
 
 SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, float valueWidth, const SliderMetrics& m,
-                              Orientation orientation, float length)
+                              Orientation orientation, float length, int columnKind)
 {
     SliderFrame f;
     origin = ImVec2(std::round(origin.x), std::round(origin.y));
@@ -119,6 +120,16 @@ SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, flo
     float controlMin = origin.x + f.label.width;
     float controlMax = origin.x + width;
     float column = valueWidth > 0.0f ? std::ceil(valueWidth) + m.valueGap : 0.0f;
+    // The sliders of one column share their value column (row_layout.h), so their tracks end at
+    // one x and keep one length whatever values they show.
+    // A shared column that would leave the track shorter than the narrowest row control gives
+    // way to the slider's own column first.
+    if (column > 0.0f)
+    {
+        const float shared = RowTrailingColumn(controlMax, column, columnKind);
+        if (controlMax - controlMin - shared >= std::max(m.knob * 2.0f, Px(T().layout.minRowControl)))
+            column = shared;
+    }
     // The value column gives way first, so the track keeps the length of the narrowest control a
     // labelled row keeps beside its label.
     if (controlMax - controlMin - column < std::max(m.knob * 2.0f, Px(T().layout.minRowControl)))

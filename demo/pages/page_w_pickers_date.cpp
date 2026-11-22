@@ -526,6 +526,9 @@ FACET_DEMO_SELFTEST("pickers-date")
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("Right and Enter in the calendar pick the next day", [same] { return same(ui.date, Date{2026, 3, 21}); });
     test.ExpectFocused("pickers.date");
+    // Right moves to the day segment wherever the click left the segment focus.
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_RightArrow);
     test.KeyPress(ImGuiKey_UpArrow);
     test.Expect("Up steps the day segment", [same] { return same(ui.date, Date{2026, 3, 22}); });
     test.KeyPress(ImGuiKey_LeftArrow);

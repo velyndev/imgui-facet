@@ -98,10 +98,11 @@ bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const A
     const float wellGap = std::round(Px(t.spacing.sm));
     const float wellWidth = options.customColor ? side : 0.0f;
     const float rowWidth = count > 0 ? static_cast<float>(count) * (side + swatchGap) - swatchGap : side;
-    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX);
+    const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(0.0f, next);
+    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX, fit);
     const float content = rowWidth + (options.customColor ? wellGap + wellWidth : 0.0f);
     const float width = std::round(internal::ResolveItemWidth(0.0f, next, natural.width + content));
-    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width);
+    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width, fit);
     const float paletteWidth =
         std::max(side, width - std::round(front.width) - (options.customColor ? wellGap + wellWidth : 0.0f));
     const ImVec2 origin(std::round(window->DC.CursorPos.x), std::round(window->DC.CursorPos.y));

@@ -72,9 +72,10 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
                                ? std::ceil(ImGui::CalcTextSize(options.alpha ? kWellHexSample : kWellHexSampleOpaque).x)
                                : 0.0f;
     const float content = swatchWidth + (options.showHex ? m.iconGap + hexWidth + m.fieldPadding - inset : 0.0f);
-    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX);
+    const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(options.width, next);
+    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX, fit);
     const float width = std::round(internal::ResolveItemWidth(options.width, next, natural.width + content));
-    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width);
+    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width, fit);
     const ImVec2 origin(std::round(window->DC.CursorPos.x), std::round(window->DC.CursorPos.y));
     const ImRect frame(origin.x + std::round(front.width), origin.y, origin.x + width, origin.y + m.height);
 

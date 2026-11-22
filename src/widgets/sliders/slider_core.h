@@ -75,12 +75,20 @@ struct SliderFrame
     float knob = 0.0f;  // the knob diameter used: the metrics' one, smaller in a very short control
 };
 
+// Kinds of value columns shared in a column of sliders (RowTrailingColumn in row_layout.h): one
+// value, or a low and a high value, so a range never widens the column of single sliders.
+inline constexpr int kSliderColumnSingle = 0;
+inline constexpr int kSliderColumnRange = 1;
+inline constexpr int kSliderColumnField = 2;  // the number field of SliderWithInput
+
 // Lays out a slider at `origin` (pixels). Horizontal: `width` pixels wide and one control height
-// high, the label in front (cut at kFrontLabelMaxShare), then the control, then a value column of
-// `valueWidth` pixels (0 for none; dropped when the control would get shorter than two knobs).
-// Vertical: one control height wide and `length` pixels high, no label and no value column.
+// high, the label in front in the label column (control.h), then the control, then a value column
+// of at least `valueWidth` pixels, shared with the sliders of `columnKind` that end at the same x
+// (0 for none; the shared width gives way to the own one, and the own one is dropped, when the
+// control would get shorter than layout.minRowControl). Vertical: one control height wide and
+// `length` pixels high, no label and no value column.
 SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, float valueWidth, const SliderMetrics& m,
-                              Orientation orientation, float length);
+                              Orientation orientation, float length, int columnKind = kSliderColumnSingle);
 
 // The knob rectangle of a fraction on the track, a square of `knob` pixels on whole pixels.
 ImRect SliderKnobRect(const ImRect& track, Orientation orientation, float knob, double fraction);

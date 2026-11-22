@@ -61,11 +61,12 @@ bool RunRating(const char* label, Value* value, const RatingOptions& options)
     const ImGuiID id = window->GetID(label);
 
     // 2. Width: the label and the icons, at most the available width; the icons shrink to fit.
-    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX);
+    const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(0.0f, next);
+    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX, fit);
     const float content = natural.width + m.height * static_cast<float>(count);
     const float available = std::max(1.0f, ImGui::GetContentRegionAvail().x);
     const float width = internal::ResolveItemWidth(0.0f, next, std::min(content, available));
-    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width);
+    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width, fit);
     const float iconBox = std::max(1.0f, std::min(m.height, (width - front.width) / static_cast<float>(count)));
 
     // 3. One item for the row.

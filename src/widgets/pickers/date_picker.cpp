@@ -200,13 +200,15 @@ bool DatePicker(const char* label, Date* date, const DatePickerOptions& options)
     panel.readOnly = readOnly;
     const float available = std::max(1.0f, ImGui::GetContentRegionAvail().x);
     float defaultWidth = kFill;
+    // An inline calendar fits its content like a compact control; the field fills like any field.
+    const FrontLabelFit fit = options.inlineCalendar ? CompactFrontLabelFit(options.width, next) : FrontLabelFit::Column;
     if (options.inlineCalendar)
     {
-        const FrontLabel natural = MeasureFrontLabel(label, m.size, available * 2.0f);
+        const FrontLabel natural = MeasureFrontLabel(label, m.size, available * 2.0f, fit);
         defaultWidth = std::min(available, natural.width + CalendarPanelSize(panel).x);
     }
     const float width = ResolveItemWidth(options.width, next, defaultWidth);
-    const FrontLabel front = MeasureFrontLabel(label, m.size, width);
+    const FrontLabel front = MeasureFrontLabel(label, m.size, width, fit);
 
     // 3. The field item.
     ImGui::BeginGroup();

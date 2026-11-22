@@ -107,6 +107,30 @@ ImGuiID RowColumnKey();
 // Sets the column key and returns the one it replaces, to be put back with this call again.
 ImGuiID SetRowColumnKey(ImGuiID key);
 
+// ---- One control column -------------------------------------------------------------------------
+//
+// Controls stacked in a column line up whatever their labels say: a control with its own label in
+// front (MeasureFrontLabel in control.h) starts its control at the label column of a labelled row,
+// the same x as the control of a settings row, and controls that end in a column of their own (a
+// slider's value, the number field beside a slider) share that column, so their tracks end at one
+// x as well and keep one length.
+
+// The label column a visible label in front of a control takes, in pixels, the gap to the control
+// included: T().layout.labelColumn, the column of a settings row outside a group.
+float RowFrontLabelColumn();
+
+// Most trailing columns shared in one frame; a column beyond them is not shared.
+inline constexpr int kRowTrailingColumns = 32;
+
+// A column at the end of a control, shared by the controls of one window and one column key
+// (RowColumnKey) whose right edge is `right` (screen pixels) and that ask with the same `kind` (a
+// module's own numbering, so a wide kind of column never widens another). Returns the widest
+// `width` (pixels) any of them asked for in this frame or the previous one, at least `width`.
+// Nothing is allocated.
+float RowTrailingColumn(float right, float width, int kind = 0);
+// Forgets every shared trailing column (facet::Shutdown through the widgets_common subsystem).
+void ClearRowTrailingColumns();
+
 // The y at which text in the current font sits on `baseline` (screen pixels).
 float TextTopForBaseline(float baseline);
 

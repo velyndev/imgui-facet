@@ -435,4 +435,83 @@ ImGuiID SetRowColumnKey(ImGuiID key)
     return previous;
 }
 
+float RowFrontLabelColumn()
+{
+    return std::round(Px(T().layout.labelColumn));
+}
+
+namespace
+{
+
+struct RowTrailingRecord
+{
+    ImGuiID key = 0;
+    int frame = -1;          // the frame `current` belongs to
+    float current = 0.0f;    // the widest column asked for in that frame
+    float previous = 0.0f;   // the widest column of the frame before it
+};
+
+RowTrailingRecord* RowTrailingRecords()
+{
+    static RowTrailingRecord records[kRowTrailingColumns];
+    return records;
+}
+
+} // namespace
+
+float RowTrailingColumn(float right, float width, int kind)
+{
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    if (g == nullptr || g->CurrentWindow == nullptr)
+        return width;
+    const int frame = g->FrameCount;
+    struct
+    {
+        ImGuiID window;
+        ImGuiID column;
+        int right;
+        int kind;
+    } const keyData{g->CurrentWindow->ID, RowColumnKey(), static_cast<int>(std::lround(right)), kind};
+    ImGuiID key = ImHashData(&keyData, sizeof(keyData));
+    if (key == 0)
+        key = 1;
+    RowTrailingRecord* records = RowTrailingRecords();
+    RowTrailingRecord* found = nullptr;
+    RowTrailingRecord* spare = nullptr;
+    for (int i = 0; i < kRowTrailingColumns; ++i)
+    {
+        RowTrailingRecord& r = records[i];
+        if (r.key == key)
+        {
+            found = &r;
+            break;
+        }
+        // A record nobody used in this frame or the one before is free again.
+        if (spare == nullptr && (r.key == 0 || r.frame < frame - 1 || r.frame > frame))
+            spare = &r;
+    }
+    if (found == nullptr)
+    {
+        if (spare == nullptr)
+            return width;
+        *spare = RowTrailingRecord{key, frame, 0.0f, 0.0f};
+        found = spare;
+    }
+    if (found->frame != frame)
+    {
+        found->previous = found->frame == frame - 1 ? found->current : 0.0f;
+        found->current = 0.0f;
+        found->frame = frame;
+    }
+    found->current = std::max(found->current, width);
+    return std::max(found->previous, found->current);
+}
+
+void ClearRowTrailingColumns()
+{
+    RowTrailingRecord* records = RowTrailingRecords();
+    for (int i = 0; i < kRowTrailingColumns; ++i)
+        records[i] = RowTrailingRecord{};
+}
+
 } // namespace facet::internal

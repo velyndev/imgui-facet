@@ -111,11 +111,12 @@ bool PinCodeCall(const char* label, bool writable, const PinCodeInputOptions& op
 
     // Width: the label and the cells at full size, at most the available width (rule 6 otherwise).
     const PinCodeLayout full = PinCodeLayoutFor(cells, options.groupSize, fullCell, minCell, gap, groupGap, FLT_MAX);
-    const internal::FrontLabel measured = internal::MeasureFrontLabel(label, metrics.size, FLT_MAX);
+    const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(options.width, next);
+    const internal::FrontLabel measured = internal::MeasureFrontLabel(label, metrics.size, FLT_MAX, fit);
     const float available = std::max(1.0f, ImGui::GetContentRegionAvail().x);
     const float totalWidth =
         internal::ResolveItemWidth(options.width, next, std::min(available, measured.width + full.width));
-    const internal::FrontLabel front = internal::MeasureFrontLabel(label, metrics.size, totalWidth);
+    const internal::FrontLabel front = internal::MeasureFrontLabel(label, metrics.size, totalWidth, fit);
     const float cellsWidth = std::max(1.0f, totalWidth - front.width);
     const PinCodeLayout layout =
         PinCodeLayoutFor(cells, options.groupSize, fullCell, minCell, gap, groupGap, cellsWidth);

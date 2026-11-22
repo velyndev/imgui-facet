@@ -56,7 +56,8 @@ bool HistogramImpl(const char* label, Value* low, Value* high, double min, doubl
     const ImVec2 origin(std::round(window->DC.CursorPos.x), std::round(window->DC.CursorPos.y));
     const internal::SliderFrame frame =
         internal::LayoutSliderFrame(ImVec2(origin.x, origin.y + barsHeight), label, width,
-                                    internal::RangeValueColumnWidth(valueWidth), m, Orientation::Horizontal, 0.0f);
+                                    internal::RangeValueColumnWidth(valueWidth), m, Orientation::Horizontal, 0.0f,
+                                    internal::kSliderColumnRange);
     const ImRect widget(origin, frame.widget.Max);
     // The bars stand on the track's row, over the knob travel.
     const ImRect bars(frame.track.Min.x, origin.y, frame.track.Max.x, origin.y + barsHeight);

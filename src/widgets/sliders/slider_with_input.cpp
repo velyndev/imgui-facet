@@ -17,6 +17,7 @@
 #include "facet/core/theme.h"
 #include "internal/control.h"
 #include "internal/item.h"
+#include "internal/row_layout.h"
 #include "internal/text_field_number.h"
 #include "widgets/sliders/slider_core.h"
 
@@ -45,7 +46,14 @@ bool SliderWithInputImpl(const char* label, Value* value, double min, double max
     const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.control.size, width);
     // Beside the track while the track keeps the narrowest control length of a labelled row.
     const bool stacked = width - front.width - fieldWidth - gap < Px(T().layout.minRowControl);
-    const float sliderWidth = stacked ? width : std::max(1.0f, width - fieldWidth - gap);
+    // Beside the track the field sits at the end of a trailing column shared with the sliders above
+    // and below (row_layout.h), so the tracks of one column end at one x.
+    const float column = stacked ? 0.0f
+                                 : std::min(width - front.width - Px(T().layout.minRowControl),
+                                            internal::RowTrailingColumn(std::round(window->DC.CursorPos.x) + width,
+                                                                        fieldWidth + gap, internal::kSliderColumnField));
+    const float trailing = std::max(fieldWidth + gap, column);
+    const float sliderWidth = stacked ? width : std::max(1.0f, width - trailing);
 
     double edited = value != nullptr ? internal::SliderValueIn(*value) : min;
     const bool readOnly = o.readOnly || value == nullptr;
@@ -80,7 +88,7 @@ bool SliderWithInputImpl(const char* label, Value* value, double min, double max
     if (stacked)
         ImGui::SetCursorScreenPos(ImVec2(control.Min.x, ImGui::GetCursorScreenPos().y));
     else
-        ImGui::SameLine(0.0f, gap);
+        ImGui::SameLine(0.0f, trailing - fieldWidth);
     internal::NumberFieldParams field;
     field.format = o.format;
     field.formatter = o.formatter;

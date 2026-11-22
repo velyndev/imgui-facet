@@ -100,6 +100,46 @@ TEST_CASE("Text fits its width with an ellipsis and labels take their share")
     CHECK(above.height > 0.0f);
 }
 
+TEST_CASE("A label in front takes the label column, or its text for a compact control that fits")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::internal::FrontLabel shortColumn;
+    facet::internal::FrontLabel longColumn;
+    facet::internal::FrontLabel shortText;
+    facet::internal::FrontLabel narrow;
+    facet::internal::FrontLabelFit fitFree = facet::internal::FrontLabelFit::Column;
+    facet::internal::FrontLabelFit fitSet = facet::internal::FrontLabelFit::Text;
+    float wide = 0.0f;
+    session.SetUi([&] {
+        wide = facet::Px(600.0f);
+        shortColumn = facet::internal::MeasureFrontLabel("Gain##a", facet::ControlSize::Regular, wide);
+        longColumn = facet::internal::MeasureFrontLabel("A label far longer than the label column##b",
+                                                        facet::ControlSize::Regular, wide);
+        shortText = facet::internal::MeasureFrontLabel("Gain##c", facet::ControlSize::Regular, wide,
+                                                       facet::internal::FrontLabelFit::Text);
+        // Narrower than the column and the narrowest row control: the text width, as a settings row stacks.
+        narrow = facet::internal::MeasureFrontLabel("Gain##d", facet::ControlSize::Regular, facet::Px(200.0f));
+        const facet::internal::NextItemData none = facet::internal::TakeNextItemData();
+        fitFree = facet::internal::CompactFrontLabelFit(0.0f, none);
+        fitSet = facet::internal::CompactFrontLabelFit(facet::kFill, none);
+    });
+    session.Frame();
+    const float column = std::round(facet::Px(facet::T().layout.labelColumn));
+    // Short and long labels start their control at one x: the settings row's label column.
+    CHECK(shortColumn.width == doctest::Approx(column));
+    CHECK(longColumn.width == doctest::Approx(column));
+    CHECK_FALSE(shortColumn.shown.truncated);
+    CHECK(longColumn.shown.truncated);
+    CHECK(longColumn.shown.width <= column - facet::Px(facet::T().spacing.sm) + 0.5f);
+    // A compact control that fits its content keeps its label tight.
+    CHECK(shortText.width < column);
+    CHECK(shortText.width == doctest::Approx(shortText.shown.width + std::round(facet::Px(facet::T().spacing.sm))).epsilon(0.02));
+    CHECK(narrow.width == doctest::Approx(shortText.width));
+    CHECK(fitFree == facet::internal::FrontLabelFit::Text);
+    CHECK(fitSet == facet::internal::FrontLabelFit::Column);
+}
+
 TEST_CASE("A drawn error message is reported to the next frame with its window and item")
 {
     facet::test::Session session;

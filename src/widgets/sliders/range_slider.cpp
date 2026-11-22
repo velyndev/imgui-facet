@@ -58,7 +58,7 @@ bool RangeSliderImpl(const char* label, Value* low, Value* high, double min, dou
     const float length = vertical ? Px(o.height > 0.0f ? o.height : T().metrics.faderLength) : 0.0f;
     const internal::SliderFrame frame = internal::LayoutSliderFrame(
         window->DC.CursorPos, label, width, vertical ? 0.0f : internal::RangeValueColumnWidth(valueWidth), m,
-        o.orientation, length);
+        o.orientation, length, internal::kSliderColumnRange);
 
     internal::RangeTrackParams params;
     params.format = o.format;

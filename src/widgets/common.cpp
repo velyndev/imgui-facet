@@ -53,6 +53,7 @@ void CommonShutdown()
     stack.depth = 0;
     stack.overflow = 0;
     internal::ClearFieldErrors();
+    internal::ClearRowTrailingColumns();
 }
 
 // Every member of Strings. The static_assert below fails when a member is added to the struct

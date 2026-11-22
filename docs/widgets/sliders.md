@@ -9,6 +9,13 @@ once; typed values (Ctrl+click or Enter on a handle) write on Enter, Tab or focu
 restores the values from activation. `facet::IsItemEditCommitted()` after the call reports one
 finished drag, which is the moment to save or to push an undo step.
 
+Sliders stacked in a column line up: the visible label in front takes the label column of a
+settings row (`layout.labelColumn`; a longer label ends in an ellipsis and shows in full on hover and
+keyboard focus), and sliders of one window that end at one x share their value column (single
+values, ranges and the number field of SliderWithInput each among their own kind), so their tracks
+start and end at one x whatever their labels and values say. A slider narrower than the label
+column plus `layout.minRowControl` gives its label only the text width, at most half the widget.
+
 ## The multi-handle model
 
 RangeSlider, RangeInput, RangeSliderHistogram, MultiSlider, ArcRangeSlider, BoxRangePad and

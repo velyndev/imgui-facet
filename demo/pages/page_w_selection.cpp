@@ -248,8 +248,8 @@ void ToggleSection(facet::demo::PageCtx& ctx)
         ui.sizesLargeCenter = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
     }
 
-    LabeledRow("Full width");
-    facet::Toggle("The switch sits at the end of a wide row", &ui.wide, {.width = facet::kFill});
+    LabeledRow("Set width");
+    facet::Toggle("A label longer than its column", &ui.wide, {.width = facet::kFill});
     ctx.Probe("sel.toggle.wide");
 
     LabeledRow("States");

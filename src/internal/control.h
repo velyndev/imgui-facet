@@ -177,10 +177,28 @@ struct FrontLabel
     FittedText shown;            // what is drawn
 };
 
-// Measures the visible part of `label` (up to "##") in the text style of `size`. It takes its
-// text width plus spacing.sm, at most kFrontLabelMaxShare of `totalWidth` (pixels, the whole
-// widget); a longer text is cut.
-FrontLabel MeasureFrontLabel(const char* label, ControlSize size, float totalWidth);
+// How much room a label in front takes.
+enum class FrontLabelFit
+{
+    // The label column of a labelled row (RowFrontLabelColumn in row_layout.h): every control with
+    // a label in front starts at one x, the x of a settings row's control, whatever the label says.
+    // Field widgets and every control whose width is set take it. A widget narrower than the
+    // column plus layout.minRowControl (where a settings row stacks) fits its text as Text does.
+    Column,
+    // The text width plus spacing.sm: a compact control that fits its content (a segmented
+    // control, a color well) sits inline among other controls, where a column would only add a gap.
+    Text,
+};
+
+// Measures the visible part of `label` (up to "##") in the text style of `size`. It takes the
+// room `fit` names, at most kFrontLabelMaxShare of `totalWidth` (pixels, the whole widget); a text
+// longer than its room is cut (show it with CutTextTooltip).
+FrontLabel MeasureFrontLabel(const char* label, ControlSize size, float totalWidth,
+                             FrontLabelFit fit = FrontLabelFit::Column);
+// The fit of a compact control that fits its content unless a width is set (rule 6 of
+// docs/api-conventions.md: `optionsWidth`, ImGui::SetNextItemWidth or ImGui::PushItemWidth): Column
+// with a set width, so it lines up in a column of fields, Text otherwise.
+FrontLabelFit CompactFrontLabelFit(float optionsWidth, const NextItemData& next);
 // Draws it with its text top at `pos` (text style of the control, see CenteredTextY in text.h),
 // in ControlLabelColor(disabled).
 void DrawFrontLabel(ImDrawList* drawList, const FrontLabel& label, ImVec2 pos, ControlSize size, bool disabled);

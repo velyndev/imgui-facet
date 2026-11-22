@@ -13,6 +13,7 @@
 #include "facet/core/text.h"
 #include "internal/loading.h"
 #include "internal/popup_host.h"
+#include "internal/row_layout.h"
 
 namespace facet::internal
 {
@@ -200,7 +201,7 @@ void CutTextTooltip(ImGuiID id, const ImRect& anchor, bool hovered, bool focusVi
 
 // ---- Labels -----------------------------------------------------------------------------------
 
-FrontLabel MeasureFrontLabel(const char* label, ControlSize size, float totalWidth)
+FrontLabel MeasureFrontLabel(const char* label, ControlSize size, float totalWidth, FrontLabelFit fit)
 {
     FrontLabel front;
     if (label == nullptr)
@@ -212,10 +213,27 @@ FrontLabel MeasureFrontLabel(const char* label, ControlSize size, float totalWid
     front.end = end;
     const float gap = std::round(Px(T().spacing.sm));
     ControlTextScope text(ControlTextStyle(size));
-    const float room = std::max(0.0f, std::floor(totalWidth * kFrontLabelMaxShare) - gap);
-    front.shown = FitText(label, end, room);
+    const float share = std::max(0.0f, std::floor(totalWidth * kFrontLabelMaxShare));
+    const float column = RowFrontLabelColumn();
+    if (fit == FrontLabelFit::Column && totalWidth >= column + std::round(Px(T().layout.minRowControl)))
+    {
+        // The whole column, so the control starts at one x in every row; the text is cut to it.
+        // Narrower, where a settings row would stack, the label takes its text width as below so
+        // the control keeps its room.
+        front.shown = FitText(label, end, std::max(0.0f, column - gap));
+        front.width = column;
+        return front;
+    }
+    front.shown = FitText(label, end, std::max(0.0f, share - gap));
     front.width = std::round(front.shown.width + gap);
     return front;
+}
+
+FrontLabelFit CompactFrontLabelFit(float optionsWidth, const NextItemData& next)
+{
+    const ImGuiWindow* window = ImGui::GetCurrentWindowRead();
+    const bool stacked = window != nullptr && !window->DC.ItemWidthStack.empty();
+    return optionsWidth != 0.0f || next.hasWidth || stacked ? FrontLabelFit::Column : FrontLabelFit::Text;
 }
 
 void DrawFrontLabel(ImDrawList* drawList, const FrontLabel& label, ImVec2 pos, ControlSize size, bool disabled)

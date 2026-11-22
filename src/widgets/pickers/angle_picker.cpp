@@ -98,10 +98,11 @@ bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& op
     diameter = std::max(2.0f, diameter);
     const float gap = PxSnapped(t.spacing.sm);
     const float available = std::max(1.0f, ImGui::GetContentRegionAvail().x);
-    const FrontLabel natural = MeasureFrontLabel(label, m.size, available * 2.0f);
+    const FrontLabelFit fit = CompactFrontLabelFit(options.width, next);
+    const FrontLabel natural = MeasureFrontLabel(label, m.size, available * 2.0f, fit);
     const float fieldDefault = options.field ? gap + std::round(Px(t.metrics.numberFieldWidth)) : 0.0f;
     const float width = ResolveItemWidth(options.width, next, std::min(available, natural.width + diameter + fieldDefault));
-    const FrontLabel front = MeasureFrontLabel(label, m.size, width);
+    const FrontLabel front = MeasureFrontLabel(label, m.size, width, fit);
     diameter = std::max(1.0f, std::min(diameter, width - front.width));
     const float fieldWidth = width - front.width - diameter - gap;
     const bool field = options.field && fieldWidth >= m.height * kAngleFieldMinHeights;

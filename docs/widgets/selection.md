@@ -11,8 +11,9 @@ Dropdowns, list boxes and trees are in [lists](lists.md).
 The visible label part is drawn by the widget's shape (rule 6): in front of one-line controls
 (segmented control, cycle selector, key bind mode selector), above groups that wrap into rows
 (checkbox and radio groups, chip groups, option cards), after the mark for checkboxes, and in front
-of the switch for toggles, as the Toggle declaration states (its `width` puts the switch at the end
-of a wider row). `"##name"` hides it, as in settings rows.
+of the switch for toggles. A label in front of a control with a set width (and of every field)
+takes the label column of a settings row, so the controls of a column start at one x; a compact
+control that fits its content keeps its label tight. `"##name"` hides it, as in settings rows.
 
 ## Widgets
 
@@ -40,8 +41,10 @@ after it; returns true on the frame it wrote `*value`.
   and on again. `error` replaces `helpText` under the toggle, in destructive with the error icon.
 - **Sizes and width.** `size` sets the item height (the control height) and the label text; the
   switch keeps the toggle tokens at every size. The default width is the label, spacing.sm and the
-  switch. A wider width puts the switch at the end of the row; a narrower one cuts the label with an
-  ellipsis and shows it in full as a tooltip on hover and keyboard focus.
+  switch. With a set width the label takes the label column (`layout.labelColumn`, at most half the
+  width) and the switch follows it, so a toggle lines up with the sliders and fields of a column;
+  a label longer than its room ends in an ellipsis and shows in full as a tooltip on hover and
+  keyboard focus. Without a visible label the switch starts the item.
 
 Status: ready.
 

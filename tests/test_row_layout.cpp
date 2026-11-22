@@ -410,3 +410,41 @@ TEST_CASE("Rows: rows and groups left open are reported and cleared at EndFrame"
     session.Frame();
     CHECK(facet::internal::UsageErrorCount() == after + 1);
 }
+
+TEST_CASE("Controls of one column share their trailing column from the frame before")
+{
+    LayoutGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float narrow = 0.0f;
+    float wide = 0.0f;
+    float otherEdge = 0.0f;
+    float otherKind = 0.0f;
+    session.SetUi([&] {
+        const float right = ImGui::GetCursorScreenPos().x + 300.0f;
+        narrow = facet::internal::RowTrailingColumn(right, 20.0f);
+        wide = facet::internal::RowTrailingColumn(right, 50.0f);
+        // A control that ends elsewhere, or a column of another kind, is a column of its own.
+        otherEdge = facet::internal::RowTrailingColumn(right + 40.0f, 20.0f);
+        otherKind = facet::internal::RowTrailingColumn(right, 30.0f, 1);
+    });
+    session.Frame();
+    // In the first frame the narrow control has not seen the wide one yet.
+    CHECK(narrow == doctest::Approx(20.0f));
+    CHECK(wide == doctest::Approx(50.0f));
+    CHECK(otherEdge == doctest::Approx(20.0f));
+    session.Frame();
+    // From the next frame on both take the widest.
+    CHECK(narrow == doctest::Approx(50.0f));
+    CHECK(wide == doctest::Approx(50.0f));
+    CHECK(otherEdge == doctest::Approx(20.0f));
+    CHECK(otherKind == doctest::Approx(30.0f));
+    // A column nobody asks for any more is forgotten.
+    session.SetUi([&] {
+        const float right = ImGui::GetCursorScreenPos().x + 300.0f;
+        narrow = facet::internal::RowTrailingColumn(right, 20.0f);
+    });
+    session.Frame();
+    session.Frame();
+    CHECK(narrow == doctest::Approx(20.0f));
+}

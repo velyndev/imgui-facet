@@ -55,13 +55,15 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
     const Theme& t = T();
     const Colors& c = t.colors;
 
-    // Measure: the label, spacing.sm, then the track.
+    // Measure: the label in front (control.h), then the track. With a set width the label takes the
+    // label column, so the switch starts where the controls of a settings column start.
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
     const bool hasLabel = labelEnd != label;
     const ImVec2 track(std::max(1.0f, PxSnapped(t.metrics.toggleWidth)), std::max(1.0f, PxSnapped(t.metrics.toggleHeight)));
-    const float gap = hasLabel ? std::round(Px(t.spacing.sm)) : 0.0f;
-    const float labelWidth = hasLabel ? ImGui::CalcTextSize(label, labelEnd).x : 0.0f;
-    const float width = internal::ResolveItemWidth(options.width, next, std::ceil(labelWidth + gap + track.x));
+    const internal::FrontLabelFit fit = internal::CompactFrontLabelFit(options.width, next);
+    const internal::FrontLabel natural = internal::MeasureFrontLabel(label, m.size, FLT_MAX, fit);
+    const float width = internal::ResolveItemWidth(options.width, next, std::ceil(natural.width + track.x));
+    const internal::FrontLabel front = internal::MeasureFrontLabel(label, m.size, width, fit);
     const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     const bool grouped = message.IsSet();
 
@@ -78,9 +80,10 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
     internal::ApplyNextItemData(next);
     const internal::ItemState item = internal::ItemBehavior(id, ImVec2(width, m.height), itemOptions);
 
-    // The track sits at the end of the item, so a wider toggle puts the switch at the end.
-    const ImRect trackRect(item.rect.Max.x - track.x, std::round(item.rect.GetCenter().y - track.y * 0.5f),
-                           item.rect.Max.x, std::round(item.rect.GetCenter().y - track.y * 0.5f) + track.y);
+    // The track follows the label (or starts the item without one), inside the item.
+    const float trackX = std::round(std::min(item.rect.Min.x + front.width, item.rect.Max.x - track.x));
+    const ImRect trackRect(trackX, std::round(item.rect.GetCenter().y - track.y * 0.5f), trackX + track.x,
+                           std::round(item.rect.GetCenter().y - track.y * 0.5f) + track.y);
     const float inset = std::max(1.0f, std::round(Px(t.metrics.toggleKnobInset)));
     const float knob = std::max(1.0f, track.y - inset * 2.0f);
     const float travel = std::max(0.0f, track.x - inset * 2.0f - knob);
@@ -149,6 +152,7 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         // Label: everything in front of the track, cut with an ellipsis when it does not fit.
         if (hasLabel)
         {
+            const float gap = std::round(Px(t.spacing.sm));
             const internal::FittedText shown =
                 internal::FitText(label, labelEnd, std::max(0.0f, trackRect.Min.x - item.rect.Min.x - gap));
             truncated = shown.truncated;

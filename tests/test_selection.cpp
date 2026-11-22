@@ -151,7 +151,7 @@ TEST_CASE("A mixed toggle shows its knob in the middle until the first edit")
     CHECK_FALSE(value);
 }
 
-TEST_CASE("A toggle fits label and switch, puts the switch at the end when wider and cuts a long label")
+TEST_CASE("A toggle fits label and switch, keeps a set width and cuts a long label")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

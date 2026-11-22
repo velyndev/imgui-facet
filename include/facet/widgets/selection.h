@@ -40,7 +40,7 @@ namespace facet
 struct ToggleOptions
 {
     ControlSize size = ControlSize::Inherit;
-    float width = 0.0f;                 // units; 0 fits label and switch; wider puts the switch at the end
+    float width = 0.0f;                 // units; 0 fits label and switch; set: the switch follows the label column
     bool readOnly = false;
     bool loading = false;               // the knob shows a spinner; input ignored
     bool mixed = false;                 // knob in the middle until the first edit
