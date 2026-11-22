@@ -908,7 +908,7 @@ Composites, inventory and cards:
 
 Composites, search and app controls:
 
-- **AccentPicker custom well.** A custom accent gets the same selection ring as a chosen swatch, so
+- **AccentPicker custom well.** A custom accent gets the same accent outline as a chosen swatch, so
   the choice reads as one mark across swatches and well.
 - **SettingsSearch reveal.** The revealed hit gets an accentSubtle fill behind its row for
   motion.feedbackHold, then fades over durationSlow, so the eye finds where the search landed;

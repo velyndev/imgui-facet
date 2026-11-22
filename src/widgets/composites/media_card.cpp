@@ -6,7 +6,7 @@
 // StyledText and the badges as Badge items in a Flow (display.h, layout.h). The card adds the layout
 // (the cover on top; beside the text when the card is narrower than composites.mediaCardHorizontalBelow),
 // the title cut to one line, and one item over the whole card for hover, press, the focus ring, the
-// accent ring of `selected` and activation by click, Enter or Space.
+// selected look (accentSubtle and the accent outline) and activation by click, Enter or Space.
 
 #include "facet/widgets/composites.h"
 

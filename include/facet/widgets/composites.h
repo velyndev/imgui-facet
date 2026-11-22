@@ -490,7 +490,7 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
 
 struct InventoryTileOptions
 {
-    bool selected = false;                 // the accent ring
+    bool selected = false;                 // accentSubtle and the accent outline
     bool dragSource = true;                // the tile can be dragged (InventoryPayload)
     const char* payloadType = nullptr;     // null uses kInventoryPayloadType
     float slotSize = 0.0f;                 // units; 0 for twice the xxxl spacing
@@ -543,7 +543,7 @@ struct MediaCardOptions
 {
     const char* description = nullptr;     // wrapped line under the title in labelSecondary; null for none
     std::span<const char* const> badges = {};
-    bool selected = false;                 // the accent ring
+    bool selected = false;                 // accentSubtle and the accent outline
     ImageFit fit = ImageFit::Cover;
     float width = 0.0f;                    // units; 0 for the card width default; narrow cards lay out horizontally
 };

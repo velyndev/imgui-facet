@@ -143,7 +143,7 @@ struct SwatchPaletteOptions
     std::span<const char* const> names = {};  // read during the call; name of grid swatch i, its tooltip on hover and keyboard focus; null or missing for none (since 0.1)
 };
 
-// A grid of swatches; the one equal to *color shows the selection ring, and a click or Enter on
+// A grid of swatches; the one equal to *color shows the accent outline, and a click or Enter on
 // a swatch writes its color. `history` (may be null) adds a row of recent colors above the
 // grid and receives every color written. One Tab stop; arrow keys move between swatches.
 // Returns true when *color was written.
@@ -429,7 +429,7 @@ struct ThumbnailPickerOptions
     bool readOnly = false;
 };
 
-// A grid of captioned thumbnails; the picked one shows the selection ring. The single form is
+// A grid of captioned thumbnails; the picked one shows accentSubtle and the accent outline. The single form is
 // one Tab stop with arrow-key movement. The multi form holds checked values, not a selection
 // (lists.h): `checked` has one flag per item, each tile is a Tab stop, and a click or Space
 // flips its flag, like OptionCardGroup. Returns true when *index or a flag was written. With a count of 0

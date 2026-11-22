@@ -69,7 +69,7 @@ struct AvatarOptions
     bool squircle = false;                 // a continuous-corner square instead of a circle
     bool showStatus = false;               // a status dot on the lower right
     Tone status = Tone::Neutral;           // color of the status dot
-    bool selected = false;                 // the accent ring of a chosen avatar
+    bool selected = false;                 // the accent outline of a chosen avatar
     bool activatable = false;              // a Tab stop; click, Enter and Space activate it
     float diameter = 0.0f;                 // units; 0 the control height of size
     ControlSize size = ControlSize::Inherit;
@@ -129,7 +129,7 @@ struct ThumbnailStripOptions
     bool readOnly = false;                 // the row still scrolls; the selection is shown, never written
 };
 
-// A horizontally scrolling row of thumbnails with the chosen one ringed. One Tab stop; Left
+// A horizontally scrolling row of thumbnails with the chosen one outlined. One Tab stop; Left
 // and Right move the selection, Home and End jump; the wheel scrolls. *selected -1 means none.
 // Returns true when *selected was written. Scroll position kept under the id. The visible label
 // part is the strip's tooltip (see the top of this file).
