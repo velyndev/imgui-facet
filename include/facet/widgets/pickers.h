@@ -4,9 +4,8 @@
 // and thumbnail pickers, and the file browser.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families. The entry of each widget in docs/widgets/pickers.md ends with its status.
-// A widget whose status is planned draws a placeholder of the widget's default size, returns
-// false and writes nothing; SampleAnimatedColor states its placeholder result in its own comment.
+// with other families. Every widget of the family is implemented; its entry in
+// docs/widgets/pickers.md describes what it does and ends with its status.
 //
 // Common to every widget here:
 //   - Colors are ImVec4 in gamma-encoded sRGB with straight alpha (color.h), everywhere: the

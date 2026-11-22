@@ -2,9 +2,7 @@
 
 Header: `facet/widgets/pickers.h`. The declarations follow [the API conventions](../api-conventions.md);
 the comment above each declaration in the header is the full reference. Each entry below ends with
-the widget's status. A **planned** widget exists as a function that draws a placeholder of the
-widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
-header describes. See [the widget index](../widgets.md). The demo gallery shows the color pickers on
+the widget's status; every widget of the family is ready and works as its header describes. See [the widget index](../widgets.md). The demo gallery shows the color pickers on
 the page Color pickers and the others on the page Other pickers.
 
 Colors are `ImVec4` in gamma-encoded sRGB with straight alpha everywhere (see `core/color.h`): the

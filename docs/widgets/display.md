@@ -8,10 +8,7 @@ Header: `facet/widgets/display.h`. Every declaration follows [the API convention
 and the header comments are the full reference (parameters, units, keys, state kept per id).
 The demo gallery shows every widget on the page Widgets > Display.
 
-Every widget below is declared, compiles and can be called, and each entry ends with its status. A
-**planned** widget draws a placeholder of its default size (a dashed box that names the widget)
-and returns the neutral result (false, `None`, nothing written); a **ready** one works as its
-header describes.
+Each entry ends with its status; every widget of the family is ready and works as its header describes.
 
 ## Widgets
 

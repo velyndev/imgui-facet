@@ -6,17 +6,12 @@ holds the types the families share (`ControlSize`, `Tone`, `ChoiceItem`, `DataSt
 control size stack, the edit session queries and the built-in strings). Every declaration
 follows [the API conventions](api-conventions.md).
 
-**Status: in progress.** Every family header declares its widgets with documentation comments,
-and every declared function links. Every widget of the buttons, selection, sliders, inputs,
-pickers, lists, navigation, containers, layout, overlays, display, charts and media families is
-ready; the widgets of the composites family are planned. The status of each widget is the last
-line of its entry on its family page under `docs/widgets/`: "Status: ready." for a widget that
-works as its header describes, "Status: planned." for one that does not yet, so one search for
-either text lists them. A planned widget function draws a placeholder at the widget's default size ("Name:
-planned"), returns the neutral result and writes nothing; planned End functions, queries and
-helpers draw nothing and return neutral values. Besides the ready widgets, `ApplyReorderMove`,
-`PassesFilter`, the built-in strings and the edit session queries in `common.h` work. The
-demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
+**Status: every declared widget is implemented.** Every family header declares its widgets with
+documentation comments, and every widget of all fourteen families is ready: no declared widget is
+a placeholder. The status of each widget is the last line of its entry on its family page under
+`docs/widgets/` ("Status: ready."). Widgets that are planned but not declared yet are listed at
+the end of their family page. Besides the widgets, `ApplyReorderMove`, `PassesFilter`, the
+built-in strings and the edit session queries in `common.h` work. The demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
 inputs), the pickers (color pickers and the other pickers) and the display family (the display
 widgets and the data table), and three for the composites (inventory and cards, search and app
 controls, editors and canvas). How a widget is built is described in

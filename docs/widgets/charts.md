@@ -7,9 +7,7 @@ Header: `facet/widgets/charts.h`. Every declaration follows [the API conventions
 and the header comments are the full reference. The demo gallery shows every widget on the page
 Widgets > Charts.
 
-Each entry ends with its status. A widget whose status is planned is declared, compiles and can be
-called; until it is implemented, a call draws a placeholder of the widget's default size and
-returns the neutral result.
+Each entry ends with its status; every widget of the family is ready and works as its header describes.
 
 ## One data form, one axis pattern
 

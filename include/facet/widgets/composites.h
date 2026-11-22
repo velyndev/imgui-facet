@@ -20,8 +20,8 @@
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families, and this header includes the family headers whose types it takes.
-// The entry of each widget in docs/widgets/composites.md ends with its status; a widget whose
-// status is planned draws a placeholder of its default size and returns the neutral result.
+// Every widget of the family is implemented; its entry in docs/widgets/composites.md describes
+// what it does and ends with its status.
 // Lengths are design units. Every function is for the thread that runs the Dear ImGui frame.
 
 #include <cstddef>
@@ -802,15 +802,19 @@ struct DragSourceOptions
 
 // Makes the last item a drag source for a payload of `type` (at most 32 bytes, Dear ImGui's
 // limit; names starting with '_' are reserved) whose `size` bytes at `data` are copied while
-// the drag starts. Returns true while the item is being dragged; then optional extra preview
-// content may be submitted, and EndDragSource must be called. The preview is drawn as a
-// floating layer in the theme, and lists and scroll areas scroll while it nears their edge.
+// the drag starts; the payload is at most 64 bytes. Returns true while the item is being
+// dragged; then optional extra preview content may be submitted, and EndDragSource must be
+// called. The preview is drawn as a floating layer in the theme, and lists and scroll areas
+// scroll while it nears their edge. While the item has the keyboard focus, Ctrl+Space picks it
+// up for a keyboard drag (arrows carry, Space or Enter drops, Escape cancels).
 [[nodiscard]] bool BeginDragSource(const char* type, const void* data, std::size_t size,
                                    const DragSourceOptions& options = {});
 void EndDragSource();
 
-// Makes the last item a drop target. Returns true while a payload is dragged over it; then call
-// AcceptDrop for each accepted type, and EndDropTarget.
+// Makes the last item a drop target. Returns true while a drag is in progress and the item is
+// visible, so that each AcceptDrop can declare it as a target of its type (a keyboard drag needs
+// that before it arrives); then call AcceptDrop for each accepted type, and EndDropTarget. A
+// disabled or read-only item refuses every drag.
 [[nodiscard]] bool BeginDropTarget();
 
 // How a drop target shows where the payload lands.

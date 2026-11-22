@@ -2,9 +2,7 @@
 
 Header: `facet/widgets/buttons.h`. The declarations follow [the API conventions](../api-conventions.md);
 the comment above each declaration in the header is the full reference. Each entry below ends with
-the widget's status. A **planned** widget exists as a function that draws a placeholder of the
-widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
-header describes. See [the widget index](../widgets.md).
+the widget's status; every widget of the family is ready and works as its header describes. See [the widget index](../widgets.md).
 
 Activation means a click released inside, Enter or Space while focused, or the gamepad activate
 button. Disable a button with `ImGui::BeginDisabled`.

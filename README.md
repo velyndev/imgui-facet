@@ -7,8 +7,8 @@ for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 **Status: early development.** The building blocks of Phase 1 exist inside the library and
 work. Planned blocks: overlay scrollbars inside popup levels and multiline text areas (both still
 use Dear ImGui's own bar there). The fourteen widget family headers in `include/facet/widgets/`
-declare every widget with documentation comments, and every declared function links. Every
-widget of thirteen families is implemented:
+declare every widget with documentation comments, and every declared widget of the fourteen
+families is implemented; none is a placeholder:
 
 - Buttons, Selection and Lists.
 - Sliders, including the two-dimensional pads (`XYPad`, `BoxRangePad`, `JoystickPad`),
@@ -29,13 +29,18 @@ widget of thirteen families is implemented:
   `FrameTimeGraph` and `ChartRangeBrush`.
 - Media: `ImageView`, `Avatar`, `AvatarGroup`, `ThumbnailStrip`, `Carousel`, `ImageViewer`,
   `ImageCompare`, `DropZone` and `TimelineScrubber`, next to the core image and icon items.
+- Composites: the inventory and card composites (`InventoryGrid`, `InventoryTile`,
+  `InventorySlot`, `InventoryDetailCard`, `MediaCard`, `UserChip`, `ProfileSwitcher`) and the
+  public drag and drop calls (`BeginDragSource`, `BeginDropTarget`, `AcceptDrop`); the search and
+  app controls (`SearchFilterBar`, `SettingsSearch` with its hit counts, `PresetList`,
+  `KeybindList`, `ThemeModeControl`, `AccentPicker`, `UiScaleControl`, `Onboarding`,
+  `ConsoleView`); and the editors (`PropertyGrid`, `GradientEditor`, `CurveEditor`,
+  `BezierEditor`, `LayerList`, `PreviewCanvas`, `CanvasElement`).
 
-The widgets of the Composites family are planned. A planned widget function draws a placeholder
-that says "planned", returns the neutral result and writes nothing, and planned End functions,
-queries and helpers draw nothing and return neutral values. Besides the widgets,
-`ApplyReorderMove`, `PassesFilter`, the built-in strings and the edit session queries in
-`common.h` work. The status of each widget is the last line of its entry on its family page under
-`docs/widgets/` (see `docs/widgets.md`). What exists today:
+Besides the widgets, `ApplyReorderMove`, `PassesFilter`, the built-in strings and the edit
+session queries in `common.h` work. The status of each widget is the last line of its entry on its
+family page under `docs/widgets/` (see `docs/widgets.md`); widgets that are planned but not
+declared yet are listed at the end of their family page. What exists today:
 
 - The CMake build with pinned dependencies and presets for MSVC x64 and x86. The version is
   written once, in `include/facet/core/version.h`, which CMake reads.
@@ -189,13 +194,11 @@ queries and helpers draw nothing and return neutral values. Besides the widgets,
     are built apart (Buttons, Selection, Sliders, Text inputs and Value inputs, Color pickers and
     Other pickers, Lists, Navigation, Containers, Layout, Overlays, Display and Data table,
     Charts, Media, and for the composites Inventory and cards, Search and app controls, and
-    Editors and canvas). Every page except the three composites pages shows every widget of its
-    family in its variants, sizes and states (read-only, disabled, error, mixed, loading and
-    empty where the widget has them, and narrow widths), with capture states that force hover,
-    press, keyboard focus, open popups and drags per section, and a selftest that operates each
-    of them by mouse and keyboard and checks the values. The three composites pages show their
-    planned widgets as placeholders of their declared size; their selftests check that the
-    placeholders write nothing.
+    Editors and canvas). Every page shows every widget of its family or group in its variants,
+    sizes and states (read-only, disabled, error, mixed, loading and empty where the widget has
+    them, and narrow widths), with capture states that force hover, press, keyboard focus, open
+    popups and drags per section, and a selftest that operates each of them by mouse and keyboard
+    and checks the values.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection

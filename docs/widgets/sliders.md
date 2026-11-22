@@ -2,9 +2,7 @@
 
 Header: `facet/widgets/sliders.h`. The declarations follow [the API conventions](../api-conventions.md);
 the comment above each declaration in the header is the full reference. Each entry below ends with
-the widget's status. A **planned** widget exists as a function that draws a placeholder of the
-widget's default size, returns the neutral result and writes nothing; a **ready** one works as its
-header describes. See [the widget index](../widgets.md).
+the widget's status; every widget of the family is ready and works as its header describes. See [the widget index](../widgets.md).
 
 Every widget here returns true on the frame a value was written. Drags, clicks and keys write at
 once; typed values (Ctrl+click or Enter on a handle) write on Enter, Tab or focus loss; Escape

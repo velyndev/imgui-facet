@@ -4,8 +4,8 @@
 // dependent groups, separators and item grids.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families, and docs/widgets/layout.md has usage examples. The entry of each widget
-// there ends with its status; a widget whose status is planned draws a placeholder.
+// with other families, and docs/widgets/layout.md has usage examples. Every widget of the family
+// is implemented; its entry there describes what it does and ends with its status.
 //
 // Responsive behaviour uses the width classes of core/layout.h (WidthClass, AvailableWidthClass,
 // LayoutLabeledRow), so every layout switches at the same breakpoints: settings rows stack their

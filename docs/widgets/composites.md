@@ -12,9 +12,8 @@ Header: `facet/widgets/composites.h`. It includes `display.h` (for `LogEntry`), 
 demo gallery shows them on three pages: Inventory and cards, Search and app controls, and Editors
 and canvas.
 
-Each entry ends with its status. A **planned** widget is declared, compiles and can be called: a
-call draws a placeholder of the widget's default size and returns the neutral result; the drag and
-drop calls return false and null. A **ready** one works as its header describes.
+Each entry ends with its status. Every widget of the family is ready: it works as its header
+describes.
 
 ## Who owns the data
 
@@ -183,6 +182,7 @@ below for `LineBefore` and `LineAfter`) while a drag of its type is over the ite
 payload on the drop, with `peek` also while it hovers. Disabled and read-only items take nothing.
 Both pairs have their scope class (`DragSourceScope`, `DropTargetScope`); an End without its Begin is
 reported. Status: ready.
+
 ### Usage of the inventory, cards and drag and drop
 
 #### Inventory grid
@@ -796,3 +796,7 @@ if (r.action == facet::LayerAction::Moved)
 - **SettingsSearch result jumps**: choosing a result scrolls to its row and flashes it.
 - **SearchFilterBar sort menu**: a sort choice next to the chips; until then place a Dropdown
   beside the bar.
+- **PresetList reordering**: moving a preset by keyboard, reported as a move in
+  `PresetListResult`.
+- **InventoryGrid height**: an option that bounds the height of a large grid; today the grid is at
+  most the visible height of its window.

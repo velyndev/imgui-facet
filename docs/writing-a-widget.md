@@ -9,11 +9,11 @@ implementation. `src/widgets/buttons/button.cpp` (Button) is the model to copy, 
 
 | What | Where |
 |---|---|
-| The widget | `src/widgets/<family>/<widget>.cpp`, one file per widget, already present as a placeholder |
+| The widget | `src/widgets/<family>/<widget>.cpp`, one file per widget |
 | Helpers shared by widgets of one family | `src/widgets/<family>/`, for example `buttons/button_look.h` |
 | Building blocks shared by every family | `src/internal/` (each header starts with a usage sketch) |
 | Per-frame or per-device work of a family | the accessor in `src/widgets/<family>/<family>_frame.cpp` (the subsystem table in `src/core/subsystems.cpp` already lists it) |
-| API and placeholder checks | `tests/test_api_<family>.cpp` |
+| API checks | `tests/test_api_<family>.cpp` |
 | Behaviour tests | `tests/test_<family>.cpp` |
 | Demo page with its selftest | `demo/pages/page_w_<family>.cpp` |
 | Documentation entry | `docs/widgets/<family>.md`; the reason for every new visual choice in `DESIGN.md` |
@@ -34,9 +34,8 @@ files are picked up by the build without a CMake edit.
 | Editors, property grid, canvas and layers | `composites/editors_frame.cpp` | `test_api_composites_editors.cpp` | `test_composites_editors.cpp` | `page_w_composites_editors.cpp` (`composites-editors`) |
 
 The layout family keeps its behaviour tests in `test_layout_widgets.cpp`, because
-`test_layout.cpp` tests the core layout of `core/layout.h`. The placeholder helpers themselves are
-tested in `test_api_controls.cpp` and `test_api_structure.cpp`; a widget never needs an edit
-there.
+`test_layout.cpp` tests the core layout of `core/layout.h`. The width and readOnly rules that
+every widget group shares are tested in `test_widget_conventions.cpp`.
 
 ## The structure of a widget file
 
@@ -166,13 +165,13 @@ TEST_CASE("A focused button activates with Space and Enter and is a Tab stop")
 A test that changes the theme, the accent or the motion settings restores them. Colors are
 checked by counting the draw list vertices of a token color; geometry with `session.ItemRect`.
 
-When a widget stops being a placeholder, take its calls out of the placeholder checks in
-`tests/test_api_<family>.cpp`: the `FACET_CHECK_STUB` list and its call count
-(`support/controls_stub_check.h`), the `CHECK_BALANCED` calls (`support/structure_stub_check.h`)
-or the `Check` calls (`support/content_stub_check.h`), whichever the file uses. A placeholder test
-that used it moves to a placeholder of the same family that is still planned, or is deleted when
-it only checked placeholder behaviour; the checks of the options structs stay. Its behaviour tests
-go into the behaviour file of its group.
+`tests/test_api_<family>.cpp` checks the declarations: the options structs follow the
+conventions, and every function is called once without input, also inside `ImGui::BeginDisabled`,
+and must leave every stack as it found it and write nothing. A new widget adds its call there: to
+the `FACET_CHECK_CALL` list and its call count (`support/controls_api_check.h`), the
+`CHECK_BALANCED` calls (`support/structure_api_check.h`) or the `Check` calls
+(`support/content_api_check.h`), whichever the file uses. Its behaviour tests go into the
+behaviour file of its group.
 
 ## The demo page
 
@@ -192,8 +191,7 @@ says so.
   label, `LabeledRow(label, lineHeight)`, so the label is centered on that line too.
   `LastLabeledRowBox()` gives the box the label was centered in, for a selftest check.
 - Wrapping rows of buttons use `ContentRight()` and `SameLineIfFits`.
-- The note under the page header is `PlannedFamilyNote(family)` while any widget on the page is
-  planned and `ReadyFamilyNote(family)` once all of them are ready.
+- The note under the page header is `ReadyFamilyNote(family)`.
 
 - `ctx.Probe("button.save")` right after a widget records it for the selftest; probe names start
   with the family.
@@ -209,8 +207,7 @@ says so.
 - One `FACET_DEMO_SELFTEST("<page id>")` per page. It resets the page state with `test.Do`, then
   operates every ready widget with the mouse and the keyboard and checks the results
   (`Expect`, `ExpectNear`, `ExpectFocused`, `ExpectVisible`). Its log is the click-through
-  evidence for a widget. A page without a script fails `--selftest --page <id>`, so a page of
-  placeholders checks at least that they write nothing.
+  evidence for a widget. A page without a script fails `--selftest --page <id>`.
 - Positions in a script come from probes of the latest frame. A popup row is found from the level
   rect (`internal::PopupLevelRect`) recorded with `ProbeRect`; before aiming at one, the lists
   page reveals the field (`test.Reveal`) and waits (`test.WaitSeconds(0.4f)`), so the field is
@@ -224,9 +221,8 @@ and at `--size 900x600 --scale 2`.
 
 The entry of a widget on its family page is a `### Name` heading, the declarations in a `cpp`
 block, a short description of what it draws and does (variants, sizes, keys, states, width), and
-as its last sentence its status: `Status: planned.` or `Status: ready.` When the last widget of a
-page becomes ready, the page switches its note from `PlannedFamilyNote` to `ReadyFamilyNote`
-(`demo/gallery.h`).
+as its last sentence its status, `Status: ready.` A widget is declared in its family header only
+once it is built; what is planned and not declared yet is listed at the end of its family page.
 
 Three files describe every family at once: the lists of what is ready in the status section of
 `README.md` and in `docs/widgets.md`, and the one-line reason for every new visual choice in
@@ -260,10 +256,9 @@ must look or act differently is a request for an option of that widget. After th
 item covers the whole composite (`internal::FinishWidgetGroup`), as for any widget made of several
 items, and an edit of an inner widget is reported for the composite with `MarkWidgetEdited`.
 
-The composites are built by three groups at the same time, each in its own files: the widget files
-under `src/widgets/composites/`, the frame hook, the two test files and the demo page of the table
-at the top, and its section of `docs/widgets/composites.md` (Inventory, cards and people; Search,
+The composites form three groups, each with its own files: the widget files under
+`src/widgets/composites/`, the frame hook, the two test files and the demo page of the table at
+the top, and its section of `docs/widgets/composites.md` (Inventory, cards and people; Search,
 presets and app controls; Editors and canvas) with its own usage section. The intro of that page,
 its "Who owns the data" and "Planned, not declared yet" sections, `composites.h`, `theme.h`,
-`common.h` and the shared blocks belong to none of them: a change there is a request to the
-engineer who merges the stage.
+`common.h` and the shared blocks belong to all three.

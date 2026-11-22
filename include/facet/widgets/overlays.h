@@ -4,8 +4,8 @@
 // loading overlays, the command palette, watermark overlays and the unsaved changes bar.
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
-// with other families, and docs/widgets/overlays.md has usage examples. The entry of each widget
-// there ends with its status; a widget whose status is planned draws a placeholder.
+// with other families, and docs/widgets/overlays.md has usage examples. Every widget of the
+// family is implemented; its entry there describes what it does and ends with its status.
 //
 // How layers open and how results come back (rule 8):
 //   - Layers the caller opens (BeginModal, ConfirmDialog, BeginPopover, BeginDrawer,

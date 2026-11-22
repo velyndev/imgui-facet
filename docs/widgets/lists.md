@@ -5,9 +5,7 @@ transfer lists and searchable checklists, declared in `facet/widgets/lists.h`. E
 follows [the API conventions](../api-conventions.md); the header comments are the full reference.
 See [the widget index](../widgets.md) for the other families.
 
-A widget whose status is planned is declared and callable: it draws a dashed placeholder with its
-name, returns the neutral result (false, -1) and never writes a value. A widget whose status is ready works
-as its header describes.
+Each entry ends with its status; every widget of the family is ready and works as its header describes.
 
 Two kinds of multiple choice use two kinds of storage. A selection (highlighted rows that the next
 command acts on) is a caller-owned `ImGuiSelectionBasicStorage` driven by
