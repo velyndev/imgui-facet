@@ -22,7 +22,6 @@ using facet::demo::SectionHeader;
 // Tile widths in multiples of the largest spacing token.
 constexpr float kColorTileInXxxl = 5.5f;
 constexpr float kSwatchInXxxl = 1.0f;
-constexpr float kFullTurn = 6.28318530718f;
 
 // What a color tile reports as its contrast.
 enum class Measure
@@ -266,8 +265,14 @@ void DrawAccentPicker(facet::demo::PageCtx& ctx)
         const float ring = facet::Px(theme.metrics.focusRingWidth);
         drawList->AddCircleFilled(center, size * 0.5f - ring, U32(swatch));
         if (current)
-            facet::StrokeArc(drawList, center, size * 0.5f - ring * 0.5f, 0.0f, kFullTurn, U32(c.label),
-                             facet::HairlineThickness() * 2.0f, false);
+        {
+            // The chosen swatch takes the selection mark of the library's swatches: the accent
+            // outline at the one border width, one hairline outside the disc.
+            const float hairline = facet::HairlineThickness();
+            const float outer = size * 0.5f - ring + hairline * 2.0f;
+            facet::StrokeRect(drawList, ImVec2(center.x - outer, center.y - outer), ImVec2(center.x + outer, center.y + outer),
+                              U32(c.focusRing), outer, hairline);
+        }
         ImGui::PopID();
         if (i + 1 < static_cast<int>(presets.size()))
             facet::demo::SameLineIfFits(right, size);
