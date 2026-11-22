@@ -369,6 +369,12 @@ int FormatTokens(char* out, std::size_t outSize, const char* format, std::span<c
                     }
                 }
             }
+            if (match != nullptr && match->text != nullptr)
+            {
+                append(match->text, match->text + std::strlen(match->text));
+                p = close + 1;
+                continue;
+            }
             if (match != nullptr)
             {
                 char number[24];

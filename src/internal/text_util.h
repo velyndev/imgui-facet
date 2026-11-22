@@ -77,15 +77,18 @@ float DrawHighlightedText(ImDrawList* drawList, ImFont* font, float size, ImVec2
 // ranges.size() of them and returns how many exist. An empty query matches nothing.
 int FindMatches(const char* text, const char* textEnd, const char* query, std::span<TextRange> ranges);
 
-// A number for a template of the Strings table: "{name}" in the template becomes `value`.
+// A number or a text for a template of the Strings table: "{name}" in the template becomes
+// `value`, or `text` when that is set (a preset or action name: {"name", 0, label}).
 struct TextToken
 {
     const char* name = nullptr;  // without braces, for example "count"
     long long value = 0;
+    const char* text = nullptr;  // UTF-8, zero terminated; null writes `value` instead
 };
 
 // Writes `format` (a Strings template, which may come from a translation) into `out` with each
-// "{name}" of `tokens` replaced by its decimal value. Everything else is copied as written:
+// "{name}" of `tokens` replaced by its text or its decimal value. A token's text is copied as it
+// is, never read as a template again. Everything else is copied as written:
 // '%', unknown "{...}" and lone braces included, so no input can cause undefined behaviour.
 // `out` is always zero terminated and cut at a whole UTF-8 character when it is too small.
 // Returns the bytes written without the terminator. A null format writes "".

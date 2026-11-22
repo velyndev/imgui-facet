@@ -90,6 +90,17 @@ constexpr const char* Strings::*kStringMembers[] = {
     &Strings::parentFolder, &Strings::play,     &Strings::pause,     &Strings::loopStart,
     &Strings::loopEnd,    &Strings::playhead,   &Strings::seconds,   &Strings::milliseconds,
     &Strings::framesPerSecond, &Strings::minimum, &Strings::average, &Strings::maximum,
+    &Strings::newPreset,  &Strings::rename,     &Strings::duplicate, &Strings::deleteAction,
+    &Strings::importAction, &Strings::exportAction, &Strings::deletePresetTitle, &Strings::deletePresetMessage,
+    &Strings::modified,   &Strings::builtIn,    &Strings::action,    &Strings::primaryBind,
+    &Strings::alternateBind, &Strings::conflictWith, &Strings::resetToDefault, &Strings::resultCount,
+    &Strings::resultCountOne, &Strings::locked, &Strings::emptySlot, &Strings::lock,
+    &Strings::unlock,     &Strings::themeDefaultAccent, &Strings::customColor, &Strings::percent,
+    &Strings::zoomIn,     &Strings::zoomOut,    &Strings::stepOf,    &Strings::easeLinear,
+    &Strings::ease,       &Strings::easeIn,     &Strings::easeOut,   &Strings::easeInOut,
+    &Strings::colorStop,  &Strings::position,   &Strings::anchor,    &Strings::anchorTopLeft,
+    &Strings::anchorTop,  &Strings::anchorTopRight, &Strings::anchorLeft, &Strings::anchorCenter,
+    &Strings::anchorRight, &Strings::anchorBottomLeft, &Strings::anchorBottom, &Strings::anchorBottomRight,
 };
 constexpr size_t kStringCount = std::size(kStringMembers);
 static_assert(sizeof(Strings) == kStringCount * sizeof(const char*), "kStringMembers misses a Strings member");

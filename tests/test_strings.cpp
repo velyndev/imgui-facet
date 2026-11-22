@@ -100,6 +100,41 @@ TEST_CASE("Strings templates: the defaults fill as documented, also after SetStr
     facet::SetStrings(facet::Strings{});
 }
 
+TEST_CASE("Strings templates: a text token is copied as it is, never read as a template")
+{
+    const TextToken tokens[] = {{"name", 0, "Preset {count} 100%"}, {"count", 4}};
+    char out[96];
+    FormatTokens(out, sizeof(out), facet::GetStrings().deletePresetMessage, tokens);
+    CHECK(std::strcmp(out, "\"Preset {count} 100%\" will be deleted. This cannot be undone.") == 0);
+    FormatTokens(out, sizeof(out), facet::GetStrings().conflictWith, tokens);
+    CHECK(std::strcmp(out, "Also bound to Preset {count} 100%") == 0);
+    // An empty text writes nothing, and a text too long for the buffer is cut at a whole character.
+    const TextToken empty[] = {{"name", 0, ""}};
+    FormatTokens(out, sizeof(out), "[{name}]", empty);
+    CHECK(std::strcmp(out, "[]") == 0);
+    const TextToken umlaut[] = {{"name", 0, "ab\xC3\xBC"}};
+    char small[4];
+    FormatTokens(small, sizeof(small), "{name}", umlaut);
+    CHECK(std::strcmp(small, "ab") == 0);
+}
+
+TEST_CASE("Strings templates: the composite templates fill as documented")
+{
+    char out[64];
+    const TextToken results[] = {{"count", 12}};
+    FormatTokens(out, sizeof(out), facet::GetStrings().resultCount, results);
+    CHECK(std::strcmp(out, "12 results") == 0);
+    const TextToken one[] = {{"count", 1}};
+    FormatTokens(out, sizeof(out), facet::GetStrings().resultCountOne, one);
+    CHECK(std::strcmp(out, "1 result") == 0);
+    const TextToken scale[] = {{"percent", 125}};
+    FormatTokens(out, sizeof(out), facet::GetStrings().percent, scale);
+    CHECK(std::strcmp(out, "125 %") == 0);
+    const TextToken step[] = {{"step", 2}, {"count", 3}};
+    FormatTokens(out, sizeof(out), facet::GetStrings().stepOf, step);
+    CHECK(std::strcmp(out, "Step 2 of 3") == 0);
+}
+
 TEST_CASE("Every Strings member named in a header or a doc exists")
 {
     const std::filesystem::path root = FACET_TEST_SOURCE_DIR;
