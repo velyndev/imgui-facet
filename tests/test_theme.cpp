@@ -84,7 +84,14 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
             &t.tabs.underlineHeight, &t.picker.colorBarHeight, &t.picker.hueRingWidth, &t.picker.timeColumnWidth,
             &t.charts.lineWidth, &t.charts.markerSize, &t.charts.barGap, &t.charts.legendSwatch,
             &t.charts.donutHole, &t.charts.gaugeWidth, &t.charts.meterSegmentGap, &t.charts.peakHold,
-            &t.media.avatarOverlap, &t.media.playheadWidth, &t.media.dashLength, &t.media.dashGap};
+            &t.media.avatarOverlap, &t.media.playheadWidth, &t.media.dashLength, &t.media.dashGap,
+            // The tokens of the composites.
+            &t.composites.editorHandleSize, &t.composites.gradientStopSize, &t.composites.stopRemoveDistance,
+            &t.composites.easingPreviewTime, &t.composites.propertyLabelMinWidth,
+            &t.composites.searchFieldMinWidth, &t.composites.keybindColumnWidth,
+            &t.composites.inventoryTintHeight, &t.composites.mediaCoverAspect,
+            &t.composites.mediaCardHorizontalBelow, &t.composites.canvasSnapDistance,
+            &t.composites.canvasHandleSize};
 }
 
 // Restores the global theme state after a test changes it.
@@ -332,6 +339,41 @@ TEST_CASE("The tokens of the second widget wave hold their documented starting v
         CHECK(theme.media.playheadWidth == c.lineWidth);
         CHECK(theme.media.dashLength == 6.0f);
         CHECK(theme.media.dashGap == theme.spacing.xs);
+    }
+}
+
+TEST_CASE("The tokens of the composites hold their documented starting values in both presets")
+{
+    for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
+    {
+        CAPTURE(theme.dark);
+        const facet::Metrics& m = theme.metrics;
+        const facet::CompositeTokens& c = theme.composites;
+        // An editor handle reads as grabbable next to a chart marker and stays below the slider
+        // knob, so points close together stay apart; its hit target grows to minHitTarget.
+        CHECK(c.editorHandleSize == 10.0f);
+        CHECK(c.editorHandleSize > theme.charts.markerSize);
+        CHECK(c.editorHandleSize < m.sliderKnobSize);
+        // A stop marker shows its color inside and fits the default bar height (twice a control).
+        CHECK(c.gradientStopSize == 14.0f);
+        CHECK(c.gradientStopSize > c.editorHandleSize);
+        CHECK(c.gradientStopSize < m.controlHeight);
+        CHECK(c.stopRemoveDistance == theme.spacing.xxxl);
+        CHECK(c.easingPreviewTime == doctest::Approx(1.0f));
+        CHECK(c.easingPreviewTime > theme.motion.durationSlow);  // slow enough to follow the curve
+        CHECK(c.propertyLabelMinWidth == theme.spacing.xxxl * 2.0f);
+        CHECK(c.propertyLabelMinWidth < theme.layout.labelColumn);
+        CHECK(c.searchFieldMinWidth == 160.0f);
+        CHECK(c.searchFieldMinWidth >= theme.layout.minRowControl);
+        CHECK(c.keybindColumnWidth == c.searchFieldMinWidth);
+        CHECK(c.inventoryTintHeight == m.sliderTrackHeight);
+        CHECK(c.mediaCoverAspect == doctest::Approx(9.0f / 16.0f));
+        CHECK(c.mediaCardHorizontalBelow == m.padSize);
+        CHECK(c.mediaCardHorizontalBelow < m.cardWidth);  // the default card width lays out vertically
+        CHECK(c.canvasSnapDistance == 6.0f);
+        CHECK(c.canvasSnapDistance > theme.drag.startThreshold);  // the snap band is wider than a slip of the press
+        CHECK(c.canvasHandleSize == m.sliderTrackHeight * 2.0f);
+        CHECK(c.canvasHandleSize < m.minHitTarget);
     }
 }
 

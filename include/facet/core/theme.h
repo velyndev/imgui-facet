@@ -458,6 +458,29 @@ struct MediaTokens
     float dashGap = 4.0f;              // the gaps between them
 };
 
+// Editors, canvases, search and settings controls, inventories and cards (the composites; since
+// 0.1). Lengths in design units, times in seconds.
+struct CompositeTokens
+{
+    // Curve, easing and gradient editors.
+    float editorHandleSize = 10.0f;       // a point of a curve editor and a control point of an easing editor
+    float gradientStopSize = 14.0f;       // the marker of a gradient stop, its color inside
+    float stopRemoveDistance = 32.0f;     // a gradient stop dragged this far from the bar is removed
+    float easingPreviewTime = 1.0f;       // one run of the easing editor's preview dot (times motion.scale)
+    // Property grids, search and key bind lists.
+    float propertyLabelMinWidth = 64.0f;  // narrowest label column the column drag of a property grid leaves
+    float searchFieldMinWidth = 160.0f;   // narrowest search field beside the chips of a search filter bar;
+                                          // a narrower bar puts the chips under the field
+    float keybindColumnWidth = 160.0f;    // each chord column of a key bind list
+    // Inventories and cards.
+    float inventoryTintHeight = 4.0f;     // the category bar at the bottom of an inventory slot
+    float mediaCoverAspect = 0.5625f;     // height of a media card's cover as a share of its width
+    float mediaCardHorizontalBelow = 192.0f;  // a media card narrower than this puts its cover beside the text
+    // Preview canvas.
+    float canvasSnapDistance = 6.0f;      // a dragged canvas element this close to a guide snaps to it
+    float canvasHandleSize = 8.0f;        // the edge and corner handles of a resizable canvas element
+};
+
 struct Theme
 {
     bool dark = false;
@@ -481,6 +504,7 @@ struct Theme
     PickerTokens picker; // (since 0.1)
     ChartTokens charts;  // (since 0.1)
     MediaTokens media;   // (since 0.1)
+    CompositeTokens composites;  // (since 0.1)
 
     static Theme Light();
     static Theme Dark();

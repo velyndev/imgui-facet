@@ -401,6 +401,24 @@ MediaTokens MixMedia(const MediaTokens& a, const MediaTokens& b, float t)
     return out;
 }
 
+CompositeTokens MixComposites(const CompositeTokens& a, const CompositeTokens& b, float t)
+{
+    CompositeTokens out;
+    out.editorHandleSize = Lerp(a.editorHandleSize, b.editorHandleSize, t);
+    out.gradientStopSize = Lerp(a.gradientStopSize, b.gradientStopSize, t);
+    out.stopRemoveDistance = Lerp(a.stopRemoveDistance, b.stopRemoveDistance, t);
+    out.easingPreviewTime = Lerp(a.easingPreviewTime, b.easingPreviewTime, t);
+    out.propertyLabelMinWidth = Lerp(a.propertyLabelMinWidth, b.propertyLabelMinWidth, t);
+    out.searchFieldMinWidth = Lerp(a.searchFieldMinWidth, b.searchFieldMinWidth, t);
+    out.keybindColumnWidth = Lerp(a.keybindColumnWidth, b.keybindColumnWidth, t);
+    out.inventoryTintHeight = Lerp(a.inventoryTintHeight, b.inventoryTintHeight, t);
+    out.mediaCoverAspect = Lerp(a.mediaCoverAspect, b.mediaCoverAspect, t);
+    out.mediaCardHorizontalBelow = Lerp(a.mediaCardHorizontalBelow, b.mediaCardHorizontalBelow, t);
+    out.canvasSnapDistance = Lerp(a.canvasSnapDistance, b.canvasSnapDistance, t);
+    out.canvasHandleSize = Lerp(a.canvasHandleSize, b.canvasHandleSize, t);
+    return out;
+}
+
 // --- Current theme and transition state -----------------------------------------------------
 
 struct ThemeState
@@ -828,6 +846,7 @@ Theme MixThemes(const Theme& a, const Theme& b, float t)
     out.picker = MixPicker(a.picker, b.picker, t);
     out.charts = MixCharts(a.charts, b.charts, t);
     out.media = MixMedia(a.media, b.media, t);
+    out.composites = MixComposites(a.composites, b.composites, t);
     return out;
 }
 

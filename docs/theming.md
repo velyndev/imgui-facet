@@ -30,6 +30,7 @@ the reason for each are listed in `DESIGN.md`.
 | `picker` | Day cell of the date pickers, the color bars and hue ring of the color pickers, the time picker columns |
 | `charts` | Series line width, point markers, the gap between bars, legend swatches, the donut hole, the gauge arc, level meter segments and peak hold |
 | `media` | The overlap of grouped avatars, the timeline playhead, the dashes of a drop zone outline |
+| `composites` | Curve and easing editor points, gradient stops and their remove distance, the easing preview time, the narrowest property label column, the search field beside filter chips, key bind chord columns, the inventory category bar, media card covers and their horizontal layout, canvas snapping and resize handles |
 
 Lengths are design units. Widgets convert them with `facet::Px()` (see `docs/scaling.md`).
 
@@ -73,6 +74,10 @@ tokens. Each widget in the table reads the token listed for its option.
 | `ColorChannelSlider` and the bars of `ColorPicker`, `ColorPickerMode::Wheel`, `TimePicker` columns | `picker.colorBarHeight`, `picker.hueRingWidth`, `picker.timeColumnWidth` |
 | Series lines and `markers`, `BarChart` bars, `Legend` entries, `DonutChart` (not `pie`), `Gauge`, `LevelMeterOptions::segments` and `peakHold` | `charts.lineWidth`, `charts.markerSize`, `charts.barGap`, `charts.legendSwatch`, `charts.donutHole`, `charts.gaugeWidth`, `charts.meterSegmentGap`, `charts.peakHold` |
 | `AvatarGroup`, `TimelineScrubber`, `DropZone` | `media.avatarOverlap`, `media.playheadWidth`, `media.dashLength` and `media.dashGap` |
+| `CurveEditor` and `BezierEditor` points, `GradientEditor` stops, `BezierEditorOptions::preview` | `composites.editorHandleSize`, `composites.gradientStopSize` and `composites.stopRemoveDistance`, `composites.easingPreviewTime` |
+| `PropertyGridOptions::labelWidth` (the column drag), `SearchFilterBar` (chips under the field), `KeybindList` | `composites.propertyLabelMinWidth`, `composites.searchFieldMinWidth`, `composites.keybindColumnWidth` |
+| `InventoryItem::tint`, `MediaCardOptions::width` (cover size and the horizontal layout) | `composites.inventoryTintHeight`, `composites.mediaCoverAspect` and `composites.mediaCardHorizontalBelow` |
+| `CanvasElementOptions::snap` and `resizable` | `composites.canvasSnapDistance`, `composites.canvasHandleSize` |
 
 ## Switching
 
