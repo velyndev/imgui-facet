@@ -55,6 +55,9 @@ Session::Session(const SessionOptions& sessionOptions) : options(sessionOptions)
     platform.Platform_ClipboardUserData = this;
     platform.Platform_GetClipboardTextFn = &Session::GetClipboardText;
     platform.Platform_SetClipboardTextFn = &Session::SetClipboardText;
+    // The Windows animation setting is not followed: a machine with animations off (a server, a
+    // remote session) would otherwise run every motion test with reduced motion.
+    facet::SetFollowSystemMotion(false);
 
     ready = SUCCEEDED(hr) && device != nullptr;
     if (ready && options.initFacet)

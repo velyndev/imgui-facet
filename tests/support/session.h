@@ -16,6 +16,9 @@
 //     so draw lists can also be recorded outside a frame;
 //   - a clipboard of its own (Clipboard, SetClipboard), empty at the start, so copy and paste
 //     in a test never read or change the system clipboard;
+//   - facet::SetFollowSystemMotion(false), so the Windows animation setting does not decide
+//     whether motion runs: a server or a remote session has animations off and would run every
+//     test with reduced motion. A test of reduced motion sets theme.motion.reduceMotion itself;
 //   - facet::Init with the device (unless options.initFacet is false; then call InitFacet).
 // The destructor runs facet::Shutdown and destroys the context. One Session at a time.
 //
