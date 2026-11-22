@@ -857,7 +857,12 @@ TEST_CASE("A primary button with a light accent keeps a visible edge")
     struct Restore
     {
         facet::Theme theme;
-        ~Restore() { facet::SetTheme(theme, false); }
+        ~Restore()
+        {
+            // The accent set below stays in force for every later theme until it is cleared.
+            facet::ClearAccent();
+            facet::SetTheme(theme, false);
+        }
     } restore{saved};
     facet::SetTheme(facet::Theme::Light(), false);
     facet::SetAccent(facet::Rgb(0xFFD60A));
