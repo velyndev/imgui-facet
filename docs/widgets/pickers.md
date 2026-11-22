@@ -106,7 +106,9 @@ compares and writes red, green and blue only. The editable forms end with a + sw
 as its tooltip) that adds the color while there is room, Delete or Backspace removes the focused
 swatch, Alt with Left or Right moves it, and a drag moves a swatch to where the pointer is (a
 focus ring colored line marks the place). Without swatches and history it shows Strings::empty.
-The label is the palette's tooltip. Status: ready.
+`names` gives grid swatch i a name, its tooltip on hover and while it has the keyboard focus, so
+keyboard users read it too; a swatch without a name shows none. The label is the palette's tooltip
+otherwise. Status: ready.
 
 ### SatValSquare
 
@@ -470,9 +472,6 @@ These widgets of the later tier are not declared yet.
 
 These options of declared widgets are planned too:
 
-- **SwatchPalette swatch names**: a name per swatch, shown as its tooltip on hover and on keyboard
-  focus. Today a caller can show names on hover only, because the palette does not report which
-  swatch has the focus.
 - **ColorWell selected**: an option that draws the selection ring around the well, so a well
   that stands for a chosen value matches the chosen swatch. Today `AccentPicker` draws that ring
   itself.

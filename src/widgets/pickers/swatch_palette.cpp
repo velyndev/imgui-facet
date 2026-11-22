@@ -535,13 +535,30 @@ bool RunSwatchPalette(const char* label, ImVec4* color, SwatchList list, ColorHi
         }
     }
 
-    // The palette's label is its tooltip; a hovered swatch names the + cell.
+    // The palette's label is its tooltip; a hovered swatch names the + cell. A grid swatch with a
+    // name in options.names shows it on hover and on keyboard focus, so keyboard users read it too.
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
+    const auto swatchName = [&](int cell) -> const char* {
+        const int j = cell - layout.history;
+        if (cell < 0 || j < 0 || j >= list.count || j >= static_cast<int>(options.names.size()))
+            return nullptr;
+        const char* name = options.names[static_cast<std::size_t>(j)];
+        return name != nullptr && name[0] != '\0' ? name : nullptr;
+    };
+    const int namedCell = hovered >= 0 ? hovered : (item.focusVisible ? state.focus : -1);
     if (hovered >= 0 && hovered == drawTotal - 1 && list.CanAdd() && !readOnly)
     {
         if (internal::BeginPopupTooltip(id, layout.Rect(hovered), true, false))
         {
             Text(TextStyle::Footnote, "%s", GetStrings().add);
+            internal::EndPopupTooltip();
+        }
+    }
+    else if (const char* name = swatchName(namedCell); name != nullptr && !state.dragging)
+    {
+        if (internal::BeginPopupTooltip(id, layout.Rect(namedCell), hovered >= 0, hovered < 0 && item.focusVisible))
+        {
+            Text(TextStyle::Footnote, "%s", name);
             internal::EndPopupTooltip();
         }
     }

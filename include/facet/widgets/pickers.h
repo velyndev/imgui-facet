@@ -140,6 +140,7 @@ struct SwatchPaletteOptions
     ControlSize size = ControlSize::Inherit;  // swatch size: the control height of this size
     float width = 0.0f;                 // units; 0 fills the available width
     bool readOnly = false;
+    std::span<const char* const> names = {};  // read during the call; name of grid swatch i, its tooltip on hover and keyboard focus; null or missing for none (since 0.1)
 };
 
 // A grid of swatches; the one equal to *color shows the selection ring, and a click or Enter on

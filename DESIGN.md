@@ -685,6 +685,8 @@ Color pickers:
   the color stays visible as information while reading as unavailable.
 - **Chosen swatch.** A label-colored ring outside it plus a white or black check, so the choice
   does not rest on color alone.
+- **Swatch names** show as the swatch's tooltip on hover and on keyboard focus, so a keyboard user
+  learns what a swatch stands for as a pointer user does.
 - **Mixed color well** shows diagonal labelTertiary stripes over fill[2]: a value that is not one
   color.
 - **Wheel mode** puts hue 0 at the top and keeps the triangle fixed (hue right, white lower left,

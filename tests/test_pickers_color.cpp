@@ -448,6 +448,44 @@ TEST_CASE("SwatchPalette picks by click and by keys in two dimensions, and recor
     CHECK(Same(history.colors[0], ImVec4(0, 1, 1, 0.25f)));
 }
 
+TEST_CASE("SwatchPalette shows a swatch's name on hover and on keyboard focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const ImVec4 kSwatches[] = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}};
+    static const char* const kNames[] = {"Placeholder red", nullptr, "Placeholder blue"};
+    ImVec4 color(0.5f, 0.5f, 0.5f, 1.0f);
+    bool tooltip = false;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        // No visible label, so the palette has no tooltip of its own.
+        (void)facet::SwatchPalette("##palette", &color, std::span<const ImVec4>(kSwatches), nullptr,
+                                   {.columns = 3, .names = kNames});
+        session.Track("palette");
+        tooltip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(session.ItemId("palette")));
+    });
+    session.Frame();
+    const ImRect r = session.ItemRect("palette");
+    const float side = facet::ControlHeight(facet::ControlSize::Inherit);
+    // Hover: the first swatch has a name, the second none.
+    session.MouseMove(ImVec2(r.Min.x + side * 0.5f, r.Min.y + side * 0.5f));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tooltip);
+    session.MouseMove(ImVec2(r.Min.x + side * 1.5f + facet::Px(4.0f), r.Min.y + side * 0.5f));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK_FALSE(tooltip);
+    // Keyboard focus on the third swatch shows its name without hovering.
+    session.MouseMove(ImVec2(r.Max.x + facet::Px(200.0f), r.Max.y + facet::Px(200.0f)));
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("palette"));
+    session.KeyPress(ImGuiKey_End);
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tooltip);
+}
+
 TEST_CASE("The editable SwatchPalette adds, removes and moves swatches in the caller's storage")
 {
     facet::test::Session session;

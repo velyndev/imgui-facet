@@ -132,13 +132,16 @@ bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const A
     // outside 0 to 1 never equals a swatch.
     const ImVec4 kNoSwatch(-1.0f, -1.0f, -1.0f, 1.0f);
     ImVec4 inPalette = presetChosen >= 0 ? swatches[presetChosen] : kNoSwatch;
+    // The preset names are the swatches' tooltips, on hover and on keyboard focus.
+    const char* names[kAccentPickerMaxSwatches] = {};
+    for (int i = 0; i < count; ++i)
+        names[i] = i == 0 && hasThemeDefault ? s.themeDefaultAccent : presets[i].name;
     SwatchPaletteOptions palette;
     palette.size = options.size;
     palette.readOnly = readOnly;
+    palette.names = std::span<const char* const>(names, static_cast<std::size_t>(count));
     const bool picked = SwatchPalette("##swatches", &inPalette, std::span<const ImVec4>(swatches, static_cast<std::size_t>(count)),
                                       nullptr, palette);
-    const ImRect paletteRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    const bool paletteHovered = ImGui::IsItemHovered();
     if (picked && !readOnly)
     {
         // The palette wrote the swatch's color; the first swatch equal to it is the choice.
@@ -157,32 +160,6 @@ bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const A
         {
             chosenColor = swatches[index];
             written = defaultChosen || !AccentPickerSameColor(chosenColor, current);
-        }
-    }
-
-    // The preset name of the swatch under the pointer, laid out as the palette lays its cells out.
-    if (paletteHovered && count > 0)
-    {
-        const int columns = std::max(1, static_cast<int>((paletteWidth + swatchGap) / (side + swatchGap)));
-        const float cell = std::max(1.0f, std::min(side, std::floor((paletteWidth - swatchGap * static_cast<float>(columns - 1)) /
-                                                                   static_cast<float>(columns))));
-        const ImVec2 mouse = ImGui::GetIO().MousePos;
-        const int column = static_cast<int>((mouse.x - paletteRect.Min.x) / (cell + swatchGap));
-        const int row = static_cast<int>((mouse.y - paletteRect.Min.y) / (cell + swatchGap));
-        const int index = row * columns + column;
-        const ImRect cellRect(paletteRect.Min.x + static_cast<float>(column) * (cell + swatchGap),
-                              paletteRect.Min.y + static_cast<float>(row) * (cell + swatchGap),
-                              paletteRect.Min.x + static_cast<float>(column) * (cell + swatchGap) + cell,
-                              paletteRect.Min.y + static_cast<float>(row) * (cell + swatchGap) + cell);
-        if (column >= 0 && column < columns && index >= 0 && index < count && cellRect.Contains(mouse))
-        {
-            const ImGuiID cellId = ImHashData(&index, sizeof(index), id);
-            const char* name = index == 0 && hasThemeDefault ? s.themeDefaultAccent : presets[index].name;
-            if (name != nullptr && name[0] != '\0' && internal::BeginPopupTooltip(cellId, cellRect, true, false))
-            {
-                Text(TextStyle::Footnote, "%s", name);
-                internal::EndPopupTooltip();
-            }
         }
     }
 
