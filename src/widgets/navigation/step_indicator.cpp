@@ -1,9 +1,10 @@
 // StepIndicator (navigation.h): numbered step markers joined by connectors. Steps before `current`
-// are done (an accent disc with a check mark), `current` is marked (an accent ring around an
-// accentSubtle disc, its number and label semibold), the rest are open (a boundary ring); a step
-// whose ChoiceItem is disabled draws the disabled look whatever its place. Connectors between done
-// steps take the focus ring color, the others the 3:1 control boundary, so the progress reads
-// without color alone: done steps also carry the check mark.
+// are done (an accent disc with a check mark), `current` is marked (an accentSubtle disc with the
+// accent hairline, its number and label semibold), the rest are open (a controlBorder hairline); a
+// step whose ChoiceItem is disabled draws the disabled look whatever its place. Every marker outline
+// is the one hairline of the border rule. Connectors between done steps take the accent as a mark
+// (focusRing, 3:1), the others controlBorder, so the progress reads without color alone: done steps
+// also carry the check mark.
 //
 // Horizontal: the width is divided into one column per step, the marker centered at the top and
 // the label (and the item detail as a second line) centered under it, cut with an ellipsis and a
@@ -66,7 +67,6 @@ void DrawStepMarker(ImDrawList* drawList, const ImRect& marker, StepLook look, i
     const Colors& c = t.colors;
     const ImVec2 center = marker.GetCenter();
     const float radius = marker.GetWidth() * 0.5f;
-    const float ring = std::max(1.0f, std::round(Px(t.metrics.stepConnectorWidth)));
     char text[16];
     std::snprintf(text, sizeof(text), "%d", number);
     ImU32 ink = 0;
@@ -76,17 +76,19 @@ void DrawStepMarker(ImDrawList* drawList, const ImRect& marker, StepLook look, i
         drawList->AddCircleFilled(center, radius, ToU32(Mix(c.accent, c.accentHover, hover)));
         break;
     case StepLook::Current:
+        // The current step is marked like a selected tile: the accentSubtle fill and the accent
+        // outline at the one border width.
         drawList->AddCircleFilled(center, radius, ToU32(c.accentSubtle));
-        drawList->AddCircle(center, radius - ring * 0.5f, ToU32(c.focusRing), 0, ring);
+        DrawOutline(drawList, marker, radius, ControlOutlineColor({.selected = true}));
         ink = ToU32(c.accentText);
         break;
     case StepLook::Open:
-        drawList->AddCircle(center, radius - HairlineThickness() * 0.5f, ToU32(ControlBoundaryColor(c)), 0, HairlineThickness());
+        DrawOutline(drawList, marker, radius, ControlOutlineColor({}));
         ink = ToU32(c.labelSecondary);
         break;
     case StepLook::Disabled:
         drawList->AddCircleFilled(center, radius, ToU32(c.fill[3]));
-        drawList->AddCircle(center, radius - HairlineThickness() * 0.5f, ToU32(c.separator), 0, HairlineThickness());
+        DrawOutline(drawList, marker, radius, ControlOutlineColor({.disabled = true}));
         ink = ToU32(c.labelTertiary);
         break;
     }

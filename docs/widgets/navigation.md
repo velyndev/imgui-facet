@@ -250,10 +250,11 @@ Numbered markers (`metrics.stepMarkerSize`, scaled with `size`) joined by connec
 (`metrics.stepConnectorWidth`), the available width by default.
 
 - **Look.** Done steps (before `current`) are an accent disc with a check mark; the current step is
-  a focus-ring colored ring around an `accentSubtle` disc with its number and label in semibold;
-  open steps are a boundary ring with the number in `labelSecondary`. A disabled step
+  an `accentSubtle` disc with the accent hairline (`focusRing`) and its number and label in
+  semibold, like a selected tile; open steps are a `controlBorder` hairline with the number in
+  `labelSecondary`. Every marker outline is the one hairline of the border rule. A disabled step
   (`ChoiceItem::disabled`) takes the disabled look wherever it is. Connectors between done steps
-  take the focus ring color, the others the 3:1 control boundary; the check mark keeps the progress
+  take the accent mark (`focusRing`), the others `controlBorder`; the check mark keeps the progress
   readable without color. Labels and the item `detail` (a second line) are cut with an ellipsis and
   shown in full on hover.
 - **Layout.** Horizontal: one column per step, the label under the marker. Vertical, and horizontal

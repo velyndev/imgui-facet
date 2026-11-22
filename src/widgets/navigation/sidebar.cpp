@@ -37,6 +37,7 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/scope_stack.h"
 #include "internal/scroll.h"
@@ -260,13 +261,13 @@ bool SidebarItem(const char* label, Icon icon, const SidebarItemOptions& options
     if (row.visible)
     {
         ImDrawList* drawList = window->DrawList;
-        const float feedback = row.disabled ? 0.0f : std::max(row.hoverAmount, row.pressAmount);
-        if (feedback > 0.0f)
-        {
-            const ImVec4 tint = Mix(c.fill[2], c.fill[1], row.pressAmount);
-            FillRect(drawList, row.rect.Min, row.rect.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-        }
-        // A selected item outside a sidebar has no pill to show it: it takes the pill's still look.
+        // The shared row look: hover and press by fill. The pill shows the selection in a
+        // sidebar; a selected item outside one has no pill and takes the pill's still look.
+        ListRowLook look;
+        look.hoverAmount = row.hoverAmount;
+        look.pressAmount = row.pressAmount;
+        look.disabled = row.disabled;
+        DrawListRowFill(drawList, row.rect, radius, look);
         if (options.selected && entry == nullptr)
             FillRect(drawList, row.rect.Min, row.rect.Max, ToU32(disabled ? c.fill[1] : c.accentSubtle), radius);
         ControlTextScope text(TextStyle::Body);
@@ -310,7 +311,8 @@ bool SidebarItem(const char* label, Icon icon, const SidebarItemOptions& options
             drawList->AddText(ImVec2(x, CenteredTextY(row.rect.Min.y, rowHeight)), ink, shown.text);
             PopTextStyle();
         }
-        DrawFocusRing(drawList, row.rect, radius, row.focusAmount);
+        // Inside the row: the rows touch each other and the column's edge.
+        DrawFocusRingInside(drawList, row.rect, radius, row.focusAmount);
     }
     SidebarRowTooltip(row, label, end, rail, cut);
     return row.pressed;
@@ -401,12 +403,11 @@ bool BeginSidebarSection(const char* label, const SidebarSectionOptions& options
         {
             ImDrawList* drawList = window->DrawList;
             const float radius = Px(t.radii.control);
-            const float feedback = row.disabled ? 0.0f : std::max(row.hoverAmount, row.pressAmount);
-            if (feedback > 0.0f)
-            {
-                const ImVec4 tint = Mix(c.fill[2], c.fill[1], row.pressAmount);
-                FillRect(drawList, row.rect.Min, row.rect.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-            }
+            ListRowLook look;
+            look.hoverAmount = row.hoverAmount;
+            look.pressAmount = row.pressAmount;
+            look.disabled = row.disabled;
+            DrawListRowFill(drawList, row.rect, radius, look);
             ControlTextScope text(TextStyle::Footnote);
             const float iconSize = text.IconSize();
             const ImU32 ink = ToU32(ControlSecondaryColor(row.disabled));
@@ -415,7 +416,7 @@ bool BeginSidebarSection(const char* label, const SidebarSectionOptions& options
             const FittedText shown = FitText(label, end, std::max(0.0f, right - pad - (row.rect.Min.x + pad)));
             cut = shown.truncated;
             drawList->AddText(ImVec2(row.rect.Min.x + pad, CenteredTextY(row.rect.Min.y, rowHeight)), ink, shown.text);
-            DrawFocusRing(drawList, row.rect, radius, row.focusAmount);
+            DrawFocusRingInside(drawList, row.rect, radius, row.focusAmount);
         }
         CutTextTooltip(row, label, end, cut);
     }

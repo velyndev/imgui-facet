@@ -128,3 +128,40 @@ TEST_CASE("Lists look: a reorderable row shows no ring after a click and an insi
     CHECK(ring.Min.x >= list.Min.x - 0.5f);
     CHECK(ring.Max.x <= list.Max.x + 0.5f);
 }
+
+TEST_CASE("Navigation look: a sidebar item shows no ring after a click and an inside ring after a key")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    int selected = 0;
+    session.SetUi([&] {
+        if (facet::BeginSidebar("##nav", {.mode = facet::SidebarMode::Expanded}))
+        {
+            if (facet::SidebarItem("First", facet::Icon("list"), {.selected = selected == 0}))
+                selected = 0;
+            session.Track("first");
+            if (facet::SidebarItem("Second", facet::Icon("grid"), {.selected = selected == 1}))
+                selected = 1;
+            session.Track("second");
+            facet::EndSidebar();
+        }
+    });
+    session.Frames(2);
+    const ImRect second = session.ItemRect("second");
+    session.Click(second.GetCenter());
+    session.Frames(3);
+    CHECK(selected == 1);
+    CHECK(ColorCount(RingColor(), false) == 0);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.Frames(3);
+    REQUIRE(ColorCount(RingColor(), false) > 0);
+    // Inside the row: the ring never reaches past the item's own rectangle.
+    const ImRect first = session.ItemRect("first");
+    const ImRect ring = ColorBounds(RingColor());
+    CHECK(ring.Min.x >= first.Min.x - 0.5f);
+    CHECK(ring.Max.x <= first.Max.x + 0.5f);
+    CHECK(ring.Min.y >= first.Min.y - 0.5f);
+    CHECK(ring.Max.y <= first.Max.y + 0.5f);
+}

@@ -7,7 +7,6 @@
 // src/internal/control.h. FACET_BORDER_EXCEPTION("path", "width argument", "reason") allows a stroke
 // that is not an outline (a glyph, a ring that marks focus) with its reason.
 
-FACET_BORDER_PENDING("src/widgets/navigation/step_indicator.cpp")
 FACET_BORDER_PENDING("demo/overlay_backdrop.cpp")
 FACET_BORDER_PENDING("demo/page_helpers.cpp")
 FACET_BORDER_PENDING("demo/pages/page_b_keys.cpp")
