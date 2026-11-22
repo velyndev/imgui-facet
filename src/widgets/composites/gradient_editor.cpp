@@ -242,12 +242,8 @@ int GradientRemoveStop(GradientStop* stops, ImGuiID* keys, int count, int at)
 
 internal::PopupAnchor GradientStopAnchor(const ImRect& track, float position, float size)
 {
-    internal::PopupAnchor anchor;
-    anchor.rect = internal::HandleRect(track, Orientation::Horizontal, {.min = 0.0, .max = 1.0},
-                                       std::clamp(position, 0.0f, 1.0f), size);
-    anchor.side = internal::PopupSide::Below;
-    anchor.align = internal::PopupAlign::Center;
-    return anchor;
+    return internal::PanelAnchor(internal::HandleRect(track, Orientation::Horizontal, {.min = 0.0, .max = 1.0},
+                                                      std::clamp(position, 0.0f, 1.0f), size));
 }
 
 bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int* count, GradientGrowFn grow,
