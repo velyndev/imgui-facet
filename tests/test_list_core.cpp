@@ -1302,3 +1302,35 @@ TEST_CASE("Row look: hover and current rows take fill[2], a selection accentSubt
     CHECK(fill.Max.y == doctest::Approx(32.0f - facet::HairlineThickness()));
     CHECK(fill.Min.x == 0.0f);
 }
+
+TEST_CASE("Row look: a selected tile of the row block shows the accent outline, a selected row does not")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetTheme(facet::Theme::Light(), false);
+    const ImU32 outline = facet::ToU32(facet::T().colors.focusRing);
+    int tileOutline = -1;
+    int rowOutline = -1;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        fi::ListRowGroup group;
+        group.Begin();
+        int from = drawList->VtxBuffer.Size;
+        group.Row(ImGui::GetID("tile"), ImRect(at, ImVec2(at.x + 64.0f, at.y + 64.0f)),
+                  {.selected = true, .inPlace = true, .tile = true});
+        tileOutline = 0;
+        for (int v = from; v < drawList->VtxBuffer.Size; ++v)
+            tileOutline += drawList->VtxBuffer[v].col == outline ? 1 : 0;
+        from = drawList->VtxBuffer.Size;
+        group.Row(ImGui::GetID("row"), ImRect(ImVec2(at.x, at.y + 80.0f), ImVec2(at.x + 200.0f, at.y + 112.0f)),
+                  {.selected = true, .inPlace = true});
+        rowOutline = 0;
+        for (int v = from; v < drawList->VtxBuffer.Size; ++v)
+            rowOutline += drawList->VtxBuffer[v].col == outline ? 1 : 0;
+        group.End();
+    });
+    session.Frame();
+    CHECK(tileOutline > 0);
+    CHECK(rowOutline == 0);
+}

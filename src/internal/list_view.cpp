@@ -106,6 +106,7 @@ struct RowPlacement
     bool inPlace = false;
     bool allowOverlap = false;
     bool ownRing = false;
+    bool tile = false;  // the row look of a tile (ListRowDesc::tile)
 };
 
 ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSelectionUserData data, bool selected,
@@ -168,6 +169,7 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
         look.highlighted = highlighted;
         look.selected = selected && env.pill == nullptr;
         look.disabled = item.disabled;
+        look.tile = placement.tile;
         DrawListRowFill(window->DrawList, fill, Px(theme.radii.control), look);
     }
     if (env.ring != nullptr && !placement.ownRing &&
@@ -839,6 +841,7 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
     placement.inPlace = desc.inPlace;
     placement.allowOverlap = desc.allowOverlap;
     placement.ownRing = desc.ownRing;
+    placement.tile = desc.tile;
     return RunRow(env, id, rect, desc.selection, desc.selected, desc.disabled, desc.tabStop, desc.part, desc.indent,
                   desc.highlighted, placement);
 }

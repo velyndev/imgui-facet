@@ -235,6 +235,9 @@ struct ListRowDesc
     // The container draws the focus ring of this row itself (a table draws it around the focused
     // cell instead of the row); End leaves the row out.
     bool ownRing = false;
+    // A tile of a grid or a card rather than a row: a selected one adds the accent outline (the row
+    // look, ListRowLook::tile). (since 0.1)
+    bool tile = false;
 };
 
 // The rows of one list in one window, between Begin and End.
