@@ -369,7 +369,8 @@ class ScrollAreaScope;
 ```
 
 A scrolling region on the scroll core: a Dear ImGui child window whose overlay scrollbar is thin at
-rest, wider while the pointer is over it, and fades out a moment after the last scroll; the wheel
+rest, wider while the pointer is over it, and dimmed (`scroll.barRestOpacity`, never hidden) a
+moment after the last scroll while the pointer is elsewhere; the wheel
 scrolls smoothly, and with `edgeFades` the content fades into the surface behind the area (bg, or
 the card's color inside a card) where more of it continues past an edge. `horizontal` adds sideways
 scrolling. The width fills the available width unless `width` is set; `height` 0 fills the available

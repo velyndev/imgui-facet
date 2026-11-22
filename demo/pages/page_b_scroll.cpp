@@ -317,9 +317,9 @@ void Fits(facet::demo::PageCtx&)
 FACET_DEMO_PAGE("scroll", "Scroll", "Blocks", 120, "default", "bar hovered", "thumb dragging", "scrolled")
 {
     facet::demo::PageHeader("Scroll",
-                            "Scroll areas with an overlay bar that appears while scrolling or hovered, smooth wheel "
-                            "scrolling that hands over between nested areas, and edge fades that show where content "
-                            "continues.");
+                            "Scroll areas with an overlay bar that is dimmed until the area is scrolled or hovered, "
+                            "smooth wheel scrolling that hands over between nested areas, and edge fades that show "
+                            "where content continues.");
     Note("Prototype areas built on the scroll core block; the lines inside them are generated filler. The wheel moves a "
          "target that the visible position follows; dragging the thumb, pressing the track or moving the keyboard "
          "focus takes over at once. Content that scrolls ends before the bar.");

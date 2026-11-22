@@ -1041,13 +1041,17 @@ void RunBars(ImGuiWindow* window, OpenArea& open, ScrollRecord& record, const Fo
         anyActive = anyActive || bar.hovered || bar.held;
     }
 
-    // The bars show while the area is hovered or scrolled, and fade out scroll.barHideDelay after
-    // the last scroll once the pointer has left.
+    // The bars show at full strength while the area is hovered or scrolled, and dim to
+    // scroll.barRestOpacity scroll.barHideDelay after the last scroll once the pointer has left.
+    // An area that scrolls always shows that it does, and the gutter beside its bar always shows
+    // what it is for. The increased contrast variant never dims the thumb: only at its full
+    // strength does it reach 3:1 on the surface.
     const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_NoPopupHierarchy);
     const bool recent = core.clock - record.lastActivity < tokens.barHideDelay;
     const bool show = hovered || anyActive || recent || IsScrollAreaScrolling(window);
+    const float rest = IncreasedContrast() ? 1.0f : std::clamp(tokens.barRestOpacity, 0.0f, 1.0f);
     const ImGuiID barId = window->GetID("##facet.vbar");
-    open.alpha = Tween(barId, kBarAlphaSub, show ? 1.0f : 0.0f, T().motion.durationStandard);
+    open.alpha = Tween(barId, kBarAlphaSub, show ? 1.0f : rest, T().motion.durationStandard);
 }
 
 void DrawBars(ImDrawList* drawList, ImGuiWindow* window, const ImRect& clip, const OpenArea& open)

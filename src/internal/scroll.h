@@ -165,8 +165,9 @@ ImVec2 ScrollAreaGutter(const ImGuiWindow* window);
 // window with ImGuiChildFlags_NavFlattened, so keyboard navigation crosses into it and scrolls it
 // to the focused item; Page Up and Down, Home and End move the focus by a page or to the ends.
 // It clips its content at its own rectangle. Its overlay bars are thin while the pointer is
-// elsewhere, wider while it is over a bar or drags one, and fade out scroll.barHideDelay after
-// the last scroll while the area is not hovered; dragging a thumb scrolls with it and pressing
+// elsewhere, wider while it is over a bar or drags one, and dim to scroll.barRestOpacity
+// scroll.barHideDelay after the last scroll while the area is not hovered (they stay visible, so
+// the gutter never reads as an empty strip); dragging a thumb scrolls with it and pressing
 // the track pages toward the pointer, repeating while held. The bars are mouse affordances: they
 // take no keyboard focus. A capture can force the bar's look: ForceNextItemState (item.h) right
 // before this call shows the vertical bar (part 0, or -1) or the horizontal one (part 1) hovered,

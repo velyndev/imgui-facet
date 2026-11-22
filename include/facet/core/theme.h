@@ -390,7 +390,8 @@ struct ScrollTokens
     float barInset = 2.0f;             // between the thumb and the edge of the area
     float barGap = 4.0f;               // between the content and the bar at its hovered width, while the area scrolls
     float minThumbLength = 24.0f;      // a long content still gets a thumb that can be grabbed
-    float barHideDelay = 1.0f;         // an idle bar fades out after this time
+    float barHideDelay = 1.0f;         // an idle bar dims to barRestOpacity after this time
+    float barRestOpacity = 0.5f;       // strength of an idle bar, of its thumb color; 0 hides it, 1 never dims it
     float wheelDistance = 64.0f;       // scrolled per wheel notch, eased over motion.durationStandard
     float edgeFade = 16.0f;            // length of the fade where content continues past an edge
 };

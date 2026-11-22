@@ -124,7 +124,7 @@ cursor, disabled ones the not-allowed cursor.
 | Dialogs and drawers | modal 440, drawer 320 wide or 280 high, command palette 560 | Wide enough for a title and two buttons in one row, narrow enough to read as a layer over the content |
 | Shell | first size 420 x 520, smallest 280 x 160, title bar 40, resize band 6 | A settings menu fits without scrolling at the first size; at the smallest the title bar and one control row remain |
 | Side columns | sidebar 220, icon rail 52, inspector 280 (at least 200) | Room for an icon and a short label; the rail keeps the icon on the minimum hit target with a margin |
-| Scrollbars | 6 wide at rest, 10 while hovered or dragged, 2 inset, a gap of 4 to the content (a gutter of 16 while the area scrolls), thumb at least 24, hidden after 1 s idle, edge fade 16, 64 per wheel notch | A thin bar takes little from the content; it grows where the pointer needs a target, the gutter keeps it off the content even then, and the thumb never gets shorter than the minimum hit target |
+| Scrollbars | 6 wide at rest, 10 while hovered or dragged, 2 inset, a gap of 4 to the content (a gutter of 16 while the area scrolls), thumb at least 24, dimmed to half strength after 1 s idle, edge fade 16, 64 per wheel notch | A thin bar takes little from the content; it grows where the pointer needs a target, the gutter keeps it off the content even then, an idle bar steps back without leaving its gutter empty, and the thumb never gets shorter than the minimum hit target |
 | List rows | small 24, regular 32, large 40; indent 16 per tree level; dropdowns show 8 rows, inline lists 6; typeahead resets after 1 s | A list is scanned row by row and gets one grid step more air than a form row; 8 rows show a choice without hiding the field above |
 | Drag and drop | starts after 4, preview at 70 %, edge scroll in a 32 band at up to 800 per second, a resting drag opens a target after 0.6 s | A small slip stays a click; the preview shows what moves without hiding where it lands; scrolling speeds up toward the edge so the user controls it |
 | Text fields | 8 inner padding, caret 1.5 rounded to whole pixels | Text lines up with the labels of other controls; the caret stays one or two crisp pixels at every scale |
@@ -329,6 +329,11 @@ Scroll core:
   hovered width (16 from the edge with the starting tokens; the area's padding counts toward it),
   so a card, a row or a trailing button never lies under the bar and the bar reads as its own
   strip. Content that fits keeps the full width: the gutter comes and goes with the bar.
+- **Idle bar.** A bar never hides while its area can scroll: scroll.barHideDelay after the last
+  scroll, with the pointer elsewhere, it dims to scroll.barRestOpacity of its thumb color. So an
+  area always shows that it scrolls and how far, and its gutter never reads as content that is
+  out of line. The increased contrast variant keeps the thumb at full strength, where it reaches
+  3:1; a rest opacity of 0 hides idle bars.
 - **Edge fades.** A gradient of the surface color over scroll.edgeFade whose strength grows with
   the content left on that side, so the fade eases in instead of popping. A surface pushed by the
   page stays with the page: an area inside a popup fades into the popup surface, never into a

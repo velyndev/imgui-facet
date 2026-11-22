@@ -642,6 +642,60 @@ TEST_CASE("Scroll area: both axes get a bar and the wheel scrolls sideways with 
     CHECK(area.Window()->Scroll.y == 0.0f);
 }
 
+TEST_CASE("Scroll area: an idle bar dims and stays visible, and shows at full strength while hovered")
+{
+    MotionGuard guard;
+    struct ContrastGuard
+    {
+        ~ContrastGuard() { facet::SetIncreasedContrast(false); }
+    } contrast;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SingleArea ui;
+    int alpha = -1;  // the strongest alpha drawn where the thumb is, -1 when nothing is drawn there
+    session.SetUi([&] {
+        ui.Ui(session);
+        alpha = -1;
+        ImGuiWindow* window = ui.area.Window();
+        ImRect thumb;
+        if (window == nullptr || !fi::ScrollAreaBarRects(window, ImGuiAxis_Y, nullptr, &thumb))
+            return;
+        thumb.Expand(1.0f);
+        for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+            if (thumb.Contains(vertex.pos))
+                alpha = std::max(alpha, static_cast<int>((vertex.col >> IM_COL32_A_SHIFT) & 0xFF));
+    });
+    const ImVec2 elsewhere(700.0f, 500.0f);
+    const float rest = facet::T().scroll.barRestOpacity;
+    REQUIRE(rest > 0.0f);
+    REQUIRE(rest < 1.0f);
+
+    // The pointer is elsewhere and nothing scrolled: the bar is there, dimmed.
+    session.MouseMove(elsewhere);
+    session.Seconds(2.0f);
+    CHECK(std::fabs(static_cast<float>(alpha) - facet::T().colors.scrollThumb.w * rest * 255.0f) <= 1.0f);
+    // Over the area it shows at full strength, and dims again once the pointer has left.
+    session.MouseMove(ui.area.Center());
+    session.Seconds(1.0f);
+    CHECK(std::fabs(static_cast<float>(alpha) - facet::T().colors.scrollThumb.w * 255.0f) <= 1.0f);
+    session.MouseMove(elsewhere);
+    session.Seconds(2.0f);
+    CHECK(std::fabs(static_cast<float>(alpha) - facet::T().colors.scrollThumb.w * rest * 255.0f) <= 1.0f);
+
+    // The increased contrast variant never dims it.
+    facet::SetIncreasedContrast(true);
+    session.Seconds(1.0f);
+    CHECK(std::fabs(static_cast<float>(alpha) - facet::T().colors.scrollThumb.w * 255.0f) <= 1.0f);
+    facet::SetIncreasedContrast(false);
+
+    // A rest opacity of 0 hides an idle bar.
+    facet::Theme theme = facet::T();
+    theme.scroll.barRestOpacity = 0.0f;
+    facet::SetTheme(theme, false);
+    session.Seconds(1.0f);
+    CHECK(alpha == -1);
+}
+
 TEST_CASE("Scroll area: content that scrolls keeps the gutter of the bar free")
 {
     MotionGuard guard;
