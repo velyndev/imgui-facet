@@ -54,6 +54,12 @@ height of the list.
 - **Rows:** a check mark slot that shows the chosen item, the icon, the label and the detail at the
   end in labelSecondary. `ChoiceItem::group` adds a header row before each run of equal group text.
   Disabled items are shown in labelTertiary and cannot be chosen.
+- **Look:** the field is a text field's frame: fill[2] with the controlBorder hairline, and the
+  accent hairline while the list is open, never a thicker stroke. The list floats on the level 2
+  elevated surface with the separator hairline. The active row (under the pointer or moved by the
+  keys) shows the fill[2] row fill, the chosen row the accentSubtle fill with its check mark. The
+  focus ring shows only after the keys moved the active row, inside the row; the pointer never
+  draws it.
 - **Long lists:** the rows are virtualized. The getter overload is called for the rows shown, for
   the chosen item on the closed field, and for every item when the list opens or the filter
   changes (to build the group headers and the filter result); ten thousand items stay fluid.
@@ -146,7 +152,7 @@ bool ListBox(const char* label, int* index, int itemCount, ChoiceGetter getter, 
 
 A framed, scrolling list with one chosen row, which sits on the sliding selection pill and has a
 semibold label. The visible label part is drawn above the frame (a list is taller than a label line),
-cut with an ellipsis when the width is short. The frame has no fill and the boundary hairline, so
+cut with an ellipsis when the width is short. The frame has no fill and the controlBorder hairline, so
 the row fills read on any surface; it is `visibleRows` rows tall (`list.inlineRows` by default) at
 the row height of `size`, also with fewer items. Default width: the available width. The first time
 the list is shown, the chosen row is scrolled into view.
@@ -223,6 +229,8 @@ data. `from` is the row's index before the move and `to` its index after it, in 
 
 - **Rows:** one per item at the list row height, the full width (the available width by default):
   the grip, the icon, the label (cut with an ellipsis and a tooltip) and the detail at the end.
+  A row under the pointer shows the fill[2] row fill of every list; the focus ring shows after
+  keyboard input only, inside the row.
 - **Pointer:** a press on a row (on its grip alone with `handleOnly`) becomes a drag after
   `drag.startThreshold`. The ghost follows the pointer, the other rows spring aside to open the gap
   where the row would land, and that place shows a fill[2] slot. Releasing over the list reports the
@@ -305,7 +313,7 @@ it with depth + 1). It is built on the tree of TreeView, so rows, indent, chevro
 keys and typeahead are the same; it has no selection. Default width: the available width; `height`
 0 fits the rows, a height scrolls.
 
-- **Checkboxes:** Off is the neutral box with the boundary hairline; On and Mixed are the accent box
+- **Checkboxes:** Off is the neutral box with the controlBorder hairline; On and Mixed are the accent box
   with the check or minus glyph in onAccent, so Mixed differs by its shape; read-only boxes are
   labelSecondary.
 - **Toggling:** a click on a row or Space toggles its node: Off and Mixed become On, On becomes Off.
