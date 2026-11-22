@@ -459,30 +459,36 @@ LRESULT AppShell::HitTest(LPARAM lParam) const
         return HTCLIENT;
     }
 
-    if (!IsWindowMaximized())
-    {
-        const int border = ResizeBorder(dpi);
-        const bool left = point.x < border;
-        const bool right = point.x >= client.right - border;
-        const bool top = point.y < border;
-        const bool bottom = point.y >= client.bottom - border;
-        if (top && left)
-            return HTTOPLEFT;
-        if (top && right)
-            return HTTOPRIGHT;
-        if (bottom && left)
-            return HTBOTTOMLEFT;
-        if (bottom && right)
-            return HTBOTTOMRIGHT;
-        if (left)
-            return HTLEFT;
-        if (right)
-            return HTRIGHT;
-        if (top)
-            return HTTOP;
-        if (bottom)
-            return HTBOTTOM;
-    }
+    // Overlay mode: the overlay's input regions (the shell) take their points first.
+    const bool overUi =
+        imguiInput && facet::OverlayHitTest(ImVec2(static_cast<float>(point.x), static_cast<float>(point.y)));
+    return AppShellEdgeHit(point, client, ResizeBorder(dpi), IsWindowMaximized(), overUi);
+}
+
+LRESULT AppShellEdgeHit(POINT point, const RECT& client, int border, bool maximized, bool overUi)
+{
+    if (maximized || overUi)
+        return HTCLIENT;
+    const bool left = point.x < client.left + border;
+    const bool right = point.x >= client.right - border;
+    const bool top = point.y < client.top + border;
+    const bool bottom = point.y >= client.bottom - border;
+    if (top && left)
+        return HTTOPLEFT;
+    if (top && right)
+        return HTTOPRIGHT;
+    if (bottom && left)
+        return HTBOTTOMLEFT;
+    if (bottom && right)
+        return HTBOTTOMRIGHT;
+    if (left)
+        return HTLEFT;
+    if (right)
+        return HTRIGHT;
+    if (top)
+        return HTTOP;
+    if (bottom)
+        return HTBOTTOM;
     return HTCLIENT;
 }
 LRESULT AppShell::WndProc(UINT msg, WPARAM wParam, LPARAM lParam)

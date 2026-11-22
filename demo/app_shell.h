@@ -21,6 +21,12 @@ struct ShellDesc
     bool warp = false;    // use the WARP software rasterizer instead of the GPU
 };
 
+// The answer to WM_NCHITTEST of the window's own resize band, for a point in client pixels:
+// HTLEFT, HTTOPRIGHT and the other edges and corners within `border` pixels of the client edges,
+// HTCLIENT elsewhere, while maximized, and where `overUi` says the UI takes the point (the overlay
+// shell reaching into the band), so a press there reaches the UI instead of resizing the window.
+LRESULT AppShellEdgeHit(POINT point, const RECT& client, int border, bool maximized, bool overUi);
+
 // Win32 window plus D3D11 device for the demo.
 //
 // The visible window has no system title bar or frame but keeps the WS_OVERLAPPEDWINDOW

@@ -10,6 +10,7 @@
 
 #include <facet/facet.h>
 
+#include "app_shell.h"
 #include "gallery.h"
 #include "selftest.h"
 #include "theme_editor.h"
@@ -361,6 +362,20 @@ FACET_DEMO_APP_SELFTEST("overlay", "showcase")
         const ImVec2 display = ImGui::GetIO().DisplaySize;
         const float maxWidth = facet::Px(facet::T().spacing.xxxl * 50.0f);
         return ShellWidth() <= std::fmin(maxWidth, display.x) + 1.0f && Gallery().shellMax.y <= display.y + 1.0f;
+    });
+
+    // A shell that reaches into the window's own resize band takes the presses there: the window
+    // answers them as client area instead of resizing itself. The band starts at the shell's
+    // left edge here, as it does when the shell fills a small window.
+    test.Expect("the window's resize band gives a point on the shell to the shell", [] {
+        const ImVec2 edge(Gallery().shellMin.x + 2.0f, (Gallery().shellMin.y + Gallery().shellMax.y) * 0.5f);
+        const POINT point = {static_cast<LONG>(edge.x), static_cast<LONG>(edge.y)};
+        const RECT client = {static_cast<LONG>(Gallery().shellMin.x), 0, static_cast<LONG>(ImGui::GetIO().DisplaySize.x),
+                             static_cast<LONG>(ImGui::GetIO().DisplaySize.y)};
+        const int border = static_cast<int>(facet::Px(facet::T().spacing.sm));
+        return facet::OverlayHitTest(edge) &&
+               facet::demo::AppShellEdgeHit(point, client, border, false, facet::OverlayHitTest(edge)) == HTCLIENT &&
+               facet::demo::AppShellEdgeHit(point, client, border, false, false) == HTLEFT;
     });
 
     // Back to app mode with the toggle in the editor.
