@@ -773,7 +773,8 @@ FACET_DEMO_SELFTEST("sliders")
     using T = facet::demo::Target;
     // A point on the control row of a horizontal slider: half a regular control height below the
     // top of the item, so a message line under the control does not move it. Fractions from 0.55
-    // on lie on the track in every layout: the label takes at most half the width.
+    // to 0.75 lie on the track in every layout the selftests run: the label takes at most half the
+    // width and the track at least layout.minRowControl, while a value column may take the end.
     const auto Row = [](const char* probe, float fx) { return T::Item(probe, fx, 0.0f).Offset(0.0f, 14.0f); };
     test.Do([] { ui = {}; });
 
@@ -797,7 +798,7 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("a drag out of the window and back ends on the value under the pointer",
                 [] { return ui.level == pressed; });
     test.Expect("the drag was one finished edit", [] { return ui.levelCommits == 1; });
-    test.MouseMove(Row("slider.frequency", 0.9f));
+    test.MouseMove(Row("slider.frequency", 0.75f));
     test.MouseDown();
     test.Do([] { pressed = ui.frequency; });
     test.MouseMove(Row("slider.frequency", 0.6f));
@@ -840,7 +841,7 @@ FACET_DEMO_SELFTEST("sliders")
     test.MouseUp();
     test.KeyPress(ImGuiKey_Home);
     test.Expect("Home clears the error of the limit", [] { return ui.invalid <= 0.8f; });
-    test.MouseMove(Row("slider.mixed", 0.8f));
+    test.MouseMove(Row("slider.mixed", 0.7f));
     test.MouseDown();
     test.MouseUp();
     test.Expect("the first edit of a mixed slider sets its value", [] { return ui.mixedSet; });
@@ -1050,7 +1051,7 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("a drag on the slider part writes the amount", [] { return ui.amount > 0; });
 
     // SliderStepped by pointer: a drag always ends on a stop.
-    test.Drag({Row("stepped.zoom", 0.9f), Row("stepped.zoom", 0.63f)}, 0.3f);
+    test.Drag({Row("stepped.zoom", 0.75f), Row("stepped.zoom", 0.56f)}, 0.3f);
     test.Expect("a drag on the stepped slider ends on a stop", [] {
         for (const float stop : kZoomStops)
             if (ui.zoom == stop)
