@@ -20,9 +20,9 @@
 //
 // The declarations follow docs/api-conventions.md; widgets/common.h holds the types shared
 // with other families, and this header includes the family headers whose types it takes.
-// Every widget here is declared and planned: its body draws a placeholder until Phase 2
-// implements it (docs/widgets/composites.md lists the status of each). Lengths are design
-// units. Every function is for the thread that runs the Dear ImGui frame.
+// The entry of each widget in docs/widgets/composites.md ends with its status; a widget whose
+// status is planned draws a placeholder of its default size and returns the neutral result.
+// Lengths are design units. Every function is for the thread that runs the Dear ImGui frame.
 
 #include <cstddef>
 #include <cstdint>

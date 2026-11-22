@@ -29,6 +29,9 @@ files are picked up by the build without a CMake edit.
 | Date, time and other pickers | `pickers/date_pickers_frame.cpp` | `test_api_pickers_date.cpp` | `test_pickers_date.cpp` | `page_w_pickers_date.cpp` (`pickers-date`) |
 | Display without DataTable | `display/display_frame.cpp` | `test_api_display.cpp` | `test_display.cpp` | `page_w_display.cpp` (`display`) |
 | DataTable | `display/data_table_frame.cpp` | `test_api_data_table.cpp` | `test_data_table.cpp` | `page_w_data_table.cpp` (`data-table`) |
+| Inventory, cards, people and drag and drop | `composites/cards_frame.cpp` | `test_api_composites_cards.cpp` | `test_composites_cards.cpp` | `page_w_composites_cards.cpp` (`composites-cards`) |
+| Search, presets and app controls | `composites/settings_frame.cpp` | `test_api_composites_settings.cpp` | `test_composites_settings.cpp` | `page_w_composites_settings.cpp` (`composites-settings`) |
+| Editors, property grid, canvas and layers | `composites/editors_frame.cpp` | `test_api_composites_editors.cpp` | `test_composites_editors.cpp` | `page_w_composites_editors.cpp` (`composites-editors`) |
 
 The layout family keeps its behaviour tests in `test_layout_widgets.cpp`, because
 `test_layout.cpp` tests the core layout of `core/layout.h`. The placeholder helpers themselves are
@@ -73,6 +76,7 @@ second one.
 | Control sizes, paddings, radius | `GetControlMetrics`, `ControlTextScope` (`internal/control.h`); `ControlHeight`, `ControlTextStyle`, `PushControlSize` (`widgets/common.h`) |
 | Width rule | `ResolveItemWidth` (`internal/item.h`) |
 | Hover, press, focus, disabled, read-only, mixed, forced states | `ItemBehavior`, `PartBehavior`, `ItemOptions` (`internal/item.h`) |
+| Reporting an edit to the item queries | `MarkWidgetEdited` (`internal/item.h`), never `ImGui::MarkItemEdited`, which asserts when the edited id is not the active item (a write from a popover, an Escape restore); a test keeps direct calls out of `src/` |
 | Label in front of a field or one-line control | `MeasureFrontLabel`, `DrawFrontLabel` (`internal/control.h`) |
 | Label above a group or tall control | `MeasureAboveLabel`, `DrawAboveLabel` |
 | Label after a mark, any text cut to a width | `FitText` |
@@ -92,10 +96,10 @@ second one.
 | State kept across frames | `GetState`, `GetPersistentState` (`internal/state_storage.h`) |
 | Selection highlight | `SelectionPill`, `PushPillLabelStyle` (`internal/selection_pill.h`) |
 | Items that move into a "more" menu | `FitOverflow` (`internal/overflow.h`) |
-| Dragging a value, several handles, a point on two axes | `internal/value_drag.h` (`ValueDragBehavior`, `ValueDrag2DBehavior`), `internal/multi_handle.h` |
+| Dragging a value, several handles, a point on two axes | `internal/value_drag.h` (`ValueDragBehavior`, `ValueDrag2DBehavior`: a point in value units with a mapping and limits per axis, used by the pads and by the curve and easing editors), `internal/multi_handle.h`; the color pickers keep their own fraction plane (`pickers/color_plane.h`) |
 | Popups, menus, Escape and context menu keys | `internal/popup_host.h`, `internal/popup_menu.h`, `internal/popup_place.h` |
 | Lists, rows, selection, typeahead | `internal/list_core.h`, `internal/list_view.h`; `ListTabProxy` and `ListClaimTabExit` for a container that places its own rows in a selection scope |
-| Scrolling | `internal/scroll.h`; `BeginScrollAreaBars` gives the overlay bars to a window another call begins (a Dear ImGui table) |
+| Scrolling | `internal/scroll.h`; `BeginScrollAreaBars` gives the overlay bars to a window another call begins (a Dear ImGui table); an area inside a popup host level fades into that level's surface without a `fadeSurface` |
 | Drag and drop | `internal/drag_drop.h` |
 | Labelled rows | `internal/row_layout.h` |
 | Fuzzy matching, key chords, charts | `internal/fuzzy.h`, `internal/keys.h`, `internal/chart_core.h` |
@@ -104,7 +108,9 @@ The theme is fixed for widget work: every token a widget of this stage needs exi
 `include/facet/core/theme.h`, with its reason in `DESIGN.md`. A widget never uses a color or pixel
 literal; a factor that has no token (the share of a spinner stroke) is a named constant with a
 comment. In the same way, built-in text comes from a `Strings` member (`widgets/common.h`), and the
-members the widgets of a stage name exist before the stage starts.
+members the widgets of a stage name exist before the stage starts. A member with a number or a
+name in it is a template filled with `FormatTokens` (`internal/text_util.h`); a `TextToken` carries
+a number, or a text such as a preset name, which is copied as it is.
 
 A part that a helper above does not cover yet, or a token or string that is missing, is asked
 for, not added: shared headers (`src/internal/`, `include/facet/core/`, `widgets/common.h`) change
@@ -191,10 +197,15 @@ says so.
 
 - `ctx.Probe("button.save")` right after a widget records it for the selftest; probe names start
   with the family.
+- A part of a floating layer (a popup level, a modal, a toast) can lie outside the page's visible
+  area: record it with `FloatingProbe` or `FloatingProbeRect` (`demo/gallery.h`), which measure it
+  against the display, so the selftest reaches it without scrolling the page.
 - Capture states are named in `FACET_DEMO_PAGE(...)`. For a state, call
   `ctx.ForceNextItemState(ForcedItemState::Hovered)` right before the widget (`Pressed`,
   `Focused`, `Dragging`, `Open`; a part index for widgets with several items), and
-  `ctx.RevealInCapture()` after content that a state changes below the first screen.
+  `ctx.RevealInCapture()` after content that a state changes below the first screen. When a forced
+  state does not show what it should (a layer that never opened), the page sets
+  `ctx.captureError` on the last capture frame, and that capture fails with the reason.
 - One `FACET_DEMO_SELFTEST("<page id>")` per page. It resets the page state with `test.Do`, then
   operates every ready widget with the mouse and the keyboard and checks the results
   (`Expect`, `ExpectNear`, `ExpectFocused`, `ExpectVisible`). Its log is the click-through
@@ -222,5 +233,37 @@ Three files describe every family at once: the lists of what is ready in the sta
 `DESIGN.md`. Working alone, update them with the widget. When several groups are built at the same
 time, none of them edits these files: each lists its lines (the widgets that became ready, each
 new look with its reason) in its report, and the engineer who merges the work writes them once.
-The same holds for a page shared by two groups (`docs/widgets/inputs.md`, `pickers.md`,
-`display.md`): each group edits only its own entries and its own usage section.
+The same holds for a page shared by several groups (`docs/widgets/inputs.md`, `pickers.md`,
+`display.md`, `composites.md`): each group edits only its own entries and its own usage section.
+
+## Composites
+
+A composite (`include/facet/widgets/composites.h`) is assembled from finished widgets: it calls
+them through their public headers (`facet::SearchField`, `facet::Chip`, `facet::KeybindCapture`,
+`facet::ColorPicker`, `facet::Avatar`, `facet::BeginContextMenu`, `facet::ConfirmDialog`), so it
+looks and behaves like them, keyboard, states and focus ring included, and it gets every fix made
+to them. Where a composite needs what a finished widget does but no public call fits (the rows of
+a list inside its own window, a point dragged on two axes), it uses the building block that widget
+is made of (`internal/list_view.h`, `internal/value_drag.h`), never the widget's own source file
+and never a copy of it.
+
+What a composite adds is its own:
+
+- its layout, the arrangement of the parts and how it changes at narrow widths;
+- the parts no widget has (a curve with its points, a gradient bar, an inventory slot, a canvas
+  with its guides), drawn and operated like the other widgets with the helpers above;
+- its state across frames under its own id, and its result (`InventoryResult`,
+  `PresetListResult`, `LayerListResult`) for the caller to apply.
+
+A composite does not restyle the widgets it uses and does not change their behaviour: a part that
+must look or act differently is a request for an option of that widget. After the call the last
+item covers the whole composite (`internal::FinishWidgetGroup`), as for any widget made of several
+items, and an edit of an inner widget is reported for the composite with `MarkWidgetEdited`.
+
+The composites are built by three groups at the same time, each in its own files: the widget files
+under `src/widgets/composites/`, the frame hook, the two test files and the demo page of the table
+at the top, and its section of `docs/widgets/composites.md` (Inventory, cards and people; Search,
+presets and app controls; Editors and canvas) with its own usage section. The intro of that page,
+its "Who owns the data" and "Planned, not declared yet" sections, `composites.h`, `theme.h`,
+`common.h` and the shared blocks belong to none of them: a change there is a request to the
+engineer who merges the stage.

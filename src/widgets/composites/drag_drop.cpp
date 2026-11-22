@@ -1,6 +1,6 @@
-// The public drag and drop calls (facet/widgets/composites.h): planned. They wait for the drag
-// and drop core of Phase 1c part B; until then no item is a drag source or a drop target, so
-// every Begin returns false and AcceptDrop returns null.
+// The public drag and drop calls (facet/widgets/composites.h): planned. Phase 2 builds them on the
+// drag and drop core (src/internal/drag_drop.h); until then no item is a drag source or a drop
+// target, so every Begin returns false and AcceptDrop returns null.
 
 #include "facet/widgets/composites.h"
 #include "widgets/content_stub.h"

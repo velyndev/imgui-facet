@@ -18,7 +18,8 @@ helpers draw nothing and return neutral values. Besides the ready widgets, `Appl
 `PassesFilter`, the built-in strings and the edit session queries in `common.h` work. The
 demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
 inputs), the pickers (color pickers and the other pickers) and the display family (the display
-widgets and the data table). How a widget is built is described in
+widgets and the data table), and three for the composites (inventory and cards, search and app
+controls, editors and canvas). How a widget is built is described in
 [writing a widget](writing-a-widget.md).
 
 | Family | Header | Documentation | What it holds |

@@ -185,15 +185,17 @@ queries and helpers draw nothing and return neutral values. Besides the widgets,
     - Text field core: plain, narrow, search, password, validated, floating label, limited and
       loading fields, a number field with steppers and drag, a multiline area, a read-only
       field, and the three control sizes.
-  - Widgets: one page per widget family, and two for the families whose widget groups are built
-    apart (Buttons, Selection, Sliders, Text inputs and Value inputs, Color pickers and Other
-    pickers, Lists, Navigation, Containers, Layout, Overlays, Display and Data table, Charts,
-    Media, Composites). Every page except Composites shows every widget of its family in its
-    variants, sizes and states (read-only, disabled, error, mixed, loading and empty where the
-    widget has them, and narrow widths), with capture states that force hover, press, keyboard
-    focus, open popups and drags per section, and a selftest that operates each of them by mouse
-    and keyboard and checks the values. The Composites page shows its planned widgets as
-    placeholders of their declared size that cannot be operated.
+  - Widgets: one page per widget family, and two or three for the families whose widget groups
+    are built apart (Buttons, Selection, Sliders, Text inputs and Value inputs, Color pickers and
+    Other pickers, Lists, Navigation, Containers, Layout, Overlays, Display and Data table,
+    Charts, Media, and for the composites Inventory and cards, Search and app controls, and
+    Editors and canvas). Every page except the three composites pages shows every widget of its
+    family in its variants, sizes and states (read-only, disabled, error, mixed, loading and
+    empty where the widget has them, and narrow widths), with capture states that force hover,
+    press, keyboard focus, open popups and drags per section, and a selftest that operates each
+    of them by mouse and keyboard and checks the values. The three composites pages show their
+    planned widgets as placeholders of their declared size; their selftests check that the
+    placeholders write nothing.
 
   The page list scrolls when it is taller than the window and keeps the heading of the group
   at the top pinned. Its rows use the item behaviour, the keyboard focus ring and the selection
