@@ -1,9 +1,9 @@
 // BeginPreviewCanvas and EndPreviewCanvas (facet/widgets/composites.h): a letterboxed preview of a
 // screen of `referenceSize` reference pixels, scaled to fit the widget. The bands around the screen
-// are fill[3]; the screen is the window background with a hairline in the control boundary color
-// (ControlBoundaryColor, 3:1 like every control edge), the optional grid every
-// gridSpacing reference pixels in the separator color, and the optional safe area as a dashed frame
-// (media.dashLength and dashGap) in labelTertiary. Canvas elements (canvas_element.cpp) are
+// are fill[3]; the screen is the window background with the controlBorder hairline of a control
+// (DrawOutline), the optional grid every gridSpacing reference pixels in the separator color, and the
+// optional safe area as a dashed frame (media.dashLength and dashGap) in controlBorder, a reference
+// line as quiet as the screen edge. Canvas elements (canvas_element.cpp) are
 // submitted between Begin and End; End draws, on top of them, the center guides while one is moved
 // and the guide an element snapped to, in the focusRing color (3:1 on every surface). A click on
 // empty canvas clears the selection. Content is always submitted; EndPreviewCanvas is always called.
@@ -174,11 +174,11 @@ void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanva
                 const ImVec2 inset(screen.GetWidth() * share, screen.GetHeight() * share);
                 const ImRect safe(ImVec2(std::round(screen.Min.x + inset.x), std::round(screen.Min.y + inset.y)),
                                   ImVec2(std::round(screen.Max.x - inset.x), std::round(screen.Max.y - inset.y)));
-                PreviewCanvasDashedRect(drawList, safe, Px(t.media.dashLength), Px(t.media.dashGap), ToU32(c.labelTertiary));
+                PreviewCanvasDashedRect(drawList, safe, Px(t.media.dashLength), Px(t.media.dashGap), ToU32(c.controlBorder));
             }
-            // The screen edge bounds the area elements are dragged in, so it takes the control boundary
-            // color (3:1 on the window background); the grid inside stays in separator.
-            StrokeRect(drawList, screen.Min, screen.Max, ToU32(ControlBoundaryColor(c)), 0.0f, HairlineThickness());
+            // The screen edge bounds the area elements are dragged in, so it takes the outline of a
+            // control (controlBorder); the grid inside stays in separator.
+            internal::DrawOutline(drawList, screen, 0.0f, internal::ControlOutlineColor({}));
         }
     }
 

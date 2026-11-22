@@ -559,15 +559,12 @@ bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int
             FillCheckerboard(drawList, bar.Min, bar.Max, ToU32(WithAlpha(c.checker[0], c.checker[0].w * share)),
                              ToU32(WithAlpha(c.checker[1], c.checker[1].w * share)), Px(t.metrics.checkerCell), radius);
         DrawGradientBar(drawList, bar, radius, data, order, n, !options.alpha, share);
-        StrokeRect(drawList, bar.Min, bar.Max, ToU32(disabled ? c.labelQuaternary : c.separator), radius,
-                   HairlineThickness());
+        internal::DrawSurfaceOutline(drawList, bar, radius);
 
         // Markers, the active or focused one on top.
         int top = edit.activeHandle >= 0 ? edit.activeHandle : edit.focusedHandle;
         if (top >= n)
             top = -1;
-        const ImVec4 boundary = ControlBoundaryColor(c);
-        const float hairline = HairlineThickness();
         for (int pass = 0; pass < 2; ++pass)
         {
             for (int i = 0; i < n; ++i)
@@ -582,7 +579,6 @@ bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int
                     if (handles[k].id == GradientHandleId(id, state.keys[i]))
                         h = &handles[k];
                 const float hover = h != nullptr ? std::max(h->hoverAmount, h->pressAmount) : 0.0f;
-                const float press = h != nullptr ? h->pressAmount : 0.0f;
                 const float focus = h != nullptr ? h->focusAmount : 0.0f;
                 const bool going = state.removeArmed && state.pressKey == state.keys[i];
                 const ImVec4 color = options.alpha ? data[i].color : WithAlpha(data[i].color, 1.0f);
@@ -595,12 +591,12 @@ bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int
                 {
                     internal::DrawColorSwatch(drawList, rect, color, radius, options.alpha);
                 }
-                // The stop whose popover is open keeps an accent outline (focusRing, 3:1 on every
-                // surface), so it is clear which stop the picker edits.
+                // One hairline in the outline color of a control: controlBorderHover under the pointer,
+                // and for the stop whose popover is open the accent outline (focusRing, 3:1 on every
+                // surface), so it is clear which stop the picker edits. No state changes its width.
                 const bool chosen = state.popoverKey == state.keys[i];
-                const ImVec4 outline = disabled ? c.labelTertiary : (chosen ? c.focusRing : Mix(boundary, c.label, hover));
-                StrokeRect(drawList, rect.Min, rect.Max, ToU32(outline), radius,
-                           chosen ? hairline * 2.0f : hairline * (1.0f + press));
+                internal::DrawOutline(drawList, rect, radius,
+                                      internal::ControlOutlineColor({.hoverAmount = hover, .selected = chosen, .disabled = disabled}));
                 internal::DrawFocusRing(drawList, rect, radius, focus);
             }
         }

@@ -234,7 +234,6 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
             focusedRow = i;
         ImGui::PopID();
     }
-    const bool listFocused = focusedRow >= 0;
     int tabRow = focusedRow;
     if (tabRow < 0 && selected != nullptr && *selected >= 0 && *selected < count)
         tabRow = *selected;
@@ -442,15 +441,14 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
             FillRect(drawList, rect.Min, rect.Max, ToU32(c.fill[3]), radius);
             continue;
         }
-        if (isSelected)
-            FillRect(drawList, rect.Min, rect.Max, ToU32(row.disabled ? c.fill[3] : (listFocused ? c.accentSubtle : c.fill[1])),
-                     radius);
-        const float feedback = row.disabled || dragging ? 0.0f : std::max(row.hoverAmount, row.pressAmount);
-        if (feedback > 0.0f && !isSelected)
-        {
-            const ImVec4 tint = Mix(c.fill[2], c.fill[1], row.pressAmount);
-            FillRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-        }
+        // The shared row look: fill[2] under the pointer, accentSubtle while selected (with or without
+        // the list's focus), no outline. No hover feedback while a row is carried.
+        ListRowLook look;
+        look.hoverAmount = dragging ? 0.0f : row.hoverAmount;
+        look.pressAmount = dragging ? 0.0f : row.pressAmount;
+        look.selected = isSelected;
+        look.disabled = row.disabled;
+        DrawListRowFill(drawList, rect, radius, look);
         const bool hidden = !layer.visible;
         const ImU32 secondary = ToU32(ControlSecondaryColor(row.disabled));
         float x = rect.Min.x + pad + indentStep * static_cast<float>(std::max(0, layer.depth));
@@ -486,11 +484,13 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
             const ImU32 color = ToU32(column == kLayerLock && on ? ControlLabelColor(toggle.disabled)
                                                                  : ControlSecondaryColor(toggle.disabled));
             DrawControlIcon(drawList, icon, std::round(toggle.rect.GetCenter().x - glyph * 0.5f), centerY, glyph, color);
-            DrawItemFocusRing(toggle, radius);
+            // Rings inside the row's bounds (the toggle's and the row's), so neighbouring rows never
+            // cover them and the list edge never cuts them.
+            DrawItemFocusRingInside(toggle, radius);
             const char* name = column == kLayerVisible ? (on ? strings.hide : strings.show) : (on ? strings.unlock : strings.lock);
             CutTextTooltip(toggle, name, nullptr, true);
         }
-        DrawFocusRing(drawList, rect, radius, row.focusAmount);
+        DrawFocusRingInside(drawList, rect, radius, row.focusAmount);
         CutTextTooltip(row, layer.label, labelEnd, shown.truncated);
     }
     if (insert >= 0)

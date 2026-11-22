@@ -507,6 +507,80 @@ TEST_CASE("Gradient editor: a click on a stop opens its color popover and Escape
     CHECK(ui.writes == 0);
 }
 
+namespace
+{
+
+// The vertices drawn this frame inside `rect` whose color `match` accepts, relative to the smallest
+// x and y among them and sorted: two strokes of one geometry compare equal wherever they are.
+template <typename Match>
+std::vector<ImVec2> EditorStrokeShape(const ImRect& rect, Match match)
+{
+    std::vector<ImVec2> found;
+    for (const ImDrawList* list : ImGui::GetDrawData()->CmdLists)
+        for (const ImDrawVert& v : list->VtxBuffer)
+            if (rect.Contains(v.pos) && match(v.col))
+                found.push_back(v.pos);
+    if (found.empty())
+        return found;
+    float minX = found[0].x;
+    float minY = found[0].y;
+    for (const ImVec2& p : found)
+    {
+        minX = std::min(minX, p.x);
+        minY = std::min(minY, p.y);
+    }
+    for (ImVec2& p : found)
+        p = ImVec2(p.x - minX, p.y - minY);
+    std::sort(found.begin(), found.end(), [](const ImVec2& a, const ImVec2& b) { return a.x != b.x ? a.x < b.x : a.y < b.y; });
+    return found;
+}
+
+bool EditorSameShape(const std::vector<ImVec2>& a, const std::vector<ImVec2>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (std::fabs(a[i].x - b[i].x) > 0.01f || std::fabs(a[i].y - b[i].y) > 0.01f)
+            return false;
+    return true;
+}
+
+} // namespace
+
+TEST_CASE("Gradient editor: the stop whose popover is open changes its outline color, not its width")
+{
+    struct ThemeReset
+    {
+        ~ThemeReset() { facet::SetTheme(facet::Theme::Light(), false); }
+    } reset;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Theme theme = facet::Theme::Light();
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+    GradientUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("gradient");
+    session.Click(GradientStopAt(r, 1.0f));
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    REQUIRE(ui.popoverOpen);
+    const float half = std::round(facet::Px(facet::T().composites.gradientStopSize)) * 0.5f + 1.0f;
+    const auto stopRect = [&](float position) {
+        const ImVec2 c = GradientStopAt(r, position);
+        return ImRect(c.x - half, c.y - half, c.x + half, c.y + half);
+    };
+    const ImU32 accent = facet::ToU32(facet::T().colors.focusRing);
+    const ImU32 boundary = facet::ToU32(facet::T().colors.controlBorder);
+    const std::vector<ImVec2> chosen = EditorStrokeShape(stopRect(1.0f), [&](ImU32 col) {
+        return (col & ~IM_COL32_A_MASK) == (accent & ~IM_COL32_A_MASK) && (col & IM_COL32_A_MASK) != 0;
+    });
+    const std::vector<ImVec2> rest = EditorStrokeShape(stopRect(0.0f), [&](ImU32 col) { return col == boundary; });
+    REQUIRE_FALSE(chosen.empty());
+    CHECK(EditorSameShape(chosen, rest));
+}
+
 TEST_CASE("Gradient editor: read-only shows the stops and writes nothing")
 {
     facet::test::Session session;
@@ -971,6 +1045,45 @@ ImVec2 LayerToggleAt(const ImRect& r, int row, int column)
 }
 
 } // namespace
+
+TEST_CASE("Layer list: a click selects by fill with no ring; Down shows the ring inside the row")
+{
+    struct ThemeReset
+    {
+        ~ThemeReset() { facet::SetTheme(facet::Theme::Light(), false); }
+    } reset;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Theme theme = facet::Theme::Light();
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+    LayerUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    const ImU32 accent = facet::ToU32(facet::T().colors.focusRing);
+    const auto ringColor = [&](ImU32 col) {
+        return (col & ~IM_COL32_A_MASK) == (accent & ~IM_COL32_A_MASK) && (col & IM_COL32_A_MASK) != 0;
+    };
+    const ImRect everywhere(-1.0e4f, -1.0e4f, 1.0e4f, 1.0e4f);
+    session.Click(LayerRowAt(r, 1));
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    REQUIRE(ui.selected == 1);
+    CHECK(EditorStrokeShape(everywhere, ringColor).empty());
+    const ImU32 selection = facet::ToU32(facet::T().colors.accentSubtle);
+    CHECK_FALSE(EditorStrokeShape(everywhere, [&](ImU32 col) { return col == selection; }).empty());
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.Frames(12);
+    REQUIRE(ui.selected == 2);
+    // The ring of the focused row lies inside the row.
+    const float h = LayerRowHeight();
+    ImRect row(r.Min.x, r.Min.y + h * 2.0f, r.Max.x, r.Min.y + h * 3.0f);
+    row.Expand(0.5f);
+    const std::vector<ImVec2> inside = EditorStrokeShape(row, ringColor);
+    CHECK_FALSE(inside.empty());
+    CHECK(inside.size() == EditorStrokeShape(everywhere, ringColor).size());
+}
 
 TEST_CASE("Layer list: a click selects a row and the arrows move the selection")
 {

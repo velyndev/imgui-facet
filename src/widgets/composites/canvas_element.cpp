@@ -401,9 +401,9 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
         // A spot outside the canvas lies outside its clip rect: the control is clipped to the caller's.
         ImGui::PushClipRect(canvas->outerClip.Min, canvas->outerClip.Max, false);
         ImDrawList* drawList = window->DrawList;
+        // A small floating surface: bgElevated with the separator hairline of every floating layer.
         FillRect(drawList, ImVec2(x, y), ImVec2(x + side, y + side), ToU32(c.bgElevated), Px(t.radii.element));
-        StrokeRect(drawList, ImVec2(x, y), ImVec2(x + side, y + side), ToU32(ControlBoundaryColor(c)), Px(t.radii.element),
-                   HairlineThickness());
+        internal::DrawSurfaceOutline(drawList, ImRect(ImVec2(x, y), ImVec2(x + side, y + side)), Px(t.radii.element));
         for (int k = 0; k < kCanvasCells; ++k)
         {
             const ImRect cellRect(ImVec2(x + cell * static_cast<float>(k % 3), y + cell * static_cast<float>(k / 3)),
@@ -429,7 +429,8 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
             const float dot = Px(t.metrics.statusDotSize) * (chosen ? 0.5f : 0.25f);
             drawList->AddCircleFilled(cellRect.GetCenter(), dot,
                                       ToU32(cellItem.disabled ? c.labelTertiary : (chosen ? c.focusRing : c.labelSecondary)));
-            internal::DrawItemFocusRing(cellItem, Px(t.radii.element));
+            // The cells touch each other and the control's edge: the ring sits inside the cell.
+            internal::DrawItemFocusRingInside(cellItem, Px(t.radii.element));
             internal::CutTextTooltip(cellItem, CanvasAnchorName(k), nullptr, true);
         }
         ImGui::PopClipRect();
@@ -469,10 +470,15 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
     {
         const float radius = Px(t.radii.element);
         const bool disabled = item.disabled;
-        const ImVec4 fill = disabled ? c.fill[3] : Mix(c.fill[2], c.fill[1], std::max(item.hoverAmount, item.pressAmount));
+        // The tile look of the row rule: the neutral fill and the controlBorder hairline, a selected
+        // element accentSubtle and the accent outline at the same width.
+        const ImVec4 fill = disabled ? c.fill[3]
+                                     : (selected ? c.accentSubtle
+                                                 : Mix(c.fill[2], c.fill[1], std::max(item.hoverAmount, item.pressAmount)));
         FillRect(drawList, box.Min, box.Max, ToU32(fill), radius);
-        StrokeRect(drawList, box.Min, box.Max, ToU32(disabled ? c.labelTertiary : (selected ? c.focusRing : ControlBoundaryColor(c))),
-                   radius, selected ? HairlineThickness() * 2.0f : HairlineThickness());
+        internal::DrawOutline(drawList, box, radius,
+                              internal::ControlOutlineColor(
+                                  {.hoverAmount = item.hoverAmount, .selected = selected, .disabled = disabled}));
         const char* labelEnd = ImGui::FindRenderedTextEnd(label);
         internal::ControlTextScope footnote(TextStyle::Footnote);
         const float pad = Px(t.spacing.xs);
@@ -491,14 +497,15 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
     {
         for (int k = 0; k < kCanvasHandles; ++k)
         {
-            // Square handles on the box as it is now, in the accent outline of the selection, a hairline
-            // thicker on hover.
+            // Square handles on the box as it is now, in the accent outline of the selection; hover and
+            // press fill the handle with the accent mark, so the stroke keeps its one width.
             const internal::ItemState& h = handleItems[k];
             const ImVec2 p(box.Min.x + at[k].x * box.GetWidth(), box.Min.y + at[k].y * box.GetHeight());
             const ImVec2 hMin(std::round(p.x - handleSize * 0.5f), std::round(p.y - handleSize * 0.5f));
             const ImRect hr(hMin, ImVec2(hMin.x + handleSize, hMin.y + handleSize));
-            FillRect(drawList, hr.Min, hr.Max, ToU32(c.bg), 0.0f);
-            StrokeRect(drawList, hr.Min, hr.Max, ToU32(c.focusRing), 0.0f, HairlineThickness() * (1.0f + h.hoverAmount));
+            const float feedback = h.disabled ? 0.0f : std::max(h.hoverAmount, h.pressAmount);
+            FillRect(drawList, hr.Min, hr.Max, ToU32(Mix(c.bg, c.focusRing, feedback)), 0.0f);
+            internal::DrawOutline(drawList, hr, 0.0f, c.focusRing);
         }
     }
 

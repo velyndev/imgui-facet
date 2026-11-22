@@ -629,7 +629,9 @@ Backspace removes it, and Escape during a drag or key press puts every stop back
 never removed. A click on a marker that does not move it, or Enter or Space on a focused one, opens
 a popover with the stop's `ColorPicker`, its position in percent (`NumberInput`, `Strings::position`)
 and a `Strings::remove` button, titled `Strings::colorStop`; the stop it edits keeps an accent
-outline. Escape closes it and restores the color from before it opened; a click outside keeps the
+outline. Every marker has one hairline in the control outline colors (`controlBorder`,
+`controlBorderHover` under the pointer, the accent for the stop being edited); no state changes its
+width. Escape closes it and restores the color from before it opened; a click outside keeps the
 edit.
 
 Adding needs room in the caller's storage: a full span takes no new stop, and the vector overload
@@ -691,10 +693,10 @@ class PreviewCanvasScope;
 ```
 
 A letterboxed preview of a screen of `referenceSize` reference pixels, scaled to fit the widget:
-the bands around the screen in fill[3], the screen in the window background with a hairline, the
-grid every `gridSpacing` reference pixels in the separator color (left out when it would draw more
-than 64 lines along an axis), and the safe area as a dashed frame (`media.dashLength`,
-`media.dashGap`) in labelTertiary. The default width fills the available width; the default height
+the bands around the screen in fill[3], the screen in the window background with a `controlBorder`
+hairline, the grid every `gridSpacing` reference pixels in the separator color (left out when it
+would draw more than 64 lines along an axis), and the safe area as a dashed frame
+(`media.dashLength`, `media.dashGap`) in `controlBorder`. The default width fills the available width; the default height
 follows the reference aspect ratio. Canvas elements are submitted between Begin and End; End draws
 on top of them the center guides while an element is moved (`centerGuides`) and the guide an
 element snapped to, in the focusRing color. A click on empty canvas clears the selection. Elements
@@ -709,8 +711,10 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
 ```
 
 A box inside `BeginPreviewCanvas`, placed in reference pixels from an anchor of the canvas:
-fill[2] (fill[1] on hover), the boundary hairline, an accent outline while selected, and the
-visible label part centered and cut to fit. After the call the box is the last item, so the caller
+fill[2] (fill[1] on hover) with the `controlBorder` hairline, while selected `accentSubtle` with the
+accent outline at the same width, and the visible label part centered and cut to fit. The handles
+are squares in the window background with the accent hairline, filled with the accent under the
+pointer, so no state thickens a stroke. The focus ring of an anchor cell sits inside the cell. After the call the box is the last item, so the caller
 can draw its own preview into `ImGui::GetItemRectMin` and `Max`.
 
 The box is one Tab stop. A press selects it and starts a move; the arrows move it by one reference
@@ -745,7 +749,9 @@ selected, in labelSecondary while the layer is hidden) and, at the end of the ro
 toggle (eye, eye-off) and a lock toggle (lock, unlock), each the glyph alone with its name
 (`Strings::hide`, `show`, `lock`, `unlock`) as its tooltip. The default width fills the available
 width; rows have the list row height, and with `height` set the rows scroll in a scroll area and
-end before its overlay scroll bar, so the bar never covers the toggles.
+end before its overlay scroll bar, so the bar never covers the toggles. Rows take the shared row look:
+`fill[2]` under the pointer, `accentSubtle` while selected (also while the focus is elsewhere), no
+outline; the focus ring shows only after keyboard input, inside the row or the toggle.
 
 The rows are one Tab stop (the focused row, else the selected one, else the first): a click
 selects a row, Up and Down move the selection and the focus, Home and End go to the first and the
