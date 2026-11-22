@@ -21,7 +21,9 @@ the other channels with their exact float values, and a color that is not touche
 so a color survives a round trip through every picker unchanged. Handles are the solid knobs of
 the sliders (the `knob` token, white in both themes, with the level 1 shadow and one controlBorder
 hairline that turns controlBorderHover under the pointer) with their color filling the middle
-inside a white rim, so they read on any color in both themes; a held handle grows a little.
+inside a white rim; on a light color, where the white rim would vanish, the hairline is black, so
+the edge of a handle keeps 3:1 against the color under it in both themes. A held handle grows a
+little.
 Disabled pickers show their colors dimmed and the handles at the disabled opacity with a separator
 hairline.
 

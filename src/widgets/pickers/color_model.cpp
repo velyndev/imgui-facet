@@ -28,6 +28,9 @@ constexpr float kColorHandlePressGrowth = 0.15f;
 // The white rim of a handle around the picked color, as a share of its radius: wide enough to read
 // as the knob of the sliders, narrow enough to leave most of the handle to the color.
 constexpr float kColorHandleRimShare = 0.3f;
+// The contrast the edge of a handle keeps against the color under it: the 3:1 of a state mark,
+// because the handle's position is the value of the control.
+constexpr float kColorHandleEdgeContrast = 3.0f;
 // Stripes of the mixed swatch: their spacing in hairlines, and their width.
 constexpr float kColorMixedStripeGap = 4.0f;
 constexpr float kColorMixedStripeWidth = 1.5f;
@@ -476,6 +479,21 @@ ImVec4 ColorOnChecker(const ImVec4& color)
     return out;
 }
 
+ImVec4 ColorHandleEdge(const ImVec4& under, float hoverAmount, bool disabled)
+{
+    const Colors& c = T().colors;
+    ImVec4 plane = under;
+    plane.w = 1.0f;
+    // The white rim already stands out from a darker color; on a light one it would vanish, so
+    // the hairline takes black or white, whichever reads on that color.
+    if (ContrastRatio(c.knob, plane) < kColorHandleEdgeContrast)
+        return ReadableOn(plane);
+    OutlineLook outline;
+    outline.hoverAmount = disabled ? 0.0f : hoverAmount;
+    outline.disabled = disabled;
+    return ControlOutlineColor(outline);
+}
+
 void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float hoverAmount,
                      float pressAmount, float focusAmount, bool disabled)
 {
@@ -483,9 +501,9 @@ void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const Im
     const float hairline = HairlineThickness();
     const float r = std::max(hairline * 4.0f, std::round(radius * (1.0f + kColorHandlePressGrowth * pressAmount)));
     const ImRect knob(center.x - r, center.y - r, center.x + r, center.y + r);
-    // The solid knob of the sliders: the knob token with the level 1 shadow and the one
-    // controlBorder hairline (controlBorderHover under the pointer). Its white rim reads on any
-    // color under it in both themes; the picked color fills the middle.
+    // The solid knob of the sliders: the knob token with the level 1 shadow and one hairline
+    // (ColorHandleEdge). The edge reaches 3:1 against the color under it, by the rim on a dark color
+    // and by the hairline on a light one; the picked color fills the middle.
     if (!disabled)
         DrawElevation(drawList, knob.Min, knob.Max, r, 1);
     FillRect(drawList, knob.Min, knob.Max, ToU32(WithAlpha(c.knob, c.knob.w * (disabled ? kDisabledPictureOpacity : 1.0f))), r);
@@ -495,10 +513,7 @@ void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const Im
     shown.w = disabled ? kColorDisabledOpacity : 1.0f;
     FillRect(drawList, ImVec2(center.x - inner, center.y - inner), ImVec2(center.x + inner, center.y + inner), ToU32(shown),
              inner);
-    OutlineLook outline;
-    outline.hoverAmount = disabled ? 0.0f : hoverAmount;
-    outline.disabled = disabled;
-    DrawOutline(drawList, knob, r, ControlOutlineColor(outline));
+    DrawOutline(drawList, knob, r, ColorHandleEdge(fill, hoverAmount, disabled));
     DrawFocusRing(drawList, knob, r, focusAmount, 0, RingShape::Round);
 }
 

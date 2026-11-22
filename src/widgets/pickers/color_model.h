@@ -90,11 +90,16 @@ bool ColorParseText(const char* text, ImVec4* out, bool* hasAlpha);
 // theme when it is translucent, clamped to 0 to 1, opaque.
 ImVec4 ColorOnChecker(const ImVec4& color);
 
+// The hairline around a color handle drawn on `under` (the color under the handle, taken as
+// opaque): the quiet outline (controlBorder, controlBorderHover by hoverAmount, separator while
+// disabled) when the knob token already reaches 3:1 against `under`, otherwise black or white by
+// ReadableOn, so the edge of the handle always reaches 3:1 against the plane it sits on.
+ImVec4 ColorHandleEdge(const ImVec4& under, float hoverAmount, bool disabled);
+
 // A round handle centered on `center` with `radius` pixels: the solid knob of the sliders (the knob
-// token, the level 1 shadow and one controlBorder hairline that turns controlBorderHover by
-// hoverAmount) with `fill` (opaque) inside its rim, grown a little while held (pressAmount), and
-// the round focus ring at focusAmount. Disabled: the disabled opacities, a separator hairline and
-// no shadow.
+// token, the level 1 shadow and the ColorHandleEdge hairline) with `fill` (opaque, the color under
+// the handle) inside its rim, grown a little while held (pressAmount), and the round focus ring at
+// focusAmount. Disabled: the disabled opacities and no shadow.
 void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float hoverAmount,
                      float pressAmount, float focusAmount, bool disabled);
 

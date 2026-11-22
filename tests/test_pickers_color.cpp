@@ -5,6 +5,7 @@
 // One test case per behaviour; docs/writing-a-widget.md describes the pattern. The API checks are in
 // tests/test_api_pickers_color.cpp.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -820,4 +821,45 @@ TEST_CASE("Color handles are solid knobs: the knob color with the picked color i
         samePlaces = samePlaces && std::fabs(drawn[i].pos.x - rest[i].pos.x) < 0.01f && std::fabs(drawn[i].pos.y - rest[i].pos.y) < 0.01f;
     CHECK(samePlaces);
     CHECK(count(facet::ToU32(facet::T().colors.controlBorderHover)) > 0);
+}
+TEST_CASE("A color handle keeps an edge of 3:1 against white and black under it in both themes")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    const ImVec4 planes[] = {ImVec4(1.0f, 1.0f, 1.0f, 1.0f), ImVec4(0.0f, 0.0f, 0.0f, 1.0f)};
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
+        const facet::Colors& c = facet::T().colors;
+        for (const ImVec4& plane : planes)
+        {
+            CAPTURE(plane.x);
+            for (const bool disabled : {false, true})
+            {
+                CAPTURE(disabled);
+                // The outermost marks of the handle: the rim in the knob token and the hairline.
+                const ImVec4 edge = facet::internal::ColorHandleEdge(plane, 0.0f, disabled);
+                const float best = std::max(facet::ContrastRatio(edge, plane), facet::ContrastRatio(c.knob, plane));
+                CHECK(best >= 3.0f);
+            }
+            // The drawn handle carries that hairline.
+            const ImU32 edge = facet::ToU32(facet::internal::ColorHandleEdge(plane, 0.0f, false));
+            int edgeVertices = 0;
+            session.SetUi([&] {
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const int from = drawList->VtxBuffer.Size;
+                const ImVec2 origin = ImGui::GetCursorScreenPos();
+                const ImVec2 center(origin.x + 40.0f, origin.y + 40.0f);
+                facet::internal::DrawColorHandle(drawList, center, 10.0f, plane, 0.0f, 0.0f, 0.0f, false);
+                edgeVertices = 0;
+                for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+                    edgeVertices += drawList->VtxBuffer[i].col == edge ? 1 : 0;
+            });
+            session.Frames(2);
+            CHECK(edgeVertices > 0);
+        }
+    }
+    facet::SetTheme(saved, false);
 }

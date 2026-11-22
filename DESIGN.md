@@ -87,7 +87,8 @@ dark theme comes from near-black greys stepping up from black. Color and weight 
   list, open or inline.
 - **One grab face.** Slider knobs and color handles share one face: a white disc with the
   `controlBorder` hairline and the level 1 shadow; a color handle shows its color inside a white
-  rim. Reason: one grab shape on every track and plane, readable on any color under it.
+  rim, and on a light color under it the hairline turns black. Reason: one grab shape on every
+  track and plane; the handle position is the value, so its edge keeps 3:1 against any color under it.
 
 Reduced motion follows the Windows "Animation effects" setting. Interactive items show the hand
 cursor, disabled ones the not-allowed cursor.
@@ -784,7 +785,8 @@ Navigation:
 Color pickers:
 
 - **Handles** are the one grab face of Quiet layers with the picked color inside the white rim;
-  hover changes only the outline color and the handle grows on press only.
+  hover changes only the outline color and the handle grows on press only. Where the white rim
+  would vanish on a light color, the hairline is black (ColorHandleEdge).
 - **Gradients** are drawn in gamma sRGB as exact linear stretches (the hue in six, the square as
   white to hue under a black alpha ramp), so the color under a handle's centre is the value it
   stands for.

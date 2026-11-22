@@ -13,7 +13,7 @@
 // (internal/value_drag.h) with the keys of a Slider. Gradients are drawn in gamma-encoded sRGB, the
 // space HSV is defined in, so the color under the centre of a handle is the color the handle
 // stands for. Handles are the solid knobs of the sliders with that color inside their rim
-// (DrawColorHandle), so they read on any color in both themes.
+// and an edge that keeps 3:1 against the color under them (DrawColorHandle).
 
 #include <imgui.h>
 #include <imgui_internal.h>
