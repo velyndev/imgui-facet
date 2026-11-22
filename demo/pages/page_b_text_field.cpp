@@ -15,7 +15,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/row_layout.h"
 #include "internal/text_field.h"
 #include "internal/text_field_number.h"

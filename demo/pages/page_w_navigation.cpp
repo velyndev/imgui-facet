@@ -15,7 +15,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "pages/pages.h"
 #include "widgets/navigation/navigation_parts.h"
 #include "widgets/selection/selection_parts.h"

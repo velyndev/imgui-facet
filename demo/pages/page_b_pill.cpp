@@ -12,7 +12,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/row_layout.h"

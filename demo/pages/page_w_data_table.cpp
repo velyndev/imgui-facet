@@ -15,7 +15,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "pages/pages.h"
 #include "widgets/display/data_table_internal.h"
 

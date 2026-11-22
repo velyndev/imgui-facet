@@ -18,7 +18,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/chart_core.h"
 #include "internal/row_layout.h"
 #include "pages/pages.h"

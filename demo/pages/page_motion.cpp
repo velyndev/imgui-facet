@@ -11,7 +11,7 @@
 #include <facet/facet.h>
 
 #include "core/anim_store.h"
-#include "gallery.h"
+#include "page_helpers.h"
 #include "pages/pages.h"
 
 namespace

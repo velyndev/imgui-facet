@@ -14,7 +14,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/drag_drop.h"
 #include "internal/focus.h"
 #include "pages/pages.h"

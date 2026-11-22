@@ -18,7 +18,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "pages/pages.h"

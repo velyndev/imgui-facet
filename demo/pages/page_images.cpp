@@ -14,7 +14,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "pages/pages.h"
 
 // The encoder is compiled with internal linkage in this file as well, like in capture.cpp.

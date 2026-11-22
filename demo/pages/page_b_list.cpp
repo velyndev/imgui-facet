@@ -17,7 +17,7 @@
 
 #include <facet/facet.h>
 
-#include "gallery.h"
+#include "page_helpers.h"
 #include "internal/focus.h"
 #include "internal/list_view.h"
 #include "internal/scroll.h"

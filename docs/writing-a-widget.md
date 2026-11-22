@@ -178,7 +178,7 @@ behaviour file of its group.
 
 Each family page calls every widget of the family once, grouped into sections
 (`facet::demo::SectionHeader`, `Paragraph`, `LabeledRow`, `Note`, `NoteBeside` in
-`demo/gallery.h`). A ready widget is shown in each variant, size and state its declaration has,
+`demo/page_helpers.h`). A ready widget is shown in each variant, size and state its declaration has,
 and it really works: every press changes something the page shows. Content is neutral and honest:
 no invented people, numbers or product names; placeholders are labelled as placeholders. The page
 settings (a layer that shows or hides, a data state, a value) are Facet controls too; a stock Dear
@@ -197,7 +197,7 @@ says so.
 - `ctx.Probe("button.save")` right after a widget records it for the selftest; probe names start
   with the family.
 - A part of a floating layer (a popup level, a modal, a toast) can lie outside the page's visible
-  area: record it with `FloatingProbe` or `FloatingProbeRect` (`demo/gallery.h`), which measure it
+  area: record it with `FloatingProbe` or `FloatingProbeRect` (`demo/page_helpers.h`), which measure it
   against the display, so the selftest reaches it without scrolling the page.
 - Capture states are named in `FACET_DEMO_PAGE(...)`. For a state, call
   `ctx.ForceNextItemState(ForcedItemState::Hovered)` right before the widget (`Pressed`,
