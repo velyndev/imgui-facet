@@ -46,6 +46,7 @@ enum CaptureState
     kCurveDragging,
     kCurveFocused,
     kEasingDragging,
+    kLayersFocused,
 };
 
 const char* const kInterpolations[] = {"Smooth", "Linear", "Step"};
@@ -82,8 +83,17 @@ struct EditorsUi
     bool gradientPopover = false;
     float savedPosition = 0.0f;   // a value a selftest step compares with
     facet::CanvasElementState element{facet::CanvasAnchor::TopLeft, {64.0f, 64.0f}, {480.0f, 120.0f}};
-    facet::LayerItem layers[3] = {{"Layer 1"}, {"Layer 2", {}, 1}, {"Layer 3", {}, 0, false}};
+    facet::LayerItem layers[5] = {{"Layer 1", {}, 0, true, false, 1},
+                                  {"Group 1", {}, 0, true, false, 2},
+                                  {"Layer 2", {}, 1, true, false, 3},
+                                  {"Layer 3", {}, 1, false, false, 4},
+                                  {"Background", {}, 0, true, true, 5}};
     int layer = 0;
+    int layerState = 0;           // the data state shown: Ready, Loading, Error, no layers
+    char layerAction[64] = "";
+    ImGuiID layersId = 0;
+    facet::LayerItem fixedLayers[2] = {{"Layer 1"}, {"Layer 2", {}, 0, false}};  // the read-only example
+    int fixedLayer = 0;
 
     // Property grid.
     char filter[64] = "";
@@ -217,6 +227,68 @@ void BezierSection(facet::demo::PageCtx& ctx)
     CubicBezier fixed{{0.42f, 0.0f}, {0.58f, 1.0f}};
     BezierEditor("Read-only easing", &fixed,
                  {.presets = false, .numericFields = false, .width = demo::DemoWidth(240.0f), .height = 96.0f, .readOnly = true});
+}
+
+const char* const kLayerStates[] = {"Ready", "Loading", "Error", "Empty"};
+
+void LayerSection(facet::demo::PageCtx& ctx)
+{
+    using namespace facet;
+    const bool capture = ctx.capture;
+    SectionHeader("Layer list");
+    Paragraph("Rows are one Tab stop: Up and Down move the selection, Alt+Up and Alt+Down move the layer, Space picks "
+              "it up for the arrows and Space or Enter puts it down. Tab goes on to the focused row's visibility and "
+              "lock toggles. Drag across the toggles to set several; Alt+click on a visibility toggle shows that layer "
+              "alone.");
+    Note("Placeholder layers.");
+    LabeledRow("Data state");
+    SegmentedControl("##layerState", &ui.layerState, std::span<const char* const>(kLayerStates));
+    LabeledRow("Layers");
+    if (capture && ctx.captureState == kLayersFocused)
+        ctx.ForceNextItemState(demo::ForcedItemState::Focused, 1);
+    ui.layersId = ImGui::GetID("layers");
+    const DataState states[] = {DataState::Ready, DataState::Loading, DataState::Error, DataState::Ready};
+    const std::span<LayerItem> rows = ui.layerState == 3 ? std::span<LayerItem>() : std::span<LayerItem>(ui.layers);
+    const LayerListResult result =
+        LayerList("layers", &ui.layer, rows, {.state = states[ui.layerState], .width = demo::DemoWidth(320.0f)});
+    ctx.Probe("composites.layers");
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i)
+    {
+        const char* parts[] = {"row", "visible", "lock"};
+        for (int part = 0; part < 3; ++part)
+        {
+            ImGuiID itemId = 0;
+            const ImRect rect = internal::LayerListRowRect(ui.layersId, i, part, rows[i].id, &itemId);
+            char name[48];
+            std::snprintf(name, sizeof(name), "composites.layers.%s%d", parts[part], i);
+            demo::ProbeRect(ctx, name, itemId, rect.Min, rect.Max);
+        }
+    }
+    if (capture && ctx.captureState == kLayersFocused)
+        ctx.RevealInCapture(0.5f);
+    switch (result.action)
+    {
+    case LayerAction::Moved:
+        ApplyReorderMove(ui.layers, result.move);
+        std::snprintf(ui.layerAction, sizeof(ui.layerAction), "Moved from row %d to row %d.", result.move.from + 1,
+                      result.move.to + 1);
+        break;
+    case LayerAction::Visibility:
+        std::snprintf(ui.layerAction, sizeof(ui.layerAction), "Visibility of row %d.", result.index + 1);
+        break;
+    case LayerAction::Lock:
+        std::snprintf(ui.layerAction, sizeof(ui.layerAction), "Lock of row %d.", result.index + 1);
+        break;
+    case LayerAction::Selected:
+        std::snprintf(ui.layerAction, sizeof(ui.layerAction), "Selected row %d.", ui.layer + 1);
+        break;
+    case LayerAction::None:
+        break;
+    }
+    LabeledRow("");
+    Note("%s", ui.layerAction[0] != '\0' ? ui.layerAction : "No action yet.");
+    LabeledRow("Read-only");
+    LayerList("read-only layers", &ui.fixedLayer, ui.fixedLayers, {.width = demo::DemoWidth(320.0f), .readOnly = true});
 }
 
 void SeedGradients()
@@ -448,7 +520,7 @@ void PropertyGridSection(facet::demo::PageCtx& ctx)
 
 FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "default", "grid-filtered",
                 "grid-no-results", "grid-column", "gradient-open", "gradient-focused", "curve-dragging", "curve-focused",
-                "easing-dragging")
+                "easing-dragging", "layers-focused")
 {
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
@@ -461,15 +533,15 @@ FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "def
     GradientSection(ctx);
     PropertyGridSection(ctx);
 
-    SectionHeader("Canvas and layers");
+    LayerSection(ctx);
+
+    SectionHeader("Preview canvas");
     LabeledRow("Preview canvas");
     ImGui::BeginGroup();
     facet::BeginPreviewCanvas("canvas", kReferenceSize, {.safeArea = 0.05f});
     facet::CanvasElement("Element 1", &ui.element);
     facet::EndPreviewCanvas();
     ImGui::EndGroup();
-    LabeledRow("Layer list");
-    facet::LayerList("layers", &ui.layer, ui.layers);
 }
 
 FACET_DEMO_SELFTEST("composites-editors")
@@ -581,6 +653,48 @@ FACET_DEMO_SELFTEST("composites-editors")
     // The storage of two stops is full.
     test.Click("composites.gradientFull.bar");
     test.Expect("a full storage takes no new stop", [] { return ui.fullCount == 2; });
+
+    // ---- Layer list ----
+    test.Reveal("composites.layers");
+    test.WaitSeconds(0.4f);
+    test.Click("composites.layers.row2");
+    test.Expect("a click selects a row", [] { return ui.layer == 2; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.Expect("Down moves the selection", [] { return ui.layer == 3; });
+    test.KeyPress(ImGuiKey_UpArrow | ImGuiMod_Alt);
+    test.Expect("Alt+Up moves the layer up and the selection with it", [] {
+        return std::strcmp(ui.layers[2].label, "Layer 3") == 0 && ui.layer == 2;
+    });
+    test.KeyPress(ImGuiKey_Tab);  // the focused row's visibility toggle
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the visibility toggle shows the hidden layer", [] { return ui.layers[2].visible; });
+    test.KeyPress(ImGuiKey_Tab);  // its lock toggle
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter on the lock toggle locks it", [] { return ui.layers[2].locked; });
+    test.Drag({T::Item("composites.layers.visible0"), T::Item("composites.layers.visible1"),
+               T::Item("composites.layers.visible2")},
+              0.4f);
+    test.Expect("a drag down the visibility toggles hides three layers",
+                [] { return !ui.layers[0].visible && !ui.layers[1].visible && !ui.layers[2].visible && ui.layers[3].visible; });
+    test.KeyDown(ImGuiMod_Alt);
+    test.Click("composites.layers.visible4");
+    test.KeyUp(ImGuiMod_Alt);
+    test.Expect("Alt+click shows that layer alone", [] {
+        return ui.layers[4].visible && !ui.layers[0].visible && !ui.layers[1].visible && !ui.layers[2].visible &&
+               !ui.layers[3].visible;
+    });
+    test.Drag({T::Item("composites.layers.row4"), T::Item("composites.layers.row2"),
+               T::Item("composites.layers.row0", 0.5f, 0.1f)},
+              0.5f);
+    test.Expect("a drag moves the last layer to the top", [] { return std::strcmp(ui.layers[0].label, "Background") == 0; });
+    test.Do([] { ui.layerState = 1; });
+    test.Wait(2);
+    test.Do([] { ui.layer = 0; });
+    test.Click("composites.layers");
+    test.Expect("a loading list takes no click", [] { return ui.layer == 0; });
+    test.Do([] { ui.layerState = 0; });
+    test.Wait(2);
 
     // ---- Property grid ----
     // Each control edits through the finished widget and reports one change per edit.

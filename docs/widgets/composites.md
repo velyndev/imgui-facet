@@ -691,7 +691,32 @@ Anchored, draggable element inside a preview canvas. Status: planned.
 LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> layers, const LayerListOptions& options = {});
 ```
 
-Ordered layer rows with visibility and lock toggles and reordering. Status: planned.
+Ordered layer rows, topmost first: the icon, the label (indented by `depth`, in semibold while
+selected, in labelSecondary while the layer is hidden) and, at the end of the row, a visibility
+toggle (eye, eye-off) and a lock toggle (lock, unlock), each the glyph alone with its name
+(`Strings::hide`, `show`, `lock`, `unlock`) as its tooltip. The default width fills the available
+width; rows have the list row height, and with `height` set the rows scroll in a scroll area.
+
+The rows are one Tab stop (the focused row, else the selected one, else the first): a click
+selects a row, Up and Down move the selection and the focus, Home and End go to the first and the
+last row. Tab goes on to the focused row's visibility toggle and lock toggle (the toggles of the
+other rows are no Tab stops), then out of the list. Space or Enter on a toggle, or a click, flips
+it; dragging on from a toggle across the same toggle of other rows paints them with the value the
+first one took; Alt+click on a visibility toggle (`solo`) shows only that layer.
+
+Rows reorder by a pointer drag, with an accent line where the row lands, or from the keyboard:
+Alt+Up and Alt+Down move the focused row at once, and Space picks it up, the arrows move it,
+Space or Enter drops it and Escape puts it back (the drag and drop core). The widget reports the
+move as `LayerAction::Moved` with a `ReorderMove` and the caller applies it; `*selected` follows
+the layers the move shifts, so it stays on the same layer once the move is applied. One action is
+reported per frame: a move first, then a toggle (`Visibility` or `Lock` with the row's index; a
+paint or a solo click may have written other rows too), then `Selected`.
+
+`state` Loading and Error and an empty list show the list states in the list's area (three rows
+tall without `height`) and take no input. `readOnly` rows can still be selected and focused; the
+toggles and reordering do nothing. Layer names cannot be edited in the list: the result has no
+member for a new name, so inline rename is not offered. At most 256 rows are shown; a longer span
+is reported as a usage error. Nothing is allocated per frame. Status: ready.
 
 ### Usage of the editors and canvas
 

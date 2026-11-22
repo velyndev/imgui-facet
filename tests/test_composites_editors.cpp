@@ -18,6 +18,7 @@
 #include <facet/facet.h>
 
 #include "internal/focus.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/state_storage.h"
 #include "support/session.h"
@@ -866,6 +867,186 @@ TEST_CASE("Bezier editor: a shown editor allocates nothing per frame")
     REQUIRE(session.Ready());
     BezierUi ui;
     session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    const int states = facet::internal::GlobalStateStore().Count();
+    CHECK(CountImGuiAllocations(session, 10) == 0);
+    CHECK(facet::internal::GlobalStateStore().Count() == states);
+}
+
+// ---- LayerList ---------------------------------------------------------------------------------------
+
+namespace
+{
+
+struct LayerUi
+{
+    facet::LayerItem layers[4] = {{"Layer 1"}, {"Layer 2"}, {"Layer 3"}, {"Layer 4"}};
+    int selected = 0;
+    facet::LayerListResult last;
+    int actions = 0;
+    facet::LayerListOptions options;
+
+    void Draw(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        const facet::LayerListResult result = facet::LayerList("layers", &selected, layers, options);
+        session.Track("layers");
+        if (result.action != facet::LayerAction::None)
+        {
+            last = result;
+            ++actions;
+            if (result.action == facet::LayerAction::Moved)
+                facet::ApplyReorderMove(layers, result.move);
+        }
+    }
+};
+
+float LayerRowHeight()
+{
+    return facet::internal::ListRowHeight(facet::ControlSize::Regular);
+}
+
+ImVec2 LayerRowAt(const ImRect& r, int row)
+{
+    return ImVec2(r.Min.x + facet::Px(60.0f), r.Min.y + LayerRowHeight() * (static_cast<float>(row) + 0.5f));
+}
+
+// The visibility (column 0) or lock (column 1) toggle of a row.
+ImVec2 LayerToggleAt(const ImRect& r, int row, int column)
+{
+    const float h = LayerRowHeight();
+    return ImVec2(r.Max.x - h * (column == 0 ? 1.5f : 0.5f), r.Min.y + h * (static_cast<float>(row) + 0.5f));
+}
+
+} // namespace
+
+TEST_CASE("Layer list: a click selects a row and the arrows move the selection")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    session.Click(LayerRowAt(r, 2));
+    CHECK(ui.selected == 2);
+    CHECK(ui.last.action == facet::LayerAction::Selected);
+    facet::internal::SetKeyboardModality(true);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ui.selected == 3);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ui.selected == 0);
+}
+
+TEST_CASE("Layer list: the rows are one Tab stop, then the focused row's toggles")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    ui.selected = 1;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);  // the selected row
+    session.KeyPress(ImGuiKey_Tab);  // its visibility toggle
+    session.KeyPress(ImGuiKey_Space);
+    CHECK_FALSE(ui.layers[1].visible);
+    CHECK(ui.last.action == facet::LayerAction::Visibility);
+    CHECK(ui.last.index == 1);
+    session.KeyPress(ImGuiKey_Tab);  // its lock toggle
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(ui.layers[1].locked);
+    CHECK(ui.last.action == facet::LayerAction::Lock);
+    // The other rows' toggles are no Tab stops: the next Tab leaves the list.
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(ui.layers[1].locked);
+    CHECK(ui.layers[2].visible);
+    CHECK_FALSE(ui.layers[2].locked);
+}
+
+TEST_CASE("Layer list: dragging down the visibility toggles paints them, Alt+click shows one layer only")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    session.Drag({LayerToggleAt(r, 0, 0), LayerToggleAt(r, 1, 0), LayerToggleAt(r, 2, 0)}, 4);
+    CHECK_FALSE(ui.layers[0].visible);
+    CHECK_FALSE(ui.layers[1].visible);
+    CHECK_FALSE(ui.layers[2].visible);
+    CHECK(ui.layers[3].visible);
+    CHECK(ui.selected == 0);  // the toggles leave the selection alone
+    session.KeyDown(ImGuiMod_Alt);
+    session.Click(LayerToggleAt(r, 2, 0));
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK(ui.layers[2].visible);
+    CHECK_FALSE(ui.layers[0].visible);
+    CHECK_FALSE(ui.layers[3].visible);
+}
+
+TEST_CASE("Layer list: Alt+Down and a drag move a row and the selection follows")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    session.Click(LayerRowAt(r, 0));
+    facet::internal::SetKeyboardModality(true);
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Alt);
+    CHECK(ui.last.action == facet::LayerAction::Moved);
+    CHECK(ui.last.move.from == 0);
+    CHECK(ui.last.move.to == 1);
+    CHECK(std::string(ui.layers[1].label) == "Layer 1");
+    CHECK(ui.selected == 1);
+    // A pointer drag of the last row to the top.
+    session.Drag({LayerRowAt(r, 3), LayerRowAt(r, 2), LayerRowAt(r, 1), ImVec2(LayerRowAt(r, 0).x, LayerRowAt(r, 0).y - LayerRowHeight() * 0.4f)}, 6);
+    session.Frames(2);
+    CHECK(std::string(ui.layers[0].label) == "Layer 4");
+    CHECK(ui.selected == 2);  // still on "Layer 1"
+    CHECK(std::string(ui.layers[ui.selected].label) == "Layer 1");
+}
+
+TEST_CASE("Layer list: read-only rows select but toggle and move nothing; the data states show")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    ui.options.readOnly = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect r = session.ItemRect("layers");
+    session.Click(LayerToggleAt(r, 1, 0));
+    session.Drag({LayerRowAt(r, 3), LayerRowAt(r, 0)}, 6);
+    CHECK(ui.layers[1].visible);
+    CHECK(std::string(ui.layers[3].label) == "Layer 4");
+    session.Click(LayerRowAt(r, 2));
+    CHECK(ui.selected == 2);
+
+    ui.options.readOnly = false;
+    ui.options.state = facet::DataState::Loading;
+    session.Frames(2);
+    const float loading = session.ItemRect("layers").GetHeight();
+    CHECK(loading > 0.0f);
+    const int actions = ui.actions;
+    session.Click(session.ItemCenter("layers"));
+    CHECK(ui.actions == actions);
+}
+
+TEST_CASE("Layer list: a shown list allocates nothing per frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    LayerUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    session.MouseMove(LayerRowAt(session.ItemRect("layers"), 1));
     session.Frames(10);
     const int states = facet::internal::GlobalStateStore().Count();
     CHECK(CountImGuiAllocations(session, 10) == 0);

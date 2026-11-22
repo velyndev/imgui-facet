@@ -88,6 +88,15 @@ ImVec2 BezierEditorPointPos(ImGuiID id, ImVec2 value);
 ImGuiID BezierEditorPointId(ImGuiID id, int index);
 bool BezierEditorPreviewRunning(ImGuiID id);
 
+// ---- Layer list ------------------------------------------------------------------------------------
+
+// The rectangle of row `index` of the layer list `listId` (its id hashed in its window) as laid out in
+// the last frame (screen pixels, before scrolling moves it): `part` 0 the whole row, 1 its visibility
+// toggle, 2 its lock toggle. Empty for a row that does not exist. *itemId (may be null) receives the
+// item id of that part for the row whose key is key (LayerItem::id, or the index when that is 0).
+// For tests and demo probes.
+ImRect LayerListRowRect(ImGuiID listId, int index, int part, ImGuiID key = 0, ImGuiID* itemId = nullptr);
+
 // ---- Gradient editor -------------------------------------------------------------------------------
 
 // Where the gradient editor `id` (its label hashed in its window) drew its bar and the marker of stop

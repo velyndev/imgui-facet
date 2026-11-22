@@ -74,18 +74,6 @@ void CanvasCalls()
           [] { PreviewCanvasScope canvas("canvas 2", ImVec2(0.0f, 0.0f)); });
     Check("CanvasElement", Expect::Item, "Element 2", [&] { CHECK_FALSE(CanvasElement("Element 2", &element)); });
     CHECK(elementBefore.Unchanged());
-
-    LayerItem layers[] = {{"Layer 1"}, {"Layer 2", {}, 1, false, true}};
-    const Snapshot layersBefore(layers);
-    int selected = 1;
-    Check("LayerList", Expect::Item, "layers", [&] {
-        const LayerListResult result = LayerList("layers", &selected, layers);
-        CHECK(result.action == LayerAction::None);
-        CHECK(result.index == -1);
-        CHECK_FALSE(result.move.IsValid());
-    });
-    CHECK(selected == 1);
-    CHECK(layersBefore.Unchanged());
 }
 
 void EditorAndCanvasCalls()
