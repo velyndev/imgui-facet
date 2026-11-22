@@ -220,6 +220,8 @@ void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& c
     const float right = facet::demo::ContentRight();
     DrawCaptureField(theme, ctx);
     facet::demo::SameLineIfFits(right, facet::demo::ButtonWidth("Clear"));
+    // The row pushed the width of its control slot; the button keeps the width of its label.
+    ImGui::SetNextItemWidth(facet::demo::ButtonWidth("Clear"));
     if (facet::Button("Clear"))
     {
         page.capture.Clear();

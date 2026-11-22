@@ -10,6 +10,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
 #include "internal/multi_handle.h"
@@ -76,7 +77,10 @@ bool SameLineIfFits(float right, float nextWidth, float spacing)
 
 float ButtonWidth(const char* label)
 {
-    return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    // As facet::Button measures a text label: the paddings around the label in the control text.
+    const internal::ControlMetrics m = internal::GetControlMetrics(ControlSize::Inherit);
+    internal::ControlTextScope text(m);
+    return std::ceil(m.paddingX * 2.0f + ImGui::CalcTextSize(label, nullptr, true).x);
 }
 
 float CheckboxWidth(const char* label)

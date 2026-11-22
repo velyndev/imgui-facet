@@ -120,8 +120,10 @@ void FloatingProbe(PageCtx& ctx, const char* name, const ImRect& rect);
 // otherwise lets the next item start a new row. Returns whether the row continues.
 float ContentRight();
 bool SameLineIfFits(float right, float nextWidth, float spacing = -1.0f);
-// Widths of stock controls for SameLineIfFits.
+// The width of a facet::Button with a text label of the inherited control size, in pixels: for
+// SameLineIfFits, and for ImGui::SetNextItemWidth where a row pushed a wider item width.
 float ButtonWidth(const char* label);
+// The width of a stock checkbox, for SameLineIfFits.
 float CheckboxWidth(const char* label);
 
 // A width option of `units` design units, never more than the room left in the row (also in
