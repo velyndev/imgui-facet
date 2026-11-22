@@ -178,6 +178,7 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         internal::OutlineLook outlineLook;
         outlineLook.hoverAmount = look.hoverAmount;
         outlineLook.disabled = item.disabled;
+        outlineLook.error = message.error;
         if (item.disabled)
         {
             // Disabled: the on track keeps its accent mark at the disabled picture opacity, so on
@@ -199,9 +200,11 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
             trackColor = onT <= 0.0f ? off : (onT >= 1.0f ? onFill : Mix(off, onFill, onT));
         }
         FillRect(drawList, trackRect.Min, trackRect.Max, ToU32(trackColor), radius);
-        // The outline belongs to the off track and fades out as the accent comes in.
+        // The outline belongs to the off track and fades out as the accent comes in; an error keeps
+        // the destructive hairline in both positions.
         const ImVec4 outline = internal::ControlOutlineColor(outlineLook);
-        internal::DrawOutline(drawList, trackRect, radius, WithAlpha(outline, outline.w * (1.0f - onT)));
+        const float outlineShare = message.error ? 1.0f : 1.0f - onT;
+        internal::DrawOutline(drawList, trackRect, radius, WithAlpha(outline, outline.w * outlineShare));
 
         // Knob: a solid disc in the knob token with the controlBorder hairline and the level 1
         // shadow, the same in every size and state; disabled it keeps the disabled picture opacity.

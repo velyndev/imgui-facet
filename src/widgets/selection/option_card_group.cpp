@@ -128,6 +128,8 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
     int focused = -1;
     ImGuiID editor = widgetId;
     float rowTop = gridTop;
+    // An error message turns the outline of every card and mark destructive.
+    const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     for (int r = 0; r < rows; ++r)
     {
         const float rowHeight = RowHeight(cards, layout, r);
@@ -183,8 +185,9 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
             internal::OutlineLook edge;
             edge.hoverAmount = off || item.readOnly ? 0.0f : item.hoverAmount;
             edge.disabled = off;
+            edge.error = message.error;
             const ImVec4 boundary = internal::ControlOutlineColor(edge);
-            const bool accentEdge = !off && !item.readOnly;
+            const bool accentEdge = !off && !item.readOnly && !message.error;
             internal::DrawOutline(drawList, rect, radius, accentEdge ? Mix(boundary, c.focusRing, onAmount) : boundary);
 
             float y = rect.Min.y + layout.padding;
@@ -201,9 +204,9 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
             const float lineHeight = std::max(layout.titleHeight, layout.mark);
             const ImRect markRect = internal::SelectionMarkRect(innerRight - layout.mark, y + lineHeight * 0.5f);
             if (multi)
-                internal::DrawSelectionCheckbox(drawList, markRect, internal::SelectionMark::On, onAmount, item);
+                internal::DrawSelectionCheckbox(drawList, markRect, internal::SelectionMark::On, onAmount, item, message.error);
             else
-                internal::DrawSelectionRadio(drawList, markRect, onAmount, item);
+                internal::DrawSelectionRadio(drawList, markRect, onAmount, item, message.error);
             float right = markRect.Min.x - m.iconGap;
             // The badge: short status text in a pill left of the mark.
             if (card.badge != nullptr && card.badge[0] != '\0')
@@ -304,7 +307,6 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
     }
 
     const ImRect gridRect(origin.x, gridTop, origin.x + width, gridTop + gridHeight);
-    const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     const float bottom = internal::DrawControlMessage(message, ImVec2(origin.x, gridRect.Max.y), width, groupDisabled, widgetId, gridRect);
     window->DC.CursorMaxPos = ImMax(window->DC.CursorMaxPos, ImVec2(gridRect.Max.x, bottom));
     ImGui::EndGroup();

@@ -142,7 +142,7 @@ bool SelectionCheckbox(const char* label, ImGuiID id, SelectionMark* mark, const
         const ImRect boxRect = SelectionMarkRect(item.rect.Min.x, item.rect.GetCenter().y);
         // Fading out, the box keeps the check it had.
         const SelectionMark glyph = result == SelectionMark::Mixed ? SelectionMark::Mixed : SelectionMark::On;
-        DrawSelectionCheckbox(drawList, boxRect, glyph, onAmount, item);
+        DrawSelectionCheckbox(drawList, boxRect, glyph, onAmount, item, message.error || desc.groupError);
         if (hasLabel)
         {
             const float x = boxRect.Max.x + gap;

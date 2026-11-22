@@ -168,13 +168,15 @@ float SelectionCheckboxRadius(const ImRect& box);
 // Mixed fill it with the accent, edged by the accent mark, and draw the check or minus glyph in
 // onAccent, so the mixed state differs from both others by its shape. Read-only keeps an unfilled
 // quiet box and draws the glyph in label. `onAmount` (0 to 1) fades between Off and the mark;
-// `shown` is the glyph faded in or out.
+// `shown` is the glyph faded in or out. `error` turns the outline destructive in every state, at
+// the same hairline width.
 void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMark shown, float onAmount,
-                           const ItemState& item);
+                           const ItemState& item, bool error = false);
 
 // Draws a radio mark: a circle in the checkbox colors; selected, an accent disc with an onAccent dot
-// in the middle (read-only: the quiet circle with a label dot).
-void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount, const ItemState& item);
+// in the middle (read-only: the quiet circle with a label dot). `error` as for the checkbox.
+void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount, const ItemState& item,
+                        bool error = false);
 
 // The animated amount of a mark under `id`: 1 while on, 0 while off, over motion.durationFast.
 float SelectionMarkAmount(ImGuiID id, bool on);
@@ -189,6 +191,7 @@ struct SelectionCheckboxDesc
     bool disabled = false;          // in addition to ImGui::BeginDisabled
     const char* error = nullptr;    // the message line under the box
     const char* helpText = nullptr;
+    bool groupError = false;        // the group around the box shows an error: a destructive outline
 };
 
 // One checkbox item under `id`: the box, then the visible part of `label`; the label is part of

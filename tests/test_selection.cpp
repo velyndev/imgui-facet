@@ -1710,3 +1710,63 @@ TEST_CASE("A chip keeps one outline width when hovered or selected and shows no 
     session.Seconds(settle);
     CHECK(RingVerticesOutside(drawn, chip) > 0);
 }
+
+TEST_CASE("An error turns the one outline of the selection controls and the mode selector destructive")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    static const char* const kItems[] = {"One", "Two"};
+    static const facet::OptionCard kCards[] = {{"First"}, {"Second"}};
+    constexpr int kKinds = 8;
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
+        const ImU32 destructive = facet::ToU32(facet::T().colors.destructive);
+        float height[kKinds] = {};
+        int quiet[kKinds] = {};
+        int flagged[kKinds] = {};
+        int pass = 0;
+        // One pass per run of frames, so every control stays inside the window and is drawn.
+        session.SetUi([&] {
+            const char* error = pass == 1 ? "Placeholder error" : nullptr;
+            int* counts = pass == 1 ? flagged : quiet;
+            bool off = false;
+            bool on = true;
+            int index = 0;
+            bool flags[2] = {false, true};
+            facet::BindMode mode = facet::BindMode::Hold;
+            // Counts the destructive vertices of the control itself: above its message line.
+            const auto measure = [&](int kind, const auto& draw) {
+                const ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const int from = drawList->VtxBuffer.Size;
+                const float top = ImGui::GetCursorScreenPos().y;
+                draw();
+                if (pass == 0)
+                    height[kind] = ImGui::GetItemRectSize().y;
+                int count = 0;
+                for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+                    count += drawList->VtxBuffer[i].col == destructive && drawList->VtxBuffer[i].pos.y < top + height[kind] ? 1 : 0;
+                counts[kind] = count;
+            };
+            measure(0, [&] { facet::Checkbox("Off box", &off, {.error = error}); });
+            measure(1, [&] { facet::Checkbox("On box", &on, {.error = error}); });
+            measure(2, [&] { facet::Toggle("Off switch", &off, {.error = error}); });
+            measure(3, [&] { facet::Toggle("On switch", &on, {.error = error}); });
+            measure(4, [&] { facet::RadioGroup("##radio", &index, kItems, {.error = error}); });
+            measure(5, [&] { facet::CheckboxGroup("##boxes", flags, kItems, {.columns = 1, .error = error}); });
+            measure(6, [&] { facet::KeybindModeSelector("##mode", &mode, {.error = error}); });
+            measure(7, [&] { facet::OptionCardGroup("##cards", &index, kCards, {.columns = 2, .error = error}); });
+        });
+        session.Frames(4);
+        pass = 1;
+        session.Frames(4);
+        for (int kind = 0; kind < kKinds; ++kind)
+        {
+            CAPTURE(kind);
+            CHECK(quiet[kind] == 0);
+            CHECK(flagged[kind] > 0);
+        }
+    }
+}

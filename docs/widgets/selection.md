@@ -42,7 +42,8 @@ after it; returns true on the frame it wrote `*value`.
   arrow cursor. `loading`: a spinner in the knob and no
   input, but it stays a Tab stop. `mixed`: the knob in the middle of a neutral track until the
   first edit, which writes on; after that the toggle shows its value until `mixed` is switched off
-  and on again. `error` replaces `helpText` under the toggle, in destructive with the error icon.
+  and on again. `error` replaces `helpText` under the toggle, in destructive with the error icon, and the
+  track keeps a destructive hairline in both positions.
 - **Sizes and width.** `size` sets the item height (the control height) and the label text; the
   switch keeps the toggle tokens at every size. The default width is the label, spacing.sm and the
   switch. With a set width the label takes the label column (`layout.labelColumn`, at most half the
@@ -76,7 +77,8 @@ hit area. Returns true on the frame it wrote the value.
   ring goes around the box after keyboard input.
 - **States.** Disabled: fill[3] with a labelTertiary glyph, no Tab stop. `readOnly` (or a null
   value pointer): an unfilled quiet box with the glyph in label instead of the accent fill,
-  focusable, never written. `error` replaces `helpText` under the box.
+  focusable, never written. `error` replaces `helpText` under the box and turns its hairline
+  destructive.
 - **Sizes and width.** `size` sets the item height and the label text; the box keeps its token
   size. The default width is the box, spacing.sm and the label; `ImGui::SetNextItemWidth` and
   `PushItemWidth` apply as rule 6 says, and a narrower width cuts the label with an ellipsis and
@@ -109,7 +111,8 @@ part above it. Returns true when any flag was written.
   fill the columns row by row, so the Tab order follows the reading order. Labels that do not fit a
   column are cut with an ellipsis and shown in full on hover and keyboard focus.
 - **States.** `ImGui::BeginDisabled` disables every box. `readOnly`: shown and focusable, never
-  written. `error` replaces `helpText` under the list.
+  written. `error` replaces `helpText` under the list and turns the hairline of every box
+  destructive.
 - **Width.** The available width by default (rule 6).
 
 Status: ready.
@@ -145,7 +148,7 @@ above the group. Returns true on the frame it wrote `*index`; -1 means none is s
 - **States.** `ImGui::BeginDisabled` disables every option. `readOnly` (or a null `index`): the
   selection shows as a label dot in an unfilled quiet circle, the arrows still move the focus,
   nothing is written.
-  `error` replaces `helpText` under the group.
+  `error` replaces `helpText` under the group and turns the hairline of every mark destructive.
 
 Status: ready.
 
@@ -311,7 +314,8 @@ frame it wrote `*mode`.
   text instead, so it never outgrows the row. The dropdown is the lists family's widget and looks
   and works as that widget does.
 - **States.** `readOnly` (or a null `mode`) shows the mode and never writes; `mixed` shows no pill
-  until the first choice; `error` replaces `helpText` under the segments.
+  until the first choice; `error` replaces `helpText` under the segments and turns the hairline
+  of the strip destructive.
 - **Width.** `width` 0 fits the segments, at most the available width; a set width divides it
   into equal segments while they fit.
 
@@ -350,7 +354,7 @@ visible label part above them. Returns true when the index or a flag was written
 - **States.** Disabled cards (`OptionCard::disabled`, or `ImGui::BeginDisabled` for all): fill[3],
   labelTertiary, no Tab stop. `readOnly` (or a null `index`): shown and focusable, never written;
   a selected card takes fill[0] with the quiet hairline and a read-only mark. `error` replaces
-  `helpText` under the grid.
+  `helpText` under the grid and turns the hairline of every card and mark destructive.
 
 Status: ready.
 

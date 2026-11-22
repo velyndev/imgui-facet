@@ -41,29 +41,31 @@ struct MarkColors
     ImVec4 glyph;
 };
 
-MarkColors MarkLook(float onAmount, const ItemState& item)
+MarkColors MarkLook(float onAmount, const ItemState& item, bool error)
 {
     const Colors& c = T().colors;
     MarkColors look;
     if (item.disabled)
     {
         look.fill = c.fill[3];
-        look.outline = c.separator;
+        look.outline = ControlOutlineColor({.disabled = true, .error = error});
         look.glyph = WithAlpha(c.labelTertiary, c.labelTertiary.w * onAmount);
         return look;
     }
     // Off: a quiet box, the neutral control fill and the one controlBorder hairline (stronger under
-    // the pointer). Read-only shows no fill, like a read-only field.
+    // the pointer). Read-only shows no fill, like a read-only field. An error turns the hairline
+    // destructive in every state, as on a field.
     const ImVec4 clear = WithAlpha(c.fill[2], 0.0f);
     const ImVec4 offFill = item.readOnly ? clear : NeutralFill(item);
     OutlineLook outline;
     outline.hoverAmount = item.readOnly ? 0.0f : item.hoverAmount;
+    outline.error = error;
     const ImVec4 offOutline = ControlOutlineColor(outline);
     // On: the accent fill with the accent mark as its edge, the glyph in onAccent. Read-only keeps
     // the quiet box and draws the glyph in label, so a value that cannot change does not claim the
     // accent and no light grey fill appears in the dark theme.
     const ImVec4 onFill = item.readOnly ? clear : StateFill(c.accent, c.accentHover, c.accentPressed, item);
-    const ImVec4 onOutline = item.readOnly ? offOutline : c.focusRing;
+    const ImVec4 onOutline = item.readOnly || error ? offOutline : c.focusRing;
     const ImVec4 glyph = item.readOnly ? c.label : c.onAccent;
     look.fill = onAmount <= 0.0f ? offFill : (onAmount >= 1.0f ? onFill : Mix(offFill, onFill, onAmount));
     look.outline = onAmount <= 0.0f ? offOutline : (onAmount >= 1.0f ? onOutline : Mix(offOutline, onOutline, onAmount));
@@ -144,9 +146,9 @@ float SelectionCheckboxRadius(const ImRect& box)
 }
 
 void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMark shown, float onAmount,
-                           const ItemState& item)
+                           const ItemState& item, bool error)
 {
-    const MarkColors look = MarkLook(onAmount, item);
+    const MarkColors look = MarkLook(onAmount, item, error);
     const float radius = SelectionCheckboxRadius(box);
     FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);
     DrawOutline(drawList, box, radius, look.outline);
@@ -158,9 +160,9 @@ void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMar
     }
 }
 
-void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount, const ItemState& item)
+void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount, const ItemState& item, bool error)
 {
-    const MarkColors look = MarkLook(onAmount, item);
+    const MarkColors look = MarkLook(onAmount, item, error);
     const ImVec2 center = box.GetCenter();
     const float radius = box.GetWidth() * 0.5f;
     FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);

@@ -222,9 +222,10 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
     FillRect(drawList, track.Min, track.Max,
              ToU32(groupDisabled ? c.fill[3] : (readOnly ? WithAlpha(c.fill[2], 0.0f) : c.fill[2])), m.radius);
     // A quiet container: the neutral fill and one controlBorder hairline; the segments inside have
-    // no outline of their own, the selected one shows by its fill.
+    // no outline of their own, the selected one shows by its fill. An error turns it destructive.
     OutlineLook containerEdge;
     containerEdge.disabled = groupDisabled;
+    containerEdge.error = PickControlMessage(desc.error, desc.helpText).error;
     DrawOutline(drawList, track, m.radius, ControlOutlineColor(containerEdge));
     DrawFrontLabel(drawList, front, ImVec2(origin.x, CenteredTextY(origin.y, m.height)), m.size, groupDisabled);
 

@@ -165,7 +165,7 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
         if (entry.visible)
         {
             const ImRect markRect = internal::SelectionMarkRect(rect.Min.x, rect.Min.y + layout.rowHeight * 0.5f);
-            internal::DrawSelectionRadio(drawList, markRect, onAmount, entry);
+            internal::DrawSelectionRadio(drawList, markRect, onAmount, entry, message.error);
             const float x = markRect.Max.x + layout.gap;
             const float room = std::max(0.0f, rect.Max.x - x);
             const char* end = ImGui::FindRenderedTextEnd(item.label);

@@ -74,6 +74,8 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
     if (above.text != nullptr)
         internal::DrawAboveLabel(window->DrawList, above, origin, width, m.size, groupDisabled);
 
+    // An error message turns the outline of every box destructive.
+    const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     bool written = false;
     ImGuiID editor = widgetId;
     const auto boxNext = [&](float boxWidth) {
@@ -103,6 +105,7 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
         desc.size = options.size;
         desc.readOnly = options.readOnly;
         desc.disabled = enabled == 0;
+        desc.groupError = message.error;
         const ImGuiID allId = ImGui::GetIDWithSeed("select all", nullptr, widgetId);
         if (internal::SelectionCheckbox(GetStrings().selectAll, allId, &all, boxNext(width), desc))
         {
@@ -131,6 +134,7 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
         desc.size = options.size;
         desc.readOnly = options.readOnly;
         desc.disabled = !usable(i);
+        desc.groupError = message.error;
         const ImGuiID itemId = internal::SelectionEntryId(widgetId, item.id, i);
         if (internal::SelectionCheckbox(item.label, itemId, hasFlag(i) ? &mark : nullptr, boxNext(columnWidth), desc))
         {
@@ -143,7 +147,6 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
     // The message line under the list.
     window->DC.CursorPos = ImVec2(origin.x, origin.y + height);
     window->DC.CursorMaxPos = ImMax(window->DC.CursorMaxPos, ImVec2(origin.x + width, origin.y + height));
-    const internal::ControlMessage message = internal::PickControlMessage(options.error, options.helpText);
     const float bottom = internal::DrawControlMessage(message, ImVec2(origin.x, origin.y + height), width, groupDisabled,
                                                       widgetId, ImRect(origin, ImVec2(origin.x + width, origin.y + height)));
     window->DC.CursorMaxPos = ImMax(window->DC.CursorMaxPos, ImVec2(origin.x + width, bottom));
