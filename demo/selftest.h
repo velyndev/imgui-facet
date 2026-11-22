@@ -257,6 +257,34 @@ std::vector<std::string> SelftestPageIds();
 // Page ids that registered a second script; the later registration was ignored.
 const std::vector<std::string>& DuplicateSelftestIds();
 
+// Scripts of the app itself (the title bar, the navigation, the theme editor, overlay mode)
+// rather than of one page. Each has a name of its own, starts on the page `startPage` and runs
+// right after that page's script, also when --page selects that page:
+//
+//     FACET_DEMO_APP_SELFTEST("theme-editor", "showcase")
+//     {
+//         test.Click("gallery.editor");
+//         ...
+//     }
+//
+// Result lines name the script "app:<name>". A page may start any number of app scripts.
+struct AppSelftestInfo
+{
+    std::string name;
+    std::string startPage;
+    SelftestFn build = nullptr;
+};
+
+struct AppSelftestRegistrar
+{
+    AppSelftestRegistrar(const char* name, const char* startPage, SelftestFn build);
+};
+
+// The registered app scripts in registration order, and the names registered twice (the later
+// registration was ignored).
+const std::vector<AppSelftestInfo>& AppSelftests();
+const std::vector<std::string>& DuplicateAppSelftestNames();
+
 struct SelftestOptions
 {
     std::string page;  // empty: every page that registered a script
@@ -264,6 +292,7 @@ struct SelftestOptions
     int height = 800;
     float scale = 1.0f;
     ThemeSelection themes = ThemeSelection::Dark;  // Both runs every script once per theme
+    bool overlay = false;  // the gallery starts in overlay mode
 };
 
 // Runs the scripts offscreen on the shell's device. Every result line names the page and
@@ -280,3 +309,12 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options);
         pageId, &FACET_DEMO_CONCAT(FacetDemoSelftest_, __LINE__)};                                 \
     static void FACET_DEMO_CONCAT(FacetDemoSelftest_, __LINE__)(::facet::demo::SelftestScript &   \
                                                                 test)
+
+#define FACET_DEMO_APP_SELFTEST(name, startPage)                                                   \
+    static void FACET_DEMO_CONCAT(FacetDemoAppSelftest_, __LINE__)(::facet::demo::SelftestScript & \
+                                                                   test);                          \
+    static const ::facet::demo::AppSelftestRegistrar FACET_DEMO_CONCAT(                            \
+        facetDemoAppSelftestRegistrar_, __LINE__){                                                 \
+        name, startPage, &FACET_DEMO_CONCAT(FacetDemoAppSelftest_, __LINE__)};                     \
+    static void FACET_DEMO_CONCAT(FacetDemoAppSelftest_, __LINE__)(::facet::demo::SelftestScript & \
+                                                                   test)

@@ -13,6 +13,8 @@
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
 
+#include <facet/widgets/containers.h>
+
 // Declared here because imgui_impl_win32.h keeps the declaration behind #if 0 to avoid
 // pulling windows.h into every user of the header.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
@@ -368,14 +370,6 @@ void AppShell::SetLiveResizeCallback(std::function<void()> callback)
     liveResize = std::move(callback);
 }
 
-void AppShell::SetCaptionRect(float x0, float y0, float x1, float y1)
-{
-    captionRect.left = static_cast<LONG>(x0);
-    captionRect.top = static_cast<LONG>(y0);
-    captionRect.right = static_cast<LONG>(x1);
-    captionRect.bottom = static_cast<LONG>(y1);
-}
-
 // Window commands are posted rather than executed directly: they run after the current
 // frame, so a resize or minimize never starts while ImGui is in the middle of a frame.
 void AppShell::Minimize()
@@ -441,6 +435,30 @@ LRESULT AppShell::HitTest(LPARAM lParam) const
     RECT client = {};
     GetClientRect(hwnd, &client);
 
+    // The app frame answers from its last frame: its resize band, the title bar's free area and
+    // its window buttons. Only the maximize button goes to Windows (HTMAXBUTTON shows the snap
+    // layouts); minimize and close are drawn buttons that take ordinary clicks.
+    if (appFrameHitTest && imguiInput)
+    {
+        switch (facet::AppFrameHitTest(ImVec2(static_cast<float>(point.x), static_cast<float>(point.y))))
+        {
+        case facet::FrameHit::Left: return HTLEFT;
+        case facet::FrameHit::Right: return HTRIGHT;
+        case facet::FrameHit::Top: return HTTOP;
+        case facet::FrameHit::Bottom: return HTBOTTOM;
+        case facet::FrameHit::TopLeft: return HTTOPLEFT;
+        case facet::FrameHit::TopRight: return HTTOPRIGHT;
+        case facet::FrameHit::BottomLeft: return HTBOTTOMLEFT;
+        case facet::FrameHit::BottomRight: return HTBOTTOMRIGHT;
+        case facet::FrameHit::Caption: return captionBlocked ? HTCLIENT : HTCAPTION;
+        case facet::FrameHit::MaximizeButton: return captionBlocked ? HTCLIENT : HTMAXBUTTON;
+        case facet::FrameHit::MinimizeButton:
+        case facet::FrameHit::CloseButton:
+        case facet::FrameHit::Client: return HTCLIENT;
+        }
+        return HTCLIENT;
+    }
+
     if (!IsWindowMaximized())
     {
         const int border = ResizeBorder(dpi);
@@ -465,11 +483,8 @@ LRESULT AppShell::HitTest(LPARAM lParam) const
         if (bottom)
             return HTBOTTOM;
     }
-    if (!captionBlocked && PtInRect(&captionRect, point))
-        return HTCAPTION;
     return HTCLIENT;
 }
-
 LRESULT AppShell::WndProc(UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (imguiInput && ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
@@ -501,6 +516,20 @@ LRESULT AppShell::WndProc(UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_NCHITTEST:
         if (!hidden)
             return HitTest(lParam);
+        break;
+
+    // Over HTMAXBUTTON Windows sends non-client button messages. The Dear ImGui backend turns
+    // the non-client mouse moves into positions but not the buttons: they are passed on here
+    // and kept from DefWindowProc, so the drawn maximize button shows hover and press and
+    // reports its activation. A double click there counts as two clicks.
+    case WM_NCLBUTTONDOWN:
+    case WM_NCLBUTTONDBLCLK:
+    case WM_NCLBUTTONUP:
+        if (wParam == HTMAXBUTTON && imguiInput)
+        {
+            ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, msg != WM_NCLBUTTONUP);
+            return 0;
+        }
         break;
 
     case WM_GETMINMAXINFO:

@@ -29,7 +29,7 @@ Registry& GetRegistry()
 }
 
 // The navigation groups in their fixed order. Other groups follow them.
-constexpr const char* kGroupOrder[] = {"Foundations", "Media", "Blocks", "Widgets"};
+constexpr const char* kGroupOrder[] = {"Start", "Foundations", "Media", "Blocks", "Widgets"};
 
 int GroupRank(const std::string& group)
 {
@@ -158,6 +158,20 @@ bool ValidateRegistry()
         if (FindPage(id) < 0)
         {
             std::fprintf(stderr, "error: selftest script for unknown page id '%s'\n", id.c_str());
+            valid = false;
+        }
+    }
+    for (const std::string& name : DuplicateAppSelftestNames())
+    {
+        std::fprintf(stderr, "error: app selftest '%s' is registered more than once\n", name.c_str());
+        valid = false;
+    }
+    for (const AppSelftestInfo& app : AppSelftests())
+    {
+        if (FindPage(app.startPage) < 0)
+        {
+            std::fprintf(stderr, "error: app selftest '%s' starts on unknown page id '%s'\n", app.name.c_str(),
+                         app.startPage.c_str());
             valid = false;
         }
     }

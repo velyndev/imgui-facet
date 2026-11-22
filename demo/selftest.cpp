@@ -35,6 +35,18 @@ std::vector<std::string>& DuplicateSelftestStorage()
     return duplicates;
 }
 
+std::vector<AppSelftestInfo>& AppSelftestStorage()
+{
+    static std::vector<AppSelftestInfo> scripts;
+    return scripts;
+}
+
+std::vector<std::string>& DuplicateAppSelftestStorage()
+{
+    static std::vector<std::string> duplicates;
+    return duplicates;
+}
+
 ImGuiKeyChord ModifierKeys(ImGuiKeyChord chord)
 {
     return chord & ImGuiMod_Mask_;
@@ -105,12 +117,13 @@ void SetRunClipboard(ImGuiContext*, const char* value)
 class PageRun
 {
 public:
-    PageRun(const PageInfo& pageInfo, int pageIndex, bool dark, float scale, HeadlessSession& headless)
-        : page(pageInfo), session(headless), label(pageInfo.id + " (" + ThemeName(dark) + ")")
+    PageRun(const std::string& name, int pageIndex, bool dark, float scale, bool overlay, HeadlessSession& headless)
+        : session(headless), label(name + " (" + ThemeName(dark) + ")")
     {
         gallery.selectedPage = pageIndex;
         gallery.dark = dark;
         gallery.baseScale = scale;
+        gallery.overlayMode = overlay;
         ctx.probes = &probes;
         // The run's own clipboard: copy and paste in a script never touch the system clipboard.
         ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
@@ -456,7 +469,6 @@ private:
         return ok;
     }
 
-    const PageInfo& page;
     HeadlessSession& session;
     std::string label;  // "<page> (<theme>)" for result lines
     GalleryState gallery;
@@ -813,6 +825,30 @@ const std::vector<std::string>& DuplicateSelftestIds()
     return DuplicateSelftestStorage();
 }
 
+AppSelftestRegistrar::AppSelftestRegistrar(const char* name, const char* startPage, SelftestFn build)
+{
+    std::vector<AppSelftestInfo>& scripts = AppSelftestStorage();
+    for (const AppSelftestInfo& script : scripts)
+    {
+        if (script.name == name)
+        {
+            DuplicateAppSelftestStorage().emplace_back(name);
+            return;
+        }
+    }
+    scripts.push_back({name, startPage, build});
+}
+
+const std::vector<AppSelftestInfo>& AppSelftests()
+{
+    return AppSelftestStorage();
+}
+
+const std::vector<std::string>& DuplicateAppSelftestNames()
+{
+    return DuplicateAppSelftestStorage();
+}
+
 SelftestFn FindSelftest(std::string_view pageId)
 {
     const auto& registry = SelftestRegistry();
@@ -827,26 +863,11 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options)
     int totalFailed = 0;
     int scripts = 0;
 
-    for (int pageIndex = 0; pageIndex < static_cast<int>(pages.size()); ++pageIndex)
-    {
-        const PageInfo& page = pages[static_cast<size_t>(pageIndex)];
-        if (!options.page.empty() && page.id != options.page)
-            continue;
-        const SelftestFn build = FindSelftest(page.id);
-        if (build == nullptr)
-        {
-            if (!options.page.empty())
-            {
-                std::printf("FAIL %s: page has no selftest script\n", page.id.c_str());
-                ++totalFailed;
-            }
-            continue;
-        }
+    // Runs one script once per selected theme, each in a fresh offscreen session.
+    auto runScript = [&](const std::string& name, int pageIndex, SelftestFn build) {
         ++scripts;
-
         SelftestScript script;
         build(script);
-
         for (const bool dark : SelectedThemes(options.themes))
         {
             HeadlessSession session;
@@ -856,12 +877,11 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options)
             headless.scale = options.scale;
             if (!session.Begin(shell, headless))
             {
-                std::printf("FAIL %s (%s): offscreen session could not start\n", page.id.c_str(),
-                            ThemeName(dark));
+                std::printf("FAIL %s (%s): offscreen session could not start\n", name.c_str(), ThemeName(dark));
                 ++totalFailed;
                 continue;
             }
-            PageRun run(page, pageIndex, dark, options.scale, session);
+            PageRun run(name, pageIndex, dark, options.scale, options.overlay, session);
             run.Frames(kWarmupFrames);
             for (const SelftestScript::Step& step : script.Steps())
                 run.Execute(step);
@@ -869,12 +889,36 @@ int RunSelftest(AppShell& shell, const SelftestOptions& options)
             totalFailed += run.failed;
             if (!session.Healthy())
             {
-                std::printf("FAIL %s (%s): a D3D call failed\n", page.id.c_str(), ThemeName(dark));
+                std::printf("FAIL %s (%s): a D3D call failed\n", name.c_str(), ThemeName(dark));
                 ++totalFailed;
             }
         }
-    }
+    };
 
+    for (int pageIndex = 0; pageIndex < static_cast<int>(pages.size()); ++pageIndex)
+    {
+        const PageInfo& page = pages[static_cast<size_t>(pageIndex)];
+        if (!options.page.empty() && page.id != options.page)
+            continue;
+        const SelftestFn build = FindSelftest(page.id);
+        bool appScripts = false;
+        for (const AppSelftestInfo& app : AppSelftests())
+            appScripts = appScripts || app.startPage == page.id;
+        if (build == nullptr && !appScripts)
+        {
+            if (!options.page.empty())
+            {
+                std::printf("FAIL %s: page has no selftest script\n", page.id.c_str());
+                ++totalFailed;
+            }
+            continue;
+        }
+        if (build != nullptr)
+            runScript(page.id, pageIndex, build);
+        for (const AppSelftestInfo& app : AppSelftests())
+            if (app.startPage == page.id)
+                runScript("app:" + app.name, pageIndex, app.build);
+    }
     if (!options.page.empty() && FindPage(options.page) < 0)
     {
         std::printf("FAIL %s: no page with this id\n", options.page.c_str());

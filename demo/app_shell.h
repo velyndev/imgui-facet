@@ -25,7 +25,10 @@ struct ShellDesc
 //
 // The visible window has no system title bar or frame but keeps the WS_OVERLAPPEDWINDOW
 // style bits, so Windows still provides resizing from the edges, dragging, snapping,
-// minimize and maximize animations. The UI marks its drag strip with SetCaptionRect.
+// minimize and maximize animations. While the UI draws an app frame, the window answers its
+// hit test with facet::AppFrameHitTest: the title bar's free area drags the window (a double
+// click maximizes), its maximize button shows the system's snap layouts, and the frame's resize
+// band resizes it. Otherwise the window's own band along the edges resizes it.
 class AppShell
 {
 public:
@@ -50,13 +53,13 @@ public:
     // rendering while the user drags an edge. Never called while a frame is in progress.
     void SetLiveResizeCallback(std::function<void()> callback);
 
-    // Drag region in client pixels for the current frame. Mouse presses inside it move the
-    // window; double-clicks maximize. Set an empty rect to disable.
-    void SetCaptionRect(float x0, float y0, float x1, float y1);
+    // Whether the UI drew an app frame this frame, so the hit test asks facet::AppFrameHitTest.
+    void SetAppFrameHitTest(bool enabled) { appFrameHitTest = enabled; }
 
-    // While blocked, the drag region is ignored and every click inside it reaches the UI.
-    // The UI blocks it on frames where a popup is open or another window covers the strip
-    // under the mouse, so the strip never swallows a click meant for that window.
+    // While blocked, the title bar's drag region and maximize button are answered as client
+    // area, so every click there reaches the UI. The UI blocks them on frames where a popup is
+    // open or another window covers the bar under the mouse, so the bar never swallows a click
+    // meant for that window.
     void SetCaptionBlocked(bool blocked) { captionBlocked = blocked; }
 
     // Forwards window messages to the Dear ImGui Win32 backend. Enable only after
@@ -119,7 +122,7 @@ private:
     UINT bufferHeight = 0;
     UINT pendingWidth = 0;
     UINT pendingHeight = 0;
-    RECT captionRect = {};
+    bool appFrameHitTest = false;
     bool captionBlocked = false;
     std::function<void()> liveResize;
 };

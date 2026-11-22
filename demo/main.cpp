@@ -1,9 +1,11 @@
 // facet_demo: gallery application for Facet.
 //
-//   facet_demo [--page id] [--theme light|dark] [--warp]      interactive window
+//   facet_demo [--page id] [--theme light|dark] [--overlay] [--warp]      interactive window
 //   facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N]
-//              [--theme light|dark|both] [--warp]
-//   facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]
+//              [--theme light|dark|both] [--overlay] [--warp]
+//   facet_demo --capture <dir> --matrix --page id [--frames N] [--theme light|dark|both] [--warp]
+//   facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both]
+//              [--overlay] [--warp]
 //   facet_demo --list-pages
 //
 // An option that the chosen mode does not use is an error, so a typo in a script never
@@ -60,6 +62,8 @@ struct Options
     std::string page;
     ThemeSelection theme = ThemeSelection::Both;
     bool warp = false;
+    bool overlay = false;  // start in overlay mode
+    bool matrix = false;   // capture: the size matrix
     bool help = false;
     bool listPages = false;
 
@@ -85,10 +89,12 @@ void PrintUsage()
 {
     std::printf(
         "usage:\n"
-        "  facet_demo [--page id] [--theme light|dark] [--warp]\n"
+        "  facet_demo [--page id] [--theme light|dark] [--overlay] [--warp]\n"
         "  facet_demo --capture <dir> [--size WxH] [--scale S] [--page id] [--frames N]\n"
-        "             [--theme light|dark|both] [--warp]\n"
-        "  facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--warp]\n"
+        "             [--theme light|dark|both] [--overlay] [--warp]\n"
+        "  facet_demo --capture <dir> --matrix --page id [--frames N] [--theme light|dark|both] [--warp]\n"
+        "  facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both]\n"
+        "             [--overlay] [--warp]\n"
         "  facet_demo --list-pages\n"
         "\n"
         "  --capture <dir>  render every page state offscreen and write PNG files and index.json\n"
@@ -98,6 +104,10 @@ void PrintUsage()
         "  --page id        only this page (interactive: the page shown first)\n"
         "  --frames N       capture: warm-up frames per page state before readback (default 60)\n"
         "  --theme T        light, dark or both (default: both for capture, dark otherwise)\n"
+        "  --overlay        overlay mode: the gallery floats as a shell over a generated backdrop\n"
+        "  --matrix         capture: 900x600, 1280x800 and 1920x1200 at scales 1, 1.5 and 2, in app\n"
+        "                   and overlay mode, into one folder (needs --page; not with --size, --scale\n"
+        "                   or --overlay)\n"
         "  --warp           render with the WARP software rasterizer\n"
         "  --list-pages     print the registered page ids and capture states\n"
         "\n"
@@ -149,7 +159,8 @@ bool ValidateForMode(Options& options)
     if (options.listPages)
     {
         const bool extra = options.mode != Mode::Interactive || options.sawSize || options.sawScale ||
-                           options.sawFrames || options.sawPage || options.sawTheme || options.warp;
+                           options.sawFrames || options.sawPage || options.sawTheme || options.warp ||
+                           options.overlay || options.matrix;
         if (extra)
         {
             std::fprintf(stderr, "error: --list-pages takes no other options\n");
@@ -164,7 +175,7 @@ bool ValidateForMode(Options& options)
     {
         const char* name = "the interactive window";
         if (Reject(options.sawSize, "--size", name) || Reject(options.sawScale, "--scale", name) ||
-            Reject(options.sawFrames, "--frames", name))
+            Reject(options.sawFrames, "--frames", name) || Reject(options.matrix, "--matrix", name))
             return false;
         if (!options.sawTheme)
             options.theme = ThemeSelection::Dark;
@@ -176,9 +187,21 @@ bool ValidateForMode(Options& options)
         return true;
     }
     case Mode::Capture:
+        if (options.matrix)
+        {
+            const char* name = "--matrix (it sets the sizes, scales and modes itself)";
+            if (Reject(options.sawSize, "--size", name) || Reject(options.sawScale, "--scale", name) ||
+                Reject(options.overlay, "--overlay", name))
+                return false;
+            if (!options.sawPage)
+            {
+                std::fprintf(stderr, "error: --matrix needs --page: it captures one page at 18 sizes and modes\n");
+                return false;
+            }
+        }
         return true;
     case Mode::Selftest:
-        if (Reject(options.sawFrames, "--frames", "--selftest"))
+        if (Reject(options.sawFrames, "--frames", "--selftest") || Reject(options.matrix, "--matrix", "--selftest"))
             return false;
         if (!options.sawTheme)
             options.theme = ThemeSelection::Dark;
@@ -282,6 +305,14 @@ bool ParseOptions(int argc, wchar_t** argv, Options& options)
         {
             options.warp = true;
         }
+        else if (arg == L"--overlay")
+        {
+            options.overlay = true;
+        }
+        else if (arg == L"--matrix")
+        {
+            options.matrix = true;
+        }
         else if (arg == L"--list-pages")
         {
             options.listPages = true;
@@ -323,6 +354,7 @@ int RunInteractive(const Options& options)
 {
     GalleryState gallery;
     gallery.dark = options.theme == ThemeSelection::Dark;
+    gallery.overlayMode = options.overlay;
     if (!options.page.empty())
     {
         gallery.selectedPage = FindPage(options.page);
@@ -414,6 +446,8 @@ int RunOffscreen(const Options& options)
         capture.page = options.page;
         capture.warmupFrames = options.warmupFrames;
         capture.themes = options.theme;
+        capture.overlay = options.overlay;
+        capture.matrix = options.matrix;
         result = RunCapture(shell, capture);
     }
     else
@@ -424,6 +458,7 @@ int RunOffscreen(const Options& options)
         selftest.height = options.height;
         selftest.scale = options.scale;
         selftest.themes = options.theme;
+        selftest.overlay = options.overlay;
         result = RunSelftest(shell, selftest);
     }
     shell.Destroy();

@@ -30,12 +30,26 @@ namespace facet::demo
 namespace
 {
 
+// One size, scale and mode of a capture run.
+struct CaptureConfig
+{
+    int width = 1280;
+    int height = 800;
+    float scale = 1.0f;
+    bool overlay = false;
+};
+
+// The size matrix of --matrix.
+constexpr int kMatrixSizes[][2] = {{900, 600}, {1280, 800}, {1920, 1200}};
+constexpr float kMatrixScales[] = {1.0f, 1.5f, 2.0f};
+
 struct CapturedFile
 {
     std::string page;
     std::string state;
     std::string theme;
     std::string file;
+    CaptureConfig config;
 };
 
 std::string FormatScale(float scale)
@@ -89,6 +103,7 @@ bool WriteIndex(const std::filesystem::path& path, const CaptureOptions& options
     out << "  \"width\": " << options.width << ",\n";
     out << "  \"height\": " << options.height << ",\n";
     out << "  \"scale\": " << FormatScale(options.scale) << ",\n";
+    out << "  \"matrix\": " << (options.matrix ? "true" : "false") << ",\n";
     out << "  \"themes\": [";
     const std::vector<bool> themes = SelectedThemes(options.themes);
     for (size_t i = 0; i < themes.size(); ++i)
@@ -100,7 +115,10 @@ bool WriteIndex(const std::filesystem::path& path, const CaptureOptions& options
         out << (i == 0 ? "\n" : ",\n");
         out << "    {\"page\": " << JsonString(files[i].page) << ", \"state\": "
             << JsonString(files[i].state) << ", \"theme\": " << JsonString(files[i].theme)
-            << ", \"file\": " << JsonString(files[i].file) << "}";
+            << ", \"width\": " << files[i].config.width << ", \"height\": " << files[i].config.height
+            << ", \"scale\": " << FormatScale(files[i].config.scale) << ", \"mode\": "
+            << JsonString(files[i].config.overlay ? "overlay" : "app") << ", \"file\": " << JsonString(files[i].file)
+            << "}";
     }
     out << (files.empty() ? "]\n" : "\n  ]\n");
     out << "}\n";
@@ -109,21 +127,22 @@ bool WriteIndex(const std::filesystem::path& path, const CaptureOptions& options
 
 // Renders one page state in one theme in a fresh offscreen session and writes the PNG.
 // Prints the reason and returns false on failure.
-bool CaptureOne(AppShell& shell, const CaptureOptions& options, int pageIndex, int stateIndex, bool dark,
-                const std::string& fileName, std::vector<unsigned char>& pixels)
+bool CaptureOne(AppShell& shell, const CaptureOptions& options, const CaptureConfig& config, int pageIndex,
+                int stateIndex, bool dark, const std::string& fileName, std::vector<unsigned char>& pixels)
 {
     HeadlessSession session;
     HeadlessOptions headless;
-    headless.width = options.width;
-    headless.height = options.height;
-    headless.scale = options.scale;
+    headless.width = config.width;
+    headless.height = config.height;
+    headless.scale = config.scale;
     if (!session.Begin(shell, headless))
         return false;
 
     GalleryState gallery;
     gallery.selectedPage = pageIndex;
     gallery.dark = dark;
-    gallery.baseScale = options.scale;
+    gallery.baseScale = config.scale;
+    gallery.overlayMode = config.overlay;
     PageCtx ctx;
     ctx.capture = true;
     ctx.captureState = stateIndex;
@@ -145,8 +164,8 @@ bool CaptureOne(AppShell& shell, const CaptureOptions& options, int pageIndex, i
         std::fprintf(stderr, "error: readback failed for %s\n", fileName.c_str());
         return false;
     }
-    const int stride = options.width * 4;
-    if (stbi_write_png(pathText.c_str(), options.width, options.height, 4, pixels.data(), stride) == 0)
+    const int stride = config.width * 4;
+    if (stbi_write_png(pathText.c_str(), config.width, config.height, 4, pixels.data(), stride) == 0)
     {
         std::fprintf(stderr, "error: cannot write %s\n", pathText.c_str());
         return false;
@@ -183,28 +202,47 @@ int RunCapture(AppShell& shell, const CaptureOptions& options)
         return 1;
     }
 
-    const std::string suffix = "__" + std::to_string(options.width) + "x" +
-                               std::to_string(options.height) + "@" + FormatScale(options.scale);
+    std::vector<CaptureConfig> configs;
+    if (options.matrix)
+    {
+        for (const bool overlay : {false, true})
+            for (const auto& size : kMatrixSizes)
+                for (const float scale : kMatrixScales)
+                    configs.push_back({size[0], size[1], scale, overlay});
+    }
+    else
+    {
+        configs.push_back({options.width, options.height, options.scale, options.overlay});
+    }
+
     std::vector<CapturedFile> written;
     bool ok = true;
     std::vector<unsigned char> pixels;
 
-    for (const int pageIndex : selected)
+    for (const CaptureConfig& config : configs)
     {
-        const PageInfo& page = pages[static_cast<size_t>(pageIndex)];
-        for (int stateIndex = 0; stateIndex < static_cast<int>(page.states.size()); ++stateIndex)
+        std::string suffix = "__" + std::to_string(config.width) + "x" + std::to_string(config.height) + "@" +
+                             FormatScale(config.scale);
+        if (options.matrix || config.overlay)
+            suffix += config.overlay ? "__overlay" : "__app";
+        for (const int pageIndex : selected)
         {
-            for (const bool dark : SelectedThemes(options.themes))
+            const PageInfo& page = pages[static_cast<size_t>(pageIndex)];
+            for (int stateIndex = 0; stateIndex < static_cast<int>(page.states.size()); ++stateIndex)
             {
-                CapturedFile file;
-                file.page = page.id;
-                file.state = page.states[static_cast<size_t>(stateIndex)];
-                file.theme = ThemeName(dark);
-                file.file = file.page + "__" + file.state + "__" + file.theme + suffix + ".png";
-                if (CaptureOne(shell, options, pageIndex, stateIndex, dark, file.file, pixels))
-                    written.push_back(std::move(file));
-                else
-                    ok = false;
+                for (const bool dark : SelectedThemes(options.themes))
+                {
+                    CapturedFile file;
+                    file.page = page.id;
+                    file.state = page.states[static_cast<size_t>(stateIndex)];
+                    file.theme = ThemeName(dark);
+                    file.config = config;
+                    file.file = file.page + "__" + file.state + "__" + file.theme + suffix + ".png";
+                    if (CaptureOne(shell, options, config, pageIndex, stateIndex, dark, file.file, pixels))
+                        written.push_back(std::move(file));
+                    else
+                        ok = false;
+                }
             }
         }
     }
