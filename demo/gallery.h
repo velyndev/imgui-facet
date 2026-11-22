@@ -58,6 +58,7 @@ struct GalleryState
     bool editsHeld = false;     // a layout slider was being dragged in the last frame
     std::array<bool, kThemeEditGroupCount> editorTokensOpen = {};  // the "Each token" disclosures
     float uiScaleDrag = -1.0f;  // the UI scale shown while its slider is dragged; -1 while not
+    ImGuiID uiScaleDragOwner = 0;  // the scale control being dragged
 
     // Overlay mode: the gallery floats as a shell over the generated backdrop. The overlay
     // controller shows and hides it; the backdrop moves unless motion is reduced or paused.

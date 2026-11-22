@@ -112,7 +112,7 @@ bool ThemeEditorTokenGroup(GalleryState& state, PageCtx& ctx, ThemeEditGroup gro
     ctx.Probe(name);
     if (tokensOpen)
     {
-        const Theme base = ThemeEditorPreset(state.appliedDark);
+        const Theme& base = ThemeEditorPreset(state.appliedDark);
         for (int i = 0; i < kThemeEditTokenCount; ++i)
         {
             const ThemeEditToken& token = ThemeEditTokens()[static_cast<std::size_t>(i)];
@@ -146,27 +146,41 @@ bool ThemeEditorTokenGroup(GalleryState& state, PageCtx& ctx, ThemeEditGroup gro
 
 } // namespace
 
-Theme ThemeEditorPreset(bool dark)
+const Theme& ThemeEditorPreset(bool dark)
 {
-    return dark ? Theme::Dark() : Theme::Light();
+    // Built once: the presets do not change while the app runs.
+    static const Theme light = Theme::Light();
+    static const Theme darkPreset = Theme::Dark();
+    return dark ? darkPreset : light;
 }
 
 void GalleryUiScaleControl(GalleryState& state, const char* label, float widthUnits)
 {
-    float scale = state.uiScaleDrag >= 0.0f ? state.uiScaleDrag : state.uiScale;
+    // Two controls show the scale (the title bar and the editor); the one being dragged owns the
+    // value shown during the drag and applies it on release.
+    const ImGuiID id = ImGui::GetID(label);
+    const bool owner = state.uiScaleDragOwner == id;
+    float scale = owner && state.uiScaleDrag >= 0.0f ? state.uiScaleDrag : state.uiScale;
     facet::UiScaleControlOptions options;
     options.apply = false;
     options.width = widthUnits;
     const bool written = facet::UiScaleControl(label, &scale, kUiScaleMin, kUiScaleMax, options);
     const bool active = ImGui::IsItemActive();
     if (written && active)
-        state.uiScaleDrag = scale;
-    else if (written)
-        state.uiScale = scale;
-    if (!active && state.uiScaleDrag >= 0.0f)
     {
-        state.uiScale = state.uiScaleDrag;
+        state.uiScaleDrag = scale;
+        state.uiScaleDragOwner = id;
+    }
+    else if (written)
+    {
+        state.uiScale = scale;
+    }
+    if (!active && owner)
+    {
+        if (state.uiScaleDrag >= 0.0f)
+            state.uiScale = state.uiScaleDrag;
         state.uiScaleDrag = -1.0f;
+        state.uiScaleDragOwner = 0;
     }
 }
 
@@ -280,6 +294,7 @@ void DrawThemeEditor(GalleryState& state, PageCtx& ctx)
         state.edits = ThemeEdits{};
         state.uiScale = 1.0f;
         state.uiScaleDrag = -1.0f;
+        state.uiScaleDragOwner = 0;
     }
     ImGui::EndDisabled();
     ctx.Probe("editor.reset-all");

@@ -11,7 +11,7 @@ namespace facet::demo
 {
 
 // The preset the edits apply to: Theme::Dark() or Theme::Light().
-Theme ThemeEditorPreset(bool dark);
+const Theme& ThemeEditorPreset(bool dark);
 
 // The title of the editor pane; its id is fixed ("###theme-editor").
 inline constexpr const char* kThemeEditorTitle = "Theme editor###theme-editor";

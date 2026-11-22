@@ -408,6 +408,8 @@ void AppState(PageCtx& ctx)
     {
         gallery->overlayMode = true;
         gallery->overlayVisible = true;
+        if (ctx.captureFramesLeft == 0 && gallery->shellMax.x <= gallery->shellMin.x)
+            ctx.captureError = "the overlay shell did not show";
     }
     if (state == kSearch)
         page.search = "key";
