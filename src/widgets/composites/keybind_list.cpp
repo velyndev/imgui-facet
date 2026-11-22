@@ -55,6 +55,8 @@ constexpr int kKeybindListLoadingRows = 3;
 constexpr float kKeybindListSkeletonShare = 0.6f;
 // The narrowest chord column, in control heights, before the columns stop shrinking.
 constexpr float kKeybindListMinColumnControls = 2.5f;
+// The error and empty states take the height of this many rows.
+constexpr float kKeybindListStateRows = 2.0f;
 
 // One row as the list shows it.
 struct KeybindListRow
@@ -324,7 +326,7 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
         }
         else if (options.state == DataState::Error)
         {
-            const ImRect rect(rowsOrigin, ImVec2(rowsOrigin.x + width, rowsOrigin.y + rowHeight * 2.0f));
+            const ImRect rect(rowsOrigin, ImVec2(rowsOrigin.x + width, rowsOrigin.y + rowHeight * kKeybindListStateRows));
             internal::DrawListState(rect, DataState::Error, nullptr, options.errorText);
             ImGui::Dummy(ImVec2(width, rect.GetHeight()));
         }
@@ -443,7 +445,7 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
             if (shown == 0)
             {
                 const ImVec2 at = ImGui::GetCursorScreenPos();
-                const ImRect rect(at, ImVec2(at.x + width, at.y + rowHeight * 2.0f));
+                const ImRect rect(at, ImVec2(at.x + width, at.y + rowHeight * kKeybindListStateRows));
                 const char* empty = options.emptyText != nullptr ? options.emptyText : (filtering ? s.noResults : s.empty);
                 internal::DrawListState(rect, DataState::Ready, empty, nullptr);
                 ImGui::Dummy(ImVec2(width, rect.GetHeight()));

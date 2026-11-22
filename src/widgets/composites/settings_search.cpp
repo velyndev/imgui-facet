@@ -48,6 +48,9 @@ namespace
 constexpr int kSettingsSearchDepth = 4;
 // The animation store sub key of the reveal highlight under the search id.
 constexpr int kSettingsSearchFlashSub = 1;
+// Where a revealed row comes to rest: this share of the visible height from the top, so the rows
+// before it stay in sight as context.
+constexpr float kSettingsSearchRevealRatio = 0.25f;
 
 struct SettingsSearchCount
 {
@@ -277,7 +280,7 @@ bool SettingsSearchMatch(const char* label, const SettingsSearchMatchOptions& op
         const ImRect visible = window->InnerClipRect;
         const float lineHeight = ImGui::GetFrameHeight();
         if (top < visible.Min.y || top + lineHeight > visible.Max.y)
-            ImGui::SetScrollHereY(0.25f);
+            ImGui::SetScrollHereY(internal::kSettingsSearchRevealRatio);
     }
     active.rowWindow = window;
     active.rowId = rowId;
