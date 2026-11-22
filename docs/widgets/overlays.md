@@ -11,6 +11,13 @@ flipped to the other side where there is no room, then moved into the display), 
 the focus that moves in and comes back, the open and close motion (at once under reduced motion),
 the scrim and the surfaces.
 
+Every floating layer (menu, popover, dialog, drawer, tooltip, toast, command palette, loading card,
+unsaved changes bar) is its elevated surface with one `separator` hairline along its edge. In the
+dark theme the elevated levels are near-black greys a step above the page, so the lighter grey and
+the hairline show the layer's height where a shadow cannot darken black; no edge is a light grey.
+Rows in menus and in the command palette follow the row look of the lists: `fill[2]` under the
+pointer or on the current row, and the focus ring inside the row only after the keys moved there.
+
 How layers open and how results come back:
 
 - Layers the caller opens (`BeginModal`, `ConfirmDialog`, `BeginPopover`, `BeginDrawer`,
