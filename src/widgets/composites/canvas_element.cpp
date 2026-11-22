@@ -3,7 +3,7 @@
 //
 // The box is one item and Tab stop: a press selects it and starts a move, the arrows move it by one
 // reference pixel, Shift by ten; with `resizable`, Ctrl with the arrows moves its right or bottom edge
-// (Shift: ten). Escape during a move or resize puts it back. While selected, a resizable element shows
+// (Shift: ten). Escape during a move or resize puts it back: the caller's state as it was, exactly. While selected, a resizable element shows
 // eight handles (corners and edge middles, composites.canvasHandleSize, each grown to the minimum hit
 // target) that resize it like the edges and corners of the BoxRangePad, and `anchorPicker` shows a
 // 3 x 3 anchor control beside it; choosing a cell keeps the element where it is and changes its anchor
@@ -53,6 +53,7 @@ struct CanvasElementDragState
 {
     int part = -1;          // the part a mouse drag holds: 0 the box, 1 to 8 a handle; -1 none
     ImRect start;           // the element when the drag began, reference pixels
+    facet::CanvasElementState startValue;  // the caller's state then, which Escape writes back unchanged
     ImVec2 pressMouse;
     ImRect rects[1 + kCanvasHandles + kCanvasCells];  // the parts of the last frame, screen pixels
     ImGuiID ids[1 + kCanvasHandles + kCanvasCells] = {};
@@ -192,6 +193,7 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
     const bool selected = *canvas->selected == id || Has(item.forced, internal::ForcedItemState::Focused) ||
                           Has(item.forced, internal::ForcedItemState::Dragging);
     bool written = false;
+    bool restored = false;  // Escape ended a drag: the state at its start is written back as it was
 
     // A mouse drag of the box.
     if (real && !readOnly && item.active && io.MouseDown[ImGuiMouseButton_Left])
@@ -200,6 +202,7 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
         {
             state.part = 0;
             state.start = rect;
+            state.startValue = value;
             state.pressMouse = io.MousePos;
         }
     }
@@ -240,6 +243,7 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
         {
             state.part = 1 + k;
             state.start = rect;
+            state.startValue = value;
             state.pressMouse = io.MousePos;
         }
     }
@@ -301,10 +305,18 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, activePartId))
         {
             moved = state.start;
+            restored = true;
             state.part = -1;
             ImGui::ClearActiveID();
         }
-        if (moved.Min.x != rect.Min.x || moved.Min.y != rect.Min.y || moved.Max.x != rect.Max.x || moved.Max.y != rect.Max.y)
+        if (restored)
+        {
+            const facet::CanvasElementState& s = state.startValue;
+            rect = moved;
+            written = s.anchor != value.anchor || s.offset.x != value.offset.x || s.offset.y != value.offset.y ||
+                      s.extent.x != value.extent.x || s.extent.y != value.extent.y;
+        }
+        else if (moved.Min.x != rect.Min.x || moved.Min.y != rect.Min.y || moved.Max.x != rect.Max.x || moved.Max.y != rect.Max.y)
         {
             rect = moved;
             written = true;
@@ -396,8 +408,14 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
             state.rects[1 + kCanvasHandles + k] = ImRect();
     }
 
-    // Write back: the anchor and offset that put the element at `rect`.
-    if (written && !readOnly && element != nullptr)
+    // Write back: the state the drag began with after Escape (exactly, not recomputed from `rect`),
+    // else the anchor and offset that put the element at `rect`.
+    if (written && !readOnly && element != nullptr && restored)
+    {
+        *element = state.startValue;
+        box = toScreen(rect);
+    }
+    else if (written && !readOnly && element != nullptr)
     {
         const CanvasAnchor anchor = static_cast<CanvasAnchor>(anchorCell);
         element->anchor = anchor;

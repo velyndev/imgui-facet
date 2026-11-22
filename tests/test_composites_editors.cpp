@@ -1223,6 +1223,34 @@ TEST_CASE("Canvas element: one larger than the canvas moves, Escape puts a drag 
     CHECK(ui.element.offset.x == 100.0f);
 }
 
+TEST_CASE("Canvas element: Escape writes back the state the drag began with, exactly")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    ui.reference = {1920.0f, 1080.0f};
+    // Values the anchor arithmetic does not reproduce to the last bit.
+    const facet::CanvasElementState start{facet::CanvasAnchor::Center, {149.556335f, -199.394348f}, {751.422424f, 405.211304f}};
+    ui.element = start;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImVec2 from = ui.Part(0).GetCenter();
+    session.KeyDown(ImGuiMod_Alt);
+    session.MouseMove(from);
+    session.MouseDown();
+    session.MouseMove(ImVec2(from.x - 23.0f, from.y + 7.0f));
+    session.MouseMove(ImVec2(from.x - 41.0f, from.y + 13.0f));
+    REQUIRE(ui.element.offset.x != start.offset.x);
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK(ui.element.anchor == start.anchor);
+    CHECK(ui.element.offset.x == start.offset.x);
+    CHECK(ui.element.offset.y == start.offset.y);
+    CHECK(ui.element.extent.x == start.extent.x);
+    CHECK(ui.element.extent.y == start.extent.y);
+}
+
 TEST_CASE("Preview canvas: an empty reference size draws an empty canvas without elements")
 {
     facet::test::Session session;
