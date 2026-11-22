@@ -36,6 +36,7 @@
 #include "internal/scroll.h"
 #include "internal/state_storage.h"
 #include "widgets/composites/cards_look.h"
+#include "widgets/layout/layout_internal.h"
 
 namespace facet
 {
@@ -216,6 +217,8 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
         ForceNextItemState(forced.state & ~ForcedItemState::Dragging, forced.part);
     if (BeginItemGrid(id, count, selected != nullptr ? &state.selection : nullptr, grid))
     {
+        // The tile look draws each slot's outline; the grid adds only the fills under it.
+        ItemGridOwnerDrawsTiles();
         ImGuiWindow* area = ImGui::GetCurrentWindow();
         ImDrawList* drawList = area->DrawList;
         DragDropInfo drag;

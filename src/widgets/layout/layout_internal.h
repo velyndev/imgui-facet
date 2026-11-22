@@ -98,6 +98,13 @@ const LayoutDividerRecord& LastSplitViewDivider();
 // none (also beside a collapsed panel, where only the hairline is drawn).
 LayoutDividerRecord LastPanelsDivider(int index);
 
+// ---- Item grid ------------------------------------------------------------------------------------
+
+// Called after BeginItemGrid returned true by a widget that draws each tile's outline itself (the
+// inventory grid): the row block then draws the hover and selection fills but not the selected
+// tile's accent outline, so a selected tile keeps one outline.
+void ItemGridOwnerDrawsTiles();
+
 // ---- Settings row ---------------------------------------------------------------------------------
 
 // The layout of the settings row ended last (valid until the next EndSettingsRow), for tests.

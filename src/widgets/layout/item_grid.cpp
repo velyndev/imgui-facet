@@ -10,7 +10,7 @@
 // cost of a frame does not grow with the tile count.
 //
 // Every tile runs through the row block of the list view (ListRowGroup): the hover fill, the
-// selection fill (accentSubtle), the focus ring inside the
+// selected tile look (the accentSubtle fill and the accent hairline), the focus ring inside the
 // tile after keyboard input only, and activation by a double click or Enter. With a selection the
 // tiles live in ImGui::BeginMultiSelect with two-dimensional box selection: click, Ctrl, Shift,
 // Ctrl+A and Escape as in every Facet list, and the arrows move in two dimensions and wrap at the
@@ -68,6 +68,7 @@ struct ItemGridEntry
     double top = 0.0;               // y of line 0, in double precision
     int last = -2;                  // the tile started last
     int tabStop = 0;
+    bool ownerDrawsTiles = false;   // ItemGridOwnerDrawsTiles: the row block draws only the fills
     ImGuiSelectionBasicStorage* selection = nullptr;
     internal::ForcedItemRequest forced;
     internal::ListRowGroup group;
@@ -234,6 +235,9 @@ bool ItemGridTile(int index)
     }
     desc.tabStop = index == e.tabStop;
     desc.part = index;
+    // A selected tile: accentSubtle and the accent hairline (DESIGN.md, Quiet layers). An owner that
+    // draws its own tile outline keeps the fill only, so the tile never shows two outlines.
+    desc.tile = !e.ownerDrawsTiles;
     const internal::ListRowState row = e.group.Row(ItemGridTileId(e, index), rect, desc);
     if (row.focused)
         internal::GetState<ItemGridMemory>(e.id).focusIndex = index;
@@ -264,6 +268,13 @@ namespace internal
 void ClearItemGridStack()
 {
     Grids().depth = 0;
+}
+
+void ItemGridOwnerDrawsTiles()
+{
+    ItemGridStack& stack = Grids();
+    if (stack.depth > 0)
+        stack.entries[stack.depth - 1].ownerDrawsTiles = true;
 }
 
 } // namespace internal

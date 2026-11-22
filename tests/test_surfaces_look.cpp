@@ -230,7 +230,7 @@ TEST_CASE("Navigation look: a sidebar item shows no ring after a click and an in
     CHECK(ring.Max.y <= first.Max.y + 0.5f);
 }
 
-TEST_CASE("Layout look: a tile selected by a click shows the selection fill and no ring")
+TEST_CASE("Layout look: a tile selected by a click shows the selected tile look and no ring")
 {
     SurfacesLookGuard guard;
     facet::test::Session session;
@@ -261,8 +261,14 @@ TEST_CASE("Layout look: a tile selected by a click shows the selection fill and 
     session.Frames(3);
     REQUIRE(selection.Contains(0));
     CHECK(ColorCount(facet::ToU32(facet::T().colors.accentSubtle), true) > 0);
-    // The selection shows by its fill; the pointer draws nothing in the accent.
-    CHECK(ColorCount(RingColor(), false) == 0);
+    // The accent outline of the selected tile, and nothing more in the accent: it lies within the
+    // tile (a ring outside would reach past it), one hairline wide along each edge.
+    REQUIRE(ColorCount(RingColor(), false) > 0);
+    const ImRect accent = ColorBounds(RingColor());
+    CHECK(accent.Min.x >= tile.Min.x - 0.5f);
+    CHECK(accent.Max.x <= tile.Max.x + 0.5f);
+    CHECK(accent.Min.y >= tile.Min.y - 0.5f);
+    CHECK(accent.Max.y <= tile.Max.y + 0.5f);
 }
 
 TEST_CASE("Containers look: the inspector pane edge keeps its width under the pointer")
