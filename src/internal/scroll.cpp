@@ -591,7 +591,14 @@ void ScrollAreaRevealRect(ImGuiWindow* window, const ImRect& rect, ScrollAlign a
                 wanted = hi - view - pad;
             break;
         }
-        wanted = std::clamp(wanted, 0.0f, std::max(0.0f, window->ScrollMax[axis]));
+        const float scrollMax = std::max(0.0f, window->ScrollMax[axis]);
+        // Within one padding of an end the area goes to that end: the padding holds no content, and
+        // far down a very long content the float positions there are off by a pixel or two.
+        if (wanted <= pad)
+            wanted = 0.0f;
+        else if (wanted >= scrollMax - pad)
+            wanted = scrollMax;
+        wanted = std::clamp(wanted, 0.0f, scrollMax);
         if (std::fabs(wanted - current) >= 0.5f)
             target[axis] = wanted;
         const float shift = window->Scroll[axis] - (target[axis] >= 0.0f ? wanted : current);
