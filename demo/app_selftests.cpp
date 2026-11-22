@@ -286,6 +286,20 @@ FACET_DEMO_APP_SELFTEST("overlay", "showcase")
     test.WaitSeconds(0.5f);
     test.Expect("F9 shows it again", [] { return Gallery().overlayVisible; });
 
+    // The backdrop moves, and stands still while motion is reduced.
+    static double backdrop = 0.0;
+    test.Do([] { backdrop = Gallery().backdropTime; });
+    test.Wait(5);
+    test.Expect("the backdrop moves", [] { return Gallery().backdropTime > backdrop; });
+    test.Do([] { Gallery().edits.reduceMotion = true; });
+    test.Wait(2);
+    test.Do([] { backdrop = Gallery().backdropTime; });
+    test.Wait(5);
+    test.Expect("the backdrop stands still while motion is reduced",
+                [] { return facet::ReduceMotion() && Gallery().backdropTime == backdrop; });
+    test.Do([] { Gallery().edits.reduceMotion = false; });
+    test.Wait(2);
+
     // Resize at the edges and a corner; the opposite edges stay.
     static ImVec2 before;
     static ImVec2 size;

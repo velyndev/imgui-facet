@@ -547,7 +547,8 @@ void DrawOverlayMode(GalleryState& state, PageCtx& ctx, AppShell* shell)
         shell->SetCaptionBlocked(true);
     }
     const facet::Theme& t = facet::T();
-    if (!state.backdropPaused && !t.motion.reduceMotion)
+    // facet::ReduceMotion() covers the theme token and the system animation setting.
+    if (!state.backdropPaused && !facet::ReduceMotion())
         state.backdropTime += static_cast<double>(ImGui::GetIO().DeltaTime);
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     DrawOverlayBackdrop(ImGui::GetBackgroundDrawList(), viewport->Pos,
