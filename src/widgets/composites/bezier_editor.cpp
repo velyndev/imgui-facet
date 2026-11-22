@@ -206,11 +206,16 @@ bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptio
     {
         // The first and the second control point, side by side while each keeps room for its two
         // fields, else one under the other.
+        // Each pair is labelled in front with its Strings name (control.h), so the label column
+        // counts in the room a pair needs.
         const float gap = Px(t.spacing.sm);
-        const bool sideBySide = width >= Px(t.layout.minRowControl) * 2.0f + gap;
+        const bool sideBySide = width >= Px(t.layout.labelColumn + t.layout.minRowControl) * 2.0f + gap;
         const float fieldWidth = sideBySide ? std::floor((width - gap) * 0.5f) : width;
         for (int i = 0; i < 2; ++i)
         {
+            char fieldLabel[96];
+            ImFormatString(fieldLabel, sizeof(fieldLabel), "%s###p%d",
+                           i == 0 ? strings.controlPoint1 : strings.controlPoint2, i + 1);
             if (i == 1 && sideBySide)
                 ImGui::SameLine(0.0f, gap);
             ImVec2 edited = *controls[i];
@@ -221,7 +226,7 @@ bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptio
             fields.max = options.allowOvershoot ? yMax : 1.0;
             fields.speed = 0.01;
             fields.readOnly = readOnly;
-            if (VectorInput(i == 0 ? "##p1" : "##p2", &edited, fields) && !readOnly)
+            if (VectorInput(fieldLabel, &edited, fields) && !readOnly)
             {
                 edited.x = std::clamp(edited.x, 0.0f, 1.0f);
                 edited.y = std::clamp(edited.y, static_cast<float>(yMin), static_cast<float>(yMax));

@@ -819,6 +819,8 @@ Composites, editors and canvas:
   picker edits.
 - **Gradient stops dragged off the editor** fade to 35 % before they go, so the removal is visible
   before the release.
+- **Easing number fields** carry the control point's name in front (Strings::controlPoint1 and
+  controlPoint2), so the four numbers say which point they move, not only by their order.
 - **Curve and easing editors** draw their curve in the first chart series color and their points
   in the slider knob look: the curve is data, the points are controls.
 - **Layer toggles** are glyphs alone in labelSecondary (a set lock in label), named by their

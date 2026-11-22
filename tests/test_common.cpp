@@ -148,7 +148,8 @@ TEST_CASE("SetStrings copies the table and keeps English for null members")
     CHECK(std::strcmp(facet::GetStrings().bindToggle, "Toggle") == 0);
     CHECK(std::strcmp(facet::GetStrings().framesPerSecond, "fps") == 0);
     CHECK(std::strcmp(facet::GetStrings().seconds, "s") == 0);
-    CHECK(std::strcmp(facet::GetStrings().anchorBottomRight, "Bottom right") == 0);  // the last member
+    CHECK(std::strcmp(facet::GetStrings().anchorBottomRight, "Bottom right") == 0);
+    CHECK(std::strcmp(facet::GetStrings().controlPoint2, "Point 2") == 0);  // the last member
     facet::SetStrings(facet::Strings{});
     CHECK(std::strcmp(facet::GetStrings().cancel, "Cancel") == 0);
 }

@@ -882,6 +882,36 @@ TEST_CASE("Bezier editor: read-only shows the curve and writes nothing")
     CHECK(ui.writes == 0);
 }
 
+TEST_CASE("Bezier editor: the number fields carry the Strings names of the control points")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Strings strings;
+    strings.controlPoint1 = "A control point name far longer than the label column";
+    facet::SetStrings(strings);
+    facet::CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
+    ImGuiID fieldId = 0;
+    ImRect widget;
+    bool tooltip = false;
+    session.SetUi([&] {
+        const ImGuiID id = ImGui::GetID("Easing");
+        facet::BezierEditor("Easing", &curve, {.presets = false, .preview = false, .width = 600.0f});
+        widget = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        ImGui::PushOverrideID(id);
+        fieldId = ImGui::GetID("###p1");
+        ImGui::PopID();
+        tooltip = facet::internal::IsPopupLevelOpen(facet::internal::PopupTooltipLevel(fieldId));
+    });
+    session.Frames(2);
+    // The first pair sits at the start of the last line, its label in front: a cut label shows
+    // its full text over the label.
+    const float line = facet::ControlHeight(facet::ControlSize::Regular);
+    session.MouseMove(ImVec2(widget.Min.x + facet::Px(20.0f), widget.Max.y - line * 0.5f));
+    session.Seconds(facet::T().overlay.tooltipDelay + 0.2f);
+    CHECK(tooltip);
+    facet::SetStrings(facet::Strings{});
+}
+
 TEST_CASE("Bezier editor: a shown editor allocates nothing per frame")
 {
     facet::test::Session session;

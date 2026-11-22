@@ -11,8 +11,8 @@
 //
 // Size: the columns are options.columns, or as many slots as the width allows; the tiles keep the
 // slot size and shrink only when the width is too small for one column. The height is the rows the
-// slots need, at most the visible height of the window the grid is in; further rows scroll inside
-// the grid. While a keyboard drag is in progress the line above and below the visible tiles are
+// slots need, at most options.height or, without it, the visible height of the window the grid is
+// in; further rows scroll inside the grid. While a keyboard drag is in progress the line above and below the visible tiles are
 // drop zones too, so the drag can move on into rows scrolled out of view.
 
 #include "facet/widgets/composites.h"
@@ -170,6 +170,9 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
     float cap = window->InnerRect.GetHeight();
     if (cap < oneRow)
         cap = std::max(Px(t.metrics.panelHeight), oneRow);
+    // A set height bounds the grid instead, at least one row.
+    if (options.height > 0.0f)
+        cap = std::max(oneRow, std::round(Px(options.height)));
     l.size.y = std::max(oneRow, std::min(l.size.y, std::floor(cap)));
     // The empty and the error state take the whole width for their line of text.
     if (count == 0 || options.state == DataState::Error)

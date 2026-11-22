@@ -385,6 +385,8 @@ struct Strings
     const char* anchorBottomLeft = "Bottom left";  // (since 0.1)
     const char* anchorBottom = "Bottom";  // (since 0.1)
     const char* anchorBottomRight = "Bottom right";  // (since 0.1)
+    const char* controlPoint1 = "Point 1";  // BezierEditor number fields of the first control point (since 0.1)
+    const char* controlPoint2 = "Point 2";  // and of the second (since 0.1)
 };
 
 // Replaces the table. Every string is copied; a null member keeps the English default.

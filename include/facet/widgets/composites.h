@@ -91,7 +91,7 @@ struct BezierEditorOptions
 {
     bool presets = true;                   // a menu of common easings
     bool allowOvershoot = false;           // control point y may leave 0 to 1
-    bool numericFields = true;             // the four numbers as fields under the graph
+    bool numericFields = true;             // the four numbers as fields under the graph, labelled Strings::controlPoint1 and Strings::controlPoint2
     bool preview = true;                   // a dot runs the curve once after each edit; not with reduced motion
     float width = 0.0f;                    // units; 0 fills the available width
     float height = 0.0f;                   // units; 0 for the editor height default
@@ -477,6 +477,7 @@ struct InventoryGridOptions
     const char* emptyText = nullptr;       // shown for 0 slots; null uses Strings::empty
     const char* errorText = nullptr;       // null uses Strings::loadFailed
     float width = 0.0f;                    // units; 0 fills the available width
+    float height = 0.0f;                   // units; the rows the slots need, at most this (at least one row), the rest scroll inside; 0: at most the visible height of the window (since 0.1)
     bool readOnly = false;
 };
 

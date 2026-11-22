@@ -256,6 +256,31 @@ TEST_CASE("Inventory grid: the columns fit the width, reflow when it changes, an
     CHECK(session.ItemRect("grid").GetWidth() == doctest::Approx(40.0f));
 }
 
+TEST_CASE("Inventory grid: a set height bounds the grid and the rows scroll inside it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    bag.options.columns = 2;
+    bag.width = 600.0f;
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    // Three rows of two: the rows the slots need.
+    const float full = session.ItemRect("grid").GetHeight();
+    CHECK(full > 2.0f * 68.0f);
+    // A height of one and a half rows bounds it; a height above the rows changes nothing.
+    bag.options.height = 100.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(facet::Px(100.0f)));
+    bag.options.height = 2000.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetHeight() == doctest::Approx(full));
+    // Below one row it keeps one row.
+    bag.options.height = 10.0f;
+    session.Frames(2);
+    CHECK(session.ItemRect("grid").GetHeight() >= 64.0f);
+}
+
 TEST_CASE("Inventory grid: no slots show the empty state, one slot is one tile")
 {
     facet::test::Session session;

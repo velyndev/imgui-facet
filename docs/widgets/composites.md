@@ -44,7 +44,8 @@ thousand slots cost what a screenful costs. The columns are `options.columns`, o
 `slotSize` (0: `metrics.slotSize`) as the width (`options.width`, 0 the available width) holds,
 never more than there are slots, and the grid is as wide as its columns; the tiles
 keep the slot size and shrink only when the set columns do not fit. The grid is as tall as its
-rows, at most the visible height of the window it is in; further rows scroll inside it.
+rows, at most `height` units (at least one row) or, while `height` is 0, the visible height of the
+window it is in; further rows scroll inside it.
 
 Each tile shows the item's image with the loading and failed states of the media family (or its
 icon), the count, a lock chip, the cooldown as a pie in `scrim`, the category bar (`tint`,
@@ -590,8 +591,9 @@ hairlines at 0 and 1, and the points may go anywhere in it.
 Under the canvas, `presets` adds a `Dropdown` of the common easings (`Strings::easeLinear`, `ease`,
 `easeIn`, `easeOut`, `easeInOut`; it shows `Strings::presets` while the curve is none of them), and
 `numericFields` adds the four numbers as two `VectorInput` fields, the first control point and the
-second, side by side while each has room and one under the other when narrow. Their axis labels are
-the default X and Y; the fields do not name which control point they belong to (their order does).
+second, side by side while each has room and one under the other when narrow. Each pair is labelled
+in front with `Strings::controlPoint1` and `Strings::controlPoint2`; their axis labels are the
+default X and Y.
 After each edit `preview` runs a dot along the curve once (`composites.easingPreviewTime` times
 `motion.scale`); with reduced motion there is no dot. `readOnly` lets the points and fields take
 the focus and writes nothing. The label is the tooltip on hover and keyboard focus. Status: ready.
@@ -809,7 +811,3 @@ if (r.action == facet::LayerAction::Moved)
   beside the bar.
 - **PresetList reordering**: moving a preset by keyboard, reported as a move in
   `PresetListResult`.
-- **InventoryGrid height**: an option that bounds the height of a large grid; today the grid is at
-  most the visible height of its window.
-- **Easing control point names**: `Strings` members that name the two control points of
-  `BezierEditor`, so its number fields carry a label.
