@@ -133,7 +133,7 @@ enum class FrameHit
 // The region under `point` (pixels, main viewport coordinates) in the app frame of the last
 // frame: title bars report their free area as Caption and their window buttons as buttons,
 // the resize band reports the edges and corners, everything else is Client. Client before
-// the first BeginAppFrame.
+// the first BeginAppFrame, and where another window (a popup, a tooltip) covered the point.
 FrameHit AppFrameHitTest(ImVec2 point);
 // The minimum and maximum size of the last BeginAppFrame in pixels at the current scale, for
 // the host's size limits; {0, 0} where none was set.

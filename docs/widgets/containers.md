@@ -91,7 +91,9 @@ so the widget gallery does not show it; the example below has the host code.
   along each edge; with `hostMaximized` there is no band. Inside a title bar of the frame the window
   buttons report `MinimizeButton`, `MaximizeButton` and `CloseButton`, the caller's items `Client`
   and the free area `Caption`; everything else is `Client`, also outside the frame and before its
-  first frame.
+  first frame. A point that another window (a popup, a tooltip, a floating window) covered in the
+  last frame is `Client` too, also in the resize band, so the drag region and the band never take a
+  click meant for that window.
 - **Size limits.** `AppFrameMinSize` and `AppFrameMaxSize` return `minSize` and `maxSize` of the last
   frame in pixels at the current scale, {0, 0} where none was set.
 - **Placement.** `SaveAppFramePlacement` stores a `FramePlacement` under the id (hashed alone) in

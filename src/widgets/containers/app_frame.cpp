@@ -55,6 +55,30 @@ AppFrameRecords& Records()
     return records;
 }
 
+// Whether the topmost window at `point` in the last frame belongs to another root window than
+// the app frame: a popup, a tooltip or a floating window there takes the click, so the host's
+// drag region or window buttons must not swallow it. Dear ImGui keeps its windows in display
+// order, back to front. Between frames a window's Active flag still holds the last frame; inside
+// a frame that is WasActive.
+bool AppFrameCoveredAt(ImGuiID frameWindow, ImVec2 point)
+{
+    const ImGuiContext* g = GImGui;
+    if (g == nullptr)
+        return false;
+    for (int i = g->Windows.Size - 1; i >= 0; --i)
+    {
+        const ImGuiWindow* window = g->Windows[i];
+        const bool shown = g->WithinFrameScope ? window->WasActive : window->Active;
+        if (!shown || window->Hidden || window->IsFallbackWindow || (window->Flags & ImGuiWindowFlags_NoMouseInputs) != 0)
+            continue;
+        if (!window->OuterRectClipped.Contains(point))
+            continue;
+        const ImGuiWindow* root = window->RootWindow != nullptr ? window->RootWindow : window;
+        return root->ID != frameWindow;
+    }
+    return false;
+}
+
 // The placement of the host window, saved in the ini file.
 struct FramePlacementState
 {
@@ -179,6 +203,9 @@ FrameHit AppFrameHitTest(ImVec2 point)
 {
     const AppFrameRecord& frame = Records().previous;
     if (!frame.valid || !frame.rect.Contains(point))
+        return FrameHit::Client;
+    // Another window over the point takes it, also over the resize band.
+    if (AppFrameCoveredAt(frame.window, point))
         return FrameHit::Client;
     // The resize band: corners reach twice the band along each edge, so they are easy to hit.
     const ImRect& r = frame.rect;

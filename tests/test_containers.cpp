@@ -1776,6 +1776,36 @@ TEST_CASE("An app frame fills the viewport and answers the host's hit test")
     CHECK(probe.pressed == facet::WindowButton::Maximize);
 }
 
+TEST_CASE("The app frame hit test gives a point under another window to the client")
+{
+    facet::test::Session session({.window = false});
+    REQUIRE(session.Ready());
+    AppFrameProbe probe;
+    bool over = true;
+    ImRect cover;
+    session.SetUi([&] {
+        probe.Draw(session);
+        if (!over)
+            return;
+        // A floating window over the start of the caption.
+        ImGui::SetNextWindowPos(ImVec2(100.0f, 0.0f));
+        ImGui::SetNextWindowSize(ImVec2(200.0f, 120.0f));
+        ImGui::Begin("over", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        cover = ImGui::GetCurrentWindow()->Rect();
+        ImGui::End();
+    });
+    session.Frames(3);
+    REQUIRE(probe.shown);
+    using facet::FrameHit;
+    const float y = probe.bar.GetCenter().y;
+    REQUIRE(cover.Contains(ImVec2(200.0f, y)));
+    CHECK(facet::AppFrameHitTest(ImVec2(200.0f, y)) == FrameHit::Client);
+    CHECK(facet::AppFrameHitTest(ImVec2(500.0f, y)) == FrameHit::Caption);  // beside the window
+    over = false;
+    session.Frames(2);
+    CHECK(facet::AppFrameHitTest(ImVec2(200.0f, y)) == FrameHit::Caption);
+}
+
 TEST_CASE("An app frame stays behind other windows and is skipped while the viewport has no area")
 {
     {
