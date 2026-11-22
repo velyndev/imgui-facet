@@ -811,6 +811,9 @@ Composites, editors and canvas:
 - **Canvas snap guides and the selected element's outline** use focusRing, which reaches 3:1 on
   every surface; the center lines and the dashed safe area frame are labelTertiary because they
   are reference lines, not controls.
+- **Canvas screen** keeps the window background with a hairline in the control boundary color,
+  so the area elements are dragged in has a 3:1 edge; its grid stays in separator so it does not
+  compete with the elements.
 
 ## Effects
 

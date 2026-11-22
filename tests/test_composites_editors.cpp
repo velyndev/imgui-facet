@@ -1104,6 +1104,28 @@ struct CanvasUi
 
 } // namespace
 
+TEST_CASE("Preview canvas: the screen edge is drawn in the control boundary color")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const ImU32 boundary = facet::ToU32(facet::ControlBoundaryColor(facet::T().colors));
+    const ImU32 separator = facet::ToU32(facet::T().colors.separator);
+    REQUIRE(boundary != separator);
+    int boundaryVertices = 0;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        facet::BeginPreviewCanvas("edge canvas", {1000.0f, 500.0f}, {.gridSpacing = 100.0f, .width = 500.0f});
+        facet::EndPreviewCanvas();
+        boundaryVertices = 0;
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+            boundaryVertices += drawList->VtxBuffer[i].col == boundary ? 1 : 0;
+    });
+    session.Frames(2);
+    // A canvas without elements: only the screen edge uses the boundary color.
+    CHECK(boundaryVertices > 0);
+}
+
 TEST_CASE("Canvas element: a drag moves it in reference pixels and snaps to the canvas center")
 {
     facet::test::Session session;

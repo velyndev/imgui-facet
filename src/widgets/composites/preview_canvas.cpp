@@ -1,6 +1,7 @@
 // BeginPreviewCanvas and EndPreviewCanvas (facet/widgets/composites.h): a letterboxed preview of a
 // screen of `referenceSize` reference pixels, scaled to fit the widget. The bands around the screen
-// are fill[3]; the screen is the window background with a hairline, the optional grid every
+// are fill[3]; the screen is the window background with a hairline in the control boundary color
+// (ControlBoundaryColor, 3:1 like every control edge), the optional grid every
 // gridSpacing reference pixels in the separator color, and the optional safe area as a dashed frame
 // (media.dashLength and dashGap) in labelTertiary. Canvas elements (canvas_element.cpp) are
 // submitted between Begin and End; End draws, on top of them, the center guides while one is moved
@@ -175,7 +176,9 @@ void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanva
                                   ImVec2(std::round(screen.Max.x - inset.x), std::round(screen.Max.y - inset.y)));
                 PreviewCanvasDashedRect(drawList, safe, Px(t.media.dashLength), Px(t.media.dashGap), ToU32(c.labelTertiary));
             }
-            StrokeRect(drawList, screen.Min, screen.Max, ToU32(c.separator), 0.0f, HairlineThickness());
+            // The screen edge bounds the area elements are dragged in, so it takes the control boundary
+            // color (3:1 on the window background); the grid inside stays in separator.
+            StrokeRect(drawList, screen.Min, screen.Max, ToU32(ControlBoundaryColor(c)), 0.0f, HairlineThickness());
         }
     }
 
