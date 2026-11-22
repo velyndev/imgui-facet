@@ -318,7 +318,9 @@ bool PopupPointerAimsAt(const ImRect& target);
 //   - A mouse button press hides it until the pointer leaves the item; a key press hides it until
 //     the pointer moves again.
 //   - An item with visible keyboard focus (focusVisible) shows its tooltip below the item after
-//     the same delay.
+//     the same delay; so does an item reported hovered while the pointer is not over it (a forced
+//     capture state).
+//   - An item outside its window's clip rectangle shows none.
 //   - One tooltip at a time; it never takes focus or input.
 // maxWidth: pixels where its text wraps; 0 for overlay.tooltipMaxWidth.
 [[nodiscard]] bool BeginPopupTooltip(ImGuiID itemId, const ImRect& itemRect, bool hovered, bool focusVisible,
