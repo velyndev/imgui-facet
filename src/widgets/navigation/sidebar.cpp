@@ -177,6 +177,9 @@ bool BeginSidebar(const char* id, const SidebarOptions& options)
     entry.window = column;
     GetState<SidebarState>(sidebarId).roving.BeginFrame();
     entry.pill.Begin(sidebarId, column->DrawList, ImVec2(column->Pos.x - column->Scroll.x, column->Pos.y - column->Scroll.y));
+    // The caller owns the selection: when it moves it to an item above the selected one, no item
+    // is selected in the frame of the click, and the pill has to stay put to slide from there.
+    entry.pill.HoldThroughGap();
     // Rows sit flush, one list row apart, as in a list; the pill and the hover fill keep to their row.
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));
     return true;

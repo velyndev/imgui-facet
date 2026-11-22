@@ -31,6 +31,12 @@
 // that moves the selected entry (a resize) is followed by the spring. A group without a target
 // in a frame draws no pill; when a target appears again, the pill starts on it (nothing slides
 // in from a stale place). State is kept per group id in the widget state storage.
+//
+// A group whose caller owns the selection and tells each entry whether it is selected can have a
+// frame without a target although the selection only moved: the caller switches it in the middle
+// of the frame, after it submitted the newly selected entry (as not selected yet) and before it
+// submits the one that was selected. HoldThroughGap keeps the pill in place for that frame, so
+// it slides to an entry earlier in the group as it does to a later one.
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -54,6 +60,10 @@ public:
     void Begin(ImGuiID groupId, ImDrawList* drawList, ImVec2 origin);
     // The rectangle (screen pixels) of the selected entry this frame. The last call wins.
     void Target(const ImRect& rect);
+    // Any time between Begin and End: when no entry is the target in this frame, the pill stays on
+    // the target of the frame before and slides from there once a target is back. It bridges one
+    // frame; after a second frame without a target the pill is gone and starts over.
+    void HoldThroughGap();
     // Draws the pill behind the entries in `color` with corner `radius` (pixels), and merges
     // the draw list. Returns the rectangle drawn (empty when there was no target).
     ImRect End(ImU32 color, float radius);
@@ -70,6 +80,7 @@ private:
     ImVec2 origin_;
     ImRect target_;
     bool hasTarget_ = false;
+    bool hold_ = false;
     bool open_ = false;
     bool moving_ = false;
     ImRect drawn_;

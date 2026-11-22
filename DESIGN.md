@@ -249,7 +249,9 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   the ring is visible with every accent preset and every custom accent.
 - **Selection pill motion.** The leading edge uses the standard spring at 0.7 of its response,
   so the pill stretches slightly and settles; it animates relative to the group's content so
-  scrolling never animates it.
+  scrolling never animates it. It slides the same way in both directions: where the caller owns
+  the selection (the sidebar), the pill stays in place through the one frame in which no entry is
+  marked, so a move to an earlier entry does not start over on it.
 - **Selection pill label.** The selected entry's label is semibold, because the pill tint is
   soft by design and selection must not rest on color alone.
 - **Row labels.** Labels in the control's text style on the control text baseline, so label

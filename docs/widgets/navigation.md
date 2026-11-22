@@ -42,7 +42,9 @@ A navigation column on the `bgSecondary` surface with the card radius.
   sits on the icon's top-right corner and the label is the tooltip on hover and keyboard focus. The
   item the caller marks `selected` sits on the selection pill (`accentSubtle`, label in semibold),
   which slides to the next selected item with the spring of `SegmentedControl`, across sections.
-  `SidebarItem` returns true on a click, Enter or Space; the caller then selects it.
+  `SidebarItem` returns true on a click, Enter or Space; the caller then selects it. It may do so
+  at once, in the same loop: the pill slides to an item above the selected one too, although no
+  item is marked `selected` in that frame.
 - **Sections.** A header in Footnote and `labelSecondary`. With `collapsible` the header is a row
   of its own with a chevron, in the roving order with the items: a click, Enter or Space toggles it,
   Left closes and Right opens it; the open state starts at `defaultOpen` and is kept under the

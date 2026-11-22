@@ -484,6 +484,71 @@ TEST_CASE("Sidebar items are one Tab stop, Up and Down move the focus and Enter 
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
 
+TEST_CASE("The sidebar pill slides to an item above the selected one as it does to one below")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int page = 0;
+    std::vector<float> centers;  // the pill's vertical center, frame by frame
+    session.SetUi([&] {
+        if (facet::BeginSidebar("nav", {.mode = facet::SidebarMode::Expanded, .height = 300.0f}))
+        {
+            const ImDrawList* column = ImGui::GetWindowDrawList();
+            // The caller owns the selection and switches it in the middle of the frame.
+            for (int i = 0; i < 5; ++i)
+            {
+                char label[16];
+                std::snprintf(label, sizeof(label), "Page %d", i + 1);
+                if (facet::SidebarItem(label, facet::Icon("list"), {.selected = page == i}))
+                    page = i;
+                session.Track(label);
+            }
+            facet::EndSidebar();
+            const ImU32 subtle = facet::ToU32(facet::T().colors.accentSubtle);
+            ImRect pill(ImVec2(FLT_MAX, FLT_MAX), ImVec2(-FLT_MAX, -FLT_MAX));
+            bool drawn = false;
+            for (const ImDrawVert& vertex : column->VtxBuffer)
+            {
+                if (vertex.col != subtle)
+                    continue;
+                pill.Add(vertex.pos);
+                drawn = true;
+            }
+            centers.push_back(drawn ? pill.GetCenter().y : -1.0f);
+        }
+    });
+    session.Frames(2);
+    const float first = session.ItemRect("Page 1").GetCenter().y;
+    const float last = session.ItemRect("Page 5").GetCenter().y;
+    REQUIRE(last > first + 40.0f);
+    REQUIRE(centers.back() == doctest::Approx(first).epsilon(0.01));
+    // In every frame from the click on, the pill is drawn, and it passes the rows in between.
+    const auto slides = [&] {
+        bool between = false;
+        for (const float center : centers)
+        {
+            if (center < 0.0f)
+                return false;
+            between = between || (center > first + 8.0f && center < last - 8.0f);
+        }
+        return between;
+    };
+
+    centers.clear();
+    session.Click(session.ItemCenter("Page 5"));
+    REQUIRE(page == 4);
+    session.Seconds(1.0f);
+    CHECK(slides());
+    CHECK(centers.back() == doctest::Approx(last).epsilon(0.01));
+
+    centers.clear();
+    session.Click(session.ItemCenter("Page 1"));
+    REQUIRE(page == 0);
+    session.Seconds(1.0f);
+    CHECK(slides());
+    CHECK(centers.back() == doctest::Approx(first).epsilon(0.01));
+}
+
 TEST_CASE("A sidebar scrolls the item the arrow keys move the focus to into view")
 {
     facet::test::Session session;

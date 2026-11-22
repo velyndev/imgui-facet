@@ -27,7 +27,8 @@ struct PillState
 {
     ImRect target;          // relative to the origin
     bool hasTarget = false; // a target was given in the last frame that had a pill
-    int lastFrame = -1;     // the frame of the last End with a target
+    int lastFrame = -1;     // the frame of the last End that drew the pill
+    bool held = false;      // that frame had no target: the pill was held in place (HoldThroughGap)
     int generation = 0;     // new sub keys when the pill starts over, so it starts on its target
     float directionX = 0.0f;
     float directionY = 0.0f;
@@ -68,6 +69,7 @@ void SelectionPill::Begin(ImGuiID groupId, ImDrawList* drawList, ImVec2 origin)
     drawList_ = drawList;
     origin_ = origin;
     hasTarget_ = false;
+    hold_ = false;
     open_ = true;
     splitter_ = nullptr;
     SplitterPool& pool = Pool();
@@ -83,6 +85,11 @@ void SelectionPill::Target(const ImRect& rect)
 {
     target_ = rect;
     hasTarget_ = true;
+}
+
+void SelectionPill::HoldThroughGap()
+{
+    hold_ = true;
 }
 
 void PushPillLabelStyle(TextStyle style, bool selected)
@@ -107,11 +114,15 @@ ImRect SelectionPill::End(ImU32 color, float radius)
 
     PillState& state = GetState<PillState>(id_);
     const int frame = ImGui::GetFrameCount();
-    if (hasTarget_ && drawList_ != nullptr)
+    // A held pill bridges one frame without a target: it stays where the frame before left it.
+    const bool held = !hasTarget_ && hold_ && state.hasTarget && state.lastFrame == frame - 1 && !state.held;
+    if ((hasTarget_ || held) && drawList_ != nullptr)
     {
-        const ImRect target(target_.Min.x - origin_.x, target_.Min.y - origin_.y, target_.Max.x - origin_.x,
-                            target_.Max.y - origin_.y);
-        // A pill that had no target in the previous frame starts on the new one.
+        const ImRect target = held ? state.target
+                                   : ImRect(target_.Min.x - origin_.x, target_.Min.y - origin_.y,
+                                            target_.Max.x - origin_.x, target_.Max.y - origin_.y);
+        state.held = held;
+        // A pill that was not drawn in the previous frame starts on the new target.
         if (!state.hasTarget || state.lastFrame != frame - 1)
         {
             state.generation = (state.generation + 1) % kGenerations;

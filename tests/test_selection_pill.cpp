@@ -44,6 +44,7 @@ struct PillProbe
 {
     int selected = 0;
     bool target = true;
+    bool hold = false;
     ImVec2 origin = ImVec2(100.0f, 100.0f);
     ImRect drawn;
     bool moving = false;
@@ -55,6 +56,8 @@ struct PillProbe
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         SelectionPill pill;
         pill.Begin(ImGui::GetID("group"), drawList, origin);
+        if (hold)
+            pill.HoldThroughGap();
         for (int i = 0; i < 3; ++i)
         {
             const ImRect entry = Entry(origin, i);
@@ -186,6 +189,53 @@ TEST_CASE("Selection pill: no target draws nothing, and a returning target start
     probe.selected = 2;
     session.Frame();
     CHECK(Same(probe.drawn, Entry(probe.origin, 2)));
+}
+
+TEST_CASE("Selection pill: a held pill bridges one frame without a target and slides on from there")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    PillProbe probe;
+    probe.hold = true;
+    probe.selected = 2;
+    session.SetUi([&] { probe.Ui(); });
+    session.Frames(2);
+    REQUIRE(Same(probe.drawn, Entry(probe.origin, 2)));
+    // The frame in which a caller moves the selection to an earlier entry has no target.
+    probe.target = false;
+    session.Frame();
+    CHECK(probe.pillVertex >= 0);
+    CHECK(Same(probe.drawn, Entry(probe.origin, 2)));
+    // The target is back on the first entry: the pill slides there instead of starting on it.
+    probe.target = true;
+    probe.selected = 0;
+    session.Frame();
+    CHECK(probe.moving);
+    CHECK(probe.drawn.Max.x > Entry(probe.origin, 0).Max.x + 1.0f);
+    bool between = false;
+    for (int frame = 0; frame < 120; ++frame)
+    {
+        session.Frame();
+        const float x = probe.drawn.Max.x;
+        between = between || (x > Entry(probe.origin, 0).Max.x + 1.0f && x < Entry(probe.origin, 2).Max.x - 1.0f);
+    }
+    CHECK(between);
+    CHECK(Same(probe.drawn, Entry(probe.origin, 0)));
+    CHECK_FALSE(probe.moving);
+
+    // Two frames without a target: the pill is gone after the first, and starts over in place.
+    probe.target = false;
+    session.Frame();
+    CHECK(probe.pillVertex >= 0);
+    session.Frame();
+    CHECK(probe.pillVertex < 0);
+    CHECK(probe.drawn.GetWidth() == 0.0f);
+    probe.target = true;
+    probe.selected = 2;
+    session.Frame();
+    CHECK(Same(probe.drawn, Entry(probe.origin, 2)));
+    CHECK_FALSE(probe.moving);
 }
 
 TEST_CASE("Selection pill: the selected label is semibold, the others keep their weight")
