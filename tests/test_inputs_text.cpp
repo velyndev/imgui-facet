@@ -312,6 +312,44 @@ TEST_CASE("TextField forwards only the callback events it was asked for")
     CHECK(session.Clipboard() == "ab");
 }
 
+TEST_CASE("Tab in a TextField that completes runs the completion and keeps the focus")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string text;
+    std::string next;
+    CallbackLog log;
+    ImGuiID fieldId = 0;
+    ImGuiID nextId = 0;
+    session.SetUi([&] {
+        facet::TextField("Command", &text,
+                         {.callback = LogTextCallback,
+                          .callbackUser = &log,
+                          .callbackEvents = ImGuiInputTextFlags_CallbackCompletion});
+        session.Track("field");
+        fieldId = ImGui::GetID("Command");
+        facet::TextField("Next", &next);
+        nextId = ImGui::GetID("Next");
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("field"));
+    session.Type("ab");
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frames(2);
+    CHECK(log.completion == 1);
+    CHECK(ImGui::GetActiveID() == fieldId);
+    CHECK(ImGui::GetActiveID() != nextId);
+    // The completion took the key: typing still goes to the first field.
+    session.Type("c");
+    CHECK(text == "abc");
+    CHECK(next.empty());
+    // Shift+Tab is no completion and leaves the field.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.Frames(2);
+    CHECK(log.completion == 1);
+    CHECK(ImGui::GetActiveID() != fieldId);
+}
+
 TEST_CASE("A disabled TextField is no Tab stop, takes no text and returns false")
 {
     facet::test::Session session;

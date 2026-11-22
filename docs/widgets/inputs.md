@@ -10,7 +10,8 @@ draws the frame, the placeholder, icons and messages around it. Editable text co
 `std::string*`, which Facet resizes, and as a `char*` buffer with its size for hosts that avoid the
 heap. Where an options struct has `callback`, `callbackUser` and `callbackEvents`, Dear ImGui's text
 callback runs for the `ImGuiInputTextFlags_Callback*` events named there (Completion, History,
-Always, CharFilter, Edit).
+Always, CharFilter, Edit). With Completion, Tab runs the callback and the field keeps the keyboard;
+Shift+Tab still moves the focus back, so the field is no keyboard trap.
 
 Typed text is written per keystroke; typed numbers on Enter, Tab or focus loss; steppers, drags and
 list choices at once. Escape restores the value from activation. `facet::IsItemEditCommitted()`
