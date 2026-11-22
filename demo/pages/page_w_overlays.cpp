@@ -256,8 +256,15 @@ void DialogsSection(facet::demo::PageCtx& ctx, OverlaysState& s)
 void PopoverSection(facet::demo::PageCtx& ctx, OverlaysState& s)
 {
     SectionHeader("Popover");
-    Paragraph("A card next to the button that opens it. The page stays usable around it: a click outside closes "
-              "it and still reaches what was clicked.");
+    Paragraph("A card next to the button that opens it. Auto opens it beside the button and centered on it, and "
+              "under or over the button when neither side has room. The page stays usable around it: a click "
+              "outside closes it and still reaches what was clicked.");
+    // A button of the page, four rows over the anchor: the card leaves it free on every side it
+    // takes, so a click on it shows that a press outside still reaches the page.
+    LabeledRow("Page button");
+    if (facet::Button("Count a click"))
+        ++s.outsidePresses;
+    ctx.Probe("overlays.popover.outside");
     LabeledRow("Placement");
     ImGui::SetNextItemWidth(DemoWidth(320.0f));
     facet::SegmentedControl("##placement", &s.placement, kPlacements, {.width = facet::kFill});
@@ -289,10 +296,6 @@ void PopoverSection(facet::demo::PageCtx& ctx, OverlaysState& s)
     }
     if (ctx.capture && ctx.captureState == kPopover)
         ctx.RevealInCapture(0.3f);
-    ImGui::SameLine();
-    if (facet::Button("Count a click"))
-        ++s.outsidePresses;
-    ctx.Probe("overlays.popover.outside");
     LabeledRow("On hover");
     facet::IconButton("Details", facet::Icon("info"));
     ctx.Probe("overlays.popover.hover");
@@ -301,7 +304,7 @@ void PopoverSection(facet::demo::PageCtx& ctx, OverlaysState& s)
         Paragraph("Opens while the pointer rests on the button.");
         facet::EndPopover();
     }
-    Note("Clicks counted beside the popover: %d.", s.outsidePresses);
+    Note("Clicks counted by the page button: %d.", s.outsidePresses);
 }
 
 void ContextMenuSection(facet::demo::PageCtx& ctx, OverlaysState& s)

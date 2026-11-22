@@ -290,6 +290,12 @@ Popup host:
   so the layer reads as coming from its control.
 - **Tooltip at the pointer.** It sits after and below the cursor by spacing.lg and spacing.xl,
   so the cursor never covers the text.
+- **Panels beside, lists under.** A panel that an item opens (a color picker, a calendar, the
+  time columns, the icon grid, a popover on Auto) sits beside the item and centered on it: a
+  panel under its item hides the rows the user was working in and runs off the lower edge of a
+  short window. It takes the trailing side, the leading side when only that one has room, and
+  under or over the item when it fits on neither. A list or menu continues its field, so it
+  stays under the field at the field's width.
 - **Little room.** A level with less than two control heights of room beside its anchor covers
   the anchor instead of shrinking further, so it always shows at least two rows.
 - **Sticky side.** A level keeps its side while only its content changes, so a filtered list

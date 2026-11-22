@@ -596,6 +596,39 @@ TEST_CASE("A popover stays inside the display and off its anchor at every edge a
     facet::SetUiScale(1.0f);
 }
 
+TEST_CASE("A popover on Auto opens beside its anchor, centered on it, and under an anchor that fills the row")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion;
+    bool open = true;
+    float anchorWidth = 60.0f;
+    ImRect card;
+    ImRect anchor;
+    session.SetUi([&] {
+        ImGui::SetCursorScreenPos(ImVec2(40.0f, 280.0f));
+        ImGui::Button("A", ImVec2(anchorWidth, 24.0f));
+        anchor = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        if (facet::BeginPopover("auto", &open, {.width = 200.0f}))
+        {
+            ImGui::Dummy(ImVec2(facet::Px(160.0f), facet::Px(120.0f)));
+            facet::EndPopover();
+        }
+        card = fi::PopupLevelRect(ImGui::GetID("auto"));
+    });
+    session.Seconds(0.3f);
+    CHECK(card.Min.x >= anchor.Max.x);
+    CHECK(std::fabs(card.GetCenter().y - anchor.GetCenter().y) <= 1.0f);
+    CHECK(Inside(card, DisplayMinusMargin()));
+
+    // No room beside an anchor as wide as the row: the card goes under it, centered on it.
+    anchorWidth = 720.0f;
+    session.Seconds(0.3f);
+    CHECK(card.Min.y >= anchor.Max.y);
+    CHECK(std::fabs(card.GetCenter().x - anchor.GetCenter().x) <= 1.0f);
+    CHECK(Inside(card, DisplayMinusMargin()));
+}
+
 TEST_CASE("A popover follows its anchor when the window scrolls and when the anchor moves")
 
 {

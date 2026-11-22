@@ -5,7 +5,8 @@
 // that were open when it opened) and a press outside it and its anchor closes it and still reaches
 // what was pressed; a press on the anchor is left to the anchor, so a button that toggles the flag
 // closes it. The host places it on the chosen side, flips it to the other side and moves it into the
-// display where it does not fit, follows the anchor while it scrolls, plays the open and close
+// display where it does not fit (Auto: beside the anchor while the card fits there, else under or
+// over it), follows the anchor while it scrolls, plays the open and close
 // motion, draws the blurred surface and moves the keyboard focus in and back. This file maps the
 // options, keeps the open flag (overlay_parts.h), opens on hover, draws the arrow toward the anchor
 // and puts the content into a scroll area once it outgrows the display.
@@ -43,7 +44,8 @@ struct PopoverState
     bool wasOpen = false;        // the open flag of the last frame
     bool hoverOpened = false;    // openOnHover wrote the flag: leaving closes it again
     double hoverStart = -1.0;    // when the pointer came to rest on the anchor; < 0 while it is elsewhere
-    internal::PopupSide autoSide = internal::PopupSide::Below;  // Auto: the side taken when it opened
+    internal::PopupSide autoSide = internal::PopupSide::Below;  // Auto: the side for a card that does not fit beside
+                                                                // the anchor, taken when it opened
 };
 
 constexpr int kPopoverDepth = 8;
@@ -80,8 +82,8 @@ PopoverRoom RoomAround(const ImRect& anchor, const ImRect& work, float gap)
     return room;
 }
 
-// Auto: below or above, whichever has more room, unless neither holds two control heights and a
-// side beside the anchor has more.
+// Auto, for a card that does not fit beside the anchor: below or above, whichever has more room,
+// unless neither holds two control heights and a side beside the anchor has more.
 internal::PopupSide AutoSide(const PopoverRoom& room)
 {
     using internal::PopupSide;
@@ -216,7 +218,7 @@ bool BeginPopover(const char* id, bool* open, const PopoverOptions& options)
     const PopoverRoom room = RoomAround(placed, work, gap);
     if (opening || !state.wasOpen)
         state.autoSide = AutoSide(room);
-    const PopupSide side = SideOf(options.placement, state.autoSide);
+    const PopupSide chosen = SideOf(options.placement, state.autoSide);
 
     // Open on hover: resting on the anchor for overlay.submenuDelay opens it; leaving the anchor and
     // the card (and the way between them) closes what hover opened.
@@ -258,12 +260,25 @@ bool BeginPopover(const char* id, bool* open, const PopoverOptions& options)
     OverlayScrollDesc scroll;
     scroll.width = options.width > 0.0f ? std::max(1.0f, Px(options.width) - padding * 2.0f) : 0.0f;
     scroll.maxWidth = std::max(1.0f, work.GetWidth() - padding * 2.0f);
+    const ImGuiID content = ImHashStr("##facet.popover", 0, level);
+    // Auto opens beside the anchor while the card fits there (the host takes the trailing side
+    // first), so it does not cover the rows under the anchor; `chosen` is where it goes when it
+    // does not fit. The width is the one measured on the last frame; one pixel is kept for the
+    // host's whole-pixel bounds.
+    const float fullHeight = std::max(Px(theme.metrics.controlHeight), work.GetHeight() - padding * 2.0f);
+    bool beside = false;
+    if (options.placement == PopoverPlacement::Auto)
+    {
+        scroll.maxHeight = fullHeight;
+        const float cardWidth = OverlayScrollSize(content, scroll).x + padding * 2.0f;
+        beside = std::max(room.after, room.before) >= cardWidth + 1.0f;
+    }
+    const PopupSide side = beside ? PopupSide::After : chosen;
     const bool vertical = side == PopupSide::Below || side == PopupSide::Above;
     const float sideRoom = side == PopupSide::Below ? room.below : room.above;
-    scroll.maxHeight = std::max(Px(theme.metrics.controlHeight), (vertical ? sideRoom : work.GetHeight()) - padding * 2.0f);
+    scroll.maxHeight = vertical ? std::max(Px(theme.metrics.controlHeight), sideRoom - padding * 2.0f) : fullHeight;
     scroll.surface = theme.colors.ElevatedSurface(2);
     scroll.edgeFades = false;  // over the blurred surface a solid fade would show
-    const ImGuiID content = ImHashStr("##facet.popover", 0, level);
     const ImVec2 area = OverlayScrollSize(content, scroll);
     const ImVec2 size(area.x + padding * 2.0f, area.y + padding * 2.0f);
 
@@ -271,6 +286,12 @@ bool BeginPopover(const char* id, bool* open, const PopoverOptions& options)
     at.rect = placed;
     at.side = side;
     at.align = PopupAlign::Center;
+    if (beside)
+    {
+        at.fallback = true;
+        at.fallbackSide = chosen;
+        at.fallbackAlign = PopupAlign::Center;
+    }
     PopupOptions popup;
     popup.kind = PopupKind::Panel;
     popup.takeFocus = !state.hoverOpened;

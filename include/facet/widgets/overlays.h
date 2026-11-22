@@ -85,8 +85,10 @@ DialogResult ConfirmDialog(const char* label, bool* open, const char* message,
 
 // --- Popover -------------------------------------------------------------------------------------
 
-// The side of the anchor a popover opens on. Auto takes the side with the most room; every
-// placement flips to the opposite side and clamps to the display when it does not fit.
+// The side of the anchor a popover opens on. Auto opens beside the anchor and centered on it:
+// on the trailing side, on the leading side when only that one has room, and below or above
+// (whichever has more room) when the card fits on neither. Every placement flips to the opposite
+// side and clamps to the display when it does not fit.
 enum class PopoverPlacement
 {
     Auto,
@@ -105,7 +107,7 @@ enum class PopoverAnchor
 
 struct PopoverOptions
 {
-    PopoverPlacement placement = PopoverPlacement::Auto;  // the preferred side; Auto takes the side with the most room
+    PopoverPlacement placement = PopoverPlacement::Auto;  // the preferred side; Auto opens beside the anchor
     PopoverAnchor anchor = PopoverAnchor::LastItem;       // what it points at; the anchor's rect is taken when it opens
     bool arrow = true;                 // a pointer toward the anchor
     bool openOnHover = false;          // Facet writes *open = true while the anchor is hovered, false when the pointer leaves both

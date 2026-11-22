@@ -101,8 +101,9 @@ A card next to the last item (or where the pointer was when it opened, with `Pop
 on the blurred surface (the opaque tint where blur is not available), with the popover radius and
 `spacing.md` of padding.
 
-- **Placement:** the side of `placement`; `Auto` takes below or above, whichever has more room (beside
-  the anchor only when neither holds two control heights). It flips to the opposite side where it
+- **Placement:** the side of `placement`; `Auto` opens beside the anchor and centered on it, on the
+  trailing side first and on the leading side when only that one has room, and takes below or above
+  (whichever has more room) when the card fits on neither side. It flips to the opposite side where it
   does not fit, moves into the display, and follows its anchor while the anchor scrolls or moves.
   The arrow (`arrow`) points at the anchor's center from the facing edge, `overlay.arrowSize` long.
 - **Size:** `width` in units, or the width of its content; as tall as its content, which scrolls with
