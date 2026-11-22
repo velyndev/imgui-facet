@@ -84,7 +84,7 @@ Subsystem WidgetsOverlaysSubsystem();    // src/widgets/overlays/overlays_frame.
 Subsystem WidgetsDataTableSubsystem();   // src/widgets/display/data_table_frame.cpp: DataTable
 Subsystem WidgetsChartsSubsystem();      // src/widgets/charts/charts_frame.cpp
 Subsystem WidgetsMediaSubsystem();       // src/widgets/media/media_frame.cpp
-// The composites, one entry per package that builds them (docs/writing-a-widget.md):
+// The composites, one entry per group (docs/writing-a-widget.md):
 Subsystem WidgetsCardsSubsystem();       // src/widgets/composites/cards_frame.cpp: inventory, cards, people, drag and drop
 Subsystem WidgetsSettingsSubsystem();    // src/widgets/composites/settings_frame.cpp: search, presets, app controls
 Subsystem WidgetsEditorsSubsystem();     // src/widgets/composites/editors_frame.cpp: editors, property grid, canvas, layers

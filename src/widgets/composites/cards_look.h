@@ -4,7 +4,7 @@
 // InventorySlot, MediaCard, UserChip, ProfileSwitcher): the look of an item tile, the inventory drag
 // source and drop target on the drag and drop core (src/internal/drag_drop.h), and the rules that
 // turn a drop into an InventoryResult. Every name carries the module (Inventory or Cards), because
-// every package links into the same library.
+// every group of composites links into the same library.
 //
 // One tile, the same way in a grid, a standalone tile and a slot:
 //

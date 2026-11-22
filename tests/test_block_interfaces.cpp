@@ -1,7 +1,7 @@
 // The interfaces the popup host, scroll core, list core, drag and drop core and text field core
 // offer each other (src/internal/popup_host.h, scroll.h, list_core.h, drag_drop.h,
-// text_field.h): every declaration has exactly the frozen signature and links. Their behaviour
-// is tested in each block's own test file.
+// text_field.h): every declaration has exactly the signature the other blocks call, and links.
+// Their behaviour is tested in each block's own test file.
 
 #include <cstddef>
 #include <span>
@@ -44,7 +44,7 @@ static_assert(std::is_same_v<fi::ListSelection, ImGuiSelectionBasicStorage>);
 
 } // namespace
 
-TEST_CASE("The scroll core interface links with its frozen signatures")
+TEST_CASE("The scroll core interface links with its declared signatures")
 {
     CHECK(Links<void(ImGuiWindow*, ImVec2, bool)>(&fi::ScrollAreaTo));
     CHECK(Links<void(ImGuiWindow*, const ImRect&, fi::ScrollAlign, bool)>(&fi::ScrollAreaRevealRect));
@@ -54,7 +54,7 @@ TEST_CASE("The scroll core interface links with its frozen signatures")
     CHECK(Links<bool(ImGuiWindow*, ImVec2)>(&fi::RequestScrollAreaEdgeScroll));
 }
 
-TEST_CASE("The popup host interface links with its frozen signatures")
+TEST_CASE("The popup host interface links with its declared signatures")
 {
     CHECK(Links<void(ImGuiID, const fi::PopupAnchor&, const fi::PopupOptions&)>(&fi::OpenPopupLevel));
     CHECK(Links<void(ImGuiID)>(&fi::ClosePopupLevel));
@@ -75,7 +75,7 @@ TEST_CASE("The popup host interface links with its frozen signatures")
     CHECK(fi::PopupOptions{}.closeOnEscape);
 }
 
-TEST_CASE("The drag and drop core interface links with its frozen signatures")
+TEST_CASE("The drag and drop core interface links with its declared signatures")
 {
     using Source = bool(const char*, const void*, std::size_t, const fi::DragDropPreview&);
     using Zone = fi::DragDropZoneResult(ImGuiID, const ImRect&, const char*, const fi::DragDropZoneOptions&);
@@ -106,7 +106,7 @@ TEST_CASE("The appended members of the list view, the number core and the menu r
     CHECK(Links<int(const fi::ListJumpDesc&, bool, bool*)>(&fi::ListJumpToEnd));
 }
 
-TEST_CASE("The list core interface links with its frozen signatures")
+TEST_CASE("The list core interface links with its declared signatures")
 {
     CHECK(Links<void(const fi::ListRowsDesc&)>(&fi::BeginListRows));
     CHECK(Links<bool(facet::RowRange*)>(&fi::NextListRows));
@@ -119,7 +119,7 @@ TEST_CASE("The list core interface links with its frozen signatures")
     CHECK(fi::ListRowsDesc{}.keepAlive == -1);
 }
 
-TEST_CASE("The text field core interface links with its frozen signatures")
+TEST_CASE("The text field core interface links with its declared signatures")
 {
     using StringField = fi::TextFieldResult(const char*, std::string*, const fi::TextFieldParams&);
     using BufferField = fi::TextFieldResult(const char*, char*, std::size_t, const fi::TextFieldParams&);

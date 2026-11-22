@@ -1,7 +1,7 @@
 #pragma once
 
 // List and selection core: the visible row ranges of long lists, grids and tables (virtualized
-// through ImGuiListClipper) and the selection storage of the frozen list and table signatures.
+// through ImGuiListClipper) and the selection storage of the list and table signatures.
 //
 // This header holds what the other blocks and the containers call: facet::NextVisibleRows
 // (common.h) reads the row ranges opened here, and VirtualList, ItemGrid, DataTable and the list
@@ -47,7 +47,7 @@
 namespace facet::internal
 {
 
-// The selection storage type of every frozen list, grid and table signature.
+// The selection storage type of every list, grid and table signature.
 using ListSelection = ImGuiSelectionBasicStorage;
 
 inline constexpr int kListRowsDepth = 8;

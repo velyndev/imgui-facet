@@ -36,7 +36,7 @@
 //                      order; each fills its own accessor in a file of its own. The overlays'
 //                      EndFrame runs after every page has drawn (the toast stack).
 //   DataTable, charts, media, in that order, each with an entry of its own
-//   composites         one entry per package that builds them: inventory and cards (with the
+//   composites         one entry per group: inventory and cards (with the
 //                      public drag and drop calls), search and app controls, editors and canvas
 //
 // Last:

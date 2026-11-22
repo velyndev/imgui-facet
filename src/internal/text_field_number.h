@@ -117,7 +117,6 @@ struct NumberFieldParams
     bool mixed = false;                 // empty with Strings::mixed until the first edit writes
     const char* error = nullptr;
     const char* helpText = nullptr;
-    // Members below were added for the frozen number widgets.
     // Drag mode over a finite range: Logarithmic maps the pointer travel across the frame width
     // onto the range through the value drag core's mapping (DragNumberOptions::scale), so equal
     // travel multiplies the value by equal factors; logZero as ValueMapping::logZero. Keys, the

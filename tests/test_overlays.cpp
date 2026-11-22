@@ -1,5 +1,5 @@
 // Behaviour of the overlays family (facet/widgets/overlays.h), and the parts of the popup host
-// (src/internal/popup_host.h) that the family added: Panel levels, levels at a fixed rect that slide
+// (src/internal/popup_host.h) that only this family uses: Panel levels, levels at a fixed rect that slide
 // in, and interactive tooltips.
 //
 // One test case per behaviour; docs/writing-a-widget.md describes the pattern. The API checks are in

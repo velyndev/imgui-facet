@@ -102,7 +102,6 @@ struct TextFieldParams
     bool mixed = false;                  // shows Strings::mixed while empty, until the first edit
     const char* error = nullptr;         // error outline and message under the field; replaces helpText
     const char* helpText = nullptr;
-    // Members below were added by the text field core.
     // Single-line: the visible label part is drawn inside the frame where the placeholder would
     // be, and moves above the text with a spring while the field has the keyboard or text (the
     // placeholder then shows in its place). The frame is taller to hold both lines: at least
@@ -138,7 +137,6 @@ struct TextFieldResult
     bool active = false;        // the field has the keyboard
     ImRect frame;               // the field frame in screen pixels, without the label and the message line
     ImRect caret;               // the caret line in screen pixels while active; a zero-width rect at the text start otherwise
-    // Members below were added by the text field core.
     ImGuiID id = 0;             // the text item: ImGui::GetID(label) on the id stack of the call
     bool committed = false;     // facet::IsItemEditCommitted() after the call
     bool canceled = false;      // facet::IsItemEditCanceled() after the call
@@ -192,7 +190,7 @@ struct TextFieldSlotButtonOptions
     bool selected = false;      // the on look (a reveal toggle that is on)
     bool disabled = false;      // disabled in addition to the field (a stepper at its end of the range)
     const char* name = nullptr; // tooltip and accessible name; required (Strings member text)
-    // Members below were added for the filter field toggles.
+    // For the toggles of a filter field:
     const char* glyph = nullptr;  // short text ("Aa") drawn in the field's font instead of the icon; null draws the icon
     bool glyphUnderline = false;  // a hairline under the glyph (the whole word toggle)
 };

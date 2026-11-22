@@ -1,4 +1,4 @@
-// The frozen API of the layout family (facet/widgets/layout.h): every options struct follows the
+// The public API of the layout family (facet/widgets/layout.h): every options struct follows the
 // conventions, every widget is safe to call inside a real frame without input (stacks balanced, no
 // value written), also disabled and outside a frame, returns false only where its own arguments hide
 // the content, and an End without its Begin is reported. The behaviour of each widget is tested in

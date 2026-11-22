@@ -1,4 +1,4 @@
-// The frozen API of the overlays family (facet/widgets/overlays.h): every options struct follows
+// The public API of the overlays family (facet/widgets/overlays.h): every options struct follows
 // the conventions, and every widget called closed (a false or null open flag, no change, no
 // hover) inside a real frame keeps the stacks balanced, writes nothing and returns the neutral
 // result. The behaviour of each widget is tested in tests/test_overlays.cpp.

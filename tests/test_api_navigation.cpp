@@ -1,4 +1,4 @@
-// The frozen API of the navigation family (facet/widgets/navigation.h): every options struct
+// The public API of the navigation family (facet/widgets/navigation.h): every options struct
 // follows the conventions, and every widget is safe to call inside a real frame without input
 // (stacks balanced, no value written, the neutral result), also disabled and outside a frame.
 // The behaviour of each widget is tested in tests/test_navigation.cpp.

@@ -1,6 +1,6 @@
 // Per-frame and per-device work of the editor and canvas composites (PropertyGrid, CurveEditor,
 // BezierEditor, GradientEditor, PreviewCanvas, CanvasElement, LayerList). The entry is in the
-// subsystem table (src/core/subsystems.cpp). At facet::EndFrame every Begin of the package whose
+// subsystem table (src/core/subsystems.cpp). At facet::EndFrame every Begin of these composites whose
 // End was not called is forgotten (the scope stack has reported it), so the next frame starts clean.
 
 #include "internal/subsystem.h"

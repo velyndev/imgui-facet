@@ -88,7 +88,7 @@ TEST_CASE("Strings templates: the defaults fill as documented, also after SetStr
     CHECK(std::strcmp(out, "%s 5: 2") == 0);
     CHECK(std::strcmp(facet::GetStrings().jumpToLatest, "Jump to latest") == 0);
     facet::SetStrings(facet::Strings{});
-    // The "+N" chip of the second widget wave, and a member far down the table kept by SetStrings.
+    // The "+N" chip, and a member far down the table kept by SetStrings.
     const TextToken more[] = {{"count", 7}};
     FormatTokens(out, sizeof(out), facet::GetStrings().moreCount, more);
     CHECK(std::strcmp(out, "+7") == 0);

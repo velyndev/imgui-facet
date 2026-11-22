@@ -2,13 +2,13 @@
 // strokes of the library and the test app (StrokeRect, StrokeRoundRect, StrokeContinuousRect,
 // StrokeArc, ImDrawList::AddRect and AddCircle, and PathStroke and AddPolyline of a closed path)
 // checks that each one takes HairlineThickness() or a variable the same file assigns exactly that,
-// so a 2 px border here and a 3 px border there cannot creep back in.
+// so no outline takes a width of its own.
 //
 // Strokes that are not outlines keep their own weights (the focus ring, glyphs): they are listed as
 // exceptions with their reason. Files that still break the rule are listed as pending until their
 // family moves onto the outline helpers of src/internal/control.h; a pending file that no longer
 // breaks it fails the test, so the list only shrinks. Both lists live in tests/border_rule/, one
-// file per group of families, so each group edits only its own.
+// file per group of families.
 
 #include <algorithm>
 #include <cctype>

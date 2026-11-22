@@ -78,7 +78,7 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
             &m.statusDotSize, &m.pageDotSize, &m.sliderTickSize, &m.segmentInset, &m.progressHeightSmall,
             &m.progressHeight, &m.progressHeightLarge, &m.emptyIconSize, &c.statusBarHeight,
             &t.motion.feedbackHold, &t.motion.pulsePeriod,
-            // The tokens of the second widget wave.
+            // The tokens of the navigation, layout, overlay, picker, chart and media widgets.
             &m.stepMarkerSize, &m.stepConnectorWidth, &m.checkerCell, &t.layout.dividerBand,
             &t.layout.panelHeaderHeight, &o.arrowSize, &o.commandPaletteTop, &d.flickSpeed, &d.inertiaTime,
             &t.tabs.underlineHeight, &t.picker.colorBarHeight, &t.picker.hueRingWidth, &t.picker.timeColumnWidth,
@@ -305,7 +305,7 @@ TEST_CASE("The tokens of the first widgets hold their documented starting values
     }
 }
 
-TEST_CASE("The tokens of the second widget wave hold their documented starting values in both presets")
+TEST_CASE("The navigation, picker, chart and media tokens hold their documented starting values in both presets")
 {
     for (const facet::Theme& theme : {facet::Theme::Light(), facet::Theme::Dark()})
     {

@@ -127,7 +127,6 @@ struct PopupOptions
     bool closeOnEscape = true;         // Popup and Modal: Escape closes it; false: the press stops
                                        // at the level and closes nothing (a modal that must be
                                        // answered)
-    // Members below were added by the overlays family.
     ImVec2 padding = {-1.0f, -1.0f};   // pixels between the surface and the content; < 0 for the kind's default
     ImRect placeRect;                  // screen pixels: the level sits exactly here (no flip or clamp), for
                                        // drawers at a display edge; empty (the default) places it at the anchor
@@ -339,7 +338,7 @@ bool PopupPointerAimsAt(const ImRect& target);
                                      float maxWidth = 0.0f);
 void EndPopupTooltip();  // only after BeginPopupTooltip returned true
 
-// The same with more choices (added by the overlays family).
+// The same with more choices.
 struct PopupTooltipDesc
 {
     float maxWidth = 0.0f;     // pixels where the text wraps; 0 for overlay.tooltipMaxWidth

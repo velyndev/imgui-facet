@@ -2355,7 +2355,7 @@ TEST_CASE("Slider knobs are solid in the knob color and hover changes the outlin
         session.Seconds(settle);
         const std::vector<ImDrawVert> rest = drawn.vertices;
         CHECK(CountColor(rest, facet::ToU32(facet::T().colors.knob)) > 0);
-        // The old hollow knob was a disc in the background color.
+        // A hollow knob would show as a disc in the background color.
         CHECK(CountColor(rest, facet::ToU32(facet::T().colors.bg)) == 0);
         CHECK(CountColor(rest, facet::ToU32(facet::T().colors.controlBorder)) > 0);
         // The unfilled track is fill[0], the filled part the accent mark.
