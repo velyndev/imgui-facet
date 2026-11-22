@@ -892,6 +892,40 @@ int WarningVertices()
 
 } // namespace
 
+TEST_CASE("KeybindList with a height lays its rows out under the column headings")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::KeybindListItem items[] = {
+        {"Action 1", nullptr, {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
+        {"Action 2", nullptr, {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
+    };
+    float height = 0.0f;
+    facet::internal::KeybindListProbe probe;
+    session.SetUi([&] {
+        facet::KeybindList("binds", items, {.groups = false, .width = 600.0f, .height = height});
+        session.Track("binds");
+        probe = facet::internal::KeybindListLastProbe();
+    });
+    session.Frames(2);
+    // Without a height the field starts at the heading.
+    REQUIRE(probe.firstPrimary.GetWidth() > 0.0f);
+    CHECK(probe.firstPrimary.Min.x == doctest::Approx(probe.primaryHeadingX));
+    // With a height the rows sit inside the scroll area's padding, and the heading moves with them.
+    height = 200.0f;
+    session.Frames(2);
+    REQUIRE(probe.firstPrimary.GetWidth() > 0.0f);
+    CHECK(probe.firstPrimary.Min.x == doctest::Approx(probe.primaryHeadingX));
+    const ImRect list = session.ItemRect("binds");
+    const ImRect expected = facet::internal::KeybindListFirstField(list, true, false, 0, true);
+    CHECK(probe.firstPrimary.Min.x == doctest::Approx(expected.Min.x));
+    CHECK(probe.firstPrimary.Min.y == doctest::Approx(expected.Min.y));
+    // The rows are measured from the width inside the padding.
+    const facet::internal::KeybindListLayout inner = facet::internal::KeybindListMeasure(list.GetWidth(), true, true);
+    CHECK(inner.inset > 0.0f);
+    CHECK(inner.width == doctest::Approx(list.GetWidth() - inner.inset * 2.0f));
+}
+
 TEST_CASE("KeybindList captures a chord, and Escape while it listens cancels")
 {
     facet::test::Session session;

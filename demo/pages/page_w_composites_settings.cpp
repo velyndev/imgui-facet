@@ -133,6 +133,8 @@ struct SettingsUi
     int bindState = 0;  // DataState
     std::string bindFilter;
     int bindWrites = 0;
+    float registryHeadingX = 0.0f;  // the registry list's Primary heading, set every frame
+    ImRect registryFirstField;      // and its first primary field
 
     // PresetList
     DemoPreset presets[kMaxPresets] = {{"Preset 1", false, true, 1}, {"Preset 2", true, false, 2}, {"Preset 3", false, false, 3}};
@@ -778,6 +780,9 @@ void KeybindListSection(facet::demo::PageCtx& ctx)
     LabeledRow("Registry");
     facet::KeybindList("##registry", {.filter = ui.bindFilter.c_str(), .alternate = false,
                                       .width = DemoWidth(kBindsWidth), .height = kSettingsAreaHeight});
+    ctx.Probe("comp.registry");
+    ui.registryHeadingX = facet::internal::KeybindListLastProbe().primaryHeadingX;
+    ui.registryFirstField = facet::internal::KeybindListLastProbe().firstPrimary;
     LabeledRow("Read-only");
     facet::KeybindList("##readonly", std::span<facet::KeybindListItem>(ui.binds, 2),
                        {.groups = false, .width = DemoWidth(kBindsWidth), .readOnly = true});
@@ -1180,6 +1185,13 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.Expect("Tab reaches the reset button and Space resets the row",
                 [] { return ui.binds[0].bind.primary == (ImGuiMod_Ctrl | ImGuiKey_1); });
     test.Expect("four writes in the list", [] { return ui.bindWrites == 4; });
+    // The registry list has a height: its rows scroll inside a padded area, and the column
+    // headings above take the same inset.
+    test.Reveal("comp.registry");
+    test.Wait(2);
+    test.Expect("the registry list's first field starts under its Primary heading", [] {
+        return ui.registryFirstField.GetWidth() > 0.0f && std::abs(ui.registryFirstField.Min.x - ui.registryHeadingX) < 0.5f;
+    });
 
     // The page's zoom shortcuts drive the example UI scale control from anywhere.
     test.Do([] { ui.uiScale = 1.0f; });

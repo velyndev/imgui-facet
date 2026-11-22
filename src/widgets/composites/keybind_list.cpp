@@ -4,6 +4,9 @@
 // and column headings, the filter, the conflict search and mark, the data states and the writes
 // (SetShortcutChords and ResetShortcut for the registry, the bind members for the caller's rows).
 //
+// With a height the rows scroll inside a scroll area and are laid out inside its padding; the
+// column headings above it take the same inset (keybind_list.h).
+//
 // Layout per row: the label column (the label, cut with an ellipsis and a tooltip, then the
 // conflict mark: the warning icon in the warning token and Strings::conflictWith with the other
 // action's name in labelSecondary, as far as it fits), one capture column per chord
@@ -37,6 +40,7 @@
 #include "facet/widgets/display.h"
 #include "facet/widgets/inputs.h"
 #include "internal/control.h"
+#include "internal/focus.h"
 #include "internal/fuzzy.h"
 #include "internal/item.h"
 #include "internal/list_view.h"
@@ -182,11 +186,16 @@ bool KeybindListMatches(const KeybindListRow& row, const KeybindListOptions& opt
 namespace internal
 {
 
-KeybindListLayout KeybindListMeasure(float width, bool alternate)
+KeybindListLayout KeybindListMeasure(float outerWidth, bool alternate, bool scrolling)
 {
     const Theme& t = T();
     const ControlMetrics m = GetControlMetrics(ControlSize::Inherit);
     KeybindListLayout layout;
+    // The rows of a list with a height sit inside the scroll area's padding (scroll.cpp: the
+    // focus ring outset on every side).
+    layout.inset = scrolling ? FocusRingOutset() : 0.0f;
+    const float width = std::max(1.0f, outerWidth - layout.inset * 2.0f);
+    layout.width = width;
     layout.gap = std::round(Px(t.spacing.sm));
     layout.spacing = ImGui::GetStyle().ItemSpacing.y;
     layout.button = std::round(m.height);
@@ -219,14 +228,28 @@ KeybindListLayout KeybindListMeasure(float width, bool alternate)
     return layout;
 }
 
-ImRect KeybindListFirstField(const ImRect& list, bool alternate, bool groupHeading, int column)
+ImRect KeybindListFirstField(const ImRect& list, bool alternate, bool groupHeading, int column, bool scrolling)
 {
-    const KeybindListLayout layout = KeybindListMeasure(list.GetWidth(), alternate);
-    float y = list.Min.y + layout.headingHeight + (groupHeading ? layout.groupHeight : 0.0f);
+    const KeybindListLayout layout = KeybindListMeasure(list.GetWidth(), alternate, scrolling);
+    float y = std::round(list.Min.y + layout.headingHeight + layout.inset) + (groupHeading ? layout.groupHeight : 0.0f);
     if (layout.stacked)
         y += layout.labelLine + layout.spacing;
-    const float x = list.Min.x + (column == 0 ? layout.primaryX : layout.alternateX);
+    const float x = std::round(list.Min.x + layout.inset) + (column == 0 ? layout.primaryX : layout.alternateX);
     return ImRect(x, y, x + layout.column, y + layout.rowHeight);
+}
+
+namespace
+{
+KeybindListProbe& KeybindListProbeRecord()
+{
+    static KeybindListProbe probe;
+    return probe;
+}
+} // namespace
+
+const KeybindListProbe& KeybindListLastProbe()
+{
+    return KeybindListProbeRecord();
 }
 
 } // namespace internal
@@ -253,8 +276,11 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
     const int count = source.Count();
 
     // ---- Columns ----
-    const float width = std::round(internal::ResolveItemWidth(options.width, next, kFill));
-    const internal::KeybindListLayout layout = internal::KeybindListMeasure(width, options.alternate);
+    const bool scrolling = options.height != 0.0f;
+    const float outerWidth = std::round(internal::ResolveItemWidth(options.width, next, kFill));
+    const internal::KeybindListLayout layout = internal::KeybindListMeasure(outerWidth, options.alternate, scrolling);
+    // Every row length below is the rows' width, inside the scroll area's padding with a height.
+    const float width = layout.width;
     const int columns = options.alternate ? 2 : 1;
     const float gap = layout.gap;
     const float column = layout.column;
@@ -272,30 +298,36 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
     // The id is an item of its own, so the group has the list's id when nothing inside is active.
     ImGui::PushOverrideID(widgetId);
 
+    internal::KeybindListProbe& probe = internal::KeybindListProbeRecord();
+    probe = internal::KeybindListProbe{};
+    probe.id = widgetId;
+
     // ---- Column headings ----
     {
         internal::ControlTextScope text(TextStyle::Footnote);
         const float lineHeight = ImGui::GetTextLineHeight();
         const ImU32 color = ToU32(internal::ControlSecondaryColor(disabled));
+        // The headings take the rows' inset, so each stands over its column.
+        const float left = std::round(origin.x + layout.inset);  // the rows round their origin too
         const auto heading = [&](float x, float w, const char* label) {
             const internal::FittedText shown = internal::FitText(label, nullptr, w);
-            window->DrawList->AddText(ImVec2(origin.x + x, origin.y), color, shown.text);
+            window->DrawList->AddText(ImVec2(left + x, origin.y), color, shown.text);
         };
         if (!layout.stacked)
             heading(0.0f, labelWidth, s.action);
         heading(primaryX, column, s.primaryBind);
+        probe.primaryHeadingX = left + primaryX;
         if (options.alternate)
             heading(alternateX, column, s.alternateBind);
-        ImGui::Dummy(ImVec2(width, lineHeight));
+        ImGui::Dummy(ImVec2(outerWidth, lineHeight));
     }
 
     // ---- Rows ----
-    const bool scrolling = options.height != 0.0f;
     bool areaOpen = true;
     if (scrolling)
     {
         ScrollAreaOptions area;
-        area.width = width / Scale();
+        area.width = outerWidth / Scale();
         area.height = options.height;
         areaOpen = BeginScrollArea("##rows", area);
     }
@@ -418,7 +450,10 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
                     ImGui::SetNextItemWidth(column);
                     Keybind bind;
                     bind.primary = chords[c];
-                    if (KeybindCapture(c == 0 ? "##primary" : "##alternate", &bind, capture) && !readOnly)
+                    const bool captured = KeybindCapture(c == 0 ? "##primary" : "##alternate", &bind, capture);
+                    if (c == 0 && shown == 1)
+                        probe.firstPrimary = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+                    if (captured && !readOnly)
                     {
                         chords[c] = bind.primary;
                         source.Set(i, chords[0], chords[1]);
