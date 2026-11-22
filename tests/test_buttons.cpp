@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -777,4 +778,95 @@ TEST_CASE("A button outside a frame returns false")
     REQUIRE(session.Ready());
     CHECK_FALSE(facet::Button("Save"));
     CHECK_FALSE(facet::Button("Save", {.variant = facet::ButtonVariant::Primary, .loading = true}));
+}
+
+TEST_CASE("Button outlines: secondary hover changes the color only, primary has no rim, a click draws no ring")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    struct Restore
+    {
+        facet::Theme theme;
+        ~Restore() { facet::SetTheme(theme, false); }
+    } restore{saved};
+    facet::SetTheme(facet::Theme::Dark(), false);
+    std::vector<ImDrawVert> secondary;
+    std::vector<ImDrawVert> primary;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImGui::Button("before");
+        session.Track("before");
+        int from = drawList->VtxBuffer.Size;
+        facet::Button("Duplicate");
+        session.Track("secondary");
+        secondary.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+        from = drawList->VtxBuffer.Size;
+        facet::Button("Save", {.variant = facet::ButtonVariant::Primary});
+        session.Track("primary");
+        primary.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+    });
+    session.Frames(2);
+    const facet::Colors& c = facet::T().colors;
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    const auto count = [](const std::vector<ImDrawVert>& vertices, ImU32 color) {
+        int n = 0;
+        for (const ImDrawVert& v : vertices)
+            n += v.col == color ? 1 : 0;
+        return n;
+    };
+    const ImRect button = session.ItemRect("secondary");
+    session.MouseMove(ImVec2(button.Max.x + 300.0f, button.Max.y + 100.0f));
+    session.Seconds(settle);
+    const std::vector<ImDrawVert> rest = secondary;
+    CHECK(count(rest, facet::ToU32(c.controlBorder)) > 0);
+    // The dark accent reaches 3:1 on every surface: the primary button has no focusRing rim.
+    CHECK(count(primary, facet::ToU32(c.focusRing)) == 0);
+    session.MouseMove(button.GetCenter());
+    session.Seconds(settle);
+    REQUIRE(secondary.size() == rest.size());
+    for (std::size_t i = 0; i < rest.size(); ++i)
+    {
+        CHECK(secondary[i].pos.x == doctest::Approx(rest[i].pos.x));
+        CHECK(secondary[i].pos.y == doctest::Approx(rest[i].pos.y));
+    }
+    CHECK(count(secondary, facet::ToU32(c.controlBorderHover)) > 0);
+    // A click: no ring anywhere around the button.
+    const ImU32 ring = facet::ToU32(facet::internal::FocusRingColor()) & ~IM_COL32_A_MASK;
+    const auto ringVertices = [&] {
+        int n = 0;
+        for (const ImDrawVert& v : secondary)
+            n += ((v.col & ~IM_COL32_A_MASK) == ring && (v.col & IM_COL32_A_MASK) != 0) ? 1 : 0;
+        return n;
+    };
+    session.Click(button.GetCenter());
+    session.Seconds(settle);
+    CHECK(ringVertices() == 0);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Seconds(settle);
+    CHECK(ringVertices() > 0);
+}
+
+TEST_CASE("A primary button with a light accent keeps a visible edge")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    struct Restore
+    {
+        facet::Theme theme;
+        ~Restore() { facet::SetTheme(theme, false); }
+    } restore{saved};
+    facet::SetTheme(facet::Theme::Light(), false);
+    facet::SetAccent(facet::Rgb(0xFFD60A));
+    int edge = 0;
+    session.SetUi([&] {
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::Button("Save", {.variant = facet::ButtonVariant::Primary});
+        edge = CountColor(from, facet::ToU32(facet::T().colors.focusRing));
+    });
+    session.Frames(2);
+    CHECK(edge > 0);
 }

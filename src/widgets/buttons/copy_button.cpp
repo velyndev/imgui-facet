@@ -99,7 +99,7 @@ bool CopyButton(const char* label, const char* text, const CopyButtonOptions& op
         ImDrawList* drawList = window->DrawList;
         FillRect(drawList, item.rect.Min, item.rect.Max, ToU32(colors.fill), m.radius);
         if (colors.outline.w > 0.0f)
-            StrokeRect(drawList, item.rect.Min, item.rect.Max, ToU32(colors.outline), m.radius, HairlineThickness());
+            internal::DrawOutline(drawList, item.rect, m.radius, colors.outline);
         // The confirmation: the check icon, in the success color on the neutral variants (it reads
         // as text on every surface), with Strings::copied in place of the name.
         const bool neutral = options.variant == ButtonVariant::Secondary || options.variant == ButtonVariant::Plain;

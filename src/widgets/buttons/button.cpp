@@ -143,7 +143,7 @@ bool Button(const char* label, const ButtonOptions& options)
         ImDrawList* drawList = window->DrawList;
         FillRect(drawList, item.rect.Min, item.rect.Max, ToU32(colors.fill), m.radius);
         if (colors.outline.w > 0.0f)
-            StrokeRect(drawList, item.rect.Min, item.rect.Max, ToU32(colors.outline), m.radius, HairlineThickness());
+            internal::DrawOutline(drawList, item.rect, m.radius, colors.outline);
         truncated = DrawButtonContent(drawList, item.rect, content, options.loading, m, ToU32(colors.content));
         internal::DrawItemFocusRing(item, m.radius);
     }

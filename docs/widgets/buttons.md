@@ -18,10 +18,13 @@ bool Button(const char* label, const ButtonOptions& options = {});
 A push button with a variant, an optional leading icon and a loading state; returns true on the
 frame it is activated (a click released inside, or Space or Enter while it has keyboard focus).
 
-- **Variants.** `Secondary` (the default) has the neutral fill with a 3:1 outline; `Primary` the
-  accent fill with `onAccent` text, for the one primary action of a view; `Plain` is text only with
-  a fill on hover and press; `Destructive` the solid destructive fill with `onDestructive` text.
-  Hover and press deepen the fill over `motion.durationFast`. A disabled button
+- **Variants.** `Secondary` (the default) has the neutral fill with one quiet controlBorder
+  hairline, which turns controlBorderHover under the pointer; `Primary` the accent fill with
+  `onAccent` text, for the one primary action of a view, shaped by its fill alone (a light accent
+  that does not reach 3:1 on every surface gets the focusRing hairline as its edge); `Plain` is
+  text only with a fill on hover and press; `Destructive` the solid destructive fill with
+  `onDestructive` text. Hover and press deepen the fill over `motion.durationFast`; no state
+  changes the outline width. The focus ring shows after keyboard input only. A disabled button
   (`ImGui::BeginDisabled`) of any variant shows the same neutral disabled look, shows the
   not-allowed cursor, is not a Tab stop and never returns true.
 - **Sizes.** `size` picks the control height (22, 28 or 36 units) and the padding (8, 12 or 16

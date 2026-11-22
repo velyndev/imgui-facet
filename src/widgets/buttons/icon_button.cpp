@@ -74,7 +74,7 @@ bool IconButton(const char* label, Icon icon, const IconButtonOptions& options)
             }
         }
         if (colors.outline.w > 0.0f)
-            StrokeRect(drawList, item.rect.Min, item.rect.Max, ToU32(colors.outline), m.radius, HairlineThickness());
+            internal::DrawOutline(drawList, item.rect, m.radius, colors.outline);
         const float iconSize = text.IconSize();
         const ImVec2 center = item.rect.GetCenter();
         if (options.loading)

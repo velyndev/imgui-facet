@@ -30,9 +30,11 @@ ButtonColors ButtonLook(ButtonVariant variant, const ItemState& item)
     case ButtonVariant::Primary:
         colors.fill = StateFill(c.accent, c.accentHover, c.accentPressed, item);
         colors.content = c.onAccent;
-        // focusRing is the accent moved to 3:1 on every surface (the accent itself when it already
-        // reaches it), so the edge of a light accent stays visible.
-        colors.outline = c.focusRing;
+        // The fill alone shapes the button while the accent reaches 3:1 on every surface, so no
+        // lighter rim shows around it in the dark theme. A light accent that does not reach it gets
+        // the focusRing edge (the accent moved to 3:1), so the button's edge stays visible.
+        if (!ButtonAccentStandsOut(c))
+            colors.outline = c.focusRing;
         break;
     case ButtonVariant::Plain:
         colors.fill = StateFill(none, c.fill[1], c.fill[0], item);
@@ -47,10 +49,27 @@ ButtonColors ButtonLook(ButtonVariant variant, const ItemState& item)
     default:
         colors.fill = NeutralFill(item);
         colors.content = c.label;
-        colors.outline = ControlBoundaryColor(c);
+        {
+            // The one controlBorder hairline, controlBorderHover under the pointer: the state
+            // changes the color and the fill, never the width.
+            OutlineLook outline;
+            outline.hoverAmount = item.hoverAmount;
+            colors.outline = ControlOutlineColor(outline);
+        }
         break;
     }
     return colors;
+}
+
+bool ButtonAccentStandsOut(const Colors& c)
+{
+    constexpr float kNonTextContrast = 3.0f;
+    const ImVec4 surfaces[] = {c.bg, c.bgSecondary, c.bgTertiary, c.ElevatedSurface(1), c.ElevatedSurface(2),
+                               c.ElevatedSurface(3)};
+    for (const ImVec4& surface : surfaces)
+        if (ContrastRatio(c.accent, surface) < kNonTextContrast)
+            return false;
+    return true;
 }
 
 } // namespace facet::internal
