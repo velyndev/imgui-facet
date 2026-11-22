@@ -914,8 +914,9 @@ The dose caps in Direction apply. The choices behind each effect:
   and canvas), so a page stays short enough to scan and each page's note speaks for what it shows.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
   page holds at a large scale in a small window.
-- **App shell.** The reasons for the test app's own chrome (title strip, navigation and what
-  the app adds around its pages) are in `docs/demo.md`, next to its description.
+- **App shell.** The reasons for the test app's own chrome (the title bar, the navigation, the
+  theme editor, the overlay backdrop and the showcase page) are in `docs/demo.md` under "Design
+  reasons of the app shell", next to its description.
 - **Pages.** The window background with 24 / 20 padding; every page starts with a Title1
   heading and a one-paragraph summary in labelSecondary, sections with a Title3 heading.
 - **Settings rows.** A page labels each setting in one fixed label column in footnote

@@ -34,7 +34,7 @@ group in the navigation:
   - Images: fit modes, corner radii, tint, asynchronous loading with its loading and failed
     states, and an SVG at three sizes.
 - Blocks: one page per building block, each operated through prototype controls that are
-  built only from the blocks (they are not the Phase 2 widgets) and covered by selftests.
+  built only from the blocks, not from the widgets, and covered by selftests.
   - Item behaviour: hover, press, focus and disabled states with their animated amounts,
     and grown hit targets.
   - Focus: the focus ring on every surface it must stay visible on, and cut by the edge of
@@ -161,6 +161,7 @@ and hides it with F9 (a registered shortcut, `demo.overlay`) or the shell's clos
 it, and reports its input regions: while the menu is hidden a pinned panel says which key shows
 it and lets every click through; while it shows, the editor names the key and the number of input
 regions. In overlay mode the window keeps its own resize band along the edges.
+
 ## Capture mode
 
 ```
@@ -173,6 +174,10 @@ a fixed time step of 1/60 s and no OS input, and writes
 `<page>__<state>__<theme>__<W>x<H>@<scale>.png` plus `index.json` (size, scale, themes, and the
 page, state, theme, size, scale, mode and file name of every image) into `<dir>`. With `--overlay`
 the gallery runs in overlay mode and the names end in `__overlay`. The window is never shown.
+Defaults: `1280x800`, scale 1, both themes, 60 warm-up frames per image. `--warp` renders with
+the WARP software rasterizer, so the output does not depend on the GPU; two WARP runs on the
+same machine produce identical files. The exit code is 0 only when every file was written and
+no Direct3D call failed.
 
 ```
 facet_demo --capture <dir> --matrix --page id [--frames N] [--theme light|dark|both] [--warp]
@@ -181,10 +186,6 @@ facet_demo --capture <dir> --matrix --page id [--frames N] [--theme light|dark|b
 The size matrix: the page at 900x600, 1280x800 and 1920x1200, each at scale 1, 1.5 and 2, in app
 and overlay mode, into one folder, with names ending in `__<W>x<H>@<scale>__app` or `__overlay`.
 It needs `--page` and takes neither `--size`, `--scale` nor `--overlay`.
-Defaults: `1280x800`, scale 1, both themes, 60 warm-up frames per image. `--warp` renders with
-the WARP software rasterizer, so the output does not depend on the GPU; two WARP runs on the
-same machine produce identical files. The exit code is 0 only when every file was written and
-no Direct3D call failed.
 
 ## Selftest mode
 
@@ -192,13 +193,6 @@ no Direct3D call failed.
 facet_demo --selftest [--size WxH] [--scale S] [--page id] [--theme light|dark|both] [--overlay]
            [--warp]
 ```
-
-Besides the scripts of the pages, scripts of the app itself (`FACET_DEMO_APP_SELFTEST` in
-`demo/selftest.h`, in `demo/app_selftests.cpp`) start on a page and run after its script: the
-title bar and its window buttons, the navigation with its filter and rail, the theme editor (every
-group, a token row, the resets, the accent and the export) and overlay mode (show, hide, move,
-resize at the edges and a corner, the size limits). Their result lines name `app:<script>`.
-`--overlay` runs every script in overlay mode.
 
 Runs the input scripts that pages register, followed by checks, offscreen at the given size and
 scale (defaults `1280x800`, scale 1) in the given theme (default dark; `both` runs every script
@@ -212,6 +206,13 @@ in frames of the fixed 1/60 s time step, so a run does not depend on the speed o
 A scripted click on a control outside the visible part of its window scrolls it into view
 first. It prints a `PASS` or `FAIL` line per check, naming the page and theme, and exits with 1
 when any check failed.
+
+Besides the scripts of the pages, scripts of the app itself (`FACET_DEMO_APP_SELFTEST` in
+`demo/selftest.h`, in `demo/app_selftests.cpp`) start on a page and run after its script: the
+title bar and its window buttons, the navigation with its filter and rail, the theme editor (every
+group, a token row, the resets, the accent and the export) and overlay mode (show, hide, move,
+resize at the edges and a corner, the size limits). Their result lines name `app:<script>`.
+`--overlay` runs every script in overlay mode.
 
 ## Design reasons of the app shell
 
