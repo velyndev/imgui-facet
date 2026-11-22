@@ -177,6 +177,31 @@ ImRect SliderKnobRect(const ImRect& track, Orientation orientation, float knob, 
 namespace
 {
 
+// The two ends of the whole track line, whole pixels: half a thickness past the knob travel, so the
+// round ends sit under the knob at either end. `start` is the end of fraction 0.
+void SliderLineEnds(const ImRect& track, Orientation orientation, const SliderMetrics& m, float* start, float* end)
+{
+    const bool vertical = orientation == Orientation::Vertical;
+    const float half = m.track * 0.5f;
+    *start = std::round(vertical ? track.Max.y + half : track.Min.x - half);
+    *end = std::round(vertical ? track.Min.y - half : track.Max.x + half);
+}
+
+// The position along the track line of a fraction for a fill: the ends of the range reach the round
+// ends of the line, so a fill from the minimum covers the end cap instead of leaving a stub of the
+// unfilled color in front of it.
+float SliderFillPos(const ImRect& track, Orientation orientation, const SliderMetrics& m, double fraction)
+{
+    float start = 0.0f;
+    float end = 0.0f;
+    SliderLineEnds(track, orientation, m, &start, &end);
+    if (fraction <= 0.0)
+        return start;
+    if (fraction >= 1.0)
+        return end;
+    return SliderTrackPos(track, orientation, fraction);
+}
+
 // The rectangle of the track line between two positions along it, whole pixels.
 ImRect TrackLine(const ImRect& track, Orientation orientation, float thickness, float a, float b)
 {
@@ -197,18 +222,16 @@ void DrawSliderTrack(ImDrawList* drawList, const ImRect& track, Orientation orie
                      double fillFrom, double fillTo, SliderLook look, bool error, ImU32 fillColor)
 {
     const Colors& c = T().colors;
-    const bool vertical = orientation == Orientation::Vertical;
     const float half = m.track * 0.5f;
-    // The line reaches half a thickness past the knob travel, so its round ends sit under the
-    // knob at either end.
-    const float start = vertical ? track.Max.y + half : track.Min.x - half;
-    const float end = vertical ? track.Min.y - half : track.Max.x + half;
-    const ImRect whole = TrackLine(track, orientation, m.track, std::round(start), std::round(end));
+    float start = 0.0f;
+    float end = 0.0f;
+    SliderLineEnds(track, orientation, m, &start, &end);
+    const ImRect whole = TrackLine(track, orientation, m.track, start, end);
     // The unfilled line in the 3:1 boundary color, so the ends of the range stay visible.
     const ImVec4 rest = look == SliderLook::Disabled ? c.fill[3] : (error ? c.destructive : ControlBoundaryColor(c));
     FillRect(drawList, whole.Min, whole.Max, ToU32(rest), half);
-    const float a = SliderTrackPos(track, orientation, fillFrom);
-    const float b = SliderTrackPos(track, orientation, fillTo);
+    const float a = SliderFillPos(track, orientation, m, fillFrom);
+    const float b = SliderFillPos(track, orientation, m, fillTo);
     if (a == b)
         return;
     ImU32 color = fillColor;
@@ -225,8 +248,8 @@ void DrawSliderTrack(ImDrawList* drawList, const ImRect& track, Orientation orie
 void DrawSliderTrackStretch(ImDrawList* drawList, const ImRect& track, Orientation orientation, const SliderMetrics& m,
                             double from, double to, ImU32 color)
 {
-    const float a = SliderTrackPos(track, orientation, from);
-    const float b = SliderTrackPos(track, orientation, to);
+    const float a = SliderFillPos(track, orientation, m, from);
+    const float b = SliderFillPos(track, orientation, m, to);
     if (a == b)
         return;
     const ImRect fill = TrackLine(track, orientation, m.track, a, b);

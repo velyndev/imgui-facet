@@ -4,6 +4,7 @@
 // pattern. The API checks are in tests/test_api_sliders.cpp.
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #include <doctest/doctest.h>
@@ -2049,6 +2050,45 @@ TEST_CASE("Sliders stacked in a column start and end their tracks at one x whate
         CHECK(level < 1.0f);
         CHECK(gain == doctest::Approx(level).epsilon(0.001));
     }
+}
+
+TEST_CASE("A track fill from the minimum covers the round end of the line")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float restMin = 0.0f;
+    float fillMin = 0.0f;
+    float restMax = 0.0f;
+    float fillMax = 0.0f;
+    session.SetUi([&] {
+        const facet::internal::SliderMetrics m = facet::internal::GetSliderMetrics(facet::ControlSize::Regular);
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImRect track(origin.x + 20.0f, origin.y + 10.0f, origin.x + 220.0f, origin.y + 10.0f);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const auto Span = [&](int from, int to, float* lo, float* hi) {
+            *lo = FLT_MAX;
+            *hi = -FLT_MAX;
+            for (int i = from; i < to; ++i)
+            {
+                *lo = std::min(*lo, drawList->VtxBuffer[i].pos.x);
+                *hi = std::max(*hi, drawList->VtxBuffer[i].pos.x);
+            }
+        };
+        // The unfilled line alone, then the line with a fill over the whole range: the error look,
+        // where a stub of the rest color would show as a red dot.
+        const int start = drawList->VtxBuffer.Size;
+        facet::internal::DrawSliderTrack(drawList, track, facet::Orientation::Horizontal, m, 0.0, 0.0,
+                                         facet::internal::SliderLook::Normal, true);
+        const int restCount = drawList->VtxBuffer.Size - start;
+        const int filled = drawList->VtxBuffer.Size;
+        facet::internal::DrawSliderTrack(drawList, track, facet::Orientation::Horizontal, m, 0.0, 1.0,
+                                         facet::internal::SliderLook::Normal, true);
+        Span(filled, filled + restCount, &restMin, &restMax);
+        Span(filled + restCount, drawList->VtxBuffer.Size, &fillMin, &fillMax);
+    });
+    session.Frames(2);
+    CHECK(fillMin == doctest::Approx(restMin));
+    CHECK(fillMax == doctest::Approx(restMax));
 }
 
 TEST_CASE("A narrow column of sliders keeps one track start and end, with or without its value column")
