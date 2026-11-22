@@ -43,13 +43,24 @@ enum CaptureState
     kGridColumn,
     kGradientOpen,
     kGradientFocused,
+    kCurveDragging,
+    kCurveFocused,
 };
+
+const char* const kInterpolations[] = {"Smooth", "Linear", "Step"};
 
 // Placeholder data: names like "Layer 1" and property values that only show the widgets working.
 struct EditorsUi
 {
-    ImVec2 curve[8] = {{0.0f, 0.0f}, {0.5f, 0.7f}, {1.0f, 1.0f}};
-    int curveCount = 3;
+    ImVec2 curve[8] = {{0.0f, 0.0f}, {0.3f, 0.6f}, {0.7f, 0.4f}, {1.0f, 1.0f}};
+    int curveCount = 4;
+    int interpolation = 0;
+    bool lockEnds = true;
+    bool curveGrid = true;
+    float curveInput = 0.5f;
+    int curveWrites = 0;
+    ImGuiID curveId = 0;
+    ImVec2 fixedCurve[3] = {{0.0f, 0.2f}, {0.5f, 0.8f}, {1.0f, 0.6f}};  // the read-only and disabled examples
     facet::CubicBezier easing{{0.25f, 0.1f}, {0.25f, 1.0f}};
     // Gradients: seeded from the chart palette of the theme on the first frame (data colors).
     bool gradientSeeded = false;
@@ -97,6 +108,64 @@ void NoteChange(bool changed, const char* row)
         return;
     ++ui.changes;
     std::snprintf(ui.lastEdited, sizeof(ui.lastEdited), "%s", row);
+}
+
+void CurveSection(facet::demo::PageCtx& ctx)
+{
+    using namespace facet;
+    const bool capture = ctx.capture;
+    SectionHeader("Curve editor");
+    Paragraph("A double click on empty space adds a point; a double click on a point or Delete removes it, never below "
+              "two points and never a locked end. Each point is a Tab stop: the arrows move it, Shift finer, Ctrl "
+              "coarser. A point never passes its neighbours. The guide shows the input below on the curve.");
+    LabeledRow("Interpolation");
+    SegmentedControl("##interpolation", &ui.interpolation, std::span<const char* const>(kInterpolations));
+    LabeledRow("Options");
+    Toggle("Lock ends", &ui.lockEnds);
+    ImGui::SameLine();
+    Toggle("Grid", &ui.curveGrid);
+    LabeledRow("Input");
+    Slider("##input", &ui.curveInput, 0.0f, 1.0f, {.format = "%.2f", .width = demo::DemoWidth(240.0f)});
+    ctx.Probe("composites.curve.input");
+    LabeledRow("Response");
+    if (capture && ctx.captureState == kCurveDragging)
+        ctx.ForceNextItemState(demo::ForcedItemState::Hovered | demo::ForcedItemState::Dragging, 1);
+    if (capture && ctx.captureState == kCurveFocused)
+        ctx.ForceNextItemState(demo::ForcedItemState::Focused, 1);
+    ui.curveId = ImGui::GetID("Response");
+    CurveEditorOptions options;
+    options.interpolation = static_cast<CurveInterpolation>(ui.interpolation);
+    options.lockEnds = ui.lockEnds;
+    options.grid = ui.curveGrid;
+    options.marker = ui.curveInput;
+    options.width = demo::DemoWidth(480.0f);
+    if (CurveEditor("Response", ui.curve, &ui.curveCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), options))
+        ++ui.curveWrites;
+    ctx.Probe("composites.curve");
+    {
+        const float handle = Px(T().composites.editorHandleSize);
+        for (int i = 0; i < ui.curveCount; ++i)
+        {
+            const ImVec2 at = internal::CurveEditorPointPos(ui.curveId, ui.curve[i]);
+            char name[32];
+            std::snprintf(name, sizeof(name), "composites.curve.p%d", i);
+            demo::ProbeRect(ctx, name, internal::CurveEditorPointId(ui.curveId, i), ImVec2(at.x - handle * 0.5f, at.y - handle * 0.5f),
+                            ImVec2(at.x + handle * 0.5f, at.y + handle * 0.5f));
+        }
+    }
+    if (capture && (ctx.captureState == kCurveDragging || ctx.captureState == kCurveFocused))
+        ctx.RevealInCapture(0.6f);
+    LabeledRow("");
+    Note("%d of %d points in the storage.", ui.curveCount, static_cast<int>(IM_ARRAYSIZE(ui.curve)));
+    LabeledRow("Read-only");
+    int fixedCount = 3;
+    CurveEditor("Read-only curve", ui.fixedCurve, &fixedCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                {.width = demo::DemoWidth(240.0f), .height = 96.0f, .readOnly = true});
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    CurveEditor("Disabled curve", ui.fixedCurve, &fixedCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                {.width = demo::DemoWidth(240.0f), .height = 96.0f});
+    ImGui::EndDisabled();
 }
 
 void SeedGradients()
@@ -327,17 +396,15 @@ void PropertyGridSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "default", "grid-filtered",
-                "grid-no-results", "grid-column", "gradient-open", "gradient-focused")
+                "grid-no-results", "grid-column", "gradient-open", "gradient-focused", "curve-dragging", "curve-focused")
 {
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
                             "elements, and layer lists.");
     facet::demo::PlannedFamilyNote("composites");
 
-    SectionHeader("Editors");
-    LabeledRow("Curve editor");
-    facet::CurveEditor("Response", ui.curve, &ui.curveCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.marker = 0.5f});
-    ctx.Probe("composites.curve");
+    CurveSection(ctx);
+    SectionHeader("Bezier editor");
     LabeledRow("Bezier editor");
     facet::BezierEditor("Easing", &ui.easing);
 
@@ -362,9 +429,37 @@ FACET_DEMO_SELFTEST("composites-editors")
         ui = EditorsUi{};
         ++gridGeneration;  // a grid of its own: no open or column state from an earlier run
     });
-    // The curve editor placeholder writes nothing.
+    // ---- Curve editor ----
+    test.Reveal("composites.curve");
+    test.WaitSeconds(0.4f);
+    test.Click("composites.curve.input");  // a click before the editor, so Tab reaches its first point
+    test.KeyPress(ImGuiKey_Tab);           // after a click the first Tab shows the focus
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.curve.p0");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.curve.p1");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectNear("Up moves the focused point up", [] { return ui.curve[1].y; }, 0.61, 0.001);
+    test.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+Right moves it a tenth of the range", [] { return ui.curve[1].x; }, 0.4, 0.001);
+    // A drag far to the right stops at the right neighbour.
+    test.Drag({T::Item("composites.curve.p1"), T::Item("composites.curve.p1").Offset(900.0f, 0.0f)}, 0.3f);
+    test.Expect("a point never passes its neighbour", [] { return ui.curve[1].x == ui.curve[2].x; });
+    // A double click on empty space adds a point; a double click on a point removes it.
     test.DoubleClick("composites.curve");
-    test.Expect("a double click on the curve editor placeholder adds no point", [] { return ui.curveCount == 3; });
+    test.Expect("a double click on the canvas adds a point", [] { return ui.curveCount == 5; });
+    test.Expect("the points stay sorted by x", [] {
+        for (int i = 1; i < ui.curveCount; ++i)
+            if (ui.curve[i - 1].x > ui.curve[i].x)
+                return false;
+        return true;
+    });
+    test.KeyPress(ImGuiKey_Delete);  // the new point has the focus
+    test.Expect("Delete removes the focused point", [] { return ui.curveCount == 4; });
+    test.DoubleClick("composites.curve.p2");
+    test.Expect("a double click on a point removes it", [] { return ui.curveCount == 3; });
+    test.DoubleClick("composites.curve.p0");
+    test.Expect("a locked end stays", [] { return ui.curveCount == 3 && ui.curve[0].x == 0.0f; });
 
     // ---- Gradient editor ----
     test.Reveal("composites.gradient");

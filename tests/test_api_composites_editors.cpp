@@ -63,20 +63,6 @@ static_assert(OptionsFollowConventions<facet::LayerListOptions>());
 void EditorCalls()
 {
     using namespace facet;
-    ImVec2 points[4] = {{0.0f, 0.0f}, {0.5f, 0.25f}, {1.0f, 1.0f}};
-    int count = 3;
-    const Snapshot pointsBefore(points);
-    Check("CurveEditor", Expect::Item, "Curve", [&] {
-        CHECK_FALSE(CurveEditor("Curve", points, &count, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.marker = 0.5f}));
-    });
-    CHECK(count == 3);
-    CHECK(pointsBefore.Unchanged());
-    std::vector<ImVec2> pointVector = {{0.0f, 0.0f}, {1.0f, 1.0f}};
-    Check("CurveEditor, vector", Expect::Item, "Curve 2", [&] {
-        CHECK_FALSE(CurveEditor("Curve 2", &pointVector, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f)));
-    });
-    CHECK(pointVector.size() == 2);
-
     CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
     const Snapshot curveBefore(curve);
     Check("BezierEditor", Expect::Item, "Easing", [&] { CHECK_FALSE(BezierEditor("Easing", &curve)); });

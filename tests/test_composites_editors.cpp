@@ -529,3 +529,177 @@ TEST_CASE("Gradient editor: a shown editor allocates nothing per frame")
     CHECK(CountImGuiAllocations(session, 10) == 0);
     CHECK(facet::internal::GlobalStateStore().Count() == states);
 }
+
+// ---- CurveEditor -------------------------------------------------------------------------------------
+
+namespace
+{
+
+struct CurveUi
+{
+    ImVec2 points[4] = {{0.0f, 0.0f}, {0.5f, 0.5f}, {1.0f, 1.0f}};
+    int count = 3;
+    int writes = 0;
+    facet::CurveEditorOptions options;
+    ImGuiID id = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        id = ImGui::GetID("Curve");
+        writes += facet::CurveEditor("Curve", points, &count, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), options) ? 1 : 0;
+        session.Track("curve");
+    }
+
+    ImVec2 At(ImVec2 value) const { return facet::internal::CurveEditorPointPos(id, value); }
+};
+
+// Puts the keyboard focus on point `index` with the focus visible.
+void FocusCurvePoint(facet::test::Session& session, const CurveUi& ui, int index)
+{
+    ShowFocus(facet::internal::CurveEditorPointId(ui.id, index));
+    facet::internal::SetKeyboardModality(true);
+    session.Frames(1);
+}
+
+} // namespace
+
+TEST_CASE("Curve editor: Tab goes from point to point and the arrows move the focused one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == facet::internal::CurveEditorPointId(ui.id, 0));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(ImGui::GetFocusID() == facet::internal::CurveEditorPointId(ui.id, 1));
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ui.points[1].y == doctest::Approx(0.51f));
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.points[1].x == doctest::Approx(0.51f));
+    CHECK(ui.writes == 2);
+}
+
+TEST_CASE("Curve editor: a point never passes its neighbours and locked ends keep their x")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    FocusCurvePoint(session, ui, 1);
+    session.KeyPress(ImGuiKey_End);
+    CHECK(ui.points[1].x == doctest::Approx(1.0f));  // up to its right neighbour, not past it
+    CHECK(ui.points[2].x == 1.0f);
+    // A drag far to the left stops at the left neighbour.
+    const ImVec2 from = ui.At(ui.points[1]);
+    session.Drag({from, ImVec2(from.x - session.ItemRect("curve").GetWidth() * 1.5f, from.y)}, 4);
+    CHECK(ui.points[1].x == doctest::Approx(0.0f));
+    CHECK(ui.points[0].x == 0.0f);
+    // The locked first point moves up and down only.
+    FocusCurvePoint(session, ui, 0);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ui.points[0].x == 0.0f);
+    CHECK(ui.points[0].y == doctest::Approx(0.01f));
+}
+
+TEST_CASE("Curve editor: a double click adds a point in order and removes one, never below two")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    session.DoubleClick(ui.At(ImVec2(0.25f, 0.75f)));
+    REQUIRE(ui.count == 4);
+    CHECK(ui.points[1].x == doctest::Approx(0.25f).epsilon(0.03));
+    CHECK(ui.points[1].y == doctest::Approx(0.75f).epsilon(0.03));
+    CHECK(ImGui::GetFocusID() == facet::internal::CurveEditorPointId(ui.id, 1));
+    // The storage is full: no fifth point.
+    session.DoubleClick(ui.At(ImVec2(0.75f, 0.25f)));
+    CHECK(ui.count == 4);
+    // A double click on a point removes it; Delete removes the focused one; the locked ends stay.
+    session.DoubleClick(ui.At(ui.points[1]));
+    CHECK(ui.count == 3);
+    CHECK(ui.points[1].x == 0.5f);
+    FocusCurvePoint(session, ui, 1);
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(ui.count == 2);
+    FocusCurvePoint(session, ui, 0);
+    session.KeyPress(ImGuiKey_Delete);
+    CHECK(ui.count == 2);
+}
+
+TEST_CASE("Curve editor: values outside the range are drawn clamped and written only by an edit")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    ui.points[1] = {0.5f, 3.0f};
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(3);
+    CHECK(ui.points[1].y == 3.0f);
+    CHECK(ui.writes == 0);
+    const ImRect r = session.ItemRect("curve");
+    const ImVec2 shown = ui.At(ui.points[1]);
+    CHECK(shown.y >= r.Min.y);
+    FocusCurvePoint(session, ui, 1);
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(ui.points[1].y <= 1.0f);
+}
+
+TEST_CASE("Curve editor: the vector form grows its vector when a point is added")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::vector<ImVec2> points = {{0.0f, 0.0f}, {1.0f, 1.0f}};
+    points.shrink_to_fit();
+    ImGuiID id = 0;
+    session.SetUi([&] {
+        id = ImGui::GetID("Curve");
+        facet::CurveEditor("Curve", &points, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+    });
+    session.Frames(2);
+    session.DoubleClick(facet::internal::CurveEditorPointPos(id, ImVec2(0.5f, 0.2f)));
+    REQUIRE(points.size() == 3);
+    CHECK(points[1].x == doctest::Approx(0.5f).epsilon(0.03));
+}
+
+TEST_CASE("Curve editor: read-only shows the points and writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    ui.options.readOnly = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    session.DoubleClick(ui.At(ImVec2(0.25f, 0.75f)));
+    const ImVec2 from = ui.At(ui.points[1]);
+    session.Drag({from, ImVec2(from.x, from.y - facet::Px(40.0f))}, 4);
+    FocusCurvePoint(session, ui, 1);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(ui.count == 3);
+    CHECK(ui.points[1].y == 0.5f);
+    CHECK(ui.writes == 0);
+}
+
+TEST_CASE("Curve editor: a shown editor allocates nothing per frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CurveUi ui;
+    ui.options.marker = 0.3f;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    session.MouseMove(ui.At(ui.points[1]));
+    session.Frames(10);
+    const int states = facet::internal::GlobalStateStore().Count();
+    CHECK(CountImGuiAllocations(session, 10) == 0);
+    CHECK(facet::internal::GlobalStateStore().Count() == states);
+}

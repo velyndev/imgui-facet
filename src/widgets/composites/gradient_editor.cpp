@@ -611,7 +611,10 @@ bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int
     bool focusVisible = false;
     for (int i = 0; i < n; ++i)
         focusVisible = focusVisible || handles[i].focusVisible;
-    internal::CutTextTooltip(id, frame, barItem.hovered || edit.track.hovered, focusVisible, label, labelEnd,
+    // Only a real pointer counts for the tooltip: a hover forced by a capture has no pointer to follow.
+    const bool hovered = (barItem.hovered && barItem.forced == internal::ForcedItemState::None) ||
+                         (edit.track.hovered && edit.track.forced == internal::ForcedItemState::None);
+    internal::CutTextTooltip(id, frame, hovered, focusVisible, label, labelEnd,
                              labelEnd != label);
     ImGui::EndGroup();
     internal::FinishWidgetGroup(id);
@@ -620,24 +623,6 @@ bool GradientEditorImpl(const char* label, GradientStop* data, int capacity, int
     if (written && count != nullptr)
         *count = n;
     return written;
-}
-
-bool GradientGrowVector(void* user, GradientStop** data, int* capacity, int count)
-{
-    auto* stops = static_cast<std::vector<GradientStop>*>(user);
-    try
-    {
-        stops->resize(static_cast<std::size_t>(count));
-        stops->reserve(std::max<std::size_t>(8, static_cast<std::size_t>(count) * 2));
-        stops->resize(stops->capacity());
-    }
-    catch (...)
-    {
-        return false;
-    }
-    *data = stops->data();
-    *capacity = static_cast<int>(std::min<std::size_t>(stops->size(), INT_MAX));
-    return true;
 }
 
 } // namespace
@@ -675,18 +660,17 @@ ImGuiID GradientEditorPopoverLevel(ImGuiID id)
 
 bool GradientEditor(const char* label, std::span<GradientStop> stops, int* count, const GradientEditorOptions& options)
 {
-    return GradientEditorImpl(label, stops.data(), static_cast<int>(std::min<std::size_t>(stops.size(), INT_MAX)), count,
-                              nullptr, nullptr, options);
+    return GradientEditorImpl(label, stops.data(), internal::EditorsCapacity(stops.size()), count, nullptr, nullptr, options);
 }
 
 bool GradientEditor(const char* label, std::vector<GradientStop>* stops, const GradientEditorOptions& options)
 {
     if (stops == nullptr)
         return GradientEditorImpl(label, nullptr, 0, nullptr, nullptr, nullptr, options);
-    int count = static_cast<int>(std::min<std::size_t>(stops->size(), INT_MAX));
+    int count = internal::EditorsCapacity(stops->size());
     stops->resize(stops->capacity());  // within the capacity: no allocation
-    const bool written = GradientEditorImpl(label, stops->data(), static_cast<int>(std::min<std::size_t>(stops->size(), INT_MAX)),
-                                            &count, &GradientGrowVector, stops, options);
+    const bool written = GradientEditorImpl(label, stops->data(), internal::EditorsCapacity(stops->size()), &count,
+                                            &internal::EditorsGrowVector<GradientStop>, stops, options);
     stops->resize(static_cast<std::size_t>(std::max(0, count)));
     return written;
 }

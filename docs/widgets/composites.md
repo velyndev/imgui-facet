@@ -538,7 +538,29 @@ bool CurveEditor(const char* label, std::span<ImVec2> points, int* count, ImVec2
 bool CurveEditor(const char* label, std::vector<ImVec2>* points, ImVec2 min, ImVec2 max, const CurveEditorOptions& options = {});
 ```
 
-Response curve through draggable, addable control points. Status: planned.
+A response curve through control points the caller keeps sorted by x. The canvas is a field frame
+with, when `grid` is set, hairlines at the chart core's nice ticks of both ranges; the curve runs
+through the points as a monotone cubic (no overshoot between points), straight lines or steps, in
+the first series color of the chart palette, and is held flat before the first and after the last
+point. `marker` draws a guide at that x and a dot where it meets the curve. The default width fills
+the available width; the default height is `metrics.chartHeight`.
+
+Each point is a Tab stop in the order of the points, with the slider knob look and its focus ring,
+driven by the two-axis value drag: a press on a point grabs it, Shift during a drag keeps one axis,
+Ctrl snaps to the coarse grid; Left and Right move x, Up and Down move y (Shift finer, Ctrl
+coarser), Page Up and Page Down move y by a tenth of the range, Home and End send x as far as the
+neighbours allow, and Escape during an edit restores the point. A point never passes its
+neighbours: its x stays between theirs. With `lockEnds` the first and last point move only up and
+down. The focused or dragged point shows its x and y at the top of the canvas.
+
+A double click on empty canvas adds a point there, between the points around it, and gives it the
+focus, when the storage has room (the vector overload grows its vector; a full span takes no
+point). A double click on a point, or Delete or Backspace while it has the focus, removes it, never
+below two points and never a locked end. Points outside the ranges are drawn at the edge and
+written only by an edit. An empty range on either axis (`min == max`) shows the points read-only.
+`readOnly` lets the points take the focus and writes nothing. Nothing is allocated per frame: the
+curve is drawn in chunks of a fixed buffer. The label is the tooltip on hover and keyboard focus.
+Status: ready.
 
 ### BezierEditor
 
