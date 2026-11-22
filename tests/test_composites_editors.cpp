@@ -1052,3 +1052,156 @@ TEST_CASE("Layer list: a shown list allocates nothing per frame")
     CHECK(CountImGuiAllocations(session, 10) == 0);
     CHECK(facet::internal::GlobalStateStore().Count() == states);
 }
+
+// ---- PreviewCanvas and CanvasElement -----------------------------------------------------------------
+
+namespace
+{
+
+struct CanvasUi
+{
+    ImVec2 reference = {1000.0f, 500.0f};
+    facet::CanvasElementState element{facet::CanvasAnchor::TopLeft, {100.0f, 100.0f}, {200.0f, 100.0f}};
+    facet::CanvasElementState other{facet::CanvasAnchor::TopLeft, {600.0f, 300.0f}, {100.0f, 100.0f}};
+    facet::CanvasElementOptions options{.resizable = true};
+    int writes = 0;
+    ImGuiID id = 0;
+
+    void Draw(facet::test::Session& session)
+    {
+        facet::BeginPreviewCanvas("canvas", reference, {.width = 500.0f});
+        id = ImGui::GetID("Element");
+        writes += facet::CanvasElement("Element", &element, options) ? 1 : 0;
+        session.Track("element");
+        facet::CanvasElement("Other", &other, {.snap = false});
+        facet::EndPreviewCanvas();
+        session.Track("canvas");
+    }
+
+    ImRect Part(int part) const { return facet::internal::CanvasElementPartRect(id, part); }
+};
+
+} // namespace
+
+TEST_CASE("Canvas element: a drag moves it in reference pixels and snaps to the canvas center")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const float scale = session.ItemRect("element").GetWidth() / 200.0f;  // pixels per reference pixel
+    REQUIRE(scale > 0.0f);
+    const ImVec2 from = ui.Part(0).GetCenter();
+    // Alt held: no snapping; 40 screen pixels are 40 / scale reference pixels.
+    session.KeyDown(ImGuiMod_Alt);
+    session.Drag({from, ImVec2(from.x + 40.0f, from.y)}, 4);
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK(ui.element.offset.x == doctest::Approx(100.0f + 40.0f / scale).epsilon(0.01));
+    CHECK(ui.element.offset.y == doctest::Approx(100.0f));
+    CHECK(ui.writes > 0);
+    // Near the center: the element's center comes onto the canvas center (500, 250).
+    const ImVec2 at = ui.Part(0).GetCenter();
+    const ImVec2 to(ui.Part(0).GetCenter().x + (500.0f - (ui.element.offset.x + 100.0f)) * scale + 2.0f,
+                    ui.Part(0).GetCenter().y + (250.0f - 150.0f) * scale - 2.0f);
+    session.Drag({at, to}, 4);
+    CHECK(ui.element.offset.x + 100.0f == doctest::Approx(500.0f));
+    CHECK(ui.element.offset.y + 50.0f == doctest::Approx(250.0f));
+}
+
+TEST_CASE("Canvas element: the arrows nudge it, Shift by ten, and Ctrl resizes it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    ShowFocus(ui.id);
+    facet::internal::SetKeyboardModality(true);
+    session.Frames(1);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.element.offset.x == 101.0f);
+    session.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    CHECK(ui.element.offset.y == 110.0f);
+    session.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    CHECK(ui.element.extent.x == 201.0f);
+    CHECK(ui.element.offset.x == 101.0f);
+}
+
+TEST_CASE("Canvas element: a handle resizes it and the anchor control keeps its place")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    session.Click(ui.Part(0).GetCenter());  // selects it: the handles and the anchor control show
+    session.Frames(1);
+    const ImRect handle = ui.Part(5);  // bottom-right
+    REQUIRE(handle.GetWidth() > 0.0f);
+    const float scale = session.ItemRect("element").GetWidth() / 200.0f;
+    session.KeyDown(ImGuiMod_Alt);
+    session.Drag({handle.GetCenter(), ImVec2(handle.GetCenter().x + 20.0f, handle.GetCenter().y + 10.0f)}, 4);
+    session.KeyUp(ImGuiMod_Alt);
+    CHECK(ui.element.extent.x == doctest::Approx(200.0f + 20.0f / scale).epsilon(0.01));
+    CHECK(ui.element.extent.y == doctest::Approx(100.0f + 10.0f / scale).epsilon(0.01));
+    CHECK(ui.element.offset.x == doctest::Approx(100.0f));
+    // The center cell of the anchor control: the anchor changes, the element stays where it is.
+    const ImRect cell = ui.Part(9 + static_cast<int>(facet::CanvasAnchor::Center));
+    REQUIRE(cell.GetWidth() > 0.0f);
+    const ImRect before = ui.Part(0);
+    session.Click(cell.GetCenter());
+    session.Frames(1);
+    CHECK(ui.element.anchor == facet::CanvasAnchor::Center);
+    CHECK(ui.Part(0).Min.x == doctest::Approx(before.Min.x).epsilon(0.001));
+    CHECK(ui.Part(0).Min.y == doctest::Approx(before.Min.y).epsilon(0.001));
+}
+
+TEST_CASE("Canvas element: one larger than the canvas moves, Escape puts a drag back, read-only writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    ui.element.extent = {1500.0f, 800.0f};
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    const ImRect canvas = session.ItemRect("canvas");
+    CHECK(canvas.GetHeight() < ui.Part(0).GetHeight());  // the element is larger than the canvas
+    const ImVec2 from = canvas.GetCenter();
+    session.MouseMove(from);
+    session.MouseDown();
+    session.MouseMove(ImVec2(from.x - 30.0f, from.y));
+    session.MouseMove(ImVec2(from.x - 60.0f, from.y));
+    session.KeyPress(ImGuiKey_Escape);
+    session.MouseUp();
+    CHECK(ui.element.offset.x == 100.0f);
+    ui.options.readOnly = true;
+    session.Drag({from, ImVec2(from.x - 60.0f, from.y)}, 4);
+    CHECK(ui.element.offset.x == 100.0f);
+}
+
+TEST_CASE("Preview canvas: an empty reference size draws an empty canvas without elements")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    ui.reference = {0.0f, 100.0f};
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    CHECK(session.ItemRect("canvas").GetHeight() > 0.0f);
+    CHECK(ui.Part(0).GetWidth() == 0.0f);
+}
+
+TEST_CASE("Preview canvas: a shown canvas allocates nothing per frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    session.Click(ui.Part(0).GetCenter());
+    session.Frames(10);
+    const int states = facet::internal::GlobalStateStore().Count();
+    CHECK(CountImGuiAllocations(session, 10) == 0);
+    CHECK(facet::internal::GlobalStateStore().Count() == states);
+}

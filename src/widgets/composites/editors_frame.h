@@ -97,6 +97,47 @@ bool BezierEditorPreviewRunning(ImGuiID id);
 // For tests and demo probes.
 ImRect LayerListRowRect(ImGuiID listId, int index, int part, ImGuiID key = 0, ImGuiID* itemId = nullptr);
 
+// ---- Preview canvas ---------------------------------------------------------------------------------
+
+// Element rectangles a canvas keeps for snapping, from the last frame.
+inline constexpr int kPreviewCanvasMaxElements = 32;
+
+// What a canvas element needs from the canvas it is submitted in (between BeginPreviewCanvas and
+// EndPreviewCanvas), and what it hands back for the canvas to draw at its End.
+struct PreviewCanvasFrame
+{
+    bool valid = false;          // a canvas with a usable reference size is open
+    ImGuiID id = 0;
+    ImGuiWindow* window = nullptr;
+    ImRect frame;                // the whole widget, screen pixels
+    ImRect screen;               // the letterboxed reference screen, screen pixels
+    ImVec2 reference;            // the reference size, reference pixels
+    float scale = 1.0f;          // screen pixels per reference pixel
+    float safeArea = 0.0f;       // inset per side as a share of the reference size
+    bool centerGuides = true;
+    ImGuiID* selected = nullptr; // the selected element of the canvas (kept under the canvas id)
+    // Snapping targets of the last frame: the other elements' rectangles, reference pixels.
+    const ImRect* others = nullptr;
+    const ImGuiID* otherIds = nullptr;
+    int otherCount = 0;
+    // Filled by the elements this frame.
+    bool dragging = false;       // an element is moved or resized: the center guides show
+    float snapX = -1.0f;         // a guide an element snapped to, reference pixels; < 0 none
+    float snapY = -1.0f;
+};
+
+// The canvas the next CanvasElement belongs to, or null outside BeginPreviewCanvas / End.
+PreviewCanvasFrame* CurrentPreviewCanvas();
+// Records an element's rectangle (reference pixels) for the snapping of the next frame.
+void PreviewCanvasRecordElement(ImGuiID elementId, const ImRect& rect);
+void ClearPreviewCanvasStack();
+
+// The canvas element `id` (its label hashed in its window) as drawn in the last frame, screen pixels:
+// `part` 0 the box, 1 to 8 its resize handles (top-left, top, top-right, right, bottom-right, bottom,
+// bottom-left, left), 9 to 17 the cells of its anchor control (CanvasAnchor order). Empty for a part
+// not shown. *itemId (may be null) receives the part's item id. For tests and demo probes.
+ImRect CanvasElementPartRect(ImGuiID id, int part, ImGuiID* itemId = nullptr);
+
 // ---- Gradient editor -------------------------------------------------------------------------------
 
 // Where the gradient editor `id` (its label hashed in its window) drew its bar and the marker of stop

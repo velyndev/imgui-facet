@@ -1,16 +1,11 @@
 // The declared API of the editor, property grid, canvas and layer composites
-// (facet/widgets/composites.h) while they are placeholders: every function is called once inside a
-// real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled. After each call the id,
-// window, group and Facet scope stacks must be as before, a widget must have submitted one item of
-// non-zero size with the id of its label, the neutral result must come back and no value argument
-// may have changed. Every options struct is checked against the conventions at compile time. The
+// (facet/widgets/composites.h): every options struct is checked against the conventions at compile
+// time, and an End without its Begin is reported without touching a Dear ImGui stack. Every widget of
+// this group is implemented; their behaviour tests are in tests/test_composites_editors.cpp. The
 // other composites have files of their own (tests/test_api_composites_cards.cpp and
-// test_api_composites_settings.cpp); the behaviour tests of these widgets go into
-// tests/test_composites_editors.cpp.
+// test_api_composites_settings.cpp).
 
 #include <cmath>
-#include <string>
-#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -60,56 +55,7 @@ static_assert(OptionsFollowConventions<facet::PreviewCanvasOptions>());
 static_assert(OptionsFollowConventions<facet::CanvasElementOptions>());
 static_assert(OptionsFollowConventions<facet::LayerListOptions>());
 
-void CanvasCalls()
-{
-    using namespace facet;
-    CanvasElementState element{CanvasAnchor::Center, {10.0f, 20.0f}, {100.0f, 50.0f}};
-    const Snapshot elementBefore(element);
-    Check("PreviewCanvas", Expect::NoItem, nullptr, [&] {
-        BeginPreviewCanvas("canvas", ImVec2(1920.0f, 1080.0f), {.gridSpacing = 120.0f});
-        CHECK_FALSE(CanvasElement("Element", &element, {.resizable = true}));
-        EndPreviewCanvas();
-    });
-    Check("PreviewCanvasScope, empty size", Expect::NoItem, nullptr,
-          [] { PreviewCanvasScope canvas("canvas 2", ImVec2(0.0f, 0.0f)); });
-    Check("CanvasElement", Expect::Item, "Element 2", [&] { CHECK_FALSE(CanvasElement("Element 2", &element)); });
-    CHECK(elementBefore.Unchanged());
-}
-
-void EditorAndCanvasCalls()
-{
-    CanvasCalls();
-}
-
 } // namespace
-
-TEST_CASE("The canvas and layer stubs submit one item each and keep every stack")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int runs = 0;
-    RunFrame(session, &runs, &EditorAndCanvasCalls);
-    CHECK(runs == 1);
-    CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
-TEST_CASE("The canvas element stub is wide enough to name the widget and say planned")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        CanvasElementState element;
-        BeginPreviewCanvas("canvas", ImVec2(100.0f, 100.0f));
-        CanvasElement("A", &element);
-        CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, "CanvasElement: planned").x);
-        ++checked;
-        EndPreviewCanvas();
-    });
-    session.Frame();
-    CHECK(checked == 1);
-}
 
 TEST_CASE("An editor or canvas End without its Begin is reported and changes no Dear ImGui stack")
 {
@@ -130,4 +76,42 @@ TEST_CASE("An editor or canvas End without its Begin is reported and changes no 
     });
     session.Frame();
     CHECK(reported == 4);
+}
+
+TEST_CASE("Editor, grid, canvas and layer calls keep every stack and need no placeholder")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int runs = 0;
+    RunFrame(session, &runs, [] {
+        using namespace facet;
+        ImVec2 points[4] = {{0.0f, 0.0f}, {1.0f, 1.0f}};
+        int count = 2;
+        CurveEditor("Curve", points, &count, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+        CubicBezier curve;
+        BezierEditor("Easing", &curve);
+        GradientStop stops[2] = {{0.0f}, {1.0f}};
+        int stopCount = 2;
+        GradientEditor("Gradient", stops, &stopCount);
+        {
+            PropertyGridScope grid("grid");
+            if (PropertyCategoryScope category("Category"); category)
+                if (PropertyRowScope row("Property"); row)
+                    ImGui::TextUnformatted("value");
+        }
+        CanvasElementState element{CanvasAnchor::Center, {10.0f, 20.0f}, {100.0f, 50.0f}};
+        {
+            PreviewCanvasScope canvas("canvas", ImVec2(1920.0f, 1080.0f), {.gridSpacing = 120.0f});
+            CanvasElement("Element", &element, {.resizable = true});
+        }
+        {
+            PreviewCanvasScope canvas("empty canvas", ImVec2(0.0f, 0.0f));
+            CHECK_FALSE(CanvasElement("Element", &element));
+        }
+        LayerItem layers[] = {{"Layer 1"}, {"Layer 2", {}, 1, false, true}};
+        int selected = 1;
+        LayerList("layers", &selected, layers);
+    });
+    CHECK(runs == 1);
+    CHECK(facet::internal::OpenScopeCount() == 0);
 }

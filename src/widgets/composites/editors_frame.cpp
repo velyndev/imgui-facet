@@ -14,11 +14,13 @@ namespace
 void EditorsEndFrame()
 {
     ClearPropertyGridStacks();
+    ClearPreviewCanvasStack();
 }
 
 void EditorsShutdown()
 {
     ClearPropertyGridStacks();
+    ClearPreviewCanvasStack();
 }
 
 } // namespace

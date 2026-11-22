@@ -47,6 +47,7 @@ enum CaptureState
     kCurveFocused,
     kEasingDragging,
     kLayersFocused,
+    kCanvasSelected,
 };
 
 const char* const kInterpolations[] = {"Smooth", "Linear", "Step"};
@@ -82,7 +83,16 @@ struct EditorsUi
     ImGuiID gradientId = 0;
     bool gradientPopover = false;
     float savedPosition = 0.0f;   // a value a selftest step compares with
-    facet::CanvasElementState element{facet::CanvasAnchor::TopLeft, {64.0f, 64.0f}, {480.0f, 120.0f}};
+    facet::CanvasElementState element{facet::CanvasAnchor::TopLeft, {192.0f, 128.0f}, {480.0f, 270.0f}};
+    facet::CanvasElementState corner{facet::CanvasAnchor::BottomRight, {-96.0f, -96.0f}, {320.0f, 180.0f}};
+    facet::CanvasElementState oversized{facet::CanvasAnchor::Center, {0.0f, 0.0f}, {2400.0f, 1400.0f}};
+    bool canvasGrid = true;
+    bool canvasSafeArea = true;
+    bool canvasSnap = true;
+    bool canvasResizable = true;
+    bool canvasOversized = false;
+    int canvasWrites = 0;
+    ImGuiID elementId = 0;
     facet::LayerItem layers[5] = {{"Layer 1", {}, 0, true, false, 1},
                                   {"Group 1", {}, 0, true, false, 2},
                                   {"Layer 2", {}, 1, true, false, 3},
@@ -289,6 +299,63 @@ void LayerSection(facet::demo::PageCtx& ctx)
     Note("%s", ui.layerAction[0] != '\0' ? ui.layerAction : "No action yet.");
     LabeledRow("Read-only");
     LayerList("read-only layers", &ui.fixedLayer, ui.fixedLayers, {.width = demo::DemoWidth(320.0f), .readOnly = true});
+}
+
+const char* const kAnchorNames[] = {"top left", "top", "top right", "left", "center", "right", "bottom left", "bottom",
+                                    "bottom right"};
+
+void CanvasSection(facet::demo::PageCtx& ctx)
+{
+    using namespace facet;
+    const bool capture = ctx.capture;
+    SectionHeader("Preview canvas");
+    Paragraph("A 1920 by 1080 screen, scaled to fit. Drag an element, or select it with a click or Tab and move it "
+              "with the arrows (Shift: ten reference pixels); Ctrl with the arrows resizes it. A selected element "
+              "shows its handles and the anchor control. Moved elements snap to the edges, the center, the safe area "
+              "and each other; Alt moves freely.");
+    Note("Placeholder elements.");
+    LabeledRow("Grid");
+    Toggle("##canvasGrid", &ui.canvasGrid);
+    LabeledRow("Safe area");
+    Toggle("##canvasSafe", &ui.canvasSafeArea);
+    LabeledRow("Snap");
+    Toggle("##canvasSnap", &ui.canvasSnap);
+    LabeledRow("Resizable");
+    Toggle("##canvasResizable", &ui.canvasResizable);
+    LabeledRow("Larger than the canvas");
+    Toggle("##canvasOversized", &ui.canvasOversized);
+    ctx.Probe("composites.canvas.oversized");
+    LabeledRow("Canvas");
+    BeginPreviewCanvas("canvas", kReferenceSize,
+                       {.gridSpacing = ui.canvasGrid ? 120.0f : 0.0f, .safeArea = ui.canvasSafeArea ? 0.05f : 0.0f,
+                        .width = demo::DemoWidth(560.0f)});
+    if (ui.canvasOversized)
+        CanvasElement("Oversized", &ui.oversized, {.snap = ui.canvasSnap});
+    if (capture && ctx.captureState == kCanvasSelected)
+        ctx.ForceNextItemState(demo::ForcedItemState::Focused, 0);
+    ui.elementId = ImGui::GetID("Element 1");
+    if (CanvasElement("Element 1", &ui.element, {.resizable = ui.canvasResizable, .snap = ui.canvasSnap}))
+        ++ui.canvasWrites;
+    ctx.Probe("composites.canvas.e1");
+    CanvasElement("Element 2 (read-only)", &ui.corner, {.readOnly = true});
+    {
+        const char* parts[] = {"composites.canvas.e1.h5", "composites.canvas.e1.center"};
+        const int indices[] = {5, 9 + static_cast<int>(CanvasAnchor::Center)};
+        for (int k = 0; k < 2; ++k)
+        {
+            ImGuiID itemId = 0;
+            const ImRect rect = internal::CanvasElementPartRect(ui.elementId, indices[k], &itemId);
+            if (rect.GetWidth() > 0.0f)
+                demo::ProbeRect(ctx, parts[k], itemId, rect.Min, rect.Max);
+        }
+    }
+    EndPreviewCanvas();
+    ctx.Probe("composites.canvas");
+    if (capture && ctx.captureState == kCanvasSelected)
+        ctx.RevealInCapture(0.6f);
+    LabeledRow("");
+    Note("Element 1: anchor %s, offset %.0f, %.0f, size %.0f by %.0f.", kAnchorNames[static_cast<int>(ui.element.anchor)],
+         ui.element.offset.x, ui.element.offset.y, ui.element.extent.x, ui.element.extent.y);
 }
 
 void SeedGradients()
@@ -520,7 +587,8 @@ void PropertyGridSection(facet::demo::PageCtx& ctx)
 
 FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "default", "grid-filtered",
                 "grid-no-results", "grid-column", "gradient-open", "gradient-focused", "curve-dragging", "curve-focused",
-                "easing-dragging", "layers-focused")
+                "easing-dragging", "layers-focused",
+                "canvas-selected")
 {
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
@@ -535,13 +603,7 @@ FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "def
 
     LayerSection(ctx);
 
-    SectionHeader("Preview canvas");
-    LabeledRow("Preview canvas");
-    ImGui::BeginGroup();
-    facet::BeginPreviewCanvas("canvas", kReferenceSize, {.safeArea = 0.05f});
-    facet::CanvasElement("Element 1", &ui.element);
-    facet::EndPreviewCanvas();
-    ImGui::EndGroup();
+    CanvasSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("composites-editors")
@@ -695,6 +757,45 @@ FACET_DEMO_SELFTEST("composites-editors")
     test.Expect("a loading list takes no click", [] { return ui.layer == 0; });
     test.Do([] { ui.layerState = 0; });
     test.Wait(2);
+
+    // ---- Preview canvas ----
+    test.Reveal("composites.canvas");
+    test.WaitSeconds(0.4f);
+    test.KeyDown(ImGuiMod_Alt);  // no snapping, so the distances are exact
+    test.Drag({T::Item("composites.canvas.e1"), T::Item("composites.canvas.e1").Offset(40.0f, 0.0f)}, 0.3f);
+    test.KeyUp(ImGuiMod_Alt);
+    test.Expect("a drag moves the element to the right", [] {
+        return ui.element.offset.x > 192.0f && ui.element.offset.y == 128.0f && ui.canvasWrites > 0;
+    });
+    test.Do([] { ui.savedPosition = ui.element.offset.x; });
+    test.KeyPress(ImGuiKey_Tab);  // shows the focus the drag gave the element
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("Right nudges it by one reference pixel", [] { return ui.element.offset.x == ui.savedPosition + 1.0f; });
+    test.KeyPress(ImGuiKey_DownArrow | ImGuiMod_Shift);
+    test.Expect("Shift+Down nudges it by ten", [] { return ui.element.offset.y == 138.0f; });
+    test.KeyPress(ImGuiKey_RightArrow | ImGuiMod_Ctrl);
+    test.Expect("Ctrl+Right makes it one wider", [] { return ui.element.extent.x == 481.0f; });
+    test.KeyDown(ImGuiMod_Alt);
+    test.Drag({T::Item("composites.canvas.e1.h5"), T::Item("composites.canvas.e1.h5").Offset(20.0f, 10.0f)}, 0.3f);
+    test.KeyUp(ImGuiMod_Alt);
+    test.Expect("the corner handle resizes it", [] { return ui.element.extent.x > 481.0f && ui.element.extent.y > 270.0f; });
+    test.Do([] { ui.savedPosition = ui.element.offset.x; });
+    test.Click("composites.canvas.e1.center");
+    test.Expect("the anchor control sets the center anchor and keeps the place", [] {
+        const float minX = ui.element.offset.x + 960.0f - ui.element.extent.x * 0.5f;
+        return ui.element.anchor == facet::CanvasAnchor::Center && std::fabs(minX - ui.savedPosition) < 0.01f;
+    });
+    test.Do([] { ui.savedPosition = ui.element.offset.x; });
+    // The lower left part of the element: the anchor control sits beside its top right.
+    test.MouseMove(T::Item("composites.canvas.e1", 0.2f, 0.8f));
+    test.MouseDown();
+    test.MouseMove(T::Item("composites.canvas.e1", 0.2f, 0.8f).Offset(-60.0f, 0.0f));
+    test.KeyPress(ImGuiKey_Escape);
+    test.MouseUp();
+    test.Expect("Escape puts a dragged element back", [] { return ui.element.offset.x == ui.savedPosition; });
+    test.Click("composites.canvas.oversized");
+    test.Expect("an element larger than the canvas is shown", [] { return ui.canvasOversized; });
+    test.Click("composites.canvas.oversized");
 
     // ---- Property grid ----
     // Each control edits through the finished widget and reports one change per edit.

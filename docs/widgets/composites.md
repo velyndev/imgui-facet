@@ -675,7 +675,17 @@ void EndPreviewCanvas();
 class PreviewCanvasScope;
 ```
 
-Letterboxed preview of a target resolution with grid, safe area and guides. Status: planned.
+A letterboxed preview of a screen of `referenceSize` reference pixels, scaled to fit the widget:
+the bands around the screen in fill[3], the screen in the window background with a hairline, the
+grid every `gridSpacing` reference pixels in the separator color (left out when it would draw more
+than 64 lines along an axis), and the safe area as a dashed frame (`media.dashLength`,
+`media.dashGap`) in labelTertiary. The default width fills the available width; the default height
+follows the reference aspect ratio. Canvas elements are submitted between Begin and End; End draws
+on top of them the center guides while an element is moved (`centerGuides`) and the guide an
+element snapped to, in the focusRing color. A click on empty canvas clears the selection. Elements
+larger than the canvas are clipped to the widget. A reference size with a component <= 0 draws an
+empty canvas of the 16:9 shape, and elements inside it submit nothing. Content is always submitted;
+`EndPreviewCanvas` is always called. Status: ready.
 
 ### CanvasElement
 
@@ -683,7 +693,28 @@ Letterboxed preview of a target resolution with grid, safe area and guides. Stat
 bool CanvasElement(const char* label, CanvasElementState* element, const CanvasElementOptions& options = {});
 ```
 
-Anchored, draggable element inside a preview canvas. Status: planned.
+A box inside `BeginPreviewCanvas`, placed in reference pixels from an anchor of the canvas:
+fill[2] (fill[1] on hover), the boundary hairline, an accent outline while selected, and the
+visible label part centered and cut to fit. After the call the box is the last item, so the caller
+can draw its own preview into `ImGui::GetItemRectMin` and `Max`.
+
+The box is one Tab stop. A press selects it and starts a move; the arrows move it by one reference
+pixel, Shift by ten; with `resizable`, Ctrl with the arrows moves its right or bottom edge (Shift:
+ten). Escape during a move or a resize puts it back. While selected, a resizable element shows
+eight handles (corners and edge middles, `composites.canvasHandleSize`, each grown to the minimum
+hit target) that resize it, and `anchorPicker` shows a 3 by 3 anchor control beside it (right,
+else left, else under or above it): each cell is a Tab stop named by `Strings::anchorTopLeft` to
+`anchorBottomRight` on hover and focus, and choosing one changes the anchor and the offset while
+the element stays where it is. With `snap`, a moved box or edge comes to the canvas edges and
+center, the safe area and the edges and centers of the other elements of the canvas (as they were
+in the last frame) when it is within `composites.canvasSnapDistance`; Alt held moves freely.
+Resizing never makes the element smaller than one reference pixel. The handles are not Tab stops;
+the keyboard resizes through Ctrl with the arrows.
+
+One element is selected per canvas; the header offers no selection of several elements. A canvas
+keeps up to 32 elements as snapping targets. `readOnly` shows the element, lets it take the focus
+and the selection, and writes nothing. Called outside a canvas it reports a usage error and submits
+nothing. Status: ready.
 
 ### LayerList
 
