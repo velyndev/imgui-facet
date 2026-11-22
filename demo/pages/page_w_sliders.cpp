@@ -965,7 +965,8 @@ FACET_DEMO_SELFTEST("sliders")
     test.Type("1950");
     test.KeyPress(ImGuiKey_Enter);
     test.Expect("a typed high year below the low one pushes it down",
-                [] { return ui.yearHigh == 1950 && ui.yearLow == 1949; });    test.KeyPress(ImGuiKey_Tab);
+                [] { return ui.yearHigh == 1950 && ui.yearLow == 1949; });
+    test.KeyPress(ImGuiKey_Tab);
     test.Type("0.9");
     test.KeyPress(ImGuiKey_Tab);
     test.Expect("the fields-only form stops the low value one gap before the high one",
@@ -1022,7 +1023,8 @@ FACET_DEMO_SELFTEST("sliders")
     test.Expect("a click left of the low handle moves it down", [] { return ui.histogramLow < 0.7f; });
     test.KeyPress(ImGuiKey_Tab);
     test.KeyPress(ImGuiKey_End);
-    test.ExpectNear("End stops the low handle one gap before the high one", [] { return ui.histogramLow; }, 0.85, 1e-6);    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
+    test.ExpectNear("End stops the low handle one gap before the high one", [] { return ui.histogramLow; }, 0.85, 1e-6);
+    test.Drag({Row("multi.levels", 0.97f), Row("multi.levels", 0.6f)}, 0.3f);
     test.Expect("a drag pushes the whole-number levels down", [] { return ui.levels[2] < 8; });
 
     test.Do([] { ui.yearLow = 1990; ui.yearHigh = 2020; });

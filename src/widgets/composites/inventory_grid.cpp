@@ -243,7 +243,8 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
                 tileId = last.ID;
                 rect = last.Rect;
                 hovered = ImGui::IsItemHovered();
-                focused = ImGui::IsItemFocused();                tileDisabled = tileDisabled || (last.ItemFlags & ImGuiItemFlags_Disabled) != 0;
+                focused = ImGui::IsItemFocused();
+                tileDisabled = tileDisabled || (last.ItemFlags & ImGuiItemFlags_Disabled) != 0;
                 if (focused)
                     focusedTile = i;
                 if (state.focusPending == i && !focused && !tileDisabled)
