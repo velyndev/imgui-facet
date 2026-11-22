@@ -1716,6 +1716,25 @@ ImRect PopupLevelRect(ImGuiID id)
     return level->rect;
 }
 
+bool PopupLevelSurface(const ImGuiWindow* window, ImVec4* surface)
+{
+    if (window == nullptr || !InFrame())
+        return false;
+    const HostState& s = State();
+    for (const Level& level : s.levels)
+    {
+        // A plain window is shared by the levels of one slot, so only the level that submitted it
+        // in this frame owns it.
+        if (level.id == 0 || level.window != window || level.submittedFrame != s.frame)
+            continue;
+        if (surface != nullptr)
+            *surface = level.options.glass ? T().colors.bgElevated
+                                           : T().colors.ElevatedSurface(LevelElevation(level.options));
+        return true;
+    }
+    return false;
+}
+
 PopupSide PopupLevelSide(ImGuiID id)
 {
     const Level* level = FindLevel(id);

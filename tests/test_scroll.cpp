@@ -14,6 +14,7 @@
 
 #include "core/core_internal.h"
 #include "internal/focus.h"
+#include "internal/popup_host.h"
 #include "internal/scroll.h"
 #include "support/session.h"
 
@@ -739,6 +740,75 @@ TEST_CASE("Scroll area: a popup opened inside a pushed surface fades into the po
     CHECK(pageVertices == 0);
     CHECK(elevatedVertices > 0);  // the bottom fade, where the rows continue
     CHECK(insideVertices > 0);
+}
+
+TEST_CASE("Scroll area: inside a forced popup level or a panel the fades take the level's surface")
+{
+    MotionGuard guard;
+    // In the dark theme the page background and the elevated surfaces differ.
+    facet::SetTheme(facet::Theme::Dark(), false);
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Colors& c = facet::T().colors;
+    const ImU32 page = facet::ToU32(c.bg);
+    const ImU32 popup = facet::ToU32(c.ElevatedSurface(2));
+    const ImU32 dialog = facet::ToU32(c.ElevatedSurface(3));
+    REQUIRE(page != popup);
+    REQUIRE(popup != dialog);
+    struct Count
+    {
+        int page = 0;
+        int popup = 0;
+        int dialog = 0;
+    };
+    Count forced;
+    Count panel;
+    const auto rows = [&](const char* id, Count* count) {
+        if (fi::BeginScrollAreaCore(id, {.size = ImVec2(200.0f, 120.0f)}))
+        {
+            ImGui::Dummy(ImVec2(180.0f, 900.0f));
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            fi::EndScrollAreaCore();  // draws the fades
+            *count = Count{};
+            for (const ImDrawVert& vertex : window->DrawList->VtxBuffer)
+            {
+                count->page += vertex.col == page ? 1 : 0;
+                count->popup += vertex.col == popup ? 1 : 0;
+                count->dialog += vertex.col == dialog ? 1 : 0;
+            }
+        }
+    };
+    bool opened = false;
+    session.SetUi([&] {
+        ImGui::Button("anchor");
+        fi::PopupAnchor anchor;
+        anchor.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        // A capture shows a level for one frame as a plain window, not a Dear ImGui popup.
+        const ImGuiID forcedId = ImGui::GetID("forced");
+        fi::ForcePopupLevelOpen(forcedId, anchor);
+        if (fi::BeginPopupLevel(forcedId))
+        {
+            rows("forced rows", &forced);
+            fi::EndPopupLevel();
+        }
+        // A panel is a plain window too, here at the dialog elevation.
+        const ImGuiID panelId = ImGui::GetID("panel");
+        if (!opened)
+        {
+            fi::OpenPopupLevel(panelId, anchor, {.kind = fi::PopupKind::Panel, .takeFocus = false, .elevation = 3});
+            opened = true;
+        }
+        if (fi::BeginPopupLevel(panelId))
+        {
+            rows("panel rows", &panel);
+            fi::EndPopupLevel();
+        }
+    });
+    session.Frames(4);
+    CHECK(forced.page == 0);
+    CHECK(forced.popup > 0);  // the bottom fade, where the rows continue
+    CHECK(panel.page == 0);
+    CHECK(panel.dialog > 0);
 }
 
 TEST_CASE("Scroll area: an End without its Begin is reported")

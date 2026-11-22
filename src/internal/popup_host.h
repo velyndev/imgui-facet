@@ -277,6 +277,13 @@ ImGuiID CurrentPopupLevel();
 ImRect PopupLevelRect(ImGuiID id);
 PopupSide PopupLevelSide(ImGuiID id);
 
+// The surface color behind the content of the level whose window is `window` (a root window),
+// shown in this frame: the elevated surface of the level's elevation, or bgElevated for a glass
+// level, whose tint over the blurred backdrop has no single color. False when `window` is no level
+// of the host. Forced levels and panels are plain windows, not Dear ImGui popups, so the scroll
+// core asks here which surface its edge fades blend into.
+bool PopupLevelSurface(const ImGuiWindow* window, ImVec4* surface);
+
 // True on the frame a mouse button was clicked over the scrim of Modal level `id`: outside its
 // window while it is the topmost level. The level stays open; the widget decides. A left press on
 // the scrim is held until its release, so even when the widget closes the dialog on it, it presses

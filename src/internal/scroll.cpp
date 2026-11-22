@@ -36,6 +36,7 @@
 #include "internal/item.h"
 #include "internal/keys.h"
 #include "internal/list_view.h"
+#include "internal/popup_host.h"
 #include "internal/subsystem.h"
 
 namespace facet::internal
@@ -449,6 +450,11 @@ ImVec4 ResolveSurface(const ImVec4& requested, const ImGuiWindow* parent)
         if (core.surfaceRoots[i] == 0 || core.surfaceRoots[i] == root->ID)
             return core.surfaces[i];
     }
+    // A level of the popup host fills its own surface; forced levels and panels are plain windows
+    // without the popup flag, so the host is asked first.
+    ImVec4 levelSurface;
+    if (PopupLevelSurface(root, &levelSurface))
+        return levelSurface;
     if ((root->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)) != 0)
         return T().colors.bgElevated;
     return T().colors.bg;

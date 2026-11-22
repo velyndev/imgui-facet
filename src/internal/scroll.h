@@ -124,8 +124,9 @@ struct ScrollAreaDesc
     bool edgeFades = true;             // a fade of the surface where content continues past an edge
     // The surface under the area, the color its edge fades blend into. Alpha 0 (the default)
     // takes the innermost PushScrollFadeSurface pushed in the same root window (a popup does not
-    // take a surface the page pushed), else bgElevated inside a popup or tooltip and bg
-    // everywhere else.
+    // take a surface the page pushed), else the surface of the popup host level the area is in
+    // (PopupLevelSurface, also for forced levels and panels), else bgElevated inside another
+    // popup or tooltip and bg everywhere else.
     ImVec4 fadeSurface = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     // Pixels between the area's edge and its content on every side; < 0 takes FocusRingOutset()
     // (focus.h), so the focus ring of content flush with the padding shows whole.
