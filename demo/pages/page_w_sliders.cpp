@@ -195,11 +195,19 @@ void ForceCaptureLook(facet::demo::PageCtx& ctx, int part = -1)
         ctx.ForceNextItemState(ForcedItemState::Hovered | ForcedItemState::Dragging, part);
 }
 
+// Room above a first row whose slider shows a value bubble, so the bubble of a held or focused
+// knob stays clear of the paragraph above it.
+void BubbleRoom()
+{
+    ImGui::Dummy(ImVec2(0.0f, facet::Px(facet::T().spacing.lg)));
+}
+
 void SliderSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Slider");
     Paragraph("Drag the knob or click the track. Arrow keys step, Shift finer and Ctrl coarser, Page Up and Down "
               "move a tenth, Home and End go to the ends; Ctrl+click or Enter types a value, Escape restores it.");
+    BubbleRoom();
 
     LabeledRow("Continuous");
     // Hovered and focused show on this slider, dragging on the range below.
@@ -374,6 +382,7 @@ void RangeSection(facet::demo::PageCtx& ctx)
     Paragraph("Two handles, each its own Tab stop. Handles never cross and keep the minimum gap; dragging the filled "
               "span moves both, a click on the empty track moves the nearer handle. Ctrl+click or Enter on a handle "
               "types its value.");
+    BubbleRoom();
 
     LabeledRow("Minimum gap");
     const bool rangeState = ctx.capture && ctx.captureState == kDragging;

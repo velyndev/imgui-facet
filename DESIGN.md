@@ -916,6 +916,8 @@ The dose caps in Direction apply. The choices behind each effect:
   and canvas), so a page stays short enough to scan and each page's note speaks for what it shows.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
   page holds at a large scale in a small window.
+- **Value bubble room.** A section whose first slider shows a value bubble leaves spacing.lg
+  above that row, so the bubble of a held or focused knob never covers the paragraph above it.
 - **App shell.** The reasons for the test app's own chrome (the title bar, the navigation, the
   theme editor, the overlay backdrop and the showcase page) are in `docs/demo.md` under "Design
   reasons of the app shell", next to its description.
