@@ -623,6 +623,9 @@ void PlaceLevel(Level& level, ImVec2 wanted)
     in.side = level.anchor.side;
     in.align = level.anchor.align;
     in.matchWidth = level.anchor.matchWidth;
+    in.fallback = level.anchor.fallback;
+    in.fallbackSide = level.anchor.fallbackSide;
+    in.fallbackAlign = level.anchor.fallbackAlign;
     in.size = wanted;
     in.minWidth = level.options.minWidth;
     in.bounds = WorkBounds();
@@ -1363,6 +1366,18 @@ void PopupThemeChanged()
 } // namespace
 
 // ---- Levels -------------------------------------------------------------------------------------
+
+PopupAnchor PanelAnchor(const ImRect& rect)
+{
+    PopupAnchor anchor;
+    anchor.rect = rect;
+    anchor.side = PopupSide::After;
+    anchor.align = PopupAlign::Center;
+    anchor.fallback = true;
+    anchor.fallbackSide = PopupSide::Below;
+    anchor.fallbackAlign = PopupAlign::Start;
+    return anchor;
+}
 
 void OpenPopupLevel(ImGuiID id, const PopupAnchor& anchor, const PopupOptions& options)
 {

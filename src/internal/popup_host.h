@@ -82,7 +82,19 @@ struct PopupAnchor
     PopupSide side = PopupSide::Below; // preferred side; the opposite one when only that one has room for the level
     PopupAlign align = PopupAlign::Start;  // along the anchor edge; then moved to stay overlay.viewportMargin inside the display
     bool matchWidth = false;           // Below and Above: at least as wide as the anchor (dropdown lists)
+    // When the level fits on neither `side` nor the opposite one, it goes to `fallbackSide` with
+    // `fallbackAlign` and flips or shrinks there by the usual rules (PanelAnchor).
+    bool fallback = false;
+    PopupSide fallbackSide = PopupSide::Below;
+    PopupAlign fallbackAlign = PopupAlign::Start;
 };
+
+// The anchor of a panel that an item opens (a color picker, a calendar, a popover): beside
+// `rect` and centered on it, so the panel does not cover the rows under the item. It opens
+// after the item, before it when only that side has room, and under or over the item with the
+// start edges lined up when neither side holds it (a field that fills its row). Lists and menus
+// do not use it: they continue their field and open under it.
+PopupAnchor PanelAnchor(const ImRect& rect);
 
 // How a level behaves.
 enum class PopupKind

@@ -97,11 +97,21 @@ PopupPlacement PlacePopup(const PopupPlaceInput& in)
     }
     else
     {
-        // 2. The side.
-        const PopupSide preferred = in.side;
-        const PopupSide opposite = OppositePopupSide(preferred);
+        // 2. The side. A level with a fallback leaves the preferred side's axis when neither of
+        // its two sides holds it.
         const auto mainOf = [&](PopupSide side) { return IsVertical(side) ? size.y : size.x; };
         const auto fits = [&](PopupSide side) { return RoomOn(in, side) >= mainOf(side); };
+        PopupSide preferred = in.side;
+        PopupAlign wantedAlign = in.align;
+        if (in.fallback && !fits(preferred) && !fits(OppositePopupSide(preferred)))
+        {
+            preferred = in.fallbackSide;
+            wantedAlign = in.fallbackAlign;
+            out.fellBack = true;
+            if (in.matchWidth && IsVertical(preferred))
+                size.x = std::min(std::max(size.x, in.anchor.GetWidth()), avail.x);
+        }
+        const PopupSide opposite = OppositePopupSide(preferred);
         PopupSide side = preferred;
         bool shrink = false;
         bool cover = false;
@@ -150,7 +160,7 @@ PopupPlacement PlacePopup(const PopupPlaceInput& in)
         const int axis = IsVertical(side) ? 0 : 1;
         const float boundsMin = in.bounds.Min[axis];
         const float boundsMax = in.bounds.Min[axis] + avail[axis];
-        PopupAlign align = in.align;
+        PopupAlign align = wantedAlign;
         float along = AlignOnEdge(align, in.anchor.Min[axis], in.anchor.Max[axis], size[axis]);
         const bool hasRegion = in.region.Max[axis] > in.region.Min[axis];
         if (hasRegion && align != PopupAlign::Center)

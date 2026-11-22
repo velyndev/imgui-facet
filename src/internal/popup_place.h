@@ -22,7 +22,10 @@
 //      there, else the opposite side when it fits there. When it fits on neither, the side with
 //      more room takes it and the level shrinks along that axis to the room (it then scrolls);
 //      when even that room is below minExtent, the level is clamped into the bounds and may
-//      cover its anchor (an anchor as tall as the display has no room beside it).
+//      cover its anchor (an anchor as tall as the display has no room beside it). With a
+//      `fallback`, a level that fits on neither the preferred side nor its opposite goes to
+//      `fallbackSide` with `fallbackAlign` instead, and this rule runs for that side and its
+//      opposite: a panel beside a field that fills its row opens under the field.
 //   3. Along the anchor edge the level is aligned by `align`, then shifted to stay inside the
 //      bounds. With a `region` (the window that holds the anchor), a Start or End alignment
 //      turns to the other end when only that keeps more of the level over the region: a "more"
@@ -55,6 +58,9 @@ struct PopupPlaceInput
     PopupSide currentSide = PopupSide::Below;
     bool center = false;                // centered in the bounds, the anchor ignored (dialogs)
     ImRect region;                      // the anchor's window; an empty rect for none (rule 3)
+    bool fallback = false;              // leave the side's axis when neither of its two sides holds the level (rule 2)
+    PopupSide fallbackSide = PopupSide::Below;
+    PopupAlign fallbackAlign = PopupAlign::Start;
 };
 
 struct PopupPlacement
@@ -65,6 +71,7 @@ struct PopupPlacement
     bool shrunk = false;                // smaller than wanted along the side's axis (it scrolls)
     bool coversAnchor = false;          // no room on either side: clamped over the anchor
     PopupAlign align = PopupAlign::Start;  // the alignment it took along the anchor edge (rule 3)
+    bool fellBack = false;              // placed by the fallback side and alignment (rule 2)
 };
 
 PopupPlacement PlacePopup(const PopupPlaceInput& input);

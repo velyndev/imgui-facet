@@ -357,6 +357,70 @@ TEST_CASE("popup placement: content larger than the screen")
     CHECK(p.rect.GetHeight() == 300.0f);
 }
 
+TEST_CASE("popup placement: a panel opens beside its anchor, centered, and under it when neither side holds it")
+{
+    const auto panel = [](ImRect anchor, ImVec2 size) {
+        PopupPlaceInput in = Input(anchor, PopupSide::After, size);
+        in.align = PopupAlign::Center;
+        in.fallback = true;
+        in.fallbackSide = PopupSide::Below;
+        in.fallbackAlign = PopupAlign::Start;
+        return in;
+    };
+    const ImVec2 size(240.0f, 200.0f);
+
+    // Room after the anchor: beside it, centered on it.
+    const ImRect well(ImVec2(100.0f, 290.0f), ImVec2(160.0f, 310.0f));
+    PopupPlacement p = fi::PlacePopup(panel(well, size));
+    CHECK(p.side == PopupSide::After);
+    CHECK_FALSE(p.fellBack);
+    CHECK(p.rect.Min.x == 164.0f);
+    CHECK(p.rect.GetCenter().y == 300.0f);
+
+    // Near the lower edge it is centered as far as the bounds allow.
+    p = fi::PlacePopup(panel(ImRect(ImVec2(100.0f, 560.0f), ImVec2(160.0f, 580.0f)), size));
+    CHECK(p.side == PopupSide::After);
+    CHECK(p.rect.Min.x == 164.0f);
+    CHECK(p.rect.Max.y == kBounds.Max.y);
+
+    // No room after it: before it, still centered.
+    p = fi::PlacePopup(panel(ImRect(ImVec2(700.0f, 290.0f), ImVec2(760.0f, 310.0f)), size));
+    CHECK(p.side == PopupSide::Before);
+    CHECK(p.flipped);
+    CHECK_FALSE(p.fellBack);
+    CHECK(p.rect.Max.x == 696.0f);
+    CHECK(p.rect.GetCenter().y == 300.0f);
+
+    // A field that fills its row has room on neither side: under it, the start edges lined up.
+    const ImRect field(ImVec2(40.0f, 100.0f), ImVec2(760.0f, 128.0f));
+    p = fi::PlacePopup(panel(field, size));
+    CHECK(p.fellBack);
+    CHECK(p.side == PopupSide::Below);
+    CHECK_FALSE(p.flipped);
+    CHECK(p.rect.Min.x == 40.0f);
+    CHECK(p.rect.Min.y == 132.0f);
+
+    // The same field near the lower edge: over it.
+    p = fi::PlacePopup(panel(ImRect(ImVec2(40.0f, 500.0f), ImVec2(760.0f, 528.0f)), size));
+    CHECK(p.fellBack);
+    CHECK(p.side == PopupSide::Above);
+    CHECK(p.flipped);
+    CHECK(p.rect.Max.y == 496.0f);
+
+    // Taller than the bounds: as tall as the bounds, and still beside the anchor.
+    p = fi::PlacePopup(panel(well, ImVec2(240.0f, 2000.0f)));
+    CHECK(p.side == PopupSide::After);
+    CHECK(p.rect.GetHeight() == kBounds.GetHeight());
+
+    // Without the fallback the level stays on its side's axis.
+    PopupPlaceInput plain = panel(field, size);
+    plain.fallback = false;
+    p = fi::PlacePopup(plain);
+    CHECK_FALSE(p.fellBack);
+    CHECK((p.side == PopupSide::After || p.side == PopupSide::Before));
+    CHECK(Inside(p.rect, kBounds));
+}
+
 TEST_CASE("popup placement: keeps its side while it fits, point anchors, anchors outside, whole pixels, centered")
 {
     const ImRect anchor(ImVec2(300, 250), ImVec2(400, 280));
@@ -1075,6 +1139,46 @@ TEST_CASE("popup host: a level keeps its side while only its content changes")
     session.Frames(3);
     CHECK(fi::PopupLevelSide(kLevel1) == PopupSide::Above);
     CHECK(fi::PopupLevelRect(kLevel1).GetHeight() == doctest::Approx(100.0f + facet::Px(facet::T().spacing.xs) * 2.0f));
+}
+
+TEST_CASE("popup host: a panel anchor opens the level beside its item, and under an item that fills the row")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    bool requestOpen = true;
+    float anchorWidth = 60.0f;
+    session.SetUi([&] {
+        ImGui::SetCursorPos(ImVec2(40.0f, 280.0f));
+        ImGui::Button("anchor", ImVec2(anchorWidth, 24.0f));
+        session.Track("anchor");
+        if (requestOpen)
+        {
+            fi::OpenPopupLevel(kLevel1, fi::PanelAnchor(LastItemRect()));
+            requestOpen = false;
+        }
+        fi::SetPopupLevelAnchor(kLevel1, fi::PanelAnchor(LastItemRect()));
+        if (fi::BeginPopupLevel(kLevel1))
+        {
+            ImGui::Dummy(ImVec2(200.0f, 160.0f));
+            fi::EndPopupLevel();
+        }
+    });
+    session.Frames(3);
+    ImRect anchor = session.ItemRect("anchor");
+    ImRect level = fi::PopupLevelRect(kLevel1);
+    CHECK(fi::PopupLevelSide(kLevel1) == PopupSide::After);
+    CHECK(level.Min.x >= anchor.Max.x);
+    CHECK(std::fabs(level.GetCenter().y - anchor.GetCenter().y) <= 1.0f);
+
+    // The item grows to fill the row: no room beside it, so the level goes under it.
+    anchorWidth = ImGui::GetIO().DisplaySize.x - 80.0f;
+    session.Frames(3);
+    anchor = session.ItemRect("anchor");
+    level = fi::PopupLevelRect(kLevel1);
+    CHECK(fi::PopupLevelSide(kLevel1) == PopupSide::Below);
+    CHECK(level.Min.y >= anchor.Max.y);
+    CHECK(std::fabs(level.Min.x - anchor.Min.x) <= 1.0f);
 }
 // ==== Motion and replay ==============================================================================
 
