@@ -212,7 +212,7 @@ void DrawCaptureField(const facet::Theme& theme, const facet::demo::PageCtx& ctx
 void DrawCaptureSection(const facet::Theme& theme, const facet::demo::PageCtx& ctx)
 {
     facet::demo::SectionHeader("Chord capture");
-    facet::demo::Paragraph("A prototype of the capture that KeybindCapture will use. While it listens it owns "
+    facet::demo::Paragraph("A prototype field on the capture that KeybindCapture builds on. While it listens it owns "
                            "every key, so shortcuts, key binds and keyboard navigation stay quiet; the chord "
                            "is taken when its last key is released.");
     facet::internal::BeginRowGroup("capture");

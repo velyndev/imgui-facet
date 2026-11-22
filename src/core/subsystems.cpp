@@ -3,7 +3,7 @@
 // Init, NewFrame and EndFrame run in table order, Shutdown in reverse, so every module still
 // finds what it depends on. The order and its reasons:
 //
-// Core, in place since Phase 1b:
+// Core, first, because every later module reads it:
 //   theme, scale       plain token state that every later module reads; theme's EndFrame
 //                      also closes accent scopes left open
 //   state storage      per-widget state other modules may keep entries in
@@ -14,7 +14,7 @@
 //   shadow             shadow and glow atlas; rasterized per scale
 //   blur               backdrop blur pass; optional, it may fall back
 //
-// Interaction and surface blocks (Phase 1c), before every widget:
+// Interaction and surface blocks, before every widget:
 //   input              key chord state and the shortcut triggers of the frame: plain input
 //                      bookkeeping that the later blocks may read
 //   focus              keyboard modality (whether focus rings show), decided before any
@@ -28,7 +28,7 @@
 //                      popups, on the foreground layer, so it stays on top
 //   text field         per-frame state of the text field core
 //
-// Widgets (Phase 1c and 2), after the blocks they build on:
+// Widgets, after the blocks they build on:
 //   widgets common     the control size stack; EndFrame closes sizes left pushed
 //   one entry per family or part of a family that is built on its own (buttons, selection,
 //                      sliders, text inputs, value inputs, lists, containers, display, color

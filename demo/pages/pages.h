@@ -17,8 +17,8 @@
 // after that content so the change is scrolled into the captured image.
 //
 // Groups appear in the navigation in this order: Start (the showcase the app opens on),
-// Foundations, Media, Blocks (the building blocks of Phase 1c), Widgets (one page per widget
-// family); any other group follows them.
+// Foundations, Media, Blocks (the shared building blocks under the widgets), Widgets (one page
+// per widget family); any other group follows them.
 // Inside a group, pages are ordered by `order`, then by title.
 //
 // Interaction states in capture runs: a capture renders without input, so a page shows the
