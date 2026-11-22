@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -80,6 +81,11 @@ struct LayoutState
     int smallPresses = 0;
     int largePresses = 0;
     float rowControlX[3] = {};      // where the controls of the first three rows start
+    // Controls with their own label in front
+    int frontLevel = 50;
+    bool frontToggle = false;
+    int frontChoice = 0;
+    char frontText[64] = {};
     float largeLabelTop = 0.0f;     // the label of the Large row
     float largeTextTop = 0.0f;      // where the Large button draws its text
     bool largeStacked = false;      // the Large row is too narrow for label and control on one line
@@ -235,6 +241,23 @@ void SettingsRows(facet::demo::PageCtx& ctx, LayoutState& s)
     facet::Toggle("##value", &off);
     facet::EndSettingsRow();
     ImGui::EndDisabled();
+
+    // Controls with a label of their own in front take the same column.
+    ImGui::Spacing();
+    Paragraph("Controls with a label of their own in front take the same label column, so they line up with "
+              "the rows above whatever their labels say; a slider's value column is shared, so the tracks keep "
+              "one length. Below the label column and the narrowest control the label keeps only its text. The "
+              "labels are placeholders.");
+    facet::Slider("Volume", &s.frontLevel, 0, 100, {.format = "%d %%"});
+    ctx.Probe("layout.front.slider");
+    facet::Toggle("Placeholder switch", &s.frontToggle, {.width = facet::kFill});
+    ctx.Probe("layout.front.toggle");
+    facet::Dropdown("Quality", &s.frontChoice, kSegments);
+    ctx.Probe("layout.front.dropdown");
+    facet::TextField("A placeholder label longer than the label column", s.frontText, sizeof(s.frontText),
+                     {.placeholder = "Placeholder text"});
+    ctx.Probe("layout.front.field");
+    Note("Volume %d, switch %s, quality %s.", s.frontLevel, s.frontToggle ? "on" : "off", kSegments[s.frontChoice]);
 }
 
 void Stacks(facet::demo::PageCtx& ctx, LayoutState& s)
@@ -664,6 +687,10 @@ FACET_DEMO_SELFTEST("layout")
         s.level = kDefaultLevel;
         s.smallPresses = 0;
         s.largePresses = 0;
+        s.frontLevel = 50;
+        s.frontToggle = false;
+        s.frontChoice = 0;
+        s.frontText[0] = '\0';
         for (int& presses : s.stackPresses)
             presses = 0;
         s.otherPresses = 0;
@@ -690,6 +717,29 @@ FACET_DEMO_SELFTEST("layout")
         return s.largeStacked ? s.largeLabelTop < s.largeTextTop : std::fabs(s.largeLabelTop - s.largeTextTop) < 0.5f;
     });
     test.Expect("the rows of the narrow card stack their control", [] { return State().narrowStacked; });
+    // Controls with their own label: a click just past the label column lands on each control, the
+    // start of the slider's track included, whatever the label says.
+    {
+        const float past = facet::T().layout.labelColumn + facet::T().spacing.xs;
+        const auto AtColumn = [past](const char* probe) { return T::Item(probe, 0.0f, 0.5f).Offset(past, 0.0f); };
+        test.MouseMove(AtColumn("layout.front.slider"));
+        test.MouseDown();
+        test.MouseUp();
+        test.Expect("a click past the label column lands at the start of the slider's track",
+                    [] { return State().frontLevel < 25; });
+        test.MouseMove(AtColumn("layout.front.toggle"));
+        test.MouseDown();
+        test.MouseUp();
+        test.Expect("a click past the label column flips the switch", [] { return State().frontToggle; });
+        test.MouseMove(AtColumn("layout.front.field"));
+        test.MouseDown();
+        test.MouseUp();
+        test.ExpectFocused("layout.front.field");
+        test.Type("typed");
+        test.Expect("the field with a cut label takes the typed text",
+                    [] { return std::string(State().frontText) == "typed"; });
+        test.KeyPress(ImGuiKey_Escape);
+    }
     // Mouse and keyboard reach the controls in the rows.
     test.Click("layout.row.toggle");
     test.Expect("a click on the switch in a row flips it", [] { return State().toggle; });
