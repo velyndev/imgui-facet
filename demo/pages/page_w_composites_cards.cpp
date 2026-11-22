@@ -211,20 +211,20 @@ void Reset()
     CardsUi fresh;
     ui = fresh;
     const facet::Colors& c = facet::T().colors;
-    ui.bag[0] = Placeholder("Placeholder item 1", "file", 6, 1, 20);
-    ui.bag[1] = Placeholder("Placeholder item 2", "folder");
-    ui.bag[3] = Placeholder("Placeholder item 1", "file", 3, 1, 20);
-    ui.bag[4] = Placeholder("Placeholder item 3", "image");
+    ui.bag[0] = Placeholder("Item 1", "file", 6, 1, 20);
+    ui.bag[1] = Placeholder("Item 2", "folder");
+    ui.bag[3] = Placeholder("Item 1", "file", 3, 1, 20);
+    ui.bag[4] = Placeholder("Item 3", "image");
     ui.bag[4].image = assets.patterns[0];
     ui.bag[4].tint = facet::ToU32(c.chart[0]);
-    ui.bag[5] = Placeholder("Placeholder item 4, locked", "folder");
+    ui.bag[5] = Placeholder("Item 4", "folder");
     ui.bag[5].locked = true;
-    ui.bag[6] = Placeholder("Placeholder item 5 with a title far too long for one slot", "star");
-    ui.bag[8] = Placeholder("Placeholder item 6, cooling down", "clock");
+    ui.bag[6] = Placeholder("Item 5 with a title far too long for one slot", "star");
+    ui.bag[8] = Placeholder("Item 6", "clock");
     ui.bag[8].cooldown = 0.4f;
     ui.bag[8].tint = facet::ToU32(c.chart[2]);
-    ui.bag[9] = Placeholder("Placeholder item 7", "heart", 12, 2, 0);
-    ui.bag[11] = Placeholder("Placeholder item 8", "image");
+    ui.bag[9] = Placeholder("Item 7", "heart", 12, 2, 0);
+    ui.bag[11] = Placeholder("Item 8", "image");
     ui.bag[11].image = assets.patterns[2];
     ui.tile = Placeholder("Placeholder tile", "star", 2);
     ui.tile.image = assets.patterns[3];
@@ -238,7 +238,7 @@ void BuildLarge()
         return;
     const char* const icons[] = {"file", "folder", "image", "star"};
     for (int i = 0; i < kLargeSlots; ++i)
-        LargeItems[i] = Placeholder("Placeholder item", icons[i % 4], 1 + i % 5);
+        LargeItems[i] = Placeholder("Item", icons[i % 4], 1 + i % 5);
     built = true;
 }
 
@@ -769,7 +769,7 @@ FACET_DEMO_SELFTEST("composites-cards")
     test.KeyPress(ImGuiKey_UpArrow);
     test.KeyPress(ImGuiKey_Space);
     test.Expect("Space, Up and Space move it back into the bag", [] {
-        return ui.equip[0].label == nullptr || std::strcmp(ui.equip[0].label, "Placeholder item 3") != 0;
+        return ui.equip[0].label == nullptr || std::strcmp(ui.equip[0].label, "Item 3") != 0;
     });
 
     // The standalone tile: click, then Space and Enter after Tab shows the focus.
