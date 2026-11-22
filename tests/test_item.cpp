@@ -1,6 +1,11 @@
 // Item behaviour (src/internal/item.h): the behaviour every Facet widget runs, the forced state
 // request used by capture runs, and the widget entry and exit helpers.
 
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
+
 #include <doctest/doctest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -409,4 +414,40 @@ TEST_CASE("Widget edit: a widget written while another item is active still repo
     hold = true;
     session.Frame();
     CHECK(edited);
+}
+
+TEST_CASE("Widget edit: no widget or block calls ImGui::MarkItemEdited past MarkWidgetEdited")
+{
+    // ImGui::MarkItemEdited asserts when the edited id is not the active item (a write from a
+    // popover, an Escape restore while a part is active), and only Debug builds show it. So every
+    // edit goes through MarkWidgetEdited, the one place that calls Dear ImGui's function.
+    const std::filesystem::path src = std::filesystem::path(FACET_TEST_SOURCE_DIR) / "src";
+    const std::filesystem::path allowed = src / "internal" / "item.cpp";
+    int scanned = 0;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(src))
+    {
+        const std::filesystem::path& path = entry.path();
+        if (!entry.is_regular_file() || (path.extension() != ".cpp" && path.extension() != ".h"))
+            continue;
+        ++scanned;
+        if (std::filesystem::equivalent(path, allowed))
+            continue;
+        std::ifstream file(path, std::ios::binary);
+        std::stringstream text;
+        text << file.rdbuf();
+        const std::string source = text.str();
+        // Every occurrence outside a // comment counts as a call.
+        std::size_t at = 0;
+        int calls = 0;
+        while ((at = source.find("ImGui::MarkItemEdited(", at)) != std::string::npos)
+        {
+            const bool inComment = source.rfind("//", at) != std::string::npos &&
+                                   source.find('\n', source.rfind("//", at)) > at;
+            calls += inComment ? 0 : 1;
+            ++at;
+        }
+        INFO("file: " << path.string());
+        CHECK(calls == 0);
+    }
+    CHECK(scanned > 100);  // the source tree was found
 }

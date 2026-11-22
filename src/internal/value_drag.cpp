@@ -520,7 +520,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         {
             *value = next;
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
     };
     const auto cancel = [&]() {
@@ -529,7 +529,7 @@ ValueDragResult ValueDragBehavior(const ItemState& item, double* value, const Im
         {
             *value = session.startValue;
             result.changed = true;
-            ImGui::MarkItemEdited(id);
+            MarkWidgetEdited(id);
         }
         result.canceled = true;
         MarkEditCanceled(id);

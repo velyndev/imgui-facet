@@ -304,7 +304,7 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

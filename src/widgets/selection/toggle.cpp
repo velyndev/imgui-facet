@@ -132,7 +132,7 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         written = *value != result || item.mixed;
         *value = result;
         if (written)
-            ImGui::MarkItemEdited(id);
+            internal::MarkWidgetEdited(id);
     }
 
     // Motion: the knob springs (quick spring), the colors follow over durationFast.

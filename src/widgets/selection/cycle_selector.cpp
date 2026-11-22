@@ -223,7 +223,7 @@ bool CycleSelectorImpl(const char* label, int* index, const internal::SelectionI
     ImGui::EndGroup();
     internal::FinishWidgetGroup(id);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

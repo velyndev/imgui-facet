@@ -150,7 +150,7 @@ bool CheckboxGroupImpl(const char* label, std::span<bool> checked, const interna
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

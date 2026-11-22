@@ -98,7 +98,7 @@ bool RunRating(const char* label, Value* value, const RatingOptions& options)
             chosen = 0.0;
         written = internal::NumberValueStore(chosen, value);
         if (written)
-            ImGui::MarkItemEdited(id);
+            internal::MarkWidgetEdited(id);
     }
 
     // The keys, through the value drag core without its mouse input.

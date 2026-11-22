@@ -1092,7 +1092,7 @@ TextFieldResult TextFieldCall(const char* label, std::string* text, char* buffer
             {
                 buf[0] = 0;
             }
-            ImGui::MarkItemEdited(clearId);
+            MarkWidgetEdited(clearId);
             clearPressed = true;
             TextFieldRequestFocus(id, TextFieldFocus::End);
         }

@@ -204,7 +204,7 @@ bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOption
                 {
                     *chord = state.capture.Result();
                     written = true;
-                    ImGui::MarkItemEdited(slotId);
+                    internal::MarkWidgetEdited(slotId);
                 }
             }
             else if (event == internal::ChordCaptureEvent::Canceled)
@@ -251,7 +251,7 @@ bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOption
                 {
                     *chord = ImGuiKey_None;
                     written = true;
-                    ImGui::MarkItemEdited(slotId);
+                    internal::MarkWidgetEdited(slotId);
                 }
             }
         }
@@ -286,7 +286,7 @@ bool KeybindCapture(const char* label, Keybind* bind, const KeybindCaptureOption
                 {
                     *chord = ImGuiKey_None;
                     written = true;
-                    ImGui::MarkItemEdited(clear.id);
+                    internal::MarkWidgetEdited(clear.id);
                 }
             }
         }

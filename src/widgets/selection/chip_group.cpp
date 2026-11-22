@@ -313,7 +313,7 @@ bool ChipGroupImpl(const char* label, ChipGroupKind kind, std::span<bool> flags,
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

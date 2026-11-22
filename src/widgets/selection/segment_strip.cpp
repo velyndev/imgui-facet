@@ -448,7 +448,7 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
     ImGui::EndGroup();
     FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        MarkWidgetEdited(editor);
     return written;
 }
 

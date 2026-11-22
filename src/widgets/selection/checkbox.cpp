@@ -91,7 +91,6 @@ bool SelectionCheckbox(const char* label, ImGuiID id, SelectionMark* mark, const
     if (paint.origin != 0 && paint.origin != id && frame - paint.seenFrame > 1)
         paint = {};  // the first box is gone
     bool pressHandled = false;
-    bool painted = false;  // written by a drag that started on another box
     if (interactive)
     {
         if (item.activated && g.ActiveIdSource == ImGuiInputSource_Mouse)
@@ -118,7 +117,6 @@ bool SelectionCheckbox(const char* label, ImGuiID id, SelectionMark* mark, const
             {
                 result = paint.value;
                 edited = true;
-                painted = true;
             }
         }
         if (item.pressed && !pressHandled && !edited)
@@ -131,19 +129,9 @@ bool SelectionCheckbox(const char* label, ImGuiID id, SelectionMark* mark, const
     if (written)
     {
         *mark = result;
-        if (painted)
-        {
-            // The first box holds the mouse, so this box is not Dear ImGui's active item and
-            // ImGui::MarkItemEdited would assert: its edited status is set as that call sets it.
-            ImGuiLastItemData& last = g.LastItemData;
-            last.StatusFlags |= ImGuiItemStatusFlags_EditedInternal;
-            if ((last.ItemFlags & ImGuiItemFlags_NoMarkEdited) == 0)
-                last.StatusFlags |= ImGuiItemStatusFlags_Edited;
-        }
-        else
-        {
-            ImGui::MarkItemEdited(id);
-        }
+        // While a drag paints the boxes, the first box holds the mouse, so this box is not Dear
+        // ImGui's active item; MarkWidgetEdited sets its edited status without the assert.
+        internal::MarkWidgetEdited(id);
     }
 
     const float onAmount = SelectionMarkAmount(id, result != SelectionMark::Off);

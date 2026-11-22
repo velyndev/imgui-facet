@@ -248,9 +248,10 @@ void FinishWidgetGroup(ImGuiID widgetId)
 void MarkWidgetEdited(ImGuiID id)
 {
     ImGuiContext& g = *GImGui;
-    // The cases Dear ImGui's own check accepts.
+    // The cases Dear ImGui's own check accepts (the assert in ImGui::MarkItemEdited).
     if (g.DragDropActive || g.ActiveId == id || g.ActiveId == 0 || g.DeactivatedItemData.ID == id ||
-        g.ActiveIdPreviousFrame == id || g.NavJustMovedToId != 0)
+        g.ActiveIdPreviousFrame == id || g.NavJustMovedToId != 0 ||
+        (g.CurrentMultiSelect != nullptr && g.BoxSelectState.IsActive))
     {
         ImGui::MarkItemEdited(id);
         return;

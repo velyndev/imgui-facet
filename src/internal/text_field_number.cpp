@@ -529,7 +529,7 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
     result.field = TextFieldCall(label, nullptr, state.edit, sizeof(state.edit), field, hooks);
     state.frame = result.field.frame;
     if (markEdited)
-        ImGui::MarkItemEdited(id);
+        MarkWidgetEdited(id);
     markEdited = false;
 
     // ---- Typed text ----
@@ -631,12 +631,12 @@ NumberFieldResult NumberFieldBehavior(const char* label, double* value, const Nu
         {
             result.stepped = true;
             // The stepper is the active part while held: its press and release are one edit session.
-            ImGui::MarkItemEdited(steppers.increasePresses > 0 ? steppers.increaseId : steppers.decreaseId);
+            MarkWidgetEdited(steppers.increasePresses > 0 ? steppers.increaseId : steppers.decreaseId);
             markEdited = false;
         }
     }
     if (markEdited)
-        ImGui::MarkItemEdited(id);
+        MarkWidgetEdited(id);
     result.field.committed = IsItemEditCommitted();
     result.field.canceled = IsItemEditCanceled();
     return result;

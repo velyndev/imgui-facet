@@ -212,7 +212,9 @@ void FinishWidgetGroup(ImGuiID widgetId);
 // Marks the last item edited, as ImGui::MarkItemEdited(id) does, also when `id` is not Dear ImGui's
 // active item: a widget whose value its popover wrote, or that Escape restored while a part inside
 // the popover was active. ImGui::MarkItemEdited asserts in that case; here the last item's edited
-// status is set the same way and the active item's edit flags are left alone.
+// status is set the same way and the active item's edit flags are left alone. Every Facet widget and
+// block reports its edits through this call, never through ImGui::MarkItemEdited directly (a test
+// checks the sources), so an edit made while another item is active never asserts.
 void MarkWidgetEdited(ImGuiID id);
 
 } // namespace facet::internal

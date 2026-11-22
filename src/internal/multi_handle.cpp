@@ -679,7 +679,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             // Every handle back where the edit began; written only when one had moved.
             if (RestoreSnapshot(id, v, keys))
             {
-                ImGui::MarkItemEdited(handleIds[i]);
+                MarkWidgetEdited(handleIds[i]);
                 result.changed = true;
             }
             result.canceled = true;
@@ -850,7 +850,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
                 if (changed)
                 {
                     result.changed = true;
-                    ImGui::MarkItemEdited(spanId);
+                    MarkWidgetEdited(spanId);
                 }
             }
             ImGui::SetKeyOwner(ImGuiKey_Escape, spanId);
@@ -858,7 +858,7 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
             {
                 if (RestoreSnapshot(id, v, keys))
                 {
-                    ImGui::MarkItemEdited(spanId);
+                    MarkWidgetEdited(spanId);
                     result.changed = true;
                 }
                 MarkEditCanceled(spanId);

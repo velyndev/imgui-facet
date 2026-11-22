@@ -219,7 +219,7 @@ bool RadioGroupImpl(const char* label, int* index, const internal::SelectionItem
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
     if (written)
-        ImGui::MarkItemEdited(editor);
+        internal::MarkWidgetEdited(editor);
     return written;
 }
 

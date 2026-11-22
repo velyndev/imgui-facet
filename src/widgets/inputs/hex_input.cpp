@@ -237,7 +237,7 @@ bool RunHexInput(const char* label, Value* value, const HexInputOptions& options
     params.displayText = options.mixed ? nullptr : display;
     const internal::TextFieldResult field = internal::TextFieldBehavior(label, state.edit, sizeof(state.edit), params);
     if (written)
-        ImGui::MarkItemEdited(id);
+        internal::MarkWidgetEdited(id);
 
     if (!field.active && state.editing)
     {

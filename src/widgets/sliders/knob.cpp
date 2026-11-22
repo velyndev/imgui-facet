@@ -164,7 +164,7 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
             {
                 edited = press.value;
                 written = true;
-                ImGui::MarkItemEdited(id);
+                internal::MarkWidgetEdited(id);
             }
         }
         else
@@ -201,7 +201,7 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
                 {
                     edited = next_;
                     written = true;
-                    ImGui::MarkItemEdited(id);
+                    internal::MarkWidgetEdited(id);
                 }
                 ImGui::SetKeyOwner(ImGuiKey_Escape, id);
                 if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, id))
