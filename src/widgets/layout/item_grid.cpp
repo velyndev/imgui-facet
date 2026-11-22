@@ -11,10 +11,10 @@
 //
 // Every tile runs through the row block of the list view (ListRowGroup): the hover fill, the
 // selected tile look (the accentSubtle fill and the accent hairline), the focus ring inside the
-// tile after keyboard input only, and activation by a double click or Enter. With a selection the tiles live in
-// ImGui::BeginMultiSelect with two-dimensional box selection: click, Ctrl, Shift, Ctrl+A and Escape
-// as in every Facet list, and the arrows move in two dimensions and wrap at the line ends. The grid
-// is one Tab stop: without a selection the focused tile (else the first) is the only tile Tab stops
+// tile after keyboard input only, and activation by a double click or Enter. With a selection the
+// tiles live in ImGui::BeginMultiSelect with two-dimensional box selection: click, Ctrl, Shift,
+// Ctrl+A and Escape as in every Facet list, and the arrows move in two dimensions and wrap at the
+// line ends. The grid is one Tab stop: without a selection the focused tile (else the first) is the only tile Tab stops
 // on; with one, the list view's tab stop (ListTabProxy and ListClaimTabExit) carries Tab into and
 // out of the selection scope. Home and End jump to the first and last tile (with Shift: a range).
 // The focused tile is kept under the id, so the focus survives scrolling.

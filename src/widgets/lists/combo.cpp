@@ -241,7 +241,7 @@ bool ComboItem(const char* label, bool selected, const ComboItemOptions& options
         look.selected = selected;
         truncated = DrawListsRowContent(content, item, entry, look, frame.size);
         // Inside the row, after keyboard input only (item.focusAmount).
-        DrawFocusRingInside(drawList, fill, radius, item.visible ? item.focusAmount : 0.0f);
+        DrawFocusRingInside(drawList, fill, radius, item.focusAmount);
     }
     CutTextTooltip(item, label, ImGui::FindRenderedTextEnd(label), truncated);
     if (!item.pressed)
