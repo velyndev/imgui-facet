@@ -7,16 +7,30 @@ stays unmodified, and Facet widgets mix with stock Dear ImGui calls in the same 
 
 ## Screenshots
 
-<!--
-Screenshots are added in the integration step, taken from the finished test app with its
-capture mode (light and dark theme each):
-- the showcase page: a sample settings menu and the inventory grid with placeholder tiles
-- the theme editor next to a page, with a custom accent
-- a widget family page, for example the sliders with the range slider
-- an open popup level: a dropdown list or a menu with a submenu
-- overlay mode: the menu shell floating over the busy backdrop
-- the same page at UI scale 1 and 2
--->
+Taken from the test app with its capture mode at 1280x800 and UI scale 1. Every name, item and
+value in them is a placeholder of the test app.
+
+The showcase page, a sample settings menu next to an inventory grid, in the light and the dark
+theme:
+
+![The showcase page in the light theme: navigation on the left, a settings card with toggles and a dropdown, and an inventory grid with a detail card](docs/images/showcase-light.png)
+![The showcase page in the dark theme](docs/images/showcase-dark.png)
+
+The theme editor open beside the showcase page, with a custom red accent and larger corner radii,
+spacing, type sizes and control heights:
+
+![The theme editor pane beside the showcase page in the light theme, with a red accent and its factor sliders](docs/images/theme-editor-light.png)
+![The same theme edits in the dark theme](docs/images/theme-editor-dark.png)
+
+Overlay mode: the gallery as a floating shell with backdrop blur over a generated backdrop:
+
+![The gallery in a floating shell over a striped backdrop with text, blurred behind the shell, in the dark theme](docs/images/overlay-dark.png)
+
+The sliders page with the two-handle range sliders while a handle is dragged, and the data table:
+
+![The RangeSlider section of the sliders page in the light theme, with the value bubble of a dragged handle](docs/images/sliders-light.png)
+![The same section in the dark theme](docs/images/sliders-dark.png)
+![The data table page in the dark theme: sortable columns over generated placeholder rows](docs/images/data-table-dark.png)
 
 ## Requirements
 
@@ -110,16 +124,29 @@ is planned.
 ## The test app
 
 `facet_demo` shows every part of the library on a page of its own, in both themes and at UI
-scales from 75 to 200 %. Besides its window it has a capture mode, which renders pages offscreen
-into PNG files, and a selftest mode, which operates the pages with scripted mouse and keyboard
-input and checks the results. Both run on the WARP software rasterizer with `--warp`.
+scales from 75 to 200 %. It opens on the showcase page, a sample settings menu and an inventory
+grid built only from Facet widgets. The navigation groups the other pages: Foundations (tokens,
+type, motion, drawing, effects), Media (icons, images), Blocks (one page per shared building
+block) and Widgets (one or more pages per widget family). The title bar holds the theme editor
+and, as far as the width allows, the theme mode and the UI scale. The editor changes radii,
+spacing, type sizes, control heights, motion, blur, shadows and the accent of the live theme and
+copies the edits as C++ code. `--overlay`, or a switch in the editor, floats the gallery as a
+shell over a generated backdrop; F9 shows and hides it.
+
+Besides its window it has a capture mode, which renders pages offscreen into PNG files, and a
+selftest mode, which operates the pages with scripted mouse and keyboard input and checks the
+results. Both run on the WARP software rasterizer with `--warp`.
 
 ```
-build\msvc-x64\bin\Release\facet_demo.exe
+build\msvc-x64\bin\Release\facet_demo.exe [--page id] [--theme light|dark] [--overlay] [--warp]
+build\msvc-x64\bin\Release\facet_demo.exe --list-pages
 build\msvc-x64\bin\Release\facet_demo.exe --capture out --theme both --warp
-build\msvc-x64\bin\Release\facet_demo.exe --selftest --warp
+build\msvc-x64\bin\Release\facet_demo.exe --capture out --matrix --page showcase --warp
+build\msvc-x64\bin\Release\facet_demo.exe --selftest --theme both --warp
 ```
 
+`--list-pages` prints the page ids with their capture states. `--matrix` captures one page at
+900x600, 1280x800 and 1920x1200, at scales 1, 1.5 and 2, in app and overlay mode.
 [docs/demo.md](docs/demo.md) describes the window, the pages and every run option.
 
 ## Building and testing
@@ -161,7 +188,8 @@ include/facet/     public headers: core/ (one per module), widgets/ (one per wid
 src/               library sources; src/internal holds headers shared inside the library
 assets/icons/      SVG files embedded into the library
 cmake/             dependency, warning, asset embedding and consumer test scripts
-docs/              guides; docs/widgets/ has one page per widget family
+docs/              guides; docs/widgets/ has one page per widget family, docs/images the
+                   screenshots above
 demo/              facet_demo; demo/pages holds one file per page
 tests/             doctest unit tests; tests/support holds the shared Dear ImGui and WARP
                    session, tests/headers compiles every public header alone
