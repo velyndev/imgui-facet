@@ -5,8 +5,11 @@ a consistent set of custom widgets, a light and a dark theme, icon rendering and
 for desktop tools and in-game overlay menus, without modifying Dear ImGui.
 
 **Status: early development.** The building blocks of Phase 1 exist inside the library and
-work. Planned blocks: overlay scrollbars inside popup levels and multiline text areas (both still
-use Dear ImGui's own bar there). The fourteen widget family headers in `include/facet/widgets/`
+work. Two places still show Dear ImGui's own scrollbar instead of the overlay scrollbar of the
+scroll block: a popup level whose content is taller than the room (the menu, popover or dialog
+window itself; lists inside a level scroll with the overlay bar), and the multiline text of
+`TextArea`, which sizes and colors the bar from the scroll tokens. The overlay bar for both is
+planned. The fourteen widget family headers in `include/facet/widgets/`
 declare every widget with documentation comments, and every declared widget of the fourteen
 families is implemented; none is a placeholder:
 
