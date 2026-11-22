@@ -40,7 +40,43 @@ Item data always belongs to the caller and is read during the call.
 InventoryResult InventoryGrid(const char* id, int* selected, std::span<const InventoryItem> slots, const InventoryGridOptions& options = {});
 ```
 
-Slot grid with drag to move, swap, merge and split. Status: planned.
+A grid of slots laid out with ItemGrid (`layout.h`): only the visible tiles are submitted, so ten
+thousand slots cost what a screenful costs. The columns are `options.columns`, or as many slots of
+`slotSize` (0: `metrics.slotSize`) as the width (`options.width`, 0 the available width) holds,
+never more than there are slots, and the grid is as wide as its columns; the tiles
+keep the slot size and shrink only when the set columns do not fit. The grid is as tall as its
+rows, at most the visible height of the window it is in; further rows scroll inside it.
+
+Each tile shows the item's image with the loading and failed states of the media family (or its
+icon), the count, a lock chip, the cooldown as a pie in `scrim`, the category bar (`tint`,
+`composites.inventoryTintHeight`) and the title in Caption, cut with an ellipsis and left out where
+the tile is too small for it. Hover and keyboard focus show the full name and, for a locked item,
+`Strings::locked`; an empty slot names itself `Strings::emptySlot`.
+
+Selection goes through the list core: a click selects, Ctrl+click and Shift+click extend, the
+arrows move in two dimensions, Escape clears. Selected tiles show the selection fill and an accent
+ring inside the edge, so the selection does not rest on color alone. `*selected` is the focused
+selected slot, else the first selected one, and is written when it changes; a value the caller
+writes replaces the selection. Box selection is off, because a drag from a slot moves its item.
+The grid is one Tab stop. Enter or a double click returns `Activated`.
+
+Moving items: a drag (pointer, or Space on the focused slot for a keyboard drag that the arrows
+carry and Space or Enter drops) onto an empty slot returns `Moved`, onto an item with the same
+non-zero `stackKey` and room left `Merged`, onto any other item `Swapped`; Shift held at the drop
+moves half the stack (`Split`, or `Merged` with half). A locked item cannot be dragged and refuses
+drops (no highlight, the not-allowed cursor). Escape, a right click or a release outside any slot
+cancels; the place an item came from stays faded while it is carried, and the ghost is the tile
+itself at `drag.ghostOpacity`. While a keyboard drag is in progress the lines just above and below
+the visible tiles also take it, so it can move on into rows scrolled out of view. Ctrl and an arrow
+move the focused item to its neighbour at once by the same rules. The selection and the keyboard
+focus follow a moved item. Drags cross into other grids, `InventorySlot` and `InventoryTile` of the
+same payload type. The item's stack data is read from the source widget during the drag, so a
+payload of this type from a custom source moves and swaps but never merges.
+
+States: `Loading` draws skeleton slots, `Error` the error line, no slots the empty line. Disabled
+(`ImGui::BeginDisabled`) draws the disabled look and takes no input. `readOnly` shows the selection
+and writes nothing, starts no drag and accepts no drop. `InventoryItem::id` is not used yet: per-item
+state (cooldown, count) is drawn from the item as passed. Status: ready.
 
 ### InventoryTile
 
@@ -48,7 +84,11 @@ Slot grid with drag to move, swap, merge and split. Status: planned.
 bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTileOptions& options = {});
 ```
 
-One item tile with count, category bar, lock and cooldown. Status: planned.
+One tile outside a grid, a square of `slotSize` (a width set with `ImGui::SetNextItemWidth` keeps it
+square), drawn as a grid tile. A click, Space or Enter activates it; hover and press show a wash
+over it, the focus ring follows keyboard input, the item label is the tooltip. `selected` draws the
+accent ring. With `dragSource` it is an inventory drag source (pointer, or Ctrl+Space for a keyboard
+drag, since Space activates it); it is not a drop target. Status: ready.
 
 ### InventorySlot
 
@@ -56,7 +96,12 @@ One item tile with count, category bar, lock and cooldown. Status: planned.
 InventoryResult InventorySlot(const char* label, const InventoryItem& item, const InventorySlotOptions& options = {});
 ```
 
-Single slot that accepts inventory drops. Status: planned.
+A single slot that takes inventory drops by the grid's rules (`to` is -1) and gives its item away
+by a drag (Space picks it up for a keyboard drag). While a drag it takes hovers it, it shows the
+accent target highlight. Empty, it draws `placeholderIcon` faintly and its visible label is the
+tooltip. Enter or a double click returns `Activated` (`source` is the slot); a single click does
+nothing. A keyboard drop leaves the focus on the slot. Disabled and a pushed
+`ImGuiItemFlags_ReadOnly` take no drop and start no drag. Status: ready.
 
 ### InventoryDetailCard
 
@@ -64,7 +109,13 @@ Single slot that accepts inventory drops. Status: planned.
 int InventoryDetailCard(const char* label, ImageHandle image, const InventoryDetailCardOptions& options = {});
 ```
 
-Detail card with stats and differences, tags and actions. Status: planned.
+A `Card` whose header is the visible label, with the image as an `ImageView` beside the description
+(above it where the card is too narrow), the stats as a key-value list, the tags as badges and the
+actions as buttons (the first one primary) in flows that wrap. A stat with a `compare` value shows
+the difference after the value with its sign, in `success` when it is better and `destructive` when
+it is worse (`lowerIsBetter` turns that around). An invalid image leaves the picture out. Width:
+`metrics.cardWidth`, at most the available width. Returns the index of the action activated this
+frame, or -1. Status: ready.
 
 ### MediaCard
 
@@ -72,7 +123,12 @@ Detail card with stats and differences, tags and actions. Status: planned.
 bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& options = {});
 ```
 
-Card with a cover image, title, description and badges. Status: planned.
+A card surface with the cover as an `ImageView` (`mediaCoverAspect` of the width, with the loading
+and failed states), the title in Headline cut to one line, the description in Footnote
+`labelSecondary`, wrapped, and the badges in a flow. Narrower than `mediaCardHorizontalBelow` the
+cover is a square beside the text. One Tab stop over the whole card: a click, Space or Enter
+activates it; hover and press show a wash, `selected` an accent ring, a cut title shows in full on
+hover and keyboard focus. Width: `metrics.cardWidth`, at most the available width. Status: ready.
 
 ### UserChip
 
@@ -80,7 +136,11 @@ Card with a cover image, title, description and badges. Status: planned.
 bool UserChip(const char* label, ImageHandle avatar, const UserChipOptions& options = {});
 ```
 
-Avatar, name and description in a pill for the signed-in account. Status: planned.
+A pill with the avatar (initials of the name while there is no ready image, a skeleton while it
+loads), the name and the description line; with a description the pill grows to hold both lines.
+`showStatus` adds the status dot of `status` on the avatar. `compact` draws the avatar alone with the
+name and description as its tooltip. A click, Space or Enter activates it; a name cut by a set width
+shows in full on hover and focus. Status: ready.
 
 ### ProfileSwitcher
 
@@ -88,7 +148,14 @@ Avatar, name and description in a pill for the signed-in account. Status: planne
 ProfileSwitcherAction ProfileSwitcher(const char* id, int* current, std::span<const AvatarItem> profiles, const ProfileSwitcherOptions& options = {});
 ```
 
-List of profiles with add and manage entries. Status: planned.
+A field-like button with the current profile (avatar, name, description; `Strings::select` without
+one) that opens a popover with the list. In the list the arrows move, Enter, Space or a click
+switches and returns `Switched`, typing jumps to a name; the current profile has a check and a
+semibold name, so it is marked by more than color. The add and manage entries return `Add` and
+`Manage`. Switching or an entry closes the popover and puts the keyboard focus back on the button;
+Escape closes it without switching. `Loading` shows skeleton rows, `Error` the error line, no
+profiles the empty line; the entries stay usable. `readOnly` opens the list but switches nothing
+and turns the entries off. Status: ready.
 
 ### Drag and drop
 
@@ -100,9 +167,22 @@ const ImGuiPayload* AcceptDrop(const char* type, const AcceptDropOptions& option
 void EndDropTarget();
 ```
 
-Themed drag previews, drop indicators and edge scrolling on top of Dear ImGui drag and drop;
-both pairs have their scope class (`DragSourceScope`, `DropTargetScope`). Status: planned.
+Built on the drag and drop core. `BeginDragSource` makes the last item a source: a pointer drag
+after `drag.startThreshold`, or a keyboard drag picked up with Ctrl+Space while the item has the
+focus (Space alone stays the item's activation); the arrows carry it between targets of its type and
+Space or Enter drops it, Escape cancels. The payload is copied at the start and may be at most 64
+bytes; a larger one is a usage error and no drag starts. The ghost shows `previewText`, `icon` and
+`image` on the elevated surface; content submitted between Begin and End appears in a floating layer
+under the ghost. Disabled and read-only items never start a drag.
 
+`BeginDropTarget` returns true while a drag of any type is in progress and the last item is visible,
+not only while the drag hovers it: each `AcceptDrop` call declares the item as a target of its type,
+so a keyboard drag can reach it. A drag of a type no `AcceptDrop` names is refused there (no
+indicator, the not-allowed cursor). `AcceptDrop` draws the indicator (`Box`, or a line above or
+below for `LineBefore` and `LineAfter`) while a drag of its type is over the item and returns the
+payload on the drop, with `peek` also while it hovers. Disabled and read-only items take nothing.
+Both pairs have their scope class (`DragSourceScope`, `DropTargetScope`); an End without its Begin is
+reported. Status: ready.
 ### Usage of the inventory, cards and drag and drop
 
 #### Inventory grid
@@ -124,6 +204,8 @@ default: break;
 
 `r.source` is the id of the grid, tile or slot the drag started in; compare it with
 `ImGui::GetID` of that widget's id or label (`ImGui::GetID("bag")`), taken in the same id scope.
+The item lands in the widget that returned the result: slot `r.to` of a grid, or the slot widget
+itself (`r.to` is -1).
 
 #### Drag and drop between custom items
 
