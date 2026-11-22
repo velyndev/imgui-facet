@@ -30,6 +30,8 @@ enum class Measure
     Surface,   // label and labelSecondary drawn on the color (over bg)
     Text,      // the color as text on bg
     OnAccent,  // onAccent drawn on the color
+    Edge,      // an outline or divider on bg: quiet, 3:1 in the increased contrast variant
+    Knob,      // the face of knobs
     None,      // decoration only
 };
 
@@ -52,8 +54,15 @@ constexpr ColorToken kLabels[] = {
     {"labelSecondary", &facet::Colors::labelSecondary, Measure::Text},
     {"labelTertiary", &facet::Colors::labelTertiary, Measure::Text},
     {"labelQuaternary", &facet::Colors::labelQuaternary, Measure::Text},
-    {"separator", &facet::Colors::separator, Measure::Text},
-    {"separatorOpaque", &facet::Colors::separatorOpaque, Measure::Text},
+};
+
+// The border tokens of the border rule and the knob face.
+constexpr ColorToken kBorders[] = {
+    {"separator", &facet::Colors::separator, Measure::Edge},
+    {"separatorOpaque", &facet::Colors::separatorOpaque, Measure::Edge},
+    {"controlBorder", &facet::Colors::controlBorder, Measure::Edge},
+    {"controlBorderHover", &facet::Colors::controlBorderHover, Measure::Edge},
+    {"knob", &facet::Colors::knob, Measure::Knob},
 };
 
 constexpr ColorToken kAccents[] = {
@@ -132,6 +141,13 @@ void FormatMeasure(const ColorToken& token, const ImVec4& color, char* out, size
         return;
     case Measure::OnAccent:
         std::snprintf(out, size, "onAccent %.1f:1", static_cast<double>(facet::ContrastRatio(c.onAccent, color)));
+        return;
+    case Measure::Edge:
+        std::snprintf(out, size, facet::IncreasedContrast() ? "on bg %.1f:1, increased contrast" : "on bg %.1f:1, quiet",
+                      static_cast<double>(facet::ContrastRatio(facet::Over(color, c.bg), c.bg)));
+        return;
+    case Measure::Knob:
+        std::snprintf(out, size, "knob face, with the controlBorder hairline");
         return;
     case Measure::None:
         std::snprintf(out, size, "decoration, not text");
@@ -402,7 +418,16 @@ FACET_DEMO_PAGE("tokens", "Tokens", "Foundations", 0, "default", "accent", "elev
     SectionHeader("Colors");
     DrawColorGroup("Surfaces", kSurfaces, std::size(kSurfaces));
     DrawFills();
-    DrawColorGroup("Labels and separators", kLabels, std::size(kLabels));
+    DrawColorGroup("Labels", kLabels, std::size(kLabels));
+    DrawColorGroup("Borders and the knob face", kBorders, std::size(kBorders));
+    Paragraph("Every outline is one hairline in a border token: controlBorder for a control or a tile, separator "
+              "for a surface and a divider. They stay quiet on purpose; the increased contrast variant resolves "
+              "them to colors that reach 3:1 on every surface.");
+    bool increased = facet::IncreasedContrastEnabled();
+    if (facet::Toggle("Increased contrast", &increased))
+        facet::SetIncreasedContrast(increased);
+    ctx.Probe("tokens.contrast");
+    ImGui::Dummy(ImVec2(0.0f, facet::Px(facet::T().spacing.md)));
     DrawColorGroup("Accent, derived in OKLCH", kAccents, std::size(kAccents));
     DrawColorGroup("Status, effects and scrollbars", kStatus, std::size(kStatus));
     Paragraph("labelTertiary and labelQuaternary stay below 4.5:1 on purpose: they mark disabled text and "
@@ -467,6 +492,23 @@ FACET_DEMO_SELFTEST("tokens")
     test.Expect("the first swatch returns to the theme default", [] {
         const facet::Theme preset = facet::T().dark ? facet::Theme::Dark() : facet::Theme::Light();
         return !facet::HasCustomAccent() && facet::ToU32(facet::T().colors.accent) == facet::ToU32(preset.colors.accent);
+    });
+
+    // The increased contrast switch: the border tokens reach 3:1 on bg while it is on and return
+    // to the quiet standard colors when it is off again.
+    test.Do([] { facet::SetIncreasedContrast(false); });
+    test.Click("tokens.contrast");
+    test.Expect("the switch turns the increased contrast variant on", [] { return facet::IncreasedContrast(); });
+    test.Expect("in the variant controlBorder and separator reach 3:1 on bg", [] {
+        const facet::Colors& c = facet::T().colors;
+        return facet::ContrastRatio(facet::Over(c.controlBorder, c.bg), c.bg) >= 3.0f &&
+               facet::ContrastRatio(facet::Over(c.separator, c.bg), c.bg) >= 3.0f;
+    });
+    test.Click("tokens.contrast");
+    test.Expect("off again, controlBorder is the quiet preset color", [] {
+        const facet::Theme preset = facet::T().dark ? facet::Theme::Dark() : facet::Theme::Light();
+        return !facet::IncreasedContrast() &&
+               facet::ToU32(facet::T().colors.controlBorder) == facet::ToU32(preset.colors.controlBorder);
     });
 
     // The window buttons and the theme control of the title bar are covered by the app script
