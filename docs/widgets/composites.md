@@ -423,7 +423,18 @@ void EndOnboarding();
 class OnboardingScope;
 ```
 
-Paged welcome panel with progress dots and skip. Status: planned.
+A `Modal` (the scrim, the open and close motion, the focus trap) with the visible label part as its
+title, the caller's content for step `*step`, and a footer: a progress dot per step
+(`metrics.pageDotSize`; the current one in the accent, the others in `separatorOpaque`) with
+`Strings::stepOf` beside them, so the step is never told by color alone, and at the end the
+buttons `Strings::skip` (Plain; while `skippable` and not on the last step), `Strings::back` (from
+the second step on) and `Strings::next`, or `Strings::finish` on the last step (Primary). A footer
+too narrow for both puts the buttons on a line of their own. Next or Finish takes the keyboard
+focus when a step opens, so Enter steps through; Tab and Shift+Tab move between the buttons inside
+the panel. Back and Next write `*step`; Finish, Skip, Escape and a click on the scrim write
+`*open = false` and leave `*step` as it is. `*step` is clamped to the steps, and `stepCount` below 1
+counts as 1. The width is `overlay.modalWidth` unless `width` is set. A null `step` shows the first
+step and the buttons write nothing to it. Status: ready.
 
 ### ConsoleView
 

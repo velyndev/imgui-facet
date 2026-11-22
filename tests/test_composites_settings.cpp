@@ -1244,3 +1244,120 @@ TEST_CASE("ConsoleView read-only takes no typing and submits nothing")
     CHECK(h.command == "fixed");
     CHECK(h.submits == 0);
 }
+
+// ---- Onboarding ----------------------------------------------------------------------------
+
+namespace
+{
+
+// An onboarding panel of `count` steps that records whether its content was submitted.
+struct OnboardingHarness
+{
+    bool open = false;
+    int step = 0;
+    int count = 3;
+    bool skippable = true;
+    bool shown = false;
+    int shownStep = -1;
+
+    void Run()
+    {
+        shown = false;
+        if (facet::BeginOnboarding("Welcome", &open, &step, count, {.skippable = skippable}))
+        {
+            shown = true;
+            shownStep = step;
+            ImGui::TextUnformatted("Step content");
+            facet::EndOnboarding();
+        }
+    }
+};
+
+} // namespace
+
+TEST_CASE("Onboarding stays closed until opened, then Enter steps through and Finish closes it")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OnboardingHarness h;
+    session.SetUi([&] { h.Run(); });
+    session.Frames(3);
+    CHECK_FALSE(h.shown);
+    h.open = true;
+    session.Seconds(0.5f);
+    CHECK(h.shown);
+    CHECK(h.shownStep == 0);
+    // Next has the keyboard focus on each step.
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(h.step == 1);
+    session.KeyPress(ImGuiKey_Enter);
+    session.Frames(2);
+    CHECK(h.step == 2);
+    session.KeyPress(ImGuiKey_Enter);  // Finish on the last step
+    session.Seconds(0.5f);
+    CHECK_FALSE(h.open);
+    CHECK_FALSE(h.shown);
+    CHECK(h.step == 2);
+}
+
+TEST_CASE("Onboarding goes back with the Back button and Escape closes it on any step")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OnboardingHarness h;
+    h.open = true;
+    h.step = 2;
+    session.SetUi([&] { h.Run(); });
+    session.Seconds(0.5f);
+    // On the last step: Back, then Finish. Shift+Tab reaches Back.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(h.step == 1);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.5f);
+    CHECK_FALSE(h.open);
+    CHECK(h.step == 1);
+}
+
+TEST_CASE("Onboarding skip closes it, and a panel that cannot be skipped has no Skip button")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OnboardingHarness h;
+    h.open = true;
+    session.SetUi([&] { h.Run(); });
+    session.Seconds(0.5f);
+    // Step 0: Skip, then Next. Shift+Tab reaches Skip.
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Space);
+    session.Seconds(0.5f);
+    CHECK_FALSE(h.open);
+    CHECK(h.step == 0);
+    // Without skippable, Shift+Tab from Next has nothing before it to reach on the first step.
+    h.skippable = false;
+    h.open = true;
+    session.Seconds(0.5f);
+    session.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(h.open);
+    CHECK(h.step == 1);
+}
+
+TEST_CASE("Onboarding counts fewer than one step as one and clamps the step")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OnboardingHarness h;
+    h.open = true;
+    h.count = 0;
+    h.step = 5;
+    session.SetUi([&] { h.Run(); });
+    session.Seconds(0.5f);
+    CHECK(h.shownStep == 0);
+    session.KeyPress(ImGuiKey_Enter);  // the only step: Finish
+    session.Seconds(0.5f);
+    CHECK_FALSE(h.open);
+}

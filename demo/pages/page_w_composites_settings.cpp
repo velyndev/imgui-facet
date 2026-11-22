@@ -1,7 +1,7 @@
-// Demo page: Search and app controls. Each ready widget of the search, preset and app control
-// composites (facet/widgets/composites.h) has a section with its variants and states, capture
-// states for its important looks and selftest steps that operate it by mouse and keyboard; the
-// widgets that are still planned draw their placeholder. The theme controls run with apply off, so
+// Demo page: Search and app controls. Each widget of the search, preset and app control composites
+// (facet/widgets/composites.h) has a section with its variants and states, capture states for its
+// important looks and selftest steps that operate it by mouse and keyboard. The family note stays
+// the planned one until the other composite pages are ready too. The theme controls run with apply off, so
 // they never fight the theme and scale selectors of the gallery: each shows what it chose next to
 // it (the accent in a preview button under PushAccent). The inventory and cards and the editors
 // have pages of their own (page_w_composites_cards.cpp and page_w_composites_editors.cpp).
@@ -72,7 +72,11 @@ enum CaptureState
     kPresetMenu,    // the preset list's menu open
     kBindsFocus,    // the second row's capture field of the key bind list focused
     kConsoleFocus,  // the console's command field focused
+    kOnboardingOpen,  // the onboarding panel open on its second step
 };
+
+// Steps of the page's onboarding panel.
+constexpr int kOnboardingSteps = 3;
 
 // Rows of the page's key bind list, and its width in design units.
 constexpr int kBindCount = 5;
@@ -160,8 +164,11 @@ struct SettingsUi
     bool wheelZoom = false;
     int scaleWrites = 0;
 
+
+    // Onboarding
     bool onboarding = false;
     int onboardingStep = 0;
+    bool onboardingSkippable = true;
 };
 
 SettingsUi ui;
@@ -897,10 +904,51 @@ void ConsoleSection(facet::demo::PageCtx& ctx)
                        {.width = DemoWidth(kBindsWidth), .height = kConsoleReadOnlyHeight, .readOnly = true});
 }
 
+void OnboardingSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("Onboarding");
+    Paragraph("A short sequence of steps in a dialog over a scrim, with progress dots and the step number. Next "
+              "has the keyboard on each step, so Enter steps through; Back, Skip, Finish, Escape and a click on "
+              "the scrim behave as their names say. The step content below is a placeholder.");
+    LabeledRow("Skippable");
+    facet::Toggle("##skippable", &ui.onboardingSkippable);
+    LabeledRow("Show");
+    if (facet::Button("Show onboarding"))
+    {
+        ui.onboarding = true;
+        ui.onboardingStep = 0;
+    }
+    ctx.Probe("comp.onboarding.show");
+    ImGui::SameLine();
+    facet::demo::NoteBeside(ui.onboarding ? "Open on step %d" : "Closed on step %d", ui.onboardingStep + 1);
+    // The capture state sets itself up again in every pass.
+    if (ctx.capture && ctx.captureState == kOnboardingOpen)
+    {
+        ui.onboarding = true;
+        ui.onboardingStep = 1;
+    }
+    static const char* const kStepTitles[kOnboardingSteps] = {"Placeholder step 1", "Placeholder step 2",
+                                                              "Placeholder step 3"};
+    if (facet::BeginOnboarding("Welcome", &ui.onboarding, &ui.onboardingStep, kOnboardingSteps,
+                               {.skippable = ui.onboardingSkippable}))
+    {
+        const int step = std::clamp(ui.onboardingStep, 0, kOnboardingSteps - 1);
+        facet::StyledText(kStepTitles[step], {.style = facet::TextStyle::Headline});
+        facet::StyledText("The application's content for this step goes here. This placeholder only shows where.",
+                          {.secondary = true, .wrap = true});
+        facet::demo::FloatingProbe(ctx, "comp.onboarding.content",
+                                   ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
+        facet::EndOnboarding();
+    }
+    if (ctx.capture && ctx.captureState == kOnboardingOpen && ctx.captureFramesLeft == 0 && !ui.onboarding)
+        ctx.captureError = "the onboarding panel did not open";
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover", "search focused", "settings hits", "preset menu", "binds focused", "console focused")
+                "accent popover", "search focused", "settings hits", "preset menu", "binds focused", "console focused",
+                "onboarding")
 {
 
     facet::demo::PageHeader("Search and app controls",
@@ -919,18 +967,7 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
 
     KeybindListSection(ctx);
 
-    SectionHeader("Onboarding");
-    LabeledRow("Onboarding");
-    // The text changes with the state, so "###" keeps one id and the button keeps its focus.
-    if (ImGui::Button(ui.onboarding ? "Hide onboarding###onboarding" : "Show onboarding###onboarding"))
-        ui.onboarding = !ui.onboarding;
-    ctx.Probe("composites.onboarding");
-    facet::ItemCursor();
-    if (facet::BeginOnboarding("Welcome", &ui.onboarding, &ui.onboardingStep, 3))
-    {
-        facet::StyledText("Step content");
-        facet::EndOnboarding();
-    }
+    OnboardingSection(ctx);
 
     ConsoleSection(ctx);
 }
@@ -994,16 +1031,34 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.KeyUp(ImGuiMod_Ctrl);
     test.ExpectNear("Ctrl+wheel down steps to 150 %", [] { return ui.uiScale; }, 1.5, 0.001);
 
-    // The stock button that shows the onboarding placeholder, by mouse and by keyboard.
-    test.Click("composites.onboarding");
-    test.Expect("the button shows the onboarding placeholder", [] { return ui.onboarding; });
-    test.ExpectFocused("composites.onboarding");
-    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus on the button
-    test.ExpectFocused("composites.onboarding");
+    // Onboarding: opened by mouse; Enter steps and finishes, Back and Escape by keyboard; the scrim
+    // by mouse.
+    test.Click("comp.onboarding.show");
+    test.WaitSeconds(0.4f);
+    test.Expect("the button opens the onboarding on its first step", [] { return ui.onboarding && ui.onboardingStep == 0; });
+    test.ExpectVisible("comp.onboarding.content");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter on the focused Next goes to step 2", [] { return ui.onboardingStep == 1; });
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
     test.KeyPress(ImGuiKey_Space);
-    test.Expect("Space on the focused button hides it again", [] { return !ui.onboarding; });
-    test.ExpectFocused("composites.onboarding");
-    test.Do([] { ui.onboarding = false; });
+    test.Expect("Shift+Tab and Space on Back go back to step 1", [] { return ui.onboardingStep == 0; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.WaitSeconds(0.4f);
+    test.Expect("Escape closes the onboarding", [] { return !ui.onboarding; });
+    test.Click("comp.onboarding.show");
+    test.WaitSeconds(0.4f);
+    test.MouseMove(T::Display(0.02f, 0.98f));
+    test.MouseDown();
+    test.MouseUp();
+    test.WaitSeconds(0.4f);
+    test.Expect("a click on the scrim closes it", [] { return !ui.onboarding; });
+    test.Click("comp.onboarding.show");
+    test.WaitSeconds(0.4f);
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.4f);
+    test.Expect("Enter on Finish closes it on the last step", [] { return !ui.onboarding && ui.onboardingStep == 2; });
 
     // SearchFilterBar: typing, Escape, a chip by mouse and by keyboard.
     test.Click("comp.filter.field");

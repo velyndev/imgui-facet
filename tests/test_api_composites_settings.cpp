@@ -1,14 +1,10 @@
-// The declared API of the search, preset and app control composites (facet/widgets/composites.h)
-// while they are placeholders: every function is called once inside a real Dear ImGui frame, in a
-// window and again inside ImGui::BeginDisabled. After each call the id, window, group and Facet
-// scope stacks must be as before, a widget must have submitted one item of non-zero size with the
-// id of its label, the neutral result must come back and no value argument may have changed. Every
-// options struct is checked against the conventions at compile time. The other composites have
-// files of their own (tests/test_api_composites_cards.cpp and test_api_composites_editors.cpp); the
-// behaviour tests of these widgets go into tests/test_composites_settings.cpp.
-
-#include <cstring>
-#include <string>
+// The declared API of the search, preset and app control composites (facet/widgets/composites.h).
+// Every widget of the group is implemented; their behaviour tests are in
+// tests/test_composites_settings.cpp. What stays here: every options struct is checked against the
+// conventions at compile time, the settings search (which submits no item of its own) keeps every
+// stack inside a real Dear ImGui frame, in a window and again inside ImGui::BeginDisabled, and an End
+// without its Begin is reported. The other composites have files of their own
+// (tests/test_api_composites_cards.cpp and test_api_composites_editors.cpp).
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -61,7 +57,7 @@ static_assert(OptionsFollowConventions<facet::UiScaleControlOptions>());
 void SettingsCalls()
 {
     using namespace facet;
-    // The settings search is ready; it submits no item of its own and keeps every stack.
+    // The settings search submits no item of its own and keeps every stack.
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
         BeginSettingsSearch("settings", {.filter = "query"});
         CHECK_FALSE(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));
@@ -71,28 +67,20 @@ void SettingsCalls()
     Check("SettingsSearchScope", Expect::NoItem, nullptr, [] { SettingsSearchScope search("settings 2"); });
     Check("SettingsSearchHitCount", Expect::NoItem, nullptr,
           [] { CHECK(SettingsSearchHitCount("settings", nullptr) == 0); });
-
-
-
-    // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
-    bool open = true;
-    int step = 1;
-    Check("BeginOnboarding, open", Expect::Item, "Welcome", [&] { CHECK_FALSE(BeginOnboarding("Welcome", &open, &step, 3)); });
-    CHECK(open);
-    CHECK(step == 1);
+    // A closed onboarding panel submits nothing.
     bool closed = false;
-    Check("BeginOnboarding, closed", Expect::NoItem, nullptr,
-          [&] { CHECK_FALSE(BeginOnboarding("Welcome 2", &closed, &step, 3)); });
-    CHECK_FALSE(closed);
-    Check("OnboardingScope", Expect::NoItem, nullptr, [&] {
-        OnboardingScope onboarding("Welcome 3", &closed, &step, 3);
+    int step = 1;
+    Check("OnboardingScope, closed", Expect::NoItem, nullptr, [&] {
+        OnboardingScope onboarding("Welcome", &closed, &step, 3);
         CHECK_FALSE(static_cast<bool>(onboarding));
     });
+    CHECK_FALSE(closed);
+    CHECK(step == 1);
 }
 
 } // namespace
 
-TEST_CASE("The search, preset and app control stubs submit one item each and keep every stack")
+TEST_CASE("The settings search and a closed onboarding keep every stack in a frame")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -100,31 +88,6 @@ TEST_CASE("The search, preset and app control stubs submit one item each and kee
     RunFrame(session, &runs, &SettingsCalls);
     CHECK(runs == 1);
     CHECK(facet::internal::OpenScopeCount() == 0);
-}
-
-TEST_CASE("The onboarding stub follows kFill and widths relative to the available width")
-{
-    // Rule 6: kFill is the available width, any other negative width the available width minus
-    // that many units, for dialog stubs too.
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        for (const float units : {kFill, -10.0f})
-        {
-            INFO("width " << units);
-            const float expected = ImGui::GetContentRegionAvail().x + (units == kFill ? 0.0f : Px(units));
-            bool open = true;
-            int step = 0;
-            if (BeginOnboarding("Welcome", &open, &step, 2, {.width = units}))
-                EndOnboarding();
-            CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
-            ++checked;
-        }
-    });
-    session.Frame();
-    CHECK(checked == 2);
 }
 
 TEST_CASE("A settings search or onboarding End without its Begin is reported and changes no Dear ImGui stack")
