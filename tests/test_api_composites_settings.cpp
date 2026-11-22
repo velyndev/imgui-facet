@@ -82,17 +82,6 @@ void SettingsCalls()
     CHECK(command == "text");
     CHECK(std::strcmp(buffer, "text") == 0);
 
-    FilterChip filters[] = {{"Filter 1"}, {"Filter 2", {}, true}};
-    const Snapshot filtersBefore(filters);
-    Check("SearchFilterBar", Expect::Item, "Search", [&] {
-        CHECK_FALSE(SearchFilterBar("Search", &command, filters, {.resultCount = 3}));
-    });
-    Check("SearchFilterBar, buffer", Expect::Item, "Search 2",
-          [&] { CHECK_FALSE(SearchFilterBar("Search 2", buffer, sizeof(buffer), filters)); });
-    CHECK(command == "text");
-    CHECK(std::strcmp(buffer, "text") == 0);
-    CHECK(filtersBefore.Unchanged());
-
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
         BeginSettingsSearch("settings", {.filter = "query"});
         CHECK(SettingsSearchMatch("Row", {.keywords = "word", .section = "Section"}));

@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 #include <string>
 
 #include <imgui.h>
@@ -52,13 +53,22 @@ enum CaptureState
     kDefault,
     kAppFocus,    // the theme mode control focused, the accent swatches hovered
     kAccentOpen,  // the accent picker's custom color well with its popover open
+    kSearchFocus, // the search filter bar's field focused
 };
 
 struct SettingsUi
 {
     std::string command;
+
+    // SearchFilterBar
     std::string query;
-    facet::FilterChip filters[3] = {{"Filter 1"}, {"Filter 2"}, {"Filter 3"}};
+    facet::FilterChip filters[3] = {{"Group A"}, {"Group B"}, {"Group C"}};
+    char narrowQuery[64] = "";
+    facet::FilterChip narrowFilters[4] = {{"Group A"}, {"Group B"}, {"Group C"}, {"Group D"}};
+    int filterWrites = 0;
+    int filterClickChip = 2;  // the chip under the probe "comp.filter.chipclick", set every frame
+    ImGuiID filterClickChipId = 0;
+
     std::string settingsQuery;
     facet::KeybindListItem binds[2] = {
         {"Action 1", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_1}, {ImGuiMod_Ctrl | ImGuiKey_1}},
@@ -289,10 +299,106 @@ void UiScaleSection(facet::demo::PageCtx& ctx)
     ImGui::EndDisabled();
 }
 
+// The placeholder rows the search filter bar filters: "Item 1" to "Item 12", each in one of three
+// groups (the item number modulo 3), which the chips "Group A" to "Group C" select.
+constexpr int kFilterItems = 12;
+
+bool FilterItemShown(int index, const std::string& query, const facet::FilterChip* chips, int chipCount)
+{
+    char label[32];
+    std::snprintf(label, sizeof(label), "Item %d", index + 1);
+    bool anyChip = false;
+    bool inChip = false;
+    for (int c = 0; c < chipCount; ++c)
+    {
+        anyChip = anyChip || chips[c].active;
+        inChip = inChip || (chips[c].active && index % chipCount == c);
+    }
+    return (!anyChip || inChip) && facet::PassesFilter(query, {}, label);
+}
+
+int FilterItemCount(const std::string& query, const facet::FilterChip* chips, int chipCount)
+{
+    int count = 0;
+    for (int i = 0; i < kFilterItems; ++i)
+        count += FilterItemShown(i, query, chips, chipCount) ? 1 : 0;
+    return count;
+}
+
+void SearchFilterBarSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("SearchFilterBar");
+    Paragraph("A search field with filter chips and a result count. It filters the placeholder rows Item 1 to "
+              "Item 12; the chips pick their group. When the field would get narrower than its minimum the chips "
+              "move under it, and chips that do not fit their line move into a More menu.");
+    const int chipCount = static_cast<int>(std::size(ui.filters));
+    const int count = FilterItemCount(ui.query, ui.filters, chipCount);
+    LabeledRow("Search");
+    if (ctx.capture && ctx.captureState == kSearchFocus)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    if (facet::SearchFilterBar("##filter", &ui.query, ui.filters, {.resultCount = count}))
+        ++ui.filterWrites;
+    ctx.Probe("comp.filter");
+    if (ctx.capture && ctx.captureState == kSearchFocus)
+        ctx.RevealInCapture(0.3f);
+    if (ctx.probes != nullptr)
+    {
+        // The chips' ids: their index hashed with the chip group "##chips" under the bar's id.
+        const ImGuiID chips = ImHashStr("##chips", 0, ImGui::GetID("##filter"));
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        char name[64];
+        for (int i = 0; i < chipCount; ++i)
+        {
+            std::snprintf(name, sizeof(name), "comp.filter.chip.%d", i);
+            facet::demo::ProbeRect(ctx, name, ImHashData(&i, sizeof(i), chips), min, max);
+        }
+        // Points the script clicks: the start of the field, and a chip that is easy to find from the
+        // bar's edges (the last chip at the end of a one-line bar, else the first chip of the second
+        // line).
+        const float line = facet::ControlHeight(facet::ControlSize::Inherit);
+        const float inset = facet::Px(16.0f);
+        const bool twoLines = max.y - min.y > line * 1.5f;
+        ui.filterClickChip = twoLines ? 0 : chipCount - 1;
+        ui.filterClickChipId = ImHashData(&ui.filterClickChip, sizeof(int), chips);
+        const ImVec2 chip = twoLines ? ImVec2(min.x + inset, max.y - line * 0.5f) : ImVec2(max.x - inset, min.y + line * 0.5f);
+        facet::demo::ProbeRect(ctx, "comp.filter.chipclick", 0, ImVec2(chip.x - 1.0f, chip.y - 1.0f),
+                               ImVec2(chip.x + 1.0f, chip.y + 1.0f));
+        facet::demo::ProbeRect(ctx, "comp.filter.field", ImGui::GetID("##filter"), min,
+                               ImVec2(min.x + inset * 4.0f, min.y + line));
+    }
+    LabeledRow("Rows");
+    {
+        char text[256] = "";
+        int length = 0;
+        for (int i = 0; i < kFilterItems; ++i)
+        {
+            if (FilterItemShown(i, ui.query, ui.filters, chipCount))
+                length += std::snprintf(text + length, sizeof(text) - static_cast<std::size_t>(length), "%sItem %d",
+                                        length > 0 ? ", " : "", i + 1);
+        }
+        facet::StyledText(length > 0 ? text : facet::GetStrings().noResults, {.secondary = true, .wrap = true});
+    }
+    LabeledRow("Narrow");
+    facet::SearchFilterBar("##narrow", ui.narrowQuery, sizeof(ui.narrowQuery), ui.narrowFilters,
+                           {.placeholder = "Placeholder search", .width = DemoWidth(260.0f)});
+    ctx.Probe("comp.filter.narrow");
+    LabeledRow("Read-only");
+    std::string readOnlyQuery = "Item";
+    facet::FilterChip readOnlyChips[] = {{"Group A", {}, true}, {"Group B"}};
+    facet::SearchFilterBar("##readonly", &readOnlyQuery, readOnlyChips, {.resultCount = 1, .readOnly = true});
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    std::string disabledQuery;
+    facet::FilterChip disabledChips[] = {{"Group A"}, {"Group B"}};
+    facet::SearchFilterBar("##disabled", &disabledQuery, disabledChips);
+    ImGui::EndDisabled();
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover")
+                "accent popover", "search focused")
 {
     const facet::Theme& theme = facet::T();
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
@@ -306,10 +412,9 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
     AccentSection(ctx);
     UiScaleSection(ctx);
 
+    SearchFilterBarSection(ctx);
+
     SectionHeader("Search and settings");
-    LabeledRow("Search filter bar");
-    facet::SearchFilterBar("Search##filter bar", &ui.query, ui.filters);
-    ctx.Probe("composites.search");
     LabeledRow("Settings search");
     ImGui::BeginGroup();
     facet::BeginSettingsSearch("settings", {.filter = ui.settingsQuery.c_str()});
@@ -412,7 +517,32 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.ExpectFocused("composites.onboarding");
     test.Do([] { ui.onboarding = false; });
 
-    // The search filter bar placeholder writes nothing.
-    test.Click("composites.search");
-    test.Expect("a click on the search filter bar placeholder leaves the query empty", [] { return ui.query.empty(); });
+    // SearchFilterBar: typing, Escape, a chip by mouse and by keyboard.
+    test.Click("comp.filter.field");
+    test.Type("1");
+    test.ExpectText("typing writes the query", [] { return ui.query; }, "1");
+    test.Expect("four rows match 1", [] { return FilterItemCount(ui.query, ui.filters, 3) == 4; });
+    test.KeyPress(ImGuiKey_Escape);
+    test.ExpectText("Escape restores the query from activation", [] { return ui.query; }, "");
+    test.Click("comp.filter.chipclick");
+    test.Expect("a click on a chip turns its group on", [] {
+        int on = 0;
+        for (const facet::FilterChip& chip : ui.filters)
+            on += chip.active ? 1 : 0;
+        return on == 1 && ui.filters[ui.filterClickChip].active;
+    });
+    test.Expect("one group has four rows", [] { return FilterItemCount(ui.query, ui.filters, 3) == 4; });
+    test.KeyPress(ImGuiKey_Tab);  // after a click the first Tab shows the focus on the chip
+    test.Expect("the focus shows on the clicked chip", [] { return GImGui->NavId == ui.filterClickChipId; });
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Space on the clicked chip turns its group off again",
+                [] { return !ui.filters[0].active && !ui.filters[1].active && !ui.filters[2].active; });
+    test.Click("comp.filter.field");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("comp.filter.chip.0");
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Tab from the field reaches Group A, Space turns it on", [] { return ui.filters[0].active; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter turns Group A off again", [] { return !ui.filters[0].active; });
+    test.Expect("six writes in the bar: a key, Escape and four chips", [] { return ui.filterWrites == 6; });
 }

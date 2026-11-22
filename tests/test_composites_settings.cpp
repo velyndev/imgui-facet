@@ -367,3 +367,116 @@ TEST_CASE("UiScaleControl swaps min and max and moves to the ends with Home and 
     session.KeyPress(ImGuiKey_Home);
     CHECK(scale == doctest::Approx(0.5f));
 }
+
+// ---- SearchFilterBar -----------------------------------------------------------------------
+
+TEST_CASE("SearchFilterBar writes the query per keystroke and Escape restores it from activation")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query = "a";
+    facet::FilterChip chips[] = {{"Filter 1"}, {"Filter 2"}};
+    int writes = 0;
+    session.SetUi([&] {
+        if (facet::SearchFilterBar("##bar", &query, chips, {.resultCount = 2}))
+            ++writes;
+        session.Track("bar");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("bar");
+    session.Click(ImVec2(rect.Min.x + facet::Px(40.0f), rect.Min.y + facet::ControlHeight(facet::ControlSize::Inherit) * 0.5f));
+    session.KeyPress(ImGuiKey_End);
+    session.Type("b");
+    CHECK(query == "ab");
+    session.Type("c");
+    CHECK(query == "abc");
+    CHECK(writes == 2);
+    session.KeyPress(ImGuiKey_Escape);
+    CHECK(query == "a");
+    CHECK(writes == 3);
+    CHECK_FALSE(chips[0].active);
+    CHECK_FALSE(chips[1].active);
+}
+
+TEST_CASE("SearchFilterBar chips toggle their active flag by mouse and keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    facet::FilterChip chips[] = {{"Filter 1"}, {"Filter 2"}};
+    int writes = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::SearchFilterBar("##bar", &query, chips, {.width = 600.0f}))
+            ++writes;
+        session.Track("bar");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("bar");
+    // Wide enough: one line, the chips at the end.
+    CHECK(rect.GetHeight() < facet::ControlHeight(facet::ControlSize::Inherit) * 1.5f);
+    session.Click(ImVec2(rect.Max.x - facet::Px(20.0f), rect.GetCenter().y));
+    CHECK(chips[1].active);
+    CHECK_FALSE(chips[0].active);
+    CHECK(writes == 1);
+    // Tab goes from the field to the first chip, and Space toggles it.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(chips[0].active);
+    CHECK(writes == 2);
+    CHECK(query.empty());
+}
+
+TEST_CASE("A narrow SearchFilterBar puts the chips under the field")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    std::string query;
+    facet::FilterChip chips[] = {{"Filter 1"}, {"Filter 2"}, {"Filter 3"}};
+    session.SetUi([&] {
+        facet::SearchFilterBar("##bar", &query, chips, {.width = 220.0f});
+        session.Track("bar");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("bar");
+    const float row = facet::ControlHeight(facet::ControlSize::Inherit);
+    CHECK(rect.GetHeight() > row * 1.5f);
+    CHECK(rect.GetWidth() == doctest::Approx(facet::Px(220.0f)).epsilon(0.01));
+    // The first chip starts the second line.
+    session.Click(ImVec2(rect.Min.x + facet::Px(16.0f), rect.Max.y - row * 0.5f));
+    CHECK(chips[0].active);
+}
+
+TEST_CASE("SearchFilterBar read-only or disabled writes neither the query nor the chips")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    char buffer[32] = "abc";
+    facet::FilterChip chips[] = {{"Filter 1"}};
+    bool readOnly = true;
+    bool wrote = false;
+    session.SetUi([&] {
+        ImGui::BeginDisabled(!readOnly);
+        wrote |= facet::SearchFilterBar("##bar", buffer, sizeof(buffer), chips, {.width = 500.0f, .readOnly = readOnly});
+        ImGui::EndDisabled();
+        session.Track("bar");
+    });
+    session.Frame();
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const ImRect rect = session.ItemRect("bar");
+        session.Click(ImVec2(rect.Max.x - facet::Px(20.0f), rect.GetCenter().y));
+        session.Click(ImVec2(rect.Min.x + facet::Px(40.0f), rect.GetCenter().y));
+        session.Type("x");
+        readOnly = false;  // the second pass: disabled
+        session.Frame();
+    }
+    CHECK_FALSE(wrote);
+    CHECK(std::string(buffer) == "abc");
+    CHECK_FALSE(chips[0].active);
+}
+

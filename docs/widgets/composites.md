@@ -235,7 +235,20 @@ bool SearchFilterBar(const char* label, std::string* query, std::span<FilterChip
 bool SearchFilterBar(const char* label, char* buffer, std::size_t bufferSize, std::span<FilterChip> filters, const SearchFilterBarOptions& options = {});
 ```
 
-Search field with toggleable filter chips and a result count. Status: planned.
+A `TextField` with the search icon, the placeholder (`Strings::search` by default) and a clear
+button, then the result count (`Strings::resultCount`, `resultCountOne` for one; hidden while
+`resultCount` is negative) in Footnote labelSecondary, then the filter chips as a single-line
+`ChipGroup`. The field is a text field rather than a `SearchField` because the declaration promises
+the text field's Escape: it restores the query from activation and returns true, as in every text
+field; the clear button empties the field. The query is written per keystroke. Each chip is a Tab
+stop after the field; a click, Enter or Space flips its `active` member. The visible label part is
+drawn in front of the field inside the width; the default width fills the available width. The
+field takes the width the count and the chips leave, but never less than
+`composites.searchFieldMinWidth`; when that does not fit, the chips go on a line of their own under
+the field, and chips that do not fit their line move into the chip group's More menu. Chip entries
+are keyed by `FilterChip::id` when it is set. After the call the item queries describe the query
+edit. `readOnly` and `ImGui::BeginDisabled` write neither the query nor the chips. The sort choice is
+not part of the bar yet; see "Planned, not declared yet". Status: ready.
 
 ### SettingsSearch
 
