@@ -1,8 +1,8 @@
 // InventoryGrid (facet/widgets/composites.h): a grid of inventory slots.
 //
 // The slots are the tiles of an ItemGrid (layout.h): a scroll area that submits only the visible
-// tiles, reflows with the width, and selects through the list core (click, Ctrl, Shift, box select,
-// and the arrow keys in two dimensions) into a selection the grid keeps under its id; *selected is
+// tiles, reflows with the width, and selects through the list core (click, Ctrl, Shift and the arrow
+// keys in two dimensions; no box select, a drag moves items) into a selection kept under its id; *selected is
 // the focused selected slot, else the first selected one. Each tile is drawn with the module's tile
 // look (cards_look.h) and is both a drag source (pointer, or Space for a keyboard drag) and a drop
 // target of its own, so items move between slots of this grid, other grids and InventorySlot and
