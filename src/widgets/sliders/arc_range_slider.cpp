@@ -184,7 +184,6 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
         std::swap(min, max);
     const ImGuiID id = window->GetID(label);
     const Theme& t = T();
-    const Colors& c = t.colors;
 
     const float sweepDegrees = o.sweep > 0.0f ? std::min(o.sweep, 360.0f) : t.metrics.dialSweep;
     const bool full = sweepDegrees >= 360.0f;
@@ -527,9 +526,11 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
         }
         if (drag.part != 0 && g.ActiveId != drag.part)
             drag = {};
+        // The band is not a control with a look of its own: it reports the pointer but never
+        // animates, so only the handles react to hover (multi_handle.h, the span).
         band.hovered = band.hovered || hoveredPart == kArcRangeBandPart;
-        band.hoverAmount = std::max(band.hoverAmount, Tween(bandId, kArcRangeHoverSub, hoveredPart == kArcRangeBandPart ? 1.0f : 0.0f,
-                                                            t.motion.durationFast));
+        band.hoverAmount = 0.0f;
+        band.pressAmount = 0.0f;
 
         // Ctrl+click or Enter on a handle types its value.
         const bool editable = !readOnly && !disabled;
@@ -576,7 +577,7 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
     if (!typing && ImGui::IsRectVisible(widget.Min, widget.Max))
     {
         const int segments = std::max(24, static_cast<int>(arc.radius));
-        const ImVec4 rest = look == internal::SliderLook::Disabled ? c.fill[3] : (error ? c.destructive : ControlBoundaryColor(c));
+        const ImVec4 rest = internal::SliderTrackRestColor(look, error);
         if (full)
             drawList->AddCircle(arc.center, arc.radius, ToU32(rest), segments * 2, m.track);
         else
@@ -588,11 +589,9 @@ bool ArcRangeSliderImpl(const char* label, Value* low, Value* high, double min, 
         const double f1 = internal::ValueToFraction(mapping, values[1]);
         if (!mixedShown)
         {
-            // The band in the accent, thicker while a press would grab it or drags it.
-            const ImVec4 fill = look == internal::SliderLook::Disabled ? c.labelTertiary
-                                : (look == internal::SliderLook::ReadOnly ? c.labelSecondary : c.accent);
-            const float bandAmount = o.dragSpan && look == internal::SliderLook::Normal ? std::max(band.hoverAmount, band.pressAmount) : 0.0f;
-            const float thickness = std::round(m.track + PxSnapped(t.spacing.xs) * bandAmount);
+            // The band in the accent mark, the track thickness in every state.
+            const ImVec4 fill = internal::SliderTrackFillColor(look);
+            const float thickness = m.track;
             const double length = f1 >= f0 ? f1 - f0 : 1.0 - f0 + f1;
             if (length > 0.0)
             {

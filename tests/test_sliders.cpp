@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <span>
+#include <vector>
 
 #include <doctest/doctest.h>
 #include <imgui.h>
@@ -2129,4 +2131,284 @@ TEST_CASE("A narrow column of sliders keeps one track start and end, with or wit
         // The label in front still ends where the longest one needs it.
         CHECK(frames[0].control.Min.x - frames[0].widget.Min.x >= frames[1].label.shown.width);
     }
+}
+
+// ---- Look: the span, the knobs and the track ---------------------------------------------------
+
+namespace
+{
+
+// The vertices a widget drew into its window's draw list, recorded by the UI around the call.
+struct DrawnWidget
+{
+    std::vector<ImDrawVert> vertices;
+
+    template <class Fn>
+    void Record(Fn&& draw)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        draw();
+        vertices.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+    }
+};
+
+// The same geometry; `colors` also compares the colors.
+bool SameDrawing(const std::vector<ImDrawVert>& a, const std::vector<ImDrawVert>& b, bool colors)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        if (std::fabs(a[i].pos.x - b[i].pos.x) > 0.01f || std::fabs(a[i].pos.y - b[i].pos.y) > 0.01f)
+            return false;
+        if (colors && a[i].col != b[i].col)
+            return false;
+    }
+    return true;
+}
+
+int CountColor(const std::vector<ImDrawVert>& vertices, ImU32 color)
+{
+    int count = 0;
+    for (const ImDrawVert& v : vertices)
+        count += v.col == color ? 1 : 0;
+    return count;
+}
+
+// One widget on the multi-handle model, with a point on its span (or band, or body).
+struct SpanCase
+{
+    const char* name;
+    void (*ui)();
+    ImVec2 (*span)(const ImRect& rect);
+    // How many vertices at the start of the drawing belong to a frame with a hover look of its own,
+    // left out of the comparison; null: none. A pad is a field, and its frame shows the hover of the
+    // whole pad wherever the pointer is on it.
+    int (*frameVertices)(const ImRect& rect) = nullptr;
+};
+
+// The vertices of a field frame of `rect`, counted in a scratch draw list.
+int FieldFrameVertices(const ImRect& rect)
+{
+    ImDrawList scratch(ImGui::GetDrawListSharedData());
+    scratch._ResetForNewFrame();
+    scratch.PushClipRectFullScreen();
+    facet::internal::DrawFieldFrame(&scratch, rect, {});
+    return scratch.VtxBuffer.Size;
+}
+
+float RowCenterY(const ImRect& rect)
+{
+    return std::round(rect.Min.y + facet::ControlHeight(facet::ControlSize::Regular) * 0.5f);
+}
+
+// Puts the theme back after a test that changed it.
+struct SliderThemeGuard
+{
+    facet::Theme saved = facet::T();
+    ~SliderThemeGuard() { facet::SetTheme(saved, false); }
+};
+
+} // namespace
+
+TEST_CASE("The span between handles keeps its look under the pointer and while held, in every multi-handle widget")
+{
+    static const float kBins[] = {1.0f, 3.0f, 2.0f, 4.0f, 1.0f};
+    const SpanCase cases[] = {
+        {"RangeSlider",
+         [] {
+             static int low = 10, high = 90;
+             facet::RangeSlider("##w", &low, &high, 0, 100, {.width = 400.0f});
+         },
+         [](const ImRect& r) { return ImVec2(std::round(r.Min.x + r.GetWidth() * 0.4f), RowCenterY(r)); }},
+        {"RangeInput",
+         [] {
+             static int low = 10, high = 90;
+             facet::RangeInput("##w", &low, &high, 0, 100, {.width = 500.0f});
+         },
+         [](const ImRect& r) { return ImVec2(std::round(r.GetCenter().x), RowCenterY(r)); }},
+        {"RangeSliderHistogram",
+         [] {
+             static int low = 10, high = 90;
+             facet::RangeSliderHistogram("##w", &low, &high, 0, 100, kBins, {.width = 400.0f});
+         },
+         [](const ImRect& r) {
+             return ImVec2(std::round(r.Min.x + r.GetWidth() * 0.4f),
+                           std::round(r.Max.y - facet::ControlHeight(facet::ControlSize::Regular) * 0.5f));
+         }},
+        {"MultiSlider",
+         [] {
+             static float values[2] = {10.0f, 90.0f};
+             facet::MultiSliderOptions options;
+             options.dragSpan = true;
+             options.width = 400.0f;
+             facet::MultiSlider("##w", std::span<float>(values), 0.0f, 100.0f, options);
+         },
+         [](const ImRect& r) { return ImVec2(std::round(r.Min.x + r.GetWidth() * 0.4f), RowCenterY(r)); }},
+        {"ArcRangeSlider",
+         [] {
+             static float low = 10.0f, high = 90.0f;
+             facet::ArcRangeSlider("##w", &low, &high, 0.0f, 100.0f, {.diameter = 200.0f});
+         },
+         [](const ImRect& r) {
+             // The top of the arc: half of a 270 degree sweep, on the knob centre line.
+             const float radius = 100.0f - KnobSize() * 0.5f;
+             return ImVec2(r.Min.x + 100.0f, r.Min.y + 100.0f - radius);
+         }},
+        {"BoxRangePad",
+         [] {
+             static ImVec2 low(0.2f, 0.2f), high(0.8f, 0.8f);
+             facet::BoxRangePad("##w", &low, &high, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), {.width = 200.0f});
+         },
+         [](const ImRect& r) { return ImVec2(std::round(r.GetCenter().x), std::round(r.GetCenter().y)); },
+         FieldFrameVertices},
+    };
+    for (const SpanCase& c : cases)
+    {
+        INFO(std::string(c.name));
+        facet::test::Session session;
+        REQUIRE(session.Ready());
+        DrawnWidget drawn;
+        int skip = 0;
+        session.SetUi([&] {
+            drawn.Record(c.ui);
+            session.Track("w");
+            skip = c.frameVertices != nullptr ? c.frameVertices(session.ItemRect("w")) : 0;
+        });
+        session.Frames(2);
+        const ImRect rect = session.ItemRect("w");
+        const float settle = facet::T().motion.durationFast + 0.1f;
+        const auto shown = [&] {
+            const std::ptrdiff_t from = std::min<std::ptrdiff_t>(skip, std::ssize(drawn.vertices));
+            return std::vector<ImDrawVert>(drawn.vertices.begin() + from, drawn.vertices.end());
+        };
+        session.MouseMove(ImVec2(rect.Min.x, rect.Max.y + 120.0f));
+        session.Seconds(settle);
+        const std::vector<ImDrawVert> rest = shown();
+        REQUIRE_FALSE(rest.empty());
+        // Under the pointer: no thickening, no color change, no animation.
+        session.MouseMove(c.span(rect));
+        session.Seconds(settle);
+        CHECK(SameDrawing(rest, shown(), true));
+        // Held for a drag: still the same look.
+        session.MouseDown();
+        session.Seconds(settle);
+        CHECK(SameDrawing(rest, shown(), true));
+        session.MouseUp();
+        session.Frames(2);
+    }
+}
+
+TEST_CASE("Dragging the span of a histogram range and a multi slider still moves both handles")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const float kBins[] = {1.0f, 3.0f, 2.0f, 4.0f, 1.0f};
+    int low = 20, high = 60;
+    float values[2] = {20.0f, 60.0f};
+    session.SetUi([&] {
+        facet::RangeSliderHistogram("##h", &low, &high, 0, 100, kBins, {.width = 400.0f});
+        session.Track("h");
+        facet::MultiSliderOptions options;
+        options.dragSpan = true;
+        options.width = 400.0f;
+        facet::MultiSlider("##m", std::span<float>(values), 0.0f, 100.0f, options);
+        session.Track("m");
+    });
+    session.Frames(2);
+    const ImRect h = session.ItemRect("h");
+    const float hy = std::round(h.Max.y - facet::ControlHeight(facet::ControlSize::Regular) * 0.5f);
+    const ImVec2 from(std::round(h.Min.x + h.GetWidth() * 0.35f), hy);
+    session.Drag({from, ImVec2(from.x + 40.0f, hy)});
+    CHECK(low > 20);
+    CHECK(high - low == 40);
+    const ImRect m = session.ItemRect("m");
+    const ImVec2 start(std::round(m.Min.x + m.GetWidth() * 0.35f), RowCenterY(m));
+    session.Drag({start, ImVec2(start.x + 40.0f, start.y)});
+    CHECK(values[0] > 20.0f);
+    CHECK(values[1] - values[0] == doctest::Approx(40.0f).epsilon(0.01));
+}
+
+TEST_CASE("Slider knobs are solid in the knob color and hover changes the outline color, never its width")
+{
+    SliderThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::Theme theme = dark ? facet::Theme::Dark() : facet::Theme::Light();
+        // A knob color nothing else uses, so its vertices can be counted.
+        theme.colors.knob = facet::Rgb(0x00FF7F);
+        facet::SetTheme(theme, false);
+        float value = 0.5f;
+        DrawnWidget drawn;
+        session.SetUi([&] {
+            drawn.Record([&] { facet::Slider("##s", &value, 0.0f, 1.0f, {.width = kSliderWidth}); });
+            session.Track("s");
+        });
+        session.Frames(2);
+        const ImRect rect = session.ItemRect("s");
+        const float settle = facet::T().motion.durationFast + 0.1f;
+        session.MouseMove(ImVec2(rect.Min.x, rect.Max.y + 120.0f));
+        session.Seconds(settle);
+        const std::vector<ImDrawVert> rest = drawn.vertices;
+        CHECK(CountColor(rest, facet::ToU32(facet::T().colors.knob)) > 0);
+        // The old hollow knob was a disc in the background color.
+        CHECK(CountColor(rest, facet::ToU32(facet::T().colors.bg)) == 0);
+        CHECK(CountColor(rest, facet::ToU32(facet::T().colors.controlBorder)) > 0);
+        // The unfilled track is fill[0], the filled part the accent mark.
+        CHECK(CountColor(rest, facet::ToU32(facet::T().colors.fill[0])) > 0);
+        CHECK(CountColor(rest, facet::ToU32(facet::T().colors.focusRing)) > 0);
+        // On the knob: the same geometry, another outline color.
+        session.MouseMove(rect.GetCenter());
+        session.Seconds(settle);
+        CHECK(SameDrawing(rest, drawn.vertices, false));
+        CHECK_FALSE(SameDrawing(rest, drawn.vertices, true));
+        CHECK(CountColor(drawn.vertices, facet::ToU32(facet::T().colors.controlBorderHover)) > 0);
+    }
+}
+
+TEST_CASE("A click on a slider knob draws no focus ring; Tab does")
+{
+    SliderThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::Theme theme = facet::Theme::Light();
+    // A ring color nothing else uses; the filled track takes it too, but only inside the knob row.
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+    float value = 0.5f;
+    DrawnWidget drawn;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        drawn.Record([&] { facet::Slider("##s", &value, 0.0f, 1.0f, {.width = kSliderWidth}); });
+        session.Track("s");
+    });
+    session.Frames(2);
+    const ImRect rect = session.ItemRect("s");
+    const facet::internal::SliderMetrics m = facet::internal::GetSliderMetrics(facet::ControlSize::Regular);
+    // The ring sits outside the knob; the track is thinner than the knob, so ring vertices are the
+    // ones in the ring color further from the track line than half the knob.
+    const auto ringVertices = [&] {
+        int count = 0;
+        const ImU32 ring = facet::ToU32(facet::T().colors.focusRing);
+        for (const ImDrawVert& v : drawn.vertices)
+            count += ((v.col & ~IM_COL32_A_MASK) == (ring & ~IM_COL32_A_MASK) && (v.col & IM_COL32_A_MASK) != 0 &&
+                      std::fabs(v.pos.y - std::round(rect.GetCenter().y)) > m.knob * 0.5f + 0.5f)
+                         ? 1
+                         : 0;
+        return count;
+    };
+    session.Click(rect.GetCenter());
+    session.Frames(3);
+    CHECK(ringVertices() == 0);
+    // The first Tab after a click shows the focus where it is (the button), the second moves it.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frames(3);
+    CHECK(ringVertices() > 0);
 }

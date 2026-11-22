@@ -372,10 +372,10 @@ bool BoxRangePad(const char* label, ImVec2* low, ImVec2* high, ImVec2 min, ImVec
             vy[0] = by;
             vy[1] = by + spanY;
         }
+        // The body reports the pointer but never animates (multi_handle.h, the span).
         body.hovered = body.hovered || hoveredPart == kBoxRangeBodyPart;
-        body.hoverAmount = std::max(body.hoverAmount, Tween(bodyId, kBoxRangeHoverSub,
-                                                            hoveredPart == kBoxRangeBodyPart ? 1.0f : 0.0f,
-                                                            t.motion.durationFast));
+        body.hoverAmount = 0.0f;
+        body.pressAmount = 0.0f;
     }
 
     const bool writtenX[2] = {vx[0] != drawnX[0], vx[1] != drawnX[1]};
@@ -411,28 +411,25 @@ bool BoxRangePad(const char* label, ImVec2* low, ImVec2* high, ImVec2 min, ImVec
         const ImRect shown = boxRect(vx, vy);
         if (!mixedShown)
         {
-            // The box: the selection wash with an outline in the accent, as the filled span of a
-            // range slider; the outline thickens while a press would grab the body or drags it.
+            // The box: the selected look of the border rule, the accentSubtle wash and the accent
+            // outline at the one hairline width. The body is not a control of its own, so it keeps
+            // this look under the pointer and while dragged; only the handles show hover.
             ImVec4 fill = c.accentSubtle;
-            ImVec4 outline = c.accent;
+            internal::OutlineLook outline;
+            outline.selected = true;
             if (look == internal::SliderLook::ReadOnly)
             {
                 fill = c.fill[2];
-                outline = c.labelSecondary;
+                outline.selected = false;
             }
             else if (look == internal::SliderLook::Disabled)
             {
                 fill = c.fill[3];
-                outline = c.labelTertiary;
+                outline.selected = false;
+                outline.disabled = true;
             }
-            const float bodyAmount = o.dragSpan && look == internal::SliderLook::Normal
-                                         ? std::max(body.hoverAmount, body.pressAmount)
-                                         : 0.0f;
-            const float thickness = std::max(1.0f, std::round(m.track * 0.5f + PxSnapped(t.spacing.xs) * 0.5f * bodyAmount));
             FillRect(drawList, shown.Min, shown.Max, ToU32(fill));
-            const ImVec2 outerMin(shown.Min.x - thickness * 0.5f, shown.Min.y - thickness * 0.5f);
-            const ImVec2 outerMax(shown.Max.x + thickness * 0.5f, shown.Max.y + thickness * 0.5f);
-            StrokeRect(drawList, outerMin, outerMax, ToU32(outline), 0.0f, thickness);
+            internal::DrawOutline(drawList, shown, 0.0f, internal::ControlOutlineColor(outline));
         }
         // Edges first, corners on top, the handle in use above all.
         const int top = activeHandle >= 0 ? activeHandle : focusedHandle;

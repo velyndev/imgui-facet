@@ -133,9 +133,9 @@ bool XYPad(const char* label, ImVec2* value, ImVec2 min, ImVec2 max, const XYPad
         const ImVec2 point = internal::PadPoint(pad.area, mx, my, o.yDown, x, y);
         if (!mixed && o.crosshair)
         {
-            // Guide lines through the point in labelTertiary: decoration that shows where it is
-            // against the edges, quieter than the knob.
-            const ImU32 guide = ToU32(disabled ? c.labelQuaternary : c.labelTertiary);
+            // Guide lines through the point in controlBorder: decoration that shows where it is
+            // against the edges, as quiet as a control's edge and far quieter than the knob.
+            const ImU32 guide = ToU32(disabled ? c.separator : c.controlBorder);
             HairlineV(drawList, std::round(point.x), pad.frame.Min.y, pad.frame.Max.y, guide);
             HairlineH(drawList, pad.frame.Min.x, pad.frame.Max.x, std::round(point.y), guide);
             // The values at the edges: x beside the vertical guide, y above the horizontal one.

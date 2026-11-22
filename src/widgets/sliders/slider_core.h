@@ -96,9 +96,16 @@ ImRect SliderKnobRect(const ImRect& track, Orientation orientation, float knob, 
 // The position along the track of a fraction, rounded to whole pixels.
 float SliderTrackPos(const ImRect& track, Orientation orientation, double fraction);
 
+// The unfilled part of a track (and of the arcs of knobs and arc sliders): fill[0], fill[3] while
+// disabled, destructive with an error. The quiet fill gives the track its shape without a light
+// line on dark surfaces.
+ImVec4 SliderTrackRestColor(SliderLook look, bool error);
+// The filled part: the accent mark (colors.focusRing, which reaches 3:1 against fill[0] over every
+// surface, so the value reads from the fill), labelSecondary read-only, labelTertiary disabled.
+ImVec4 SliderTrackFillColor(SliderLook look);
+
 // The track line with its fill between two fractions; `error` draws the unfilled part in the
-// destructive color. `fillColor` 0 uses the accent (labelSecondary read-only, labelTertiary
-// disabled).
+// destructive color. `fillColor` 0 uses SliderTrackFillColor(look).
 void DrawSliderTrack(ImDrawList* drawList, const ImRect& track, Orientation orientation, const SliderMetrics& m,
                      double fillFrom, double fillTo, SliderLook look, bool error, ImU32 fillColor = 0);
 // A filled stretch of the track between two fractions in `color` (segments of a multi slider).
@@ -111,8 +118,14 @@ void DrawSliderTicks(ImDrawList* drawList, const ImRect& track, Orientation orie
 // count written into `out`.
 int SliderStepTicks(const ValueMapping& mapping, std::span<double> out, int maxTicks);
 
-// A knob: the background color with a 3:1 outline that darkens on hover and grows a little while
-// held, and the round focus ring.
+// The face of a knob (slider handles, pads, color planes and bars): a solid disc of `radius`
+// pixels around `center` in colors.knob with the level 1 shadow and the one controlBorder hairline,
+// which turns controlBorderHover by `hoverAmount`. Disabled: the disabled picture opacity, a
+// separator hairline and no shadow. The same in both themes, so the part to grab always reads as
+// one solid thing.
+void DrawSliderKnobFace(ImDrawList* drawList, ImVec2 center, float radius, float hoverAmount, SliderLook look);
+
+// A knob: DrawSliderKnobFace that grows a little while held, and the round focus ring.
 void DrawSliderKnob(ImDrawList* drawList, const ImRect& rect, const ItemState& item, SliderLook look);
 
 // The value bubble above a horizontal knob (beside a vertical one) at `amount` (0 to 1).

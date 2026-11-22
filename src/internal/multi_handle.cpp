@@ -748,10 +748,11 @@ MultiHandleResult MultiHandleBehavior(ImGuiID id, const ImRect& widgetRect, cons
         spanOptions.forced = &forced;
         result.span = PartBehavior(spanId, spanRect, spanOptions);
         // The track takes the pointer, so the span reports the hover a press would grab it with.
+        // The span is not a control with a look of its own: it has no hover or press animation,
+        // so no widget on this model can make it react to the pointer; only the handles do.
         result.span.hovered = result.span.hovered || result.spanHovered;
-        result.span.hoverAmount = std::max(result.span.hoverAmount, Tween(spanId, kHandleHoverSub,
-                                                                          result.spanHovered ? 1.0f : 0.0f,
-                                                                          T().motion.durationFast));
+        result.span.hoverAmount = 0.0f;
+        result.span.pressAmount = 0.0f;
 
         SpanDrag& spanDrag = CurrentSpanDrag();
         if (spanDrag.id == spanId && g.ActiveId != spanId)

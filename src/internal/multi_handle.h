@@ -159,7 +159,10 @@ struct MultiHandleResult
     bool spanHovered = false;// a press would grab the span
     int removeRequested = -1;// with removeKeys: the focused handle whose removal was asked for
     ItemState track;         // the track item (hover, disabled, cursor)
-    ItemState span;          // the span item (meaningful with two handles or more)
+    // The span item (meaningful with two handles or more): hovered, held and pressed say what the
+    // pointer does with it; hoverAmount and pressAmount stay 0, because the span is not a control
+    // with a look of its own and must not react to the pointer (only the handles do).
+    ItemState span;
 };
 
 // Runs the items of a multi-handle widget. `widgetRect` is the area that takes the mouse (the

@@ -19,6 +19,29 @@ the labelled sliders that start at one x then share the widest of those widths, 
 of sliders still starts its tracks at one x. Where the shared value column would leave a track
 shorter than `layout.minRowControl`, every slider of that column drops its value text alike.
 
+## The look
+
+Every widget of the family draws its parts the same way (`src/widgets/sliders/slider_core.h`):
+
+- **Track:** the unfilled part in `fill[0]` (`fill[3]` disabled, `destructive` with an error), the
+  filled part in the accent mark (`focusRing`, which reaches 3:1 against `fill[0]` over every
+  surface, so the value reads from the fill); read-only fills in `labelSecondary`, disabled ones in
+  `labelTertiary`. The arcs of Knob and ArcRangeSlider and the bars of RangeSliderHistogram use the
+  same two colors.
+- **Knobs:** solid discs in the `knob` token (white in both themes) with the level 1 shadow and one
+  `controlBorder` hairline, which turns `controlBorderHover` under the pointer; the width never
+  changes. A held knob grows a little. Disabled knobs keep the disabled picture opacity and a
+  `separator` hairline, without a shadow.
+- **Ticks:** small dots in `labelTertiary` (`labelQuaternary` disabled): they mark the stops, the
+  fill and the knob carry the value.
+- **Value bubble:** a small floating surface, the level 1 elevated surface with its `separator`
+  hairline and the level 1 shadow, the value in `label`.
+- **Focus ring:** only after keyboard input, round around the focused knob; a click or a hover never
+  shows it.
+- **The span between handles** (the filled part of a range, the band of an arc range, the box of a
+  box pad) is not a control of its own: it keeps its look under the pointer and while it is dragged,
+  and only the handles show hover.
+
 ## The multi-handle model
 
 RangeSlider, RangeInput, RangeSliderHistogram, MultiSlider, ArcRangeSlider, BoxRangePad and
@@ -160,7 +183,8 @@ id with its own Tab stop and round focus ring.
   the span (with `dragSpan`), which moves both handles and keeps their distance in value units; a
   press on the empty track moves the nearer handle there. Handles at one value separate in the
   direction of the first movement. A drag that leaves the window keeps going and returns exactly
-  to the values it passed on the way out. The span thickens while a press would grab it.
+  to the values it passed on the way out. The span keeps its look under the pointer and while it
+  is dragged; only the handles show hover.
 - **Keys** on a focused handle: as Slider; Home and End go as far as the handle can (the other
   handle and the gap stop it, unless it pushes). Escape during a drag or a key press restores both
   values from where the edit began.
@@ -225,7 +249,7 @@ The two-handle track of RangeSlider (label in front, both values at the end) und
 `histogramHeight` units high (histogramHeight by default). The bins divide `[min, max]` evenly;
 each bar stands where its values lie on the track (narrower toward `max` on a logarithmic track),
 with a hairline gap between bars, its height relative to the largest bin, and its top corners
-rounded. The parts of the bars between the two handles are drawn in the accent (labelSecondary
+rounded. The parts of the bars between the two handles are drawn in the accent mark (labelSecondary
 read-only, labelTertiary disabled), the rest in fill[0]; while `mixed` every bar is drawn in the
 accent. Hovering a bar shows its interval in interval notation (`[a, b)`, the last one closed)
 and its weight in a tooltip. Negative, NaN and infinite bins count as 0; no bins, or bins that
@@ -281,7 +305,8 @@ bool Knob(const char* label, int* value, int min, int max, const KnobOptions& op
 
 A dial `diameter` units across (two control heights of `size` by default, at most the available
 width) with a track arc along the sweep (`sweep` degrees, dialSweep by default, open at the bottom,
-clockwise over the top), a face in the background color with a 3:1 outline, the formatted value
+clockwise over the top) in the track colors, a face in the neutral control fill with one
+`controlBorder` hairline (both stronger under the pointer, like a button), the formatted value
 inside the face (under the dial when the dial is smaller than one and a half control heights) and
 the label under it in Footnote, cut with its full text on hover and keyboard focus.
 
@@ -349,7 +374,7 @@ bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& opt
 
 A pad with a stick: `*value` is its deflection, -1 to 1 per axis, x to the right and y up. The pad
 is `diameter` units across (the padSize token by default, at most the available width), round with
-the fill and 3:1 boundary of a field (with `circular` off, the square field frame of XYPad). The
+the fill and controlBorder hairline of a field (with `circular` off, the square field frame of XYPad). The
 stick is the slider knob, with a line in the accent from the centre to it, so the vector reads at a
 glance; a short separator cross marks the centre. The stick centre travels half a knob inside the
 pad. The label is the tooltip, as for XYPad; one item and one Tab stop.
@@ -368,7 +393,7 @@ pad. The label is the tooltip, as for XYPad; one item and one Tab stop.
   to -1 and 1); a value the caller writes moves the stick there.
 - **deadzone** (0 to 1 of the radius): inside it the value is 0; outside it the distance from the
   deadzone's edge is scaled up to the full radius, so the value grows from 0 without a jump and
-  still reaches 1 at the edge. `showDeadzone` draws its ring in labelTertiary.
+  still reaches 1 at the edge. `showDeadzone` draws its edge as one controlBorder hairline.
 - **States:** disabled and `readOnly` as XYPad (the line in labelSecondary read-only); `error`
   draws the destructive outline and the message under the pad. A null value pointer shows the pad
   read-only.
@@ -395,8 +420,8 @@ nothing leaves it. Handle 0 is `*low`, handle 1 `*high`, each its own item and T
   (with `dragSpan`), a press elsewhere on the ring moves the nearer handle there first; a press in
   the middle of the dial does nothing. Drags follow the pointer angle, with the grab offset kept;
   on an open arc a pointer in the gap at the bottom goes to the nearer end. The band turns both
-  handles by the same amount (whole steps with `step`). The band thickens while a press would grab
-  it.
+  handles by the same amount (whole steps with `step`). The band keeps its look under the pointer
+  and while it is dragged; only the handles show hover.
 - **Keys** on a focused handle: all four arrows step (Up and Right up, Down and Left down, as on a
   knob), Shift finer, Ctrl coarser, Page Up and Down a tenth, Home and End as far as the rules let
   the handle go; Escape during a drag or a key press restores both values. Ctrl+click or Enter
@@ -426,7 +451,8 @@ bool BoxRangePad(const char* label, ImVec2* low, ImVec2* high, ImVec2 min, ImVec
 
 A two-dimensional range: the box from `*low` to `*high` on the pad of XYPad (the field frame,
 `width` by `height` units, square at the padSize token by default and at most the available width),
-drawn as a wash of accentSubtle with an accent outline, like the filled span of a range slider.
+drawn as a wash of accentSubtle with the accent outline at the one hairline width (the selected
+look); like the span of a range slider it keeps that look under the pointer and while dragged.
 Eight handles, each its own item and Tab stop under the widget id, in this order: the left, top,
 right and bottom edges (parts 0 to 3), then the corners from the top left clockwise (parts 4 to 7).
 The corners are slider knobs; each edge has a knob at its middle, drawn when the edge is at least

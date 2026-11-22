@@ -117,7 +117,8 @@ bool HistogramImpl(const char* label, Value* low, Value* high, double min, doubl
         const float selMax = internal::SliderTrackPos(frame.track, Orientation::Horizontal, internal::ValueToFraction(r.mapping, r.values[1]));
         const bool off = r.disabled;
         const ImU32 dim = ToU32(off ? c.fill[3] : c.fill[0]);
-        const ImU32 lit = ToU32(off ? c.labelTertiary : (r.readOnly ? c.labelSecondary : c.accent));
+        // The bars inside the range carry the selection like the filled track under them.
+        const ImU32 lit = ToU32(internal::SliderTrackFillColor(internal::PickSliderLook(off, r.readOnly)));
         const float gap = std::max(1.0f, HairlineThickness());
         const float radius = Px(t.radii.element) * 0.5f;
         for (int k = 0; k < count; ++k)

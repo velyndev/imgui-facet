@@ -204,11 +204,15 @@ bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& o)
         {
             // A round field: the field fill and boundary of a text field, drawn as a circle.
             const float radius = diameter * 0.5f;
+            const ImRect circle(center.x - radius, center.y - radius, center.x + radius, center.y + radius);
             const ImVec4 fill = disabled ? c.fill[3] : Mix(c.fill[2], c.fill[1], item.hoverAmount);
-            const ImVec4 outline = o.error != nullptr ? c.destructive : (disabled ? c.separator : ControlBoundaryColor(c));
             if (!readOnly || disabled)
-                drawList->AddCircleFilled(center, radius, ToU32(fill), 0);
-            drawList->AddCircle(center, radius - HairlineThickness() * 0.5f, ToU32(outline), 0, HairlineThickness());
+                FillRect(drawList, circle.Min, circle.Max, ToU32(fill), radius);
+            internal::OutlineLook outline;
+            outline.hoverAmount = readOnly ? 0.0f : item.hoverAmount;
+            outline.disabled = disabled;
+            outline.error = o.error != nullptr;
+            internal::DrawOutline(drawList, circle, radius, internal::ControlOutlineColor(outline));
         }
         else
         {
@@ -226,17 +230,14 @@ bool JoystickPad(const char* label, ImVec2* value, const JoystickPadOptions& o)
         HairlineV(drawList, center.x, center.y - cross, center.y + cross, guide);
         if (o.showDeadzone && deadzone > 0.0)
         {
-            const float r = static_cast<float>(deadzone) * travel;
-            if (o.circular)
-                drawList->AddCircle(center, r, ToU32(disabled ? c.labelQuaternary : c.labelTertiary), 0, HairlineThickness());
-            else
-                StrokeRect(drawList, ImVec2(center.x - r, center.y - r), ImVec2(center.x + r, center.y + r),
-                           ToU32(disabled ? c.labelQuaternary : c.labelTertiary), 0.0f, HairlineThickness());
+            // The deadzone edge: one controlBorder hairline, quiet like a control's edge.
+            const float r = std::round(static_cast<float>(deadzone) * travel);
+            const ImRect zone(center.x - r, center.y - r, center.x + r, center.y + r);
+            internal::DrawOutline(drawList, zone, o.circular ? r : 0.0f, disabled ? c.separator : c.controlBorder);
         }
         // The vector from the centre to the stick, in the slider fill color, then the stick.
         const ImVec2 stick(center.x + state.drawn.x * travel, center.y - state.drawn.y * travel);
-        const ImU32 fillColor = ToU32(look == internal::SliderLook::Disabled ? c.labelTertiary
-                                      : (look == internal::SliderLook::ReadOnly ? c.labelSecondary : c.accent));
+        const ImU32 fillColor = ToU32(internal::SliderTrackFillColor(look));
         if (std::fabs(stick.x - center.x) + std::fabs(stick.y - center.y) >= 1.0f)
             drawList->AddLine(center, stick, fillColor, m.track);
         internal::DrawSliderKnob(drawList, internal::PadKnobRect(stick, pad.knob), item, look);

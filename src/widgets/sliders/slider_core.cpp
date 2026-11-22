@@ -10,6 +10,7 @@
 #include "facet/core/anim.h"
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
+#include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
@@ -26,11 +27,6 @@ namespace
 // How much a held knob grows, as a share of its radius: enough to show the grab under a finger
 // or pointer without covering the neighbouring ticks.
 constexpr float kSliderKnobPressGrowth = 0.15f;
-// The hover darkens the knob outline halfway from the boundary color toward label.
-constexpr float kSliderKnobHoverShare = 0.5f;
-// The knob outline is one and a half hairlines, so the round edge reads as firmly as a hairline
-// on a straight edge.
-constexpr float kSliderKnobOutlineHairlines = 1.5f;
 // Animation sub key of the value bubble under the widget or handle id.
 constexpr int kSliderBubbleSub = 0x0B00;
 
@@ -218,29 +214,36 @@ ImRect TrackLine(const ImRect& track, Orientation orientation, float thickness, 
 
 } // namespace
 
+ImVec4 SliderTrackRestColor(SliderLook look, bool error)
+{
+    const Colors& c = T().colors;
+    if (look == SliderLook::Disabled)
+        return c.fill[3];
+    return error ? c.destructive : c.fill[0];
+}
+
+ImVec4 SliderTrackFillColor(SliderLook look)
+{
+    const Colors& c = T().colors;
+    if (look == SliderLook::Disabled)
+        return c.labelTertiary;
+    return look == SliderLook::ReadOnly ? c.labelSecondary : c.focusRing;
+}
+
 void DrawSliderTrack(ImDrawList* drawList, const ImRect& track, Orientation orientation, const SliderMetrics& m,
                      double fillFrom, double fillTo, SliderLook look, bool error, ImU32 fillColor)
 {
-    const Colors& c = T().colors;
     const float half = m.track * 0.5f;
     float start = 0.0f;
     float end = 0.0f;
     SliderLineEnds(track, orientation, m, &start, &end);
     const ImRect whole = TrackLine(track, orientation, m.track, start, end);
-    // The unfilled line in the 3:1 boundary color, so the ends of the range stay visible.
-    const ImVec4 rest = look == SliderLook::Disabled ? c.fill[3] : (error ? c.destructive : ControlBoundaryColor(c));
-    FillRect(drawList, whole.Min, whole.Max, ToU32(rest), half);
+    FillRect(drawList, whole.Min, whole.Max, ToU32(SliderTrackRestColor(look, error)), half);
     const float a = SliderFillPos(track, orientation, m, fillFrom);
     const float b = SliderFillPos(track, orientation, m, fillTo);
     if (a == b)
         return;
-    ImU32 color = fillColor;
-    if (look == SliderLook::Disabled)
-        color = ToU32(c.labelTertiary);
-    else if (look == SliderLook::ReadOnly)
-        color = ToU32(c.labelSecondary);
-    else if (color == 0)
-        color = ToU32(c.accent);
+    const ImU32 color = look != SliderLook::Normal || fillColor == 0 ? ToU32(SliderTrackFillColor(look)) : fillColor;
     const ImRect fill = TrackLine(track, orientation, m.track, a, b);
     FillRect(drawList, fill.Min, fill.Max, color, half);
 }
@@ -260,7 +263,8 @@ void DrawSliderTicks(ImDrawList* drawList, const ImRect& track, Orientation orie
                      std::span<const double> fractions, SliderLook look)
 {
     const Colors& c = T().colors;
-    const ImU32 color = ToU32(look == SliderLook::Disabled ? c.labelTertiary : c.labelSecondary);
+    // Quiet marks: they show where the stops are, the knob and the fill carry the value.
+    const ImU32 color = ToU32(look == SliderLook::Disabled ? c.labelQuaternary : c.labelTertiary);
     // Below the track (beside a vertical one), clear of the knob's round edge.
     const float offset = std::round(m.knob * 0.5f) + m.tick * 0.5f;
     const float radius = m.tick * 0.5f;
@@ -307,20 +311,29 @@ int SliderStepTicks(const ValueMapping& mapping, std::span<double> out, int maxT
     return written;
 }
 
-void DrawSliderKnob(ImDrawList* drawList, const ImRect& rect, const ItemState& item, SliderLook look)
+void DrawSliderKnobFace(ImDrawList* drawList, ImVec2 center, float radius, float hoverAmount, SliderLook look)
 {
     const Colors& c = T().colors;
+    const bool disabled = look == SliderLook::Disabled;
+    const ImRect rect(center.x - radius, center.y - radius, center.x + radius, center.y + radius);
+    if (!disabled)
+        DrawElevation(drawList, rect.Min, rect.Max, radius, 1);
+    const float alpha = disabled ? kDisabledPictureOpacity : 1.0f;
+    FillRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(c.knob, c.knob.w * alpha)), radius);
+    OutlineLook outline;
+    outline.hoverAmount = look == SliderLook::Normal ? hoverAmount : 0.0f;
+    outline.disabled = disabled;
+    DrawOutline(drawList, rect, radius, ControlOutlineColor(outline));
+}
+
+void DrawSliderKnob(ImDrawList* drawList, const ImRect& rect, const ItemState& item, SliderLook look)
+{
     const ImVec2 center = rect.GetCenter();
     const float base = rect.GetWidth() * 0.5f;
     const float grow = look == SliderLook::Normal ? kSliderKnobPressGrowth * item.pressAmount : 0.0f;
     // Whole pixels: the knob grows in pixel steps instead of blurring its edge.
     const float radius = std::max(1.0f, std::round(base * (1.0f + grow)));
-    const ImVec4 boundary = ControlBoundaryColor(c);
-    ImVec4 outline = Mix(boundary, c.label, item.hoverAmount * kSliderKnobHoverShare);
-    if (look == SliderLook::Disabled)
-        outline = c.labelTertiary;
-    drawList->AddCircleFilled(center, radius, ToU32(c.bg));
-    drawList->AddCircle(center, radius, ToU32(outline), 0, HairlineThickness() * kSliderKnobOutlineHairlines);
+    DrawSliderKnobFace(drawList, center, radius, item.hoverAmount, look);
     // Round, like the knob, so the ring keeps an even gap all around it.
     DrawFocusRing(drawList, ImRect(center.x - radius, center.y - radius, center.x + radius, center.y + radius), radius,
                   item.focusAmount, 0, RingShape::Round);
@@ -345,9 +358,18 @@ void DrawSliderBubble(ImDrawList* drawList, const ImRect& knob, const char* text
         min = ImVec2(std::round(knob.GetCenter().x - box.x * 0.5f), knob.Min.y - gap - box.y);
     min = ImVec2(std::round(min.x), std::round(min.y));
     const ImVec2 max(min.x + box.x, min.y + box.y);
-    // Inverted surface: label behind bg-colored text reads over any surface in both themes.
-    FillRect(drawList, min, max, ToU32(WithAlpha(c.label, c.label.w * amount)), Px(t.radii.element));
-    drawList->AddText(ImVec2(min.x + padX, min.y + padY), ToU32(WithAlpha(c.bg, amount)), text);
+    // A small floating surface like a tooltip: the level 1 elevated surface, its separator hairline
+    // and the level 1 shadow, label text on it. In dark the lighter grey and the hairline lift it off
+    // the near-black surfaces; an inverted white bubble would be the brightest thing on the screen.
+    const float radius = Px(t.radii.element);
+    ShadowSpec shadow = ElevationShadow(1);
+    shadow.color = ToU32(WithAlpha(ImGui::ColorConvertU32ToFloat4(shadow.color),
+                                   ImGui::ColorConvertU32ToFloat4(shadow.color).w * amount));
+    DrawShadow(drawList, min, max, radius, shadow);
+    const ImVec4 surface = c.ElevatedSurface(1);
+    FillRect(drawList, min, max, ToU32(WithAlpha(surface, surface.w * amount)), radius);
+    DrawOutline(drawList, ImRect(min, max), radius, WithAlpha(c.separator, c.separator.w * amount));
+    drawList->AddText(ImVec2(min.x + padX, min.y + padY), ToU32(WithAlpha(c.label, c.label.w * amount)), text);
 }
 
 void DrawSliderValueText(ImDrawList* drawList, const ImRect& column, const char* text, bool disabled)

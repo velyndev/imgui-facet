@@ -45,8 +45,6 @@ constexpr float kKnobFaceInsetShare = 0.18f;
 constexpr float kKnobDotShare = 0.16f;
 // A held face grows by this share of its radius, less than a slider knob: the dial is larger.
 constexpr float kKnobPressGrowth = 0.04f;
-// The hover darkens the face outline halfway from the boundary color toward label.
-constexpr float kKnobHoverShare = 0.5f;
 // With the value text inside, the wiper starts this share of the face radius out, clear of the text.
 constexpr float kKnobWiperStartShare = 0.55f;
 // The value text inside the face is cut to this share of its radius (most of the diameter).
@@ -232,7 +230,6 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
     const bool disabled = item.disabled || (next.itemFlags & ImGuiItemFlags_Disabled) != 0;
     const internal::SliderLook look = internal::PickSliderLook(disabled, readOnly);
     const bool mixed = (o.mixed || item.mixed) && !written;
-    const Colors& c = t.colors;
     ImDrawList* drawList = window->DrawList;
     char formatted[64];
     internal::FormatNumber(formatted, sizeof(formatted), edited, o.format, o.formatter, o.formatterUser, integer, false);
@@ -246,13 +243,12 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
         const float fraction = static_cast<float>(internal::ValueToFraction(mapping, std::isnan(edited) ? mapping.min : edited));
         const float from = o.fillFromCenter ? 0.5f : 0.0f;
         const int segments = std::max(12, static_cast<int>(radius));
-        // Track arc in the 3:1 boundary color (destructive with an error).
-        const ImVec4 rest = look == internal::SliderLook::Disabled ? c.fill[3]
-                            : (o.error != nullptr ? c.destructive : ControlBoundaryColor(c));
+        // Track arc like a slider track: fill[0] (destructive with an error), the value in the
+        // accent mark.
+        const ImVec4 rest = internal::SliderTrackRestColor(look, o.error != nullptr);
         drawList->PathArcTo(center, arcRadius, start, start + sweep, segments);
         drawList->PathStroke(ToU32(rest), thickness);
-        const ImVec4 fill = look == internal::SliderLook::Disabled ? c.labelTertiary
-                            : (look == internal::SliderLook::ReadOnly ? c.labelSecondary : c.accent);
+        const ImVec4 fill = internal::SliderTrackFillColor(look);
         if (!mixed && o.variant == KnobVariant::Arc && fraction != from)
         {
             const float a = start + sweep * std::min(from, fraction);
@@ -263,11 +259,22 @@ bool KnobImpl(const char* label, Value* value, double min, double max, bool inte
         // The face, inset from the arc, grows a little while held like a slider knob.
         const float face = std::round(radius - thickness - radius * kKnobFaceInsetShare);
         const float faceRadius = std::max(1.0f, std::round(face * (1.0f + (look == internal::SliderLook::Normal ? kKnobPressGrowth * item.pressAmount : 0.0f))));
-        const ImVec4 outline = look == internal::SliderLook::Disabled
-                                   ? c.labelTertiary
-                                   : Mix(ControlBoundaryColor(c), c.label, item.hoverAmount * kKnobHoverShare);
-        drawList->AddCircleFilled(center, faceRadius, ToU32(look == internal::SliderLook::Disabled ? c.fill[3] : c.bg));
-        drawList->AddCircle(center, faceRadius, ToU32(outline), 0, HairlineThickness() * 1.5f);
+        // The face is a control surface that carries the value text: the neutral control fill and
+        // the one controlBorder hairline, both stronger under the pointer, like a button.
+        const ImRect faceRect(center.x - faceRadius, center.y - faceRadius, center.x + faceRadius, center.y + faceRadius);
+        const bool normal = look == internal::SliderLook::Normal;
+        internal::ItemState faceState = item;
+        faceState.disabled = look == internal::SliderLook::Disabled;
+        if (!normal)
+        {
+            faceState.hoverAmount = 0.0f;
+            faceState.pressAmount = 0.0f;
+        }
+        FillRect(drawList, faceRect.Min, faceRect.Max, ToU32(internal::NeutralFill(faceState)), faceRadius);
+        internal::OutlineLook outline;
+        outline.hoverAmount = faceState.hoverAmount;
+        outline.disabled = faceState.disabled;
+        internal::DrawOutline(drawList, faceRect, faceRadius, internal::ControlOutlineColor(outline));
         if (!mixed && o.variant != KnobVariant::Arc)
         {
             const float angle = start + sweep * fraction;

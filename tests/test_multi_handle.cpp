@@ -580,7 +580,7 @@ TEST_CASE("Multi-handle behaviour: a span drag on a logarithmic track keeps the 
     CHECK(range.commits == 1);
 }
 
-TEST_CASE("Multi-handle behaviour: the span reports the hover a press would grab it with")
+TEST_CASE("Multi-handle behaviour: the span reports the hover a press would grab it with, without animation")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());
@@ -590,9 +590,23 @@ TEST_CASE("Multi-handle behaviour: the span reports the hover a press would grab
     session.Seconds(facet::T().motion.durationFast + 0.05f);
     CHECK(range.last.spanHovered);
     CHECK(range.last.span.hovered);
-    CHECK(range.last.span.hoverAmount == 1.0f);
+    // The span is not a control: no hover amount, and no handle takes the hover either.
+    CHECK(range.last.span.hoverAmount == 0.0f);
+    CHECK(range.handles[0].hoverAmount == 0.0f);
+    CHECK(range.handles[1].hoverAmount == 0.0f);
+    // Held for a drag it shows no press amount, and the drag still moves both handles.
+    session.MouseDown();
+    session.Seconds(facet::T().motion.durationFast + 0.05f);
+    CHECK(range.last.span.held);
+    CHECK(range.last.span.pressAmount == 0.0f);
+    session.MouseMove(TestRange::At(session, 50.0));
+    session.Frames(2);
+    session.MouseUp();
+    session.Frames(1);
+    CHECK(range.values[0] == doctest::Approx(30.0));
+    CHECK(range.values[1] == doctest::Approx(70.0));
     // On a handle the span is not hovered.
-    session.MouseMove(TestRange::At(session, 20.0));
+    session.MouseMove(TestRange::At(session, 30.0));
     session.Seconds(facet::T().motion.durationFast + 0.05f);
     CHECK_FALSE(range.last.span.hovered);
     CHECK(range.last.span.hoverAmount == 0.0f);

@@ -209,15 +209,8 @@ RangeTrackResult RangeTrackBehavior(ImGuiID id, const SliderFrame& frame, const 
     const double f1 = ValueToFraction(mapping, values[1]);
     if (p.drawTrack)
         DrawSliderTrack(drawList, frame.track, p.orientation, m, f0, r.mixedShown ? f0 : f1, look, p.error);
-    // The span thickens while a press would grab it and while it is dragged, so it shows that it
-    // moves as one piece.
-    const float spanAmount = p.dragSpan ? std::max(r.multi.span.hoverAmount, r.multi.span.pressAmount) : 0.0f;
-    if (look == SliderLook::Normal && spanAmount > 0.0f && !r.mixedShown)
-    {
-        SliderMetrics thick = m;
-        thick.track = std::round(m.track + PxSnapped(T().spacing.xs) * spanAmount);
-        DrawSliderTrackStretch(drawList, frame.track, p.orientation, thick, f0, f1, ToU32(T().colors.accent));
-    }
+    // The span between the handles keeps its look under the pointer and while dragged: it is not a
+    // control of its own, so only the handles show hover (multi_handle.h).
     if (p.step > 0.0)
     {
         double ticks[kRangeMaxTicks + 1];
