@@ -482,3 +482,69 @@ TEST_CASE("Inventory grid: while loading or failed the slots take no input")
         CHECK(bag.selected == -1);
     }
 }
+
+// ---- InventorySlot ------------------------------------------------------------------------------
+
+TEST_CASE("Inventory slot: Enter and a double click activate it, a single click does not")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const InventoryItem item = Item("Item 1");
+    InventoryResult last;
+    int actions = 0;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const InventoryResult r = facet::InventorySlot("Slot", item);
+        session.Track("slot");
+        if (r.action != InventoryAction::None)
+        {
+            last = r;
+            ++actions;
+        }
+    });
+    session.Frame();
+    session.Click(session.ItemCenter("slot"));
+    CHECK(actions == 0);
+    // After a click the first Tab only shows the focus.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(actions == 1);
+    CHECK(last.action == InventoryAction::Activated);
+    CHECK(last.source == session.ItemId("slot"));
+    session.DoubleClick(session.ItemCenter("slot"));
+    session.Frames(2);
+    CHECK(actions == 2);
+}
+
+TEST_CASE("Inventory grid and slot: items move from the grid into a slot and back, by pointer and keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    Bag bag = SixSlots();
+    bag.withSlot = true;
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    // Item 2 into the empty equipment slot.
+    session.Drag({Bag::Tile(session, 1, 3), session.ItemCenter("slot")}, 8);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Moved);
+    CHECK(bag.last.source == bag.gridId);
+    CHECK(bag.last.to == -1);
+    CHECK(LabelOf(bag.equip) == "Item 2");
+    // Back by keyboard: Space on the focused slot, Up into the grid (onto Item 3 in slot 3), Right to the empty slot 4, Space.
+    session.Click(session.ItemCenter("slot"));
+    session.KeyPress(ImGuiKey_Space);
+    REQUIRE(bag.dragging);
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_RightArrow);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(bag.last.action == InventoryAction::Moved);
+    CHECK(bag.last.source == bag.slotId);
+    CHECK(bag.last.to == 4);
+    CHECK(LabelOf(bag.slots[4]) == "Item 2");
+    CHECK(bag.equip.label == nullptr);
+}
