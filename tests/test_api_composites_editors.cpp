@@ -60,15 +60,6 @@ static_assert(OptionsFollowConventions<facet::PreviewCanvasOptions>());
 static_assert(OptionsFollowConventions<facet::CanvasElementOptions>());
 static_assert(OptionsFollowConventions<facet::LayerListOptions>());
 
-void EditorCalls()
-{
-    using namespace facet;
-    CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
-    const Snapshot curveBefore(curve);
-    Check("BezierEditor", Expect::Item, "Easing", [&] { CHECK_FALSE(BezierEditor("Easing", &curve)); });
-    CHECK(curveBefore.Unchanged());
-}
-
 void CanvasCalls()
 {
     using namespace facet;
@@ -99,13 +90,12 @@ void CanvasCalls()
 
 void EditorAndCanvasCalls()
 {
-    EditorCalls();
     CanvasCalls();
 }
 
 } // namespace
 
-TEST_CASE("The editor, property grid, canvas and layer stubs submit one item each and keep every stack")
+TEST_CASE("The canvas and layer stubs submit one item each and keep every stack")
 {
     facet::test::Session session;
     REQUIRE(session.Ready());

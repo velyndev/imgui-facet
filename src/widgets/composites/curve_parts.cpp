@@ -17,7 +17,7 @@ namespace
 
 // The grid aims at a line every this many spacing.xxxl along each axis: dense enough to read a
 // value off, loose enough not to turn the canvas into a texture.
-constexpr float kCurveGridSpacingInXxxl = 1.5f;
+constexpr float kCurveGridSpacingInXxxl = 1.0f;
 
 // The pixel positions of the major ticks of `scale` inside its domain, without the ends (the frame
 // is there). Returns the count.

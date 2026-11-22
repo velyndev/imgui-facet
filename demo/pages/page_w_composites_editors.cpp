@@ -45,6 +45,7 @@ enum CaptureState
     kGradientFocused,
     kCurveDragging,
     kCurveFocused,
+    kEasingDragging,
 };
 
 const char* const kInterpolations[] = {"Smooth", "Linear", "Step"};
@@ -62,6 +63,11 @@ struct EditorsUi
     ImGuiID curveId = 0;
     ImVec2 fixedCurve[3] = {{0.0f, 0.2f}, {0.5f, 0.8f}, {1.0f, 0.6f}};  // the read-only and disabled examples
     facet::CubicBezier easing{{0.25f, 0.1f}, {0.25f, 1.0f}};
+    bool overshoot = false;
+    bool easingFields = true;
+    bool easingPresets = true;
+    int easingWrites = 0;
+    ImGuiID easingId = 0;
     // Gradients: seeded from the chart palette of the theme on the first frame (data colors).
     bool gradientSeeded = false;
     facet::GradientStop stops[8] = {};
@@ -120,10 +126,10 @@ void CurveSection(facet::demo::PageCtx& ctx)
               "coarser. A point never passes its neighbours. The guide shows the input below on the curve.");
     LabeledRow("Interpolation");
     SegmentedControl("##interpolation", &ui.interpolation, std::span<const char* const>(kInterpolations));
-    LabeledRow("Options");
-    Toggle("Lock ends", &ui.lockEnds);
-    ImGui::SameLine();
-    Toggle("Grid", &ui.curveGrid);
+    LabeledRow("Lock ends");
+    Toggle("##lockEnds", &ui.lockEnds);
+    LabeledRow("Grid");
+    Toggle("##grid", &ui.curveGrid);
     LabeledRow("Input");
     Slider("##input", &ui.curveInput, 0.0f, 1.0f, {.format = "%.2f", .width = demo::DemoWidth(240.0f)});
     ctx.Probe("composites.curve.input");
@@ -166,6 +172,51 @@ void CurveSection(facet::demo::PageCtx& ctx)
     CurveEditor("Disabled curve", ui.fixedCurve, &fixedCount, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
                 {.width = demo::DemoWidth(240.0f), .height = 96.0f});
     ImGui::EndDisabled();
+}
+
+void BezierSection(facet::demo::PageCtx& ctx)
+{
+    using namespace facet;
+    const bool capture = ctx.capture;
+    SectionHeader("Bezier editor");
+    Paragraph("The two control points of an easing curve are Tab stops: drag them or move them with the arrows. The "
+              "menu under the curve sets a common easing, the fields type the four numbers, and after each edit a dot "
+              "runs the curve once.");
+    LabeledRow("Overshoot");
+    Toggle("##overshoot", &ui.overshoot);
+    ctx.Probe("composites.easing.overshoot");
+    LabeledRow("Number fields");
+    Toggle("##fields", &ui.easingFields);
+    LabeledRow("Presets");
+    Toggle("##presets", &ui.easingPresets);
+    LabeledRow("Easing");
+    if (capture && ctx.captureState == kEasingDragging)
+        ctx.ForceNextItemState(demo::ForcedItemState::Hovered | demo::ForcedItemState::Dragging, 0);
+    ui.easingId = ImGui::GetID("Easing");
+    if (BezierEditor("Easing", &ui.easing,
+                     {.presets = ui.easingPresets, .allowOvershoot = ui.overshoot, .numericFields = ui.easingFields,
+                      .width = demo::DemoWidth(320.0f)}))
+        ++ui.easingWrites;
+    ctx.Probe("composites.easing");
+    {
+        const float handle = Px(T().composites.editorHandleSize);
+        const ImVec2 points[2] = {ui.easing.p1, ui.easing.p2};
+        for (int i = 0; i < 2; ++i)
+        {
+            const ImVec2 at = internal::BezierEditorPointPos(ui.easingId, points[i]);
+            demo::ProbeRect(ctx, i == 0 ? "composites.easing.p0" : "composites.easing.p1",
+                            internal::BezierEditorPointId(ui.easingId, i), ImVec2(at.x - handle * 0.5f, at.y - handle * 0.5f),
+                            ImVec2(at.x + handle * 0.5f, at.y + handle * 0.5f));
+        }
+    }
+    if (capture && ctx.captureState == kEasingDragging)
+        ctx.RevealInCapture(0.6f);
+    LabeledRow("");
+    Note("Control points %.2f, %.2f and %.2f, %.2f.", ui.easing.p1.x, ui.easing.p1.y, ui.easing.p2.x, ui.easing.p2.y);
+    LabeledRow("Read-only");
+    CubicBezier fixed{{0.42f, 0.0f}, {0.58f, 1.0f}};
+    BezierEditor("Read-only easing", &fixed,
+                 {.presets = false, .numericFields = false, .width = demo::DemoWidth(240.0f), .height = 96.0f, .readOnly = true});
 }
 
 void SeedGradients()
@@ -396,7 +447,8 @@ void PropertyGridSection(facet::demo::PageCtx& ctx)
 } // namespace
 
 FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "default", "grid-filtered",
-                "grid-no-results", "grid-column", "gradient-open", "gradient-focused", "curve-dragging", "curve-focused")
+                "grid-no-results", "grid-column", "gradient-open", "gradient-focused", "curve-dragging", "curve-focused",
+                "easing-dragging")
 {
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
@@ -404,9 +456,7 @@ FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "def
     facet::demo::PlannedFamilyNote("composites");
 
     CurveSection(ctx);
-    SectionHeader("Bezier editor");
-    LabeledRow("Bezier editor");
-    facet::BezierEditor("Easing", &ui.easing);
+    BezierSection(ctx);
 
     GradientSection(ctx);
     PropertyGridSection(ctx);
@@ -460,6 +510,36 @@ FACET_DEMO_SELFTEST("composites-editors")
     test.Expect("a double click on a point removes it", [] { return ui.curveCount == 3; });
     test.DoubleClick("composites.curve.p0");
     test.Expect("a locked end stays", [] { return ui.curveCount == 3 && ui.curve[0].x == 0.0f; });
+
+    // ---- Bezier editor ----
+    test.Reveal("composites.easing");
+    test.WaitSeconds(0.4f);
+    test.Click("composites.easing.overshoot");  // turns overshoot on; Tab then reaches the first point
+    test.Expect("the overshoot toggle turned on", [] { return ui.overshoot; });
+    test.KeyPress(ImGuiKey_Tab);  // shows the focus on the toggle
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.easing.p0");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.ExpectNear("Right moves the first control point", [] { return ui.easing.p1.x; }, 0.26, 0.001);
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectFocused("composites.easing.p1");
+    test.KeyPress(ImGuiKey_PageUp);
+    test.Expect("with overshoot Page Up takes the second point above 1", [] { return ui.easing.p2.y > 1.0f; });
+    test.Drag({T::Item("composites.easing.p1"), T::Item("composites.easing.p1").Offset(2000.0f, 0.0f)}, 0.3f);
+    test.Expect("a drag keeps x at 1 at most", [] { return ui.easing.p2.x == 1.0f; });
+    // The preset menu after the points: open it, take the first easing.
+    test.KeyPress(ImGuiKey_Tab);  // after the drag's click the first Tab shows the focus on the point
+    test.KeyPress(ImGuiKey_Tab);
+    test.KeyPress(ImGuiKey_Space);
+    test.WaitSeconds(0.3f);
+    test.KeyPress(ImGuiKey_Home);
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.3f);
+    test.Expect("the first preset makes the curve linear", [] {
+        return ui.easing.p1.x == 0.0f && ui.easing.p1.y == 0.0f && ui.easing.p2.x == 1.0f && ui.easing.p2.y == 1.0f;
+    });
 
     // ---- Gradient editor ----
     test.Reveal("composites.gradient");

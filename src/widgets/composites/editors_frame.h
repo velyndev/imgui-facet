@@ -79,6 +79,15 @@ void ClearPropertyGridStacks();
 ImVec2 CurveEditorPointPos(ImGuiID id, ImVec2 value);
 ImGuiID CurveEditorPointId(ImGuiID id, int index);
 
+// ---- Bezier editor ---------------------------------------------------------------------------------
+
+// Where the easing editor `id` draws a control point of `value` (screen pixels, from its last frame),
+// the item id of control point `index` (0 or 1), and whether its preview dot is running. For tests and
+// demo probes.
+ImVec2 BezierEditorPointPos(ImGuiID id, ImVec2 value);
+ImGuiID BezierEditorPointId(ImGuiID id, int index);
+bool BezierEditorPreviewRunning(ImGuiID id);
+
 // ---- Gradient editor -------------------------------------------------------------------------------
 
 // Where the gradient editor `id` (its label hashed in its window) drew its bar and the marker of stop

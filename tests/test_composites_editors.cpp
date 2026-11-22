@@ -703,3 +703,146 @@ TEST_CASE("Curve editor: a shown editor allocates nothing per frame")
     CHECK(CountImGuiAllocations(session, 10) == 0);
     CHECK(facet::internal::GlobalStateStore().Count() == states);
 }
+
+// ---- BezierEditor ------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Sets the theme's reduced motion for the life of the guard, and restores the theme.
+struct EditorsMotionGuard
+{
+    facet::Theme saved = facet::T();
+    explicit EditorsMotionGuard(bool reduce)
+    {
+        facet::Theme theme = saved;
+        theme.motion.reduceMotion = reduce;
+        facet::SetTheme(theme, false);
+    }
+    ~EditorsMotionGuard() { facet::SetTheme(saved, false); }
+    EditorsMotionGuard(const EditorsMotionGuard&) = delete;
+    EditorsMotionGuard& operator=(const EditorsMotionGuard&) = delete;
+};
+
+struct BezierUi
+{
+    facet::CubicBezier curve{{0.25f, 0.1f}, {0.25f, 1.0f}};
+    int writes = 0;
+    facet::BezierEditorOptions options;
+    ImGuiID id = 0;
+    bool previewing = false;
+
+    void Draw(facet::test::Session& session)
+    {
+        id = ImGui::GetID("Easing");
+        writes += facet::BezierEditor("Easing", &curve, options) ? 1 : 0;
+        session.Track("easing");
+        previewing = facet::internal::BezierEditorPreviewRunning(id);
+    }
+};
+
+void FocusBezierPoint(facet::test::Session& session, const BezierUi& ui, int index)
+{
+    ShowFocus(facet::internal::BezierEditorPointId(ui.id, index));
+    facet::internal::SetKeyboardModality(true);
+    session.Frames(1);
+}
+
+} // namespace
+
+TEST_CASE("Bezier editor: the arrows move a control point, x stays in 0 to 1 and y too without overshoot")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    BezierUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    FocusBezierPoint(session, ui, 0);
+    session.KeyPress(ImGuiKey_RightArrow);
+    CHECK(ui.curve.p1.x == doctest::Approx(0.26f));
+    CHECK(ui.writes == 1);
+    session.KeyPress(ImGuiKey_Home);
+    CHECK(ui.curve.p1.x == 0.0f);
+    FocusBezierPoint(session, ui, 1);
+    session.HoldKey(ImGuiKey_UpArrow, 1.0f);
+    CHECK(ui.curve.p2.y == 1.0f);  // no overshoot
+    // A drag far out of the canvas ends at its edges.
+    const ImVec2 from = facet::internal::BezierEditorPointPos(ui.id, ui.curve.p2);
+    session.Drag({from, ImVec2(from.x + facet::Px(2000.0f), from.y - facet::Px(2000.0f))}, 4);
+    CHECK(ui.curve.p2.x == 1.0f);
+    CHECK(ui.curve.p2.y == 1.0f);
+}
+
+TEST_CASE("Bezier editor: with overshoot a control point leaves 0 to 1")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    BezierUi ui;
+    ui.options.allowOvershoot = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    FocusBezierPoint(session, ui, 1);
+    session.KeyPress(ImGuiKey_PageUp);
+    CHECK(ui.curve.p2.y > 1.0f);
+    FocusBezierPoint(session, ui, 0);
+    session.KeyPress(ImGuiKey_PageDown);
+    session.KeyPress(ImGuiKey_PageDown);
+    CHECK(ui.curve.p1.y < 0.0f);
+}
+
+TEST_CASE("Bezier editor: the preview runs once after an edit, not with reduced motion")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    {
+        EditorsMotionGuard motion(false);
+        BezierUi ui;
+        session.SetUi([&] { ui.Draw(session); });
+        session.Frames(2);
+        CHECK_FALSE(ui.previewing);
+        FocusBezierPoint(session, ui, 0);
+        session.KeyPress(ImGuiKey_UpArrow);
+        CHECK(ui.previewing);
+        session.Seconds(facet::T().composites.easingPreviewTime * facet::T().motion.scale + 0.2f);
+        CHECK_FALSE(ui.previewing);
+    }
+    {
+        EditorsMotionGuard motion(true);
+        BezierUi ui;
+        session.SetUi([&] { ui.Draw(session); });
+        session.Frames(2);
+        FocusBezierPoint(session, ui, 0);
+        session.KeyPress(ImGuiKey_UpArrow);
+        CHECK(ui.writes == 1);
+        CHECK_FALSE(ui.previewing);
+    }
+}
+
+TEST_CASE("Bezier editor: read-only shows the curve and writes nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    BezierUi ui;
+    ui.options.readOnly = true;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(2);
+    FocusBezierPoint(session, ui, 0);
+    session.KeyPress(ImGuiKey_RightArrow);
+    const ImVec2 from = facet::internal::BezierEditorPointPos(ui.id, ui.curve.p2);
+    session.Drag({from, ImVec2(from.x - facet::Px(40.0f), from.y)}, 4);
+    CHECK(ui.curve.p1.x == 0.25f);
+    CHECK(ui.curve.p2.x == 0.25f);
+    CHECK(ui.writes == 0);
+}
+
+TEST_CASE("Bezier editor: a shown editor allocates nothing per frame")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    BezierUi ui;
+    session.SetUi([&] { ui.Draw(session); });
+    session.Frames(10);
+    const int states = facet::internal::GlobalStateStore().Count();
+    CHECK(CountImGuiAllocations(session, 10) == 0);
+    CHECK(facet::internal::GlobalStateStore().Count() == states);
+}

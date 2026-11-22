@@ -568,7 +568,26 @@ Status: ready.
 bool BezierEditor(const char* label, CubicBezier* curve, const BezierEditorOptions& options = {});
 ```
 
-Cubic easing editor with two handles, presets and numeric fields. Status: planned.
+An easing curve from (0, 0) to (1, 1) given by its two control points, on the canvas of the curve
+editor: the grid, the curve in the first series color, and a hairline arm from each end to its
+control point. The default width fills the available width; the default height of the canvas is
+`metrics.chartHeight`.
+
+The two control points are Tab stops with the slider knob look, on the two-axis value drag: a press
+grabs a point, Shift during a drag keeps one axis, Ctrl snaps to the coarse grid; the arrows move it
+(Shift finer, Ctrl coarser), Page Up and Page Down move y by a tenth of the range, Home and End send
+x to 0 and 1, and Escape during an edit restores it. x always stays in 0 to 1. Without
+`allowOvershoot` y stays in 0 to 1 as well; with it the canvas shows y from -0.5 to 1.5, with
+hairlines at 0 and 1, and the points may go anywhere in it.
+
+Under the canvas, `presets` adds a `Dropdown` of the common easings (`Strings::easeLinear`, `ease`,
+`easeIn`, `easeOut`, `easeInOut`; it shows `Strings::presets` while the curve is none of them), and
+`numericFields` adds the four numbers as two `VectorInput` fields, the first control point and the
+second, side by side while each has room and one under the other when narrow. Their axis labels are
+the default X and Y; the fields do not name which control point they belong to (their order does).
+After each edit `preview` runs a dot along the curve once (`composites.easingPreviewTime` times
+`motion.scale`); with reduced motion there is no dot. `readOnly` lets the points and fields take
+the focus and writes nothing. The label is the tooltip on hover and keyboard focus. Status: ready.
 
 ### GradientEditor
 
