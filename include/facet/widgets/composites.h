@@ -350,7 +350,10 @@ struct KeybindListOptions
 // The shortcut registry (core/input.h) as an editable table: label, primary and alternate
 // chord as KeybindCapture fields, a conflict mark when FindChordConflict finds one, and a
 // reset button on rows that differ from their default. Writes with SetShortcutChords. Returns
-// true when a binding was written. Rows are Tab stops through their capture fields.
+// true when a binding was written. Rows are Tab stops through their capture fields. Every listed
+// row is submitted each frame, also the rows a `height` scrolls out of sight, and the conflict
+// search compares each row with every other; it is made for the tens to few hundred binds of an
+// app's settings.
 bool KeybindList(const char* id, const KeybindListOptions& options = {});
 
 // One row of a caller-owned key bind list.
@@ -651,7 +654,10 @@ struct CanvasElementOptions
 // A draggable element inside BeginPreviewCanvas, drawn as a labelled box (the visible label
 // part); the caller may draw its own preview into the item rect afterwards. One Tab stop;
 // arrows move it by one reference pixel, Shift by ten. Writes while dragging. Returns true when
-// *element was written.
+// *element was written. The anchor control of a selected element sits inside the canvas where it
+// hides no other element; when there is no such spot it sits beside the canvas, in the window's
+// draw list, where it can cover the host's own items there (items submitted later draw over it).
+// Leave room beside a small canvas, or set anchorPicker to false.
 bool CanvasElement(const char* label, CanvasElementState* element, const CanvasElementOptions& options = {});
 
 // One layer row. `visible` and `locked` are written by the row's toggles.
@@ -696,6 +702,7 @@ struct LayerListOptions
 // toggles paints them. Rows reorder by drag (with a drop line) or Alt+Up and Alt+Down; Space
 // also picks the focused row up, the arrows move it, Space or Enter drops it and Escape puts it
 // back. One Tab stop for the rows (arrows move the selection) plus each focused row's toggles.
+// At most 256 layers are shown; a longer span is reported as a usage error and shown up to there.
 LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> layers,
                           const LayerListOptions& options = {});
 

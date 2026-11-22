@@ -313,6 +313,9 @@ filter is set and `Strings::empty` otherwise. Loading shows skeleton rows, Error
 Width: the available width by default; the chord columns are `composites.keybindColumnWidth` wide
 and a narrow list shrinks the label column first (labels cut with an ellipsis and a tooltip), then
 the chord columns. Height: the rows by default; a set `height` scrolls the rows under the headings.
+Every listed row is submitted each frame, also the rows scrolled out of sight, and the conflict
+search compares each row with every other, so the list is made for the tens to few hundred binds
+of an app's settings.
 `readOnly` shows the chords and never listens; `ImGui::BeginDisabled` the same with the disabled
 colors. Returns true on the frame a binding was written. Status: ready.
 
@@ -707,7 +710,9 @@ ten). Escape during a move or a resize puts it back. While selected, a resizable
 eight handles (corners and edge middles, `composites.canvasHandleSize`, each grown to the minimum
 hit target) that resize it, and `anchorPicker` shows a 3 by 3 anchor control beside it (right,
 else left, else under or above it, where it covers no other element of the canvas; where no such
-place is free, beside the canvas, right or else left, inside the caller's clip rect): each cell is a Tab stop named by `Strings::anchorTopLeft` to
+place is free, beside the canvas, right or else left, inside the caller's clip rect, where it can
+cover the host's own items there; items submitted later draw over it): each cell is a Tab stop
+named by `Strings::anchorTopLeft` to
 `anchorBottomRight` on hover and focus, and choosing one changes the anchor and the offset while
 the element stays where it is. With `snap`, a moved box or edge comes to the canvas edges and
 center, the safe area and the edges and centers of the other elements of the canvas (as they were
@@ -804,3 +809,5 @@ if (r.action == facet::LayerAction::Moved)
   `PresetListResult`.
 - **InventoryGrid height**: an option that bounds the height of a large grid; today the grid is at
   most the visible height of its window.
+- **Easing control point names**: `Strings` members that name the two control points of
+  `BezierEditor`, so its number fields carry a label.

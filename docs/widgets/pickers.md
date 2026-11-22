@@ -467,3 +467,12 @@ These widgets of the later tier are not declared yet.
 - **CascadePicker**: a hierarchical picker with side-by-side level columns.
 - **Screen eyedropper**: sampling colors outside the app's own frame needs a capture path that a
   Direct3D 11 overlay does not have; it waits for the blur copy path to be usable for sampling.
+
+These options of declared widgets are planned too:
+
+- **SwatchPalette swatch names**: a name per swatch, shown as its tooltip on hover and on keyboard
+  focus. Today a caller can show names on hover only, because the palette does not report which
+  swatch has the focus.
+- **ColorWell selected**: an option that draws the selection ring around the well, so a well
+  that stands for a chosen value matches the chosen swatch. Today `AccentPicker` draws that ring
+  itself.
