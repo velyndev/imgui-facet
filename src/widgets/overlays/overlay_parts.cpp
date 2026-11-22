@@ -169,8 +169,11 @@ void EndOverlayScroll()
     const ImGuiID id = stack.ids[index];
     const ImGuiWindow* area = GImGui->CurrentWindow;
     OverlayScrollState& state = GetState<OverlayScrollState>(id);
-    state.contentWidth = std::max(0.0f, area->DC.CursorMaxPos.x - area->DC.CursorStartPos.x);
-    state.contentHeight = std::max(0.0f, area->DC.CursorMaxPos.y - area->DC.CursorStartPos.y);
+    // What the gutters of the area's bars take is part of the box, so content as wide as the room
+    // it is given keeps its width when a bar appears, instead of narrowing the box frame by frame.
+    const ImVec2 gutter = ScrollAreaGutter(area);
+    state.contentWidth = std::max(0.0f, area->DC.CursorMaxPos.x - area->DC.CursorStartPos.x) + gutter.x;
+    state.contentHeight = std::max(0.0f, area->DC.CursorMaxPos.y - area->DC.CursorStartPos.y) + gutter.y;
     EndScrollAreaCore();
     // The area's outset lies in the layer's padding: it does not count as content of the layer, so
     // the layer, sized to its content, never shows a scrollbar of its own.

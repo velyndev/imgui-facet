@@ -45,6 +45,7 @@
 #include "internal/item.h"
 #include "internal/list_view.h"
 #include "internal/popup_host.h"
+#include "internal/scroll.h"
 #include "internal/text_util.h"
 #include "widgets/composites/keybind_list.h"
 
@@ -204,8 +205,10 @@ KeybindListLayout KeybindListMeasure(float outerWidth, bool alternate, bool scro
     layout.headingHeight = MeasureText(TextStyle::Footnote, "").y + layout.spacing;
     layout.groupHeight = MeasureText(TextStyle::Headline, "").y + layout.spacing;
     // With a height the overlay scroll bar lies over the end of the rows: the trailing reset button
-    // and the fields end before the bar at its hovered thickness and inset, so the bar never covers them.
-    layout.barReserve = scrolling ? std::round(Px(t.scroll.barThicknessHover + t.scroll.barInset)) : 0.0f;
+    // and the fields end before the gutter of the bar (scroll.h), of which the inset is a part, so
+    // the bar never covers them. The columns are measured here, before the area opens, so the
+    // rows keep the gutter free themselves and the headings stay over their columns.
+    layout.barReserve = scrolling ? std::max(0.0f, ScrollBarGutter() - layout.inset) : 0.0f;
     const float rowEnd = std::max(1.0f, width - layout.barReserve);
     const float columns = alternate ? 2.0f : 1.0f;
     const float minColumn = std::round(m.height * kKeybindListMinColumnControls);
@@ -330,10 +333,11 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
     bool areaOpen = true;
     if (scrolling)
     {
-        ScrollAreaOptions area;
-        area.width = outerWidth / Scale();
-        area.height = options.height;
-        areaOpen = BeginScrollArea("##rows", area);
+        // A negative height leaves that many units free below the list.
+        internal::ScrollAreaDesc area;
+        area.size = ImVec2(outerWidth, options.height > 0.0f ? Px(options.height) : -Px(-options.height));
+        area.gutter = false;  // the columns keep layout.barReserve free
+        areaOpen = internal::BeginScrollAreaCore("##rows", area);
     }
     if (areaOpen)
     {
@@ -491,7 +495,7 @@ bool KeybindListImpl(const char* id, const KeybindListSource& source, const Keyb
             }
         }
         if (scrolling)
-            EndScrollArea();
+            internal::EndScrollAreaCore();
     }
     ImGui::PopID();
     ImGui::EndGroup();

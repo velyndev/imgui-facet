@@ -67,7 +67,7 @@ std::vector<float*> AddedFloatTokens(facet::Theme& t)
             &t.picker.dayCell,
             &c.shellSize.x, &c.shellSize.y, &c.shellMinSize.x, &c.shellMinSize.y, &c.titleBarHeight,
             &c.resizeBorder, &c.sidebarWidth, &c.railWidth, &c.inspectorWidth, &c.inspectorMinWidth,
-            &s.barThickness, &s.barThicknessHover, &s.barInset, &s.minThumbLength, &s.barHideDelay,
+            &s.barThickness, &s.barThicknessHover, &s.barInset, &s.barGap, &s.minThumbLength, &s.barHideDelay,
             &s.wheelDistance, &s.edgeFade,
             &l.rowHeightSmall, &l.rowHeight, &l.rowHeightLarge, &l.indent, &l.typeaheadTimeout,
             &d.startThreshold, &d.ghostOpacity, &d.autoScrollZone, &d.autoScrollSpeed, &d.hoverOpenDelay,

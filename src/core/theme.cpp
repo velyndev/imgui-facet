@@ -365,6 +365,7 @@ ScrollTokens MixScroll(const ScrollTokens& a, const ScrollTokens& b, float t)
     out.barThickness = Lerp(a.barThickness, b.barThickness, t);
     out.barThicknessHover = Lerp(a.barThicknessHover, b.barThicknessHover, t);
     out.barInset = Lerp(a.barInset, b.barInset, t);
+    out.barGap = Lerp(a.barGap, b.barGap, t);
     out.minThumbLength = Lerp(a.minThumbLength, b.minThumbLength, t);
     out.barHideDelay = Lerp(a.barHideDelay, b.barHideDelay, t);
     out.wheelDistance = Lerp(a.wheelDistance, b.wheelDistance, t);

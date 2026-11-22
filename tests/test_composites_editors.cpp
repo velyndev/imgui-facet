@@ -1125,7 +1125,8 @@ TEST_CASE("Layer list: with a height the toggles stay clear of the overlay scrol
     const ImRect lock = facet::internal::LayerListRowRect(listId, 0, 2);
     REQUIRE(lock.GetWidth() > 0.0f);
     const facet::ScrollTokens& bar = facet::T().scroll;
-    CHECK(lock.Max.x <= r.Max.x - facet::Px(bar.barInset + bar.barThicknessHover) + 0.5f);
+    // The gutter of the bar: its inset, its hovered thickness and the gap to the content.
+    CHECK(lock.Max.x <= r.Max.x - facet::Px(bar.barInset + bar.barThicknessHover + bar.barGap) + 0.5f);
 }
 
 TEST_CASE("Layer list: the rows are one Tab stop, then the focused row's toggles")

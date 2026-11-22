@@ -21,7 +21,7 @@ the reason for each are listed in `DESIGN.md`.
 | `layout` | Width class breakpoints, the labelled row columns, the divider band of split views and panels, the panel header |
 | `overlay` | Popup placement, menus and their shortcut gap, tooltip timing, toasts, dialog, drawer and command palette sizes, the popover arrow, the command palette's distance from the top |
 | `containers` | Shell size and minimum, title bar, resize band, sidebar, icon rail and inspector widths, the status bar height |
-| `scroll` | Overlay scrollbar widths, inset, minimum thumb, hide delay, wheel distance, edge fade |
+| `scroll` | Overlay scrollbar widths, inset, the gap to the content, minimum thumb, hide delay, wheel distance, edge fade |
 | `list` | Row heights per control size, tree indent, default visible rows, typeahead timeout |
 | `drag` | Drag start threshold, preview opacity, edge scrolling, the delay before a resting drag opens a target, the flick speed and the inertia of a released pan |
 | `field` | Text field padding and caret width |

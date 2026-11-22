@@ -515,10 +515,12 @@ struct ScrollAreaOptions
 };
 
 // A scrolling region (a Dear ImGui child window) with an overlay scrollbar that appears while
-// scrolling or hovered, smooth wheel scrolling and edge fades. The keyboard scrolls it when a
-// child has focus (Page Up and Down, Home and End). Inside, ImGui::SetScrollHereY and the other
-// stock scroll calls work. Returns false while it is out of sight (Facet then closes its child
-// window itself); call EndScrollArea only after true. The content keeps ids under the area.
+// scrolling or hovered, smooth wheel scrolling and edge fades. While the content scrolls, the
+// available width ends before the bar (the scroll tokens barInset, barThicknessHover and barGap),
+// so nothing lies under it. The keyboard scrolls it when a child has focus (Page Up and Down,
+// Home and End). Inside, ImGui::SetScrollHereY and the other stock scroll calls work. Returns
+// false while it is out of sight (Facet then closes its child window itself); call EndScrollArea
+// only after true. The content keeps ids under the area.
 [[nodiscard]] bool BeginScrollArea(const char* id, const ScrollAreaOptions& options = {});
 void EndScrollArea();
 

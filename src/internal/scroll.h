@@ -50,6 +50,17 @@
 // under the pointer) keeps it, and keyboard focus alone never routes the wheel anywhere. The
 // first frame the pointer is over an area, Dear ImGui still routes the wheel itself.
 //
+// The gutter: a bar is drawn over the area, so while an area has a bar on an axis its content
+// keeps ScrollBarGutter() free along the edge that bar runs on. The right edge of the layout
+// (Dear ImGui's work and content region rectangles) moves in beside a vertical bar; under a
+// horizontal bar, and beside a vertical bar in an area that also scrolls sideways, the strip
+// counts as content at the far end, so scrolled to that end the content stops before the bar.
+// The area's padding lies inside the gutter. The gutter follows the content of the previous
+// frame, as the bar itself does: it appears one frame after the content outgrows the area.
+// Content that reflows may fit at the full width and not beside the gutter; the area then lays
+// it out once at the full width and stays without a bar when that fits (scroll.cpp,
+// KeepsBarGutter), so the gutter never causes the bar it makes room for.
+//
 //     // List core: bring the focused row into view.
 //     ScrollAreaRevealRect(ImGui::GetCurrentWindow(), rowRect, ScrollAlign::Nearest);
 //
@@ -78,8 +89,8 @@ enum class ScrollAlign
 void ScrollAreaTo(ImGuiWindow* window, ImVec2 target, bool animate = true);
 
 // Scrolls `window` so that `rect` (screen pixels, inside the window's content, at the current
-// scroll offset) lies in its visible area less the window padding, placed by `align` on both
-// axes; a rect larger than the visible area shows its start. Nearest compares with where the
+// scroll offset) lies in its visible area less the window padding and the gutters of its bars,
+// placed by `align` on both axes; a rect larger than the visible area shows its start. Nearest compares with where the
 // window is going (ScrollAreaTarget), so reveals during a smooth scroll stay stable. Uses
 // ScrollAreaTo, so the same motion and clamping apply.
 void ScrollAreaRevealRect(ImGuiWindow* window, const ImRect& rect, ScrollAlign align = ScrollAlign::Nearest,
@@ -131,7 +142,23 @@ struct ScrollAreaDesc
     // Pixels between the area's edge and its content on every side; < 0 takes FocusRingOutset()
     // (focus.h), so the focus ring of content flush with the padding shows whole.
     float padding = -1.0f;
+    // Keeps the content out from under the bars (see "The gutter" at the top of this file). False
+    // for a caller that lays its content out before the area opens and keeps ScrollBarGutter()
+    // free itself, so its layout does not move when the content starts to scroll.
+    bool gutter = true;
 };
+
+// The strip an area's content keeps free along an edge while a bar runs there, in pixels from
+// that edge: scroll.barInset, the bar at scroll.barThicknessHover and scroll.barGap, so the bar
+// never touches the content, not even at its hovered width.
+float ScrollBarGutter();
+
+// What the gutters of `window` take from its content in this frame beyond its padding, in pixels:
+// x at the right edge (beside a vertical bar), y at the bottom edge (above a horizontal bar).
+// Zero for a null window, a window that is no scroll area, content that fits, a padding as wide as
+// the gutter, and ScrollAreaDesc::gutter false. A caller that sizes a layer to the content it
+// measured inside an area adds this, so the content keeps its width when the bar appears.
+ImVec2 ScrollAreaGutter(const ImGuiWindow* window);
 
 // Opens a scroll area under `id` (hashed on the current id stack; the content gets ids under the
 // area) at the cursor, laid out like one item of the area's size. The area is a Dear ImGui child

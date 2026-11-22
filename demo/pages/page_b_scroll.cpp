@@ -322,7 +322,7 @@ FACET_DEMO_PAGE("scroll", "Scroll", "Blocks", 120, "default", "bar hovered", "th
                             "continues.");
     Note("Prototype areas built on the scroll core block; the lines inside them are generated filler. The wheel moves a "
          "target that the visible position follows; dragging the thumb, pressing the track or moving the keyboard "
-         "focus takes over at once.");
+         "focus takes over at once. Content that scrolls ends before the bar.");
 
     SectionHeader("Long page with edge fades");
     LongPage(ctx);
@@ -353,7 +353,7 @@ FACET_DEMO_PAGE("scroll", "Scroll", "Blocks", 120, "default", "bar hovered", "th
 
     SectionHeader("Content that fits");
     Fits(ctx);
-    Note("No bar and no fade when there is nothing more to see; the wheel passes to the page.");
+    Note("No bar, no gutter and no fade when there is nothing more to see; the wheel passes to the page.");
 
     SectionHeader("Motion");
     fi::BeginRow("Reduce motion", {.description = "Wheel scrolls then jump to their target."});

@@ -53,6 +53,19 @@ constexpr int kRecordLifetimeFrames = 600;
 // Animation store sub keys under the bar ids.
 constexpr int kBarAlphaSub = 1;
 
+// What the layout of an area's content depends on, as far as the scroll core can see it: the
+// area's size and the height its content had.
+struct GutterLayout
+{
+    ImVec2 size = ImVec2(0.0f, 0.0f);
+    float content = 0.0f;
+
+    bool Same(const GutterLayout& other) const
+    {
+        return size.x == other.size.x && size.y == other.size.y && std::fabs(content - other.content) < 0.5f;
+    }
+};
+
 struct ScrollRecord
 {
     ImGuiID window = 0;
@@ -75,6 +88,17 @@ struct ScrollRecord
     bool area = false;
     bool horizontal = false;
     bool hasBar[2] = {false, false};
+    // The gutters: pixels the content gives up beyond the padding, [x] at the right edge (beside
+    // the vertical bar), [y] at the bottom edge (above the horizontal bar).
+    float reserve[2] = {0.0f, 0.0f};
+    int reserveFrame = -1;           // the frame `reserve` is of
+    // Trials of the layout without the gutter beside the vertical bar (KeepsBarGutter).
+    GutterLayout gutterSeen;         // the layout of the latest frame with the gutter
+    int gutterSeenFrame = -1;
+    GutterLayout gutterTrial;        // the layout the latest trial started from
+    int gutterTrialFrame = -1;
+    GutterLayout gutterNeeded;       // the layout whose trial did not fit
+    bool gutterNeededKnown = false;
     ImRect track[2];
     ImRect thumb[2];
     int dragAxis = -1;   // the axis whose thumb is dragged, -1 for none
@@ -91,6 +115,7 @@ struct OpenArea
     bool clipPushed = false;
     float alpha = 0.0f;            // visibility of the bars
     bool hasBar[2] = {false, false};
+    float reserve[2] = {0.0f, 0.0f};  // the gutters of this frame, as in ScrollRecord
     float expand[2] = {0.0f, 0.0f};  // 0 thin, 1 wide (pointer over the bar or dragging it)
     float active[2] = {0.0f, 0.0f};  // hovered or held, for the thumb color
     float insetTop = 0.0f;           // pixels kept free above the vertical bar (BeginScrollAreaBars)
@@ -527,6 +552,43 @@ void DrawFades(ImDrawList* drawList, const ImGuiWindow* window, const ImRect& cl
     drawList->PopClipRect();
 }
 
+// Whether the area keeps the gutter beside its vertical bar in this frame. The gutter narrows the
+// content, and content that reflows (tiles in columns, wrapped text) changes its height with its
+// width, so two layouts can both hold: the full width without a bar, or the narrower one with a
+// bar. The area prefers the first. After a frame with the gutter it lays the content out once at
+// the full width, a trial, when that may fit: when the content fits beside the gutter, or when it
+// has stopped changing and outgrows the area by no more than the area's own height (tiles that
+// lose a column get at most twice as tall, so taller content cannot fit at the full width
+// either). A trial that does not fit brings the gutter back in the next frame, and is not repeated
+// until the area's size or the content's height changes, so the two layouts never alternate.
+bool KeepsBarGutter(const ImGuiWindow* window, ScrollRecord& record)
+{
+    const int frame = GImGui->FrameCount;
+    const bool had = record.reserveFrame == frame - 1 && record.reserve[kAxisX] > 0.0f;
+    const bool overflows = window->ScrollMax.y > 0.0f;
+    if (!had)
+    {
+        // The content was laid out at the full width. After a trial this is its verdict.
+        if (record.gutterTrialFrame == frame - 1)
+        {
+            record.gutterNeededKnown = overflows;
+            record.gutterNeeded = record.gutterTrial;
+        }
+        return overflows;
+    }
+    const GutterLayout now{window->Size, window->ContentSize.y};
+    const bool settled = record.gutterSeenFrame == frame - 1 && record.gutterSeen.Same(now);
+    record.gutterSeen = now;
+    record.gutterSeenFrame = frame;
+    const float view = window->InnerRect.GetHeight() - window->WindowPadding.y * 2.0f;
+    const bool mayFit = !overflows || (settled && window->ScrollMax.y <= view);
+    if (!mayFit || (record.gutterNeededKnown && record.gutterNeeded.Same(now)))
+        return true;
+    record.gutterTrial = now;
+    record.gutterTrialFrame = frame;
+    return false;
+}
+
 // Defined after the scroll area functions below.
 void RunBars(ImGuiWindow* window, OpenArea& open, ScrollRecord& record, const ForcedItemRequest& forced);
 void DrawBars(ImDrawList* drawList, ImGuiWindow* window, const ImRect& clip, const OpenArea& open);
@@ -562,6 +624,8 @@ void ScrollAreaRevealRect(ImGuiWindow* window, const ImRect& rect, ScrollAlign a
         return;
     ImVec2 target(-1.0f, -1.0f);
     ImRect shown = rect;  // where the rect will be once this window has scrolled
+    const ScrollRecord* record = FindRecord(window->ID);
+    const bool gutters = record != nullptr && record->reserveFrame >= GImGui->FrameCount - 1;
     for (int axis = kAxisX; axis <= kAxisY; ++axis)
     {
         // The rect in content coordinates (0 is the top of the scrolled content).
@@ -569,7 +633,9 @@ void ScrollAreaRevealRect(ImGuiWindow* window, const ImRect& rect, ScrollAlign a
         const float lo = rect.Min[axis] - origin;
         const float hi = rect.Max[axis] - origin;
         const float pad = window->WindowPadding[axis];
-        const float view = std::max(0.0f, window->InnerRect.Max[axis] - window->InnerRect.Min[axis] - 2.0f * pad);
+        // The far end also keeps the gutter of the bar that runs there.
+        const float padEnd = pad + (gutters ? record->reserve[axis] : 0.0f);
+        const float view = std::max(0.0f, window->InnerRect.Max[axis] - window->InnerRect.Min[axis] - pad - padEnd);
         const float current = TargetOf(window, axis);
         float wanted = current;
         const bool larger = hi - lo > view;
@@ -592,11 +658,12 @@ void ScrollAreaRevealRect(ImGuiWindow* window, const ImRect& rect, ScrollAlign a
             break;
         }
         const float scrollMax = std::max(0.0f, window->ScrollMax[axis]);
-        // Within one padding of an end the area goes to that end: the padding holds no content, and
-        // far down a very long content the float positions there are off by a pixel or two.
+        // Within one padding of an end the area goes to that end: the padding (and the gutter at
+        // the far end) holds no content, and far down a very long content the float positions
+        // there are off by a pixel or two.
         if (wanted <= pad)
             wanted = 0.0f;
-        else if (wanted >= scrollMax - pad)
+        else if (wanted >= scrollMax - padEnd)
             wanted = scrollMax;
         wanted = std::clamp(wanted, 0.0f, scrollMax);
         if (std::fabs(wanted - current) >= 0.5f)
@@ -782,6 +849,27 @@ bool BeginScrollAreaCore(ImGuiID id, const ScrollAreaDesc& desc)
     open.surface = surface;
     open.edgeFades = desc.edgeFades;
     open.horizontal = desc.horizontal;
+
+    // The gutters (scroll.h): the content keeps clear of the edges the bars run on. The padding
+    // lies inside a gutter, so only the rest of it is taken from the content.
+    const float gutter = desc.gutter ? std::round(std::max(0.0f, ScrollBarGutter() - padding)) : 0.0f;
+    if (gutter > 0.0f)
+    {
+        if (KeepsBarGutter(window, record))
+            open.reserve[kAxisX] = std::min(gutter, std::max(0.0f, window->WorkRect.GetWidth() - 1.0f));
+        if (desc.horizontal && window->ScrollMax.x > 0.0f)
+            open.reserve[kAxisY] = gutter;
+    }
+    record.reserve[kAxisX] = open.reserve[kAxisX];
+    record.reserve[kAxisY] = open.reserve[kAxisY];
+    record.reserveFrame = g.FrameCount;
+    if (open.reserve[kAxisX] > 0.0f)
+    {
+        // The right edge of the layout: what full-width items and the available width end at.
+        window->WorkRect.Max.x -= open.reserve[kAxisX];
+        window->ParentWorkRect.Max.x -= open.reserve[kAxisX];
+        window->ContentRegionRect.Max.x -= open.reserve[kAxisX];
+    }
 
     // The content is clipped at the area's own rectangle (not inset by half the padding as
     // Dear ImGui does), within what the parent shows, so focus rings and shadows of content near
@@ -1031,7 +1119,29 @@ void EndScrollAreaCore()
     DrawBars(drawList, window, clip, open);
     if (open.clipPushed)
         ImGui::PopClipRect();
+    // The gutters count as content at the far ends: scrolled to its end, the content stops before
+    // the bar that runs there.
+    if (open.reserve[kAxisY] > 0.0f)
+        window->DC.CursorMaxPos.y += open.reserve[kAxisY];
+    if (open.horizontal && open.reserve[kAxisX] > 0.0f)
+        window->DC.CursorMaxPos.x += open.reserve[kAxisX];
     ImGui::EndChild();
+}
+
+float ScrollBarGutter()
+{
+    const ScrollTokens& tokens = T().scroll;
+    return std::round(Px(tokens.barInset) + Px(tokens.barThicknessHover) + Px(tokens.barGap));
+}
+
+ImVec2 ScrollAreaGutter(const ImGuiWindow* window)
+{
+    if (window == nullptr || ImGui::GetCurrentContext() == nullptr)
+        return ImVec2(0.0f, 0.0f);
+    const ScrollRecord* record = FindRecord(window->ID);
+    if (record == nullptr || !record->area || record->reserveFrame != GImGui->FrameCount)
+        return ImVec2(0.0f, 0.0f);
+    return ImVec2(record->reserve[kAxisX], record->reserve[kAxisY]);
 }
 
 bool ScrollAreaBarRects(ImGuiWindow* window, ImGuiAxis axis, ImRect* track, ImRect* thumb)

@@ -197,6 +197,7 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
         ScrollAreaDesc area;
         area.size = ImVec2(width, height);
         area.padding = 0.0f;
+        area.gutter = false;  // the rows below end before the bar themselves, from the first frame on
         if (!BeginScrollAreaCore("##scroll", area))
         {
             ImGui::EndGroup();
@@ -209,8 +210,8 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
     ImDrawList* drawList = window->DrawList;
     const ImVec2 rowsStart = window->DC.CursorPos;
     // While the rows scroll, the overlay bar lies over their end: the rows, and the visibility and
-    // lock toggles at their end, stop before the bar at its hovered width.
-    const float barReserve = scrolled ? std::round(Px(theme.scroll.barThicknessHover + theme.scroll.barInset)) : 0.0f;
+    // lock toggles at their end, stop before the gutter of the bar (scroll.h).
+    const float barReserve = scrolled ? ScrollBarGutter() : 0.0f;
     const float rowWidth = scrolled ? std::max(1.0f, ImGui::GetContentRegionAvail().x - barReserve) : width;
     state.rowsOrigin = rowsStart;
     state.rowWidth = rowWidth;

@@ -642,6 +642,234 @@ TEST_CASE("Scroll area: both axes get a bar and the wheel scrolls sideways with 
     CHECK(area.Window()->Scroll.y == 0.0f);
 }
 
+TEST_CASE("Scroll area: content that scrolls keeps the gutter of the bar free")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SingleArea ui;
+    float available = 0.0f;
+    float workRight = 0.0f;
+    ui.inside = [&] {
+        available = ImGui::GetContentRegionAvail().x;
+        workRight = ImGui::GetCurrentWindow()->WorkRect.Max.x;
+    };
+    const facet::ScrollTokens& tokens = facet::T().scroll;
+    const float pad = fi::FocusRingOutset();
+    const float gutter = fi::ScrollBarGutter();
+    CHECK(gutter == doctest::Approx(facet::Px(tokens.barInset + tokens.barThicknessHover + tokens.barGap)));
+
+    // Content that fits takes the whole width inside the padding.
+    ui.rows = 3;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(3);
+    ImGuiWindow* window = ui.area.Window();
+    REQUIRE(window != nullptr);
+    CHECK(available == doctest::Approx(300.0f - pad * 2.0f));
+    CHECK(fi::ScrollAreaGutter(window).x == 0.0f);
+
+    // Content that scrolls ends before the bar at its hovered width, with barGap between them.
+    ui.rows = 50;
+    session.Frames(3);
+    const float right = window->Rect().Max.x;
+    CHECK(available == doctest::Approx(300.0f - pad - gutter));
+    CHECK(workRight == doctest::Approx(right - gutter));
+    CHECK(fi::ScrollAreaGutter(window).x == doctest::Approx(gutter - pad));
+    CHECK(fi::ScrollAreaGutter(window).y == 0.0f);
+    ImRect track;
+    REQUIRE(fi::ScrollAreaBarRects(window, ImGuiAxis_Y, &track, nullptr));
+    const float hoveredBarLeft = right - facet::Px(tokens.barInset) - facet::Px(tokens.barThicknessHover);
+    CHECK(workRight == doctest::Approx(hoveredBarLeft - facet::Px(tokens.barGap)));
+    CHECK(track.Min.x > workRight);
+
+    // The gutter goes with the bar.
+    ui.rows = 3;
+    session.Frames(3);
+    CHECK(available == doctest::Approx(300.0f - pad * 2.0f));
+    CHECK(fi::ScrollAreaGutter(window).x == 0.0f);
+    CHECK(fi::ScrollAreaGutter(nullptr).x == 0.0f);
+}
+
+TEST_CASE("Scroll area: the padding lies inside the gutter, and an area can leave the gutter to its caller")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const float gutter = fi::ScrollBarGutter();
+    const float wide = gutter + 4.0f;
+    float padded = 0.0f;
+    float own = 0.0f;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("padded", {.size = ImVec2(300.0f, 200.0f), .padding = wide}))
+        {
+            padded = ImGui::GetContentRegionAvail().x;
+            ImGui::Dummy(ImVec2(100.0f, 900.0f));
+            fi::EndScrollAreaCore();
+        }
+        if (fi::BeginScrollAreaCore("own", {.size = ImVec2(300.0f, 200.0f), .gutter = false}))
+        {
+            own = ImGui::GetContentRegionAvail().x;
+            ImGui::Dummy(ImVec2(100.0f, 900.0f));
+            fi::EndScrollAreaCore();
+        }
+    });
+    session.Frames(3);
+    CHECK(padded == doctest::Approx(300.0f - wide * 2.0f));
+    CHECK(own == doctest::Approx(300.0f - fi::FocusRingOutset() * 2.0f));
+}
+
+TEST_CASE("Scroll area: scrolled to its end, content stops before the bars on both axes")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AreaProbe area;
+    bool toEnd = false;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("wide", {.size = ImVec2(300.0f, 200.0f), .horizontal = true}))
+        {
+            area.Capture();
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            if (toEnd)
+                fi::ScrollAreaTo(window, window->ScrollMax, false);
+            ImGui::Dummy(ImVec2(900.0f, 900.0f));
+            session.Track("block");
+            fi::EndScrollAreaCore();
+        }
+    });
+    session.Frames(3);
+    toEnd = true;
+    session.Frames(3);
+    ImGuiWindow* window = area.Window();
+    REQUIRE(window != nullptr);
+    const float gutter = fi::ScrollBarGutter();
+    const ImRect block = session.ItemRect("block");
+    CHECK(window->Scroll.x == doctest::Approx(window->ScrollMax.x));
+    CHECK(window->Scroll.y == doctest::Approx(window->ScrollMax.y));
+    CHECK(block.Max.x == doctest::Approx(window->Rect().Max.x - gutter));
+    CHECK(block.Max.y == doctest::Approx(window->Rect().Max.y - gutter));
+    CHECK(fi::ScrollAreaGutter(window).y == doctest::Approx(gutter - fi::FocusRingOutset()));
+}
+
+TEST_CASE("Scroll area: a revealed rect stops before the horizontal bar")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AreaProbe area;
+    bool reveal = false;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("wide", {.size = ImVec2(300.0f, 200.0f), .horizontal = true}))
+        {
+            area.Capture();
+            for (int i = 0; i < 20; ++i)
+            {
+                ImGui::Dummy(ImVec2(900.0f, 26.0f));
+                if (i == 10)
+                    session.Track("row");
+            }
+            if (reveal)
+                fi::ScrollAreaRevealRect(ImGui::GetCurrentWindow(), session.ItemRect("row"), fi::ScrollAlign::Nearest, false);
+            reveal = false;
+            fi::EndScrollAreaCore();
+        }
+    });
+    session.Frames(3);
+    reveal = true;
+    session.Frames(3);
+    ImGuiWindow* window = area.Window();
+    REQUIRE(window != nullptr);
+    CHECK(window->Scroll.y > 0.0f);
+    CHECK(session.ItemRect("row").Max.y == doctest::Approx(window->Rect().Max.y - fi::ScrollBarGutter()));
+}
+
+TEST_CASE("Scroll area: content that fits only beside the gutter keeps it instead of alternating")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AreaProbe area;
+    float height = 200.0f;
+    float available = 0.0f;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("tiles", {.size = ImVec2(300.0f, height)}))
+        {
+            area.Capture();
+            // A block whose height follows its width, as tiles that keep their proportions do:
+            // taller than the area at the full width, shorter once the gutter has narrowed it.
+            available = ImGui::GetContentRegionAvail().x;
+            ImGui::Dummy(ImVec2(available, available * 0.675f));
+            fi::EndScrollAreaCore();
+        }
+    });
+    const float pad = fi::FocusRingOutset();
+    const float narrow = 300.0f - pad - fi::ScrollBarGutter();
+    REQUIRE((300.0f - pad * 2.0f) * 0.675f > height - pad * 2.0f);
+    REQUIRE(narrow * 0.675f < height - pad * 2.0f);
+    session.Frames(5);
+    for (int i = 0; i < 8; ++i)
+    {
+        session.Frame();
+        CHECK(available == doctest::Approx(narrow));
+    }
+    // No bar: the content fits beside the gutter.
+    CHECK_FALSE(fi::ScrollAreaBarRects(area.Window(), ImGuiAxis_Y, nullptr, nullptr));
+    // A taller area holds the content at the full width: the gutter is given up.
+    height = 260.0f;
+    session.Frames(4);
+    CHECK(available == doctest::Approx(300.0f - pad * 2.0f));
+}
+
+TEST_CASE("Scroll area: content that fits at the full width does not keep a bar because of the gutter")
+{
+    MotionGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    AreaProbe area;
+    int tiles = 30;
+    float available = 0.0f;
+    session.SetUi([&] {
+        if (fi::BeginScrollAreaCore("tiles", {.size = ImVec2(300.0f, 200.0f)}))
+        {
+            area.Capture();
+            // Tiles of a fixed size in as many columns as fit: narrower content has more rows.
+            available = ImGui::GetContentRegionAvail().x;
+            const int columns = std::max(1, static_cast<int>(available / 49.0f));
+            const int rows = (tiles + columns - 1) / columns;
+            ImGui::Dummy(ImVec2(static_cast<float>(columns) * 49.0f, static_cast<float>(rows) * 90.0f));
+            fi::EndScrollAreaCore();
+        }
+    });
+    const float pad = fi::FocusRingOutset();
+    const float full = 300.0f - pad * 2.0f;
+    const float narrow = 300.0f - pad - fi::ScrollBarGutter();
+    REQUIRE(static_cast<int>(full / 49.0f) == 6);
+    REQUIRE(static_cast<int>(narrow / 49.0f) == 5);
+    // Thirty tiles scroll in either layout: the gutter stays.
+    session.Frames(6);
+    CHECK(available == doctest::Approx(narrow));
+    CHECK(fi::ScrollAreaBarRects(area.Window(), ImGuiAxis_Y, nullptr, nullptr));
+    // Twelve tiles take three rows beside the gutter, which scroll, and two rows at the full
+    // width, which fit: the area ends up at the full width without a bar and stays there.
+    tiles = 12;
+    session.Frames(6);
+    for (int i = 0; i < 6; ++i)
+    {
+        session.Frame();
+        CHECK(available == doctest::Approx(full));
+    }
+    CHECK_FALSE(fi::ScrollAreaBarRects(area.Window(), ImGuiAxis_Y, nullptr, nullptr));
+    // Eighteen tiles scroll in either layout again; after one look at the full width the gutter
+    // stays for good.
+    tiles = 18;
+    session.Frames(8);
+    for (int i = 0; i < 6; ++i)
+    {
+        session.Frame();
+        CHECK(available == doctest::Approx(narrow));
+    }
+}
+
 TEST_CASE("Scroll area: edge fades draw the surface color where content continues")
 {
     MotionGuard guard;

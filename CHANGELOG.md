@@ -15,6 +15,8 @@ The first public state of the library. There is no tagged release yet.
 - **Widgets:** fourteen families, all ready: buttons, selection, lists, sliders, inputs, pickers,
   navigation, containers, layout, overlays, display, charts, media and composites. Each widget is
   documented under `docs/widgets/`.
+- **Scrolling:** content that scrolls ends before the scrollbar instead of running under it. The
+  gutter is `scroll.barInset`, the hovered bar width and the new `scroll.barGap` token.
 - **Test app:** `facet_demo` with a page per family, a theme editor that exports its edits as
   C++, an overlay mode, and capture and selftest modes.
 - **Build:** CMake presets for Visual Studio 2026 (x64 and x86) and Ninja, a consumer example

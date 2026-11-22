@@ -375,6 +375,12 @@ the card's color inside a card) where more of it continues past an edge. `horizo
 scrolling. The width fills the available width unless `width` is set; `height` 0 fills the available
 height, a negative value leaves that many units free below the area.
 
+While the content is taller than the area, it ends before the bar: the available width shrinks by
+the bar's gutter (the `scroll` tokens `barInset`, `barThicknessHover` and `barGap`, 16 units from
+the area's edge with the starting values), so nothing lies under the bar. Content that fits has the
+full width. The gutter follows the content of the previous frame, as the bar does. With
+`horizontal`, the content also stops that far above the horizontal bar.
+
 Keyboard navigation crosses into the area and scrolls it to the focused item; with the focus inside,
 Page Up and Page Down move it by a page and Home and End to the ends. `ImGui::SetScrollHereY` and
 the other stock scroll calls work inside. The bars are mouse affordances and take no focus.
