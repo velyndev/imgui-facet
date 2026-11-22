@@ -1,9 +1,16 @@
 # Facet
 
-Facet is a design framework for Dear ImGui applications on Windows with Direct3D 11. It adds a
-set of custom widgets, a light and a dark theme built from design tokens with an accent color set
-at run time, SVG icons and images, and scaling for desktop windows and overlay menus. Dear ImGui
-stays unmodified, and Facet widgets mix with stock Dear ImGui calls in the same window.
+[![build](https://github.com/velyndev/imgui-design-framework/actions/workflows/build.yml/badge.svg)](https://github.com/velyndev/imgui-design-framework/actions/workflows/build.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Facet is a design framework for Dear ImGui applications on Windows with Direct3D 11. It adds
+more than 180 custom widgets in fourteen families, a light and a dark theme built from design
+tokens with an accent color set at run time, SVG icons and images, and scaling for desktop
+windows and overlay menus. Dear ImGui stays unmodified, and Facet widgets mix with stock Dear
+ImGui calls in the same window.
+
+Facet is at version 0.1 and has no tagged release yet: every declared widget is implemented, and
+the public API may still change before 1.0. [CHANGELOG.md](CHANGELOG.md) lists what is in it.
 
 ## Screenshots
 
@@ -213,6 +220,13 @@ register themselves (`FACET_DEMO_PAGE`, `FACET_DEMO_SELFTEST` in `demo/pages/pag
 - [Scaling](docs/scaling.md): design units, the scale modes, text scale and pixel snapping.
 - [Images and icons](docs/images-and-icons.md), [layout](docs/layout.md) (width classes and
   labelled rows) and [input](docs/input.md) (key chords, key binds and shortcuts).
+
+## Contributing
+
+Bug reports, fixes and new widgets are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has what a
+report needs and what a change has to pass; the [code of conduct](CODE_OF_CONDUCT.md) applies to
+issues and pull requests. Security problems are reported privately, see
+[SECURITY.md](SECURITY.md).
 
 ## License
 
