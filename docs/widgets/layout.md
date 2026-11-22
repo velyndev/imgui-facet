@@ -362,7 +362,7 @@ units (0 fills the available room; with no height left, `metrics.panelHeight`).
   plus the focused tile and the range start of a Shift selection, so a hundred thousand tiles cost
   what a screenful does. Loop `NextVisibleRows`; its range holds tile indices.
 - `ItemGridTile(index)` places and registers the tile and draws its hover fill (`fill[2]`), the
-  selected tile look (`accentSubtle` and the accent hairline, the one border width) and, after
+  selection fill (`accentSubtle`) and, after
   keyboard input only, the focus ring inside the tile. It is Dear ImGui's last item afterwards, so the caller draws the tile's content in
   its rectangle (`ImGui::GetItemRectMin` / `Max`). It returns true when the tile was activated by a
   double click or Enter.
