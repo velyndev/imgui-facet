@@ -1,17 +1,34 @@
 // Per-frame and per-device work of the editor and canvas composites (PropertyGrid, CurveEditor,
 // BezierEditor, GradientEditor, PreviewCanvas, CanvasElement, LayerList). The entry is in the
-// subsystem table (src/core/subsystems.cpp) from the start, so the package fills its hooks here
-// without touching a shared file. No hooks yet.
+// subsystem table (src/core/subsystems.cpp). At facet::EndFrame every Begin of the package whose
+// End was not called is forgotten (the scope stack has reported it), so the next frame starts clean.
 
 #include "internal/subsystem.h"
+#include "widgets/composites/editors_frame.h"
 
 namespace facet::internal
 {
+namespace
+{
+
+void EditorsEndFrame()
+{
+    ClearPropertyGridStacks();
+}
+
+void EditorsShutdown()
+{
+    ClearPropertyGridStacks();
+}
+
+} // namespace
 
 Subsystem WidgetsEditorsSubsystem()
 {
     Subsystem subsystem;
     subsystem.name = "widgets_editors";
+    subsystem.endFrame = &EditorsEndFrame;
+    subsystem.shutdown = &EditorsShutdown;
     return subsystem;
 }
 

@@ -568,8 +568,37 @@ void EndPropertyCategory();
 void EndPropertyRow();
 ```
 
-Inspector of labelled rows in collapsible categories with a filter; every pair has its scope
-class. Status: planned.
+An inspector of labelled rows in collapsible categories, with a filter; every pair has its scope
+class. Each row is a settings row of the layout family (`BeginSettingsRow`): the visible label in
+the label column, the modified mark after it, and the caller's control (a `Toggle`, `NumberInput`,
+`Slider`, `Dropdown`, `ColorWell`, `TextField`, `VectorInput` or any other widget, with `"##value"`)
+in the control column; that control reports its own edits, one change per edit. A row whose label
+is cut ends in an ellipsis; `tooltip` shows on hover of the label and while the row's control has
+the visible keyboard focus, with the full label above it.
+
+All rows of a grid share one label column, also rows inside nested categories (their column is
+narrowed by the indent), so every control starts at one x. The column is `labelWidth`, or the
+`labelColumn` token, until the user drags its edge between the labels and the controls; the
+dragged column is kept under the grid id and saved in the ini file. A drag never makes it narrower
+than `composites.propertyLabelMinWidth` nor so wide that the rows would stack. The edge is the last
+Tab stop of the grid: the arrows move it (Shift finer, Ctrl coarser), Home and End go to the
+narrowest and widest column, Escape during a drag puts it back, and a double click returns it to
+the default. It shows its divider only while hovered, dragged or focused. In a region too narrow
+for a label column beside the controls, every row puts its control under the label and there is no
+edge.
+
+A category header is a Row disclosure (`BeginDisclosure`): a click, Enter or Space toggles it,
+Left closes and Right opens it, and its open state is kept under the label and saved in the ini
+file (`defaultOpen` applies the first time). The content opens and closes with an animated height.
+
+The filter matches a row's visible label or its `keywords`, fuzzy, or by the `PassesFilter` rules
+when `filterSettings` is set. Rows that do not match are skipped (`BeginPropertyRow` returns
+false). While a filter is set, every category returns true so its rows can be matched, and its
+header shows, open and not toggled by input, while one of its rows matched in the last frame it
+was shown; a category whose rows start to match therefore shows its header one frame after them.
+When no row matches, the grid shows `Strings::noResults` as a compact `EmptyState`. Disabled
+(`ImGui::BeginDisabled`) reaches the headers, the edge and the caller's controls. The grid keeps
+no per-frame allocation once shown. Status: ready.
 
 ### PreviewCanvas
 

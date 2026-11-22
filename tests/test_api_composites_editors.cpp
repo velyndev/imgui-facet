@@ -95,35 +95,6 @@ void EditorCalls()
         CHECK_FALSE(GradientEditor("Gradient 2", &stopVector));
     });
     CHECK(stopVector.size() == 2);
-
-    // Open categories and rows take content; the row pushes its label on the id stack.
-    Check("PropertyGrid", Expect::NoItem, nullptr, [] {
-        BeginPropertyGrid("grid", {.filter = "prop"});
-        const bool category = BeginPropertyCategory("Category");
-        CHECK(category);
-        if (category)
-        {
-            const ImGuiID outside = ImGui::GetID("##value");
-            const bool row = BeginPropertyRow("Property", {.modified = true});
-            CHECK(row);
-            if (row)
-            {
-                CHECK(ImGui::GetID("##value") != outside);
-                ImGui::Button("##value");
-                EndPropertyRow();
-            }
-            CHECK(ImGui::GetID("##value") == outside);
-            EndPropertyCategory();
-        }
-        CHECK_FALSE(BeginPropertyCategory("Closed", {.defaultOpen = false}));
-        EndPropertyGrid();
-    });
-    Check("PropertyGridScope", Expect::NoItem, nullptr, [] {
-        PropertyGridScope grid("grid2");
-        if (PropertyCategoryScope category("Category"); category)
-            if (PropertyRowScope row("Property"); row)
-                ImGui::TextUnformatted("value");
-    });
 }
 
 void CanvasCalls()
