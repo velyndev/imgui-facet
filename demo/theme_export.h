@@ -36,19 +36,22 @@ struct ThemeEditGroupInfo
     const char* name;    // shown in the editor
     float minFactor;     // range of the group factor
     float maxFactor;
+    // Step of the factor slider: 1 lies on its grid, and every group has at most 20 steps, so every
+    // factor slider shows its stops as ticks (a slider draws them for at most 21 stops).
+    double step;         // a double like SliderOptions::step, so 0.1 stays exact enough for the grid
     bool tokenRows;      // the editor shows a row per token
 };
 
 inline const ThemeEditGroupInfo& ThemeEditGroupOf(ThemeEditGroup group)
 {
     static const ThemeEditGroupInfo kGroups[kThemeEditGroupCount] = {
-        {"Corner radii", 0.0f, 2.0f, true},
-        {"Spacing", 0.5f, 2.0f, true},
-        {"Type sizes", 0.75f, 1.5f, true},
-        {"Control heights", 0.75f, 1.5f, true},
-        {"Motion scale", 0.25f, 4.0f, false},
-        {"Blur strength", 0.0f, 2.0f, false},
-        {"Shadow strength", 0.0f, 2.0f, false},
+        {"Corner radii", 0.0f, 2.0f, 0.1, true},
+        {"Spacing", 0.5f, 2.0f, 0.1, true},
+        {"Type sizes", 0.75f, 1.5f, 0.05, true},
+        {"Control heights", 0.75f, 1.5f, 0.05, true},
+        {"Motion scale", 0.25f, 4.0f, 0.25, false},
+        {"Blur strength", 0.0f, 2.0f, 0.1, false},
+        {"Shadow strength", 0.0f, 2.0f, 0.1, false},
     };
     return kGroups[static_cast<int>(group)];
 }

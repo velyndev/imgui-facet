@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.h>
 
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -131,6 +132,22 @@ TEST_CASE("A group factor never pushes a token past the range of its row, and an
         }
         CHECK(edited.elevation.levels[2].opacity <= 1.0f);
         CHECK(BuildThemeExport(base, edits, "Preset", 1.0f).find("opacity = 1.1") == std::string::npos);
+    }
+}
+
+TEST_CASE("Every factor slider of the editor has 1 on its grid and shows its stops")
+{
+    for (int g = 0; g < facet::demo::kThemeEditGroupCount; ++g)
+    {
+        const auto& info = facet::demo::ThemeEditGroupOf(static_cast<ThemeEditGroup>(g));
+        CAPTURE(info.name);
+        REQUIRE(info.step > 0.0);
+        const double steps = (static_cast<double>(info.maxFactor) - info.minFactor) / info.step;
+        const double toOne = (1.0 - info.minFactor) / info.step;
+        CHECK(std::fabs(steps - std::round(steps)) < 1e-4);
+        CHECK(std::fabs(toOne - std::round(toOne)) < 1e-4);
+        // A slider draws a tick per step for at most 21 stops (docs/widgets/sliders.md).
+        CHECK(std::round(steps) + 1.0 <= 21.0);
     }
 }
 

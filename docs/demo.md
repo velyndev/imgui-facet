@@ -229,7 +229,10 @@ The reasons for the app's own chrome are kept here, next to its description.
   sits above the card, where a search sits in the other lists of the library.
 - **Theme editor.** An inspector pane at the trailing edge, so the page stays in view while a
   value changes; groups are divided by hairline captions instead of cards, because the pane is
-  narrow and every row is a control.
+  narrow and every row is a control. Its switches take the pane width, so they start at the label
+  column where the factor sliders start their tracks, and every factor slider steps on a grid of
+  at most 20 steps through 1, so all of them show their stops as ticks and read as one kind of
+  control.
 - **Overlay backdrop.** Chart palette bands, circles and text, so the blur has colors, edges and
   type to soften, and motion that shows it is live; the text names the scene as generated.
 - **Showcase.** Two cards in a reflowing grid: a settings menu and an inventory are the two kinds

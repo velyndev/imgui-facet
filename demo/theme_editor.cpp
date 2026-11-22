@@ -71,7 +71,7 @@ bool ThemeEditorFactorRow(GalleryState& state, PageCtx& ctx, ThemeEditGroup grou
     ImGui::SetNextItemWidth(std::max(button, ImGui::GetContentRegionAvail().x - button - gap));
     facet::SliderOptions slider;
     slider.format = "%.2f\xC3\x97";  // the factor with a multiplication sign
-    slider.step = 0.05;
+    slider.step = info.step;
     if (facet::Slider(label, &factor, info.minFactor, info.maxFactor, slider))
         state.edits.factor[static_cast<std::size_t>(group)] = factor;
     const bool dragged = ImGui::IsItemActive();
@@ -230,7 +230,11 @@ void DrawThemeEditor(GalleryState& state, PageCtx& ctx)
     ImGui::PushID("motion");
     facet::SeparatorText("Motion");
     ThemeEditorFactorRow(state, ctx, ThemeEditGroup::Motion, "Scale");
-    facet::Toggle("Reduce motion", &state.edits.reduceMotion);
+    // Toggles with a set width put the switch at the label column, where the factor sliders above
+    // and below start their tracks.
+    facet::ToggleOptions columnToggle;
+    columnToggle.width = facet::kFill;
+    facet::Toggle("Reduce motion", &state.edits.reduceMotion, columnToggle);
     ctx.Probe("editor.reduce-motion");
     ImGui::PopID();
 
@@ -244,11 +248,11 @@ void DrawThemeEditor(GalleryState& state, PageCtx& ctx)
     // ---- App or overlay mode ----
     ImGui::PushID("mode");
     facet::SeparatorText("Window");
-    facet::Toggle("Overlay mode", &state.overlayMode);
+    facet::Toggle("Overlay mode", &state.overlayMode, columnToggle);
     ctx.Probe("editor.overlay");
     ImGui::BeginDisabled(!state.overlayMode);
     bool animate = !state.backdropPaused;
-    if (facet::Toggle("Animate the backdrop", &animate))
+    if (facet::Toggle("Backdrop motion", &animate, columnToggle))
         state.backdropPaused = !animate;
     ctx.Probe("editor.backdrop");
     ImGui::EndDisabled();
