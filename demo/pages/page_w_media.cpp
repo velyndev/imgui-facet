@@ -429,7 +429,7 @@ void CollectionsSection(facet::demo::PageCtx& ctx)
 {
     const facet::Theme& t = facet::T();
     SectionHeader("Thumbnail strip");
-    Paragraph("A scrolling row with the chosen thumbnail ringed. Left and Right choose, Home and End jump; the wheel "
+    Paragraph("A scrolling row with the chosen thumbnail outlined in the accent. Left and Right choose, Home and End jump; the wheel "
               "and a drag scroll, and a released drag glides on.");
     LabeledRow("Data");
     facet::SegmentedControl("##stripState", &ui.stripState, kDataStates);
