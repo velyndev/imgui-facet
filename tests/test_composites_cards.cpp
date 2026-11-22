@@ -548,3 +548,58 @@ TEST_CASE("Inventory grid and slot: items move from the grid into a slot and bac
     CHECK(LabelOf(bag.slots[4]) == "Item 2");
     CHECK(bag.equip.label == nullptr);
 }
+
+// ---- InventoryDetailCard ------------------------------------------------------------------------
+
+TEST_CASE("Inventory detail card: the actions are Tab stops and the activated one is returned")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const facet::InventoryStat stats[] = {{"Stat 1", 4.0, 3.0}, {"Stat 2", 2.0, 5.0, true}, {"Stat 3", 1.0}};
+    static const char* const tags[] = {"Tag 1", "Tag 2"};
+    static const char* const actions[] = {"Action 1", "Action 2"};
+    int pressed = -1;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int r = facet::InventoryDetailCard(
+            "Item 1", facet::ImageHandle{},
+            {.description = "Placeholder text", .stats = stats, .tags = tags, .actions = actions});
+        session.Track("card");
+        if (r >= 0)
+            pressed = r;
+    });
+    session.Frames(2);
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Space);
+    CHECK(pressed == 0);
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(pressed == 1);
+    CHECK(session.ItemRect("card").GetWidth() == doctest::Approx(facet::Px(256.0f)));
+}
+
+TEST_CASE("Inventory detail card and media card follow kFill and widths relative to the available width")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int checked = 0;
+    session.SetUi([&] {
+        using namespace facet;
+        const auto fills = [&](float units, auto&& call) {
+            const float expected = ImGui::GetContentRegionAvail().x + (units == kFill ? 0.0f : Px(units));
+            call(units);
+            CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
+            ++checked;
+        };
+        for (const float units : {kFill, -10.0f})
+        {
+            fills(units, [](float w) { (void)InventoryDetailCard("Item", ImageHandle{}, {.width = w}); });
+            fills(units, [](float w) { (void)MediaCard("Card", ImageHandle{}, {.width = w}); });
+        }
+    });
+    session.Frame();
+    CHECK(checked == 4);
+}
