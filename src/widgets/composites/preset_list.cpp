@@ -234,7 +234,6 @@ PresetListResult PresetList(const char* id, int* active, std::span<const PresetI
     ImGui::BeginGroup();
     internal::ApplyNextItemData(next);
     const int menuPart = count;
-    bool listFocused = false;
     if (!ready && options.state == DataState::Loading)
     {
         // Loading: skeleton lines in the place of the rows.
@@ -280,12 +279,8 @@ PresetListResult PresetList(const char* id, int* active, std::span<const PresetI
                     if (renamingRow)
                         ImGui::SetNextItemAllowOverlap();
                     const internal::ListRowState row = internal::ListViewRow(i);
-                    if (row.focused)
-                    {
-                        listFocused = true;
-                        if (i < count)
-                            state.lastFocus = i;
-                    }
+                    if (row.focused && i < count)
+                        state.lastFocus = i;
                     if (state.refocus == i)
                     {
                         ImGui::SetFocusID(row.item.id, ImGui::GetCurrentWindow());
@@ -464,7 +459,6 @@ PresetListResult PresetList(const char* id, int* active, std::span<const PresetI
         if (!state.confirmOpen)
             state.deleting = -1;
     }
-    (void)listFocused;
 
     ImGui::EndGroup();
     internal::FinishWidgetGroup(widgetId);
