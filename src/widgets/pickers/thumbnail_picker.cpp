@@ -101,8 +101,8 @@ void ThumbnailDraw(void* user, const internal::PickerGridTile& tile)
                      side, ToU32(ControlSecondaryColor(tile.disabled)));
         }
     }
-    if (tile.chosen)
-        StrokeRect(drawList, picture.Min, picture.Max, ToU32(colors.accentText), radius, HairlineThickness() * 2.0f);
+    // A chosen tile shows by the selected tile look the grid draws around the whole tile
+    // (icon_picker_parts.cpp): accentSubtle and the accent hairline, no ring of its own.
     if (item.locked)
     {
         // The lock badge: the lock glyph on an elevated disc at the top-right corner.

@@ -18,10 +18,12 @@ space their gradients are drawn in, so the color under the centre of a handle is
 handle stands for. A picker keeps the last hue (and saturation) under its id, so a color dragged
 through grey or black keeps its hue. A part writes only what it edits: an edit of one channel leaves
 the other channels with their exact float values, and a color that is not touched is never written,
-so a color survives a round trip through every picker unchanged. Handles are filled with their
-color and carry an inner ring in white or black (whichever reads better on that color) with a
-hairline of the other one outside it, so they read on any color in both themes. Disabled pickers
-show their colors dimmed and the handles in the disabled label color.
+so a color survives a round trip through every picker unchanged. Handles are the solid knobs of
+the sliders (the `knob` token, white in both themes, with the level 1 shadow and one controlBorder
+hairline that turns controlBorderHover under the pointer) with their color filling the middle
+inside a white rim, so they read on any color in both themes; a held handle grows a little.
+Disabled pickers show their colors dimmed and the handles at the disabled opacity with a separator
+hairline.
 
 ### ColorWell
 
@@ -100,8 +102,9 @@ fit the width), with the recent colors of `history` in a row above it. The whole
 Tab stop: Left and Right move the focused swatch, Up and Down move to the swatch above or below
 (across the recent row and the grid), Home and End go to the first and last swatch, Enter or Space
 picks it; a click picks the swatch under the pointer. Each pick goes to the front of the history.
-The swatch equal to the color has a ring in the label color and a check mark in white or black,
-whichever reads on it, so the choice does not rest on color alone. Without `alpha` the palette
+Every swatch has one controlBorder hairline (controlBorderHover under the pointer). The swatch
+equal to the color has the accent hairline one gap outside it, at the same width, and a check mark
+in white or black, whichever reads on it, so the choice does not rest on color alone. Without `alpha` the palette
 compares and writes red, green and blue only. The editable forms end with a + swatch (Strings::add
 as its tooltip) that adds the color while there is room, Delete or Backspace removes the focused
 swatch, Alt with Left or Right moves it, and a drag moves a swatch to where the pointer is (a
@@ -216,8 +219,8 @@ writes no date. A typed commit is reported by the result and `ImGui::IsItemEdite
 
 A click, Enter, Space or Alt+Down opens the calendar below the field (above when there is no room),
 on the blurred popover surface. It shows the month of the date (or of today) with the weekday
-headings from `Strings::weekdayMonday` to `weekdaySunday` starting at `firstWeekday`, today with a
-hairline outline and the day number in the accent text color, the picked day on the accent fill in
+headings from `Strings::weekdayMonday` to `weekdaySunday` starting at `firstWeekday`, today with the
+accent hairline and the day number in the accent text color, the picked day on the accent fill in
 semibold, and days outside `[min, max]` disabled. The keyboard focus moves to the date: the arrows
 move by a day and a week, Page Up and Page Down by a month (with Shift by a year), Home and End to
 the start and end of the week, across month and year borders and never outside `[min, max]`;
@@ -317,9 +320,11 @@ press. While the dial has keyboard focus, the arrows of both axes turn it by one
 Up counter-clockwise), Shift by `snapDegrees`, Ctrl and Page Up and Down by ten steps, and the wheel
 over the focused dial turns it too; each press is an edit session of the value drag core. The angle
 wraps: it is written as 0 to 360 degrees, or -180 to 180 with `signedRange`. Typed degrees are
-written on Enter, Tab or focus loss and clamped to that range. The dial draws a face with four
-quarter ticks, the needle in the accent color (labelSecondary when read-only, labelTertiary when
-disabled) and the round focus ring; `error` turns its outline destructive and shows the message.
+written on Enter, Tab or focus loss and clamped to that range. The dial draws a face in the neutral
+control fill with one controlBorder hairline (both stronger under the pointer, like the Knob's
+face) with four quarter ticks, the needle in the accent mark (labelSecondary when read-only,
+labelTertiary when disabled) and the round focus ring after keyboard input; `error` turns its
+outline destructive and shows the message.
 
 `readOnly` (or a null pointer) shows the angle and focuses but never writes. `mixed` hides the
 needle and empties the field until an edit. Captures: a forced state for part -1 or 0 goes to the
@@ -353,8 +358,9 @@ Home and End go to the first and last icon, Page Up and Down by the lines in vie
 are shown but skipped. Enter, Space or a click picks, writes, adds the icon to the recent ones and
 closes, and the focus returns to the field; Escape (after clearing the search) or a click outside
 closes without writing. Without `searchable`, the focus starts on the chosen icon. The chosen tile
-has a ring in the accent text color; each tile shows its name as a tooltip on hover and keyboard
-focus.
+shows the selected tile look (accentSubtle and the accent hairline at the one outline width), a
+hovered tile the row fill, and the focus ring sits inside the tile after keyboard input; each tile
+shows its name as a tooltip on hover and keyboard focus.
 
 `readOnly` (or a null pointer) shows the icon but does not open. `mixed` shows `Strings::mixed`
 until an icon is picked. `error` and `helpText` show under the field. Captures:
@@ -378,12 +384,12 @@ not drawn; it is the panel's tooltip on hover and keyboard focus. Only the lines
 submitted (through the row ranges of the list core in the surrounding window), so a grid of any
 size costs the same per frame.
 
-The single form shows the picked tile with the row selection fill and a ring in the accent text
-color. It is one Tab stop: the tile focused last, else the picked one, else the first. The arrows
+The single form shows the picked tile with the selected tile look (accentSubtle and the accent
+hairline at the one outline width). It is one Tab stop: the tile focused last, else the picked one, else the first. The arrows
 move in two dimensions (Up and Down keep the column), Home and End go to the first and last tile,
 Page Up and Down by the lines in view; Enter, Space or a click writes *index. The multi form keeps
 one flag per tile in `checked`: every tile is a Tab stop, Dear ImGui's navigation moves between
-them, and a click or Space flips the flag; a checked tile shows the ring and a check badge. A
+them, and a click or Space flips the flag; a checked tile shows the selected tile look and a check badge. A
 `locked` tile shows a lock badge and takes the focus but is never picked or flipped; a `disabled`
 tile is dimmed, cannot be focused and is passed over by the arrows.
 

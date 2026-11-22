@@ -298,7 +298,7 @@ bool FileBrowserImpl(const char* label, std::string* path, char* buffer, std::si
 
     // The list, framed like the inline lists.
     const ImRect listFrame(origin.x, origin.y + bar + gap, origin.x + width, origin.y + bar + gap + listHeight);
-    StrokeRect(window->DrawList, listFrame.Min, listFrame.Max, ToU32(ControlBoundaryColor(c)), m.radius, HairlineThickness());
+    internal::DrawOutline(window->DrawList, listFrame, m.radius, internal::ControlOutlineColor({}));
     ImGui::SetCursorScreenPos(listFrame.Min);
     FileBrowserRows rows{&state};
     ListViewDesc view;

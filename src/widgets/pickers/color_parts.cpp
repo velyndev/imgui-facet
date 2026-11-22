@@ -21,8 +21,6 @@ namespace
 // The hue circle in six stretches: between the primaries and secondaries the gamma-encoded
 // channels change linearly, so each stretch is one exact two-color gradient.
 constexpr int kColorHueStretches = 6;
-// A hovered handle grows by this share of its pressed growth, so hover and press read apart.
-constexpr float kColorHandleHoverShare = 0.35f;
 
 ImU32 Dimmed(const ImVec4& color, bool disabled)
 {
@@ -61,11 +59,6 @@ ImVec2 SquareMap(const void* user, ImVec2 point)
     const float w = std::max(1.0f, area.GetWidth());
     const float h = std::max(1.0f, area.GetHeight());
     return ImVec2((point.x - area.Min.x) / w, (area.Max.y - point.y) / h);
-}
-
-float HandleGrowth(const ItemState& item)
-{
-    return std::min(1.0f, item.pressAmount + item.hoverAmount * kColorHandleHoverShare);
 }
 
 } // namespace
@@ -315,8 +308,8 @@ ColorPartResult ColorBarPart(ImGuiID id, const ImRect& control, const ImRect& tr
     {
         ImVec4 fill = ColorChannelSample(channel, shown, shownHsv, at);
         fill = ColorOnChecker(fill);
-        DrawColorHandle(drawList, center, knob * 0.5f, fill, readOnly ? 0.0f : HandleGrowth(item), item.focusAmount,
-                        item.disabled);
+        DrawColorHandle(drawList, center, knob * 0.5f, fill, readOnly ? 0.0f : item.hoverAmount,
+                        readOnly ? 0.0f : item.pressAmount, item.focusAmount, item.disabled);
     }
     return result;
 }
@@ -382,8 +375,8 @@ ColorPartResult ColorSquarePart(ImGuiID id, const ImRect& rect, float knob, cons
     else
     {
         const ImVec4 fill = ColorFromHsv({hsv->h, Clamp01(hsv->s), Clamp01(hsv->v)}, 1.0f);
-        DrawColorHandle(drawList, center, knob * 0.5f, fill, readOnly ? 0.0f : HandleGrowth(item), item.focusAmount,
-                        item.disabled);
+        DrawColorHandle(drawList, center, knob * 0.5f, fill, readOnly ? 0.0f : item.hoverAmount,
+                        readOnly ? 0.0f : item.pressAmount, item.focusAmount, item.disabled);
     }
     return result;
 }

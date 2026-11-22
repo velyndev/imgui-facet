@@ -34,10 +34,12 @@ namespace facet
 namespace
 {
 
-// The selection ring sits this many hairlines outside the swatch and is this many wide, so it
-// reads apart from the swatch edge and from the focus ring further out.
+// The accent outline of the chosen swatch sits this many hairlines outside the swatch, so it reads
+// against the surface whatever the swatch color is; it is one hairline wide like every outline.
 constexpr float kSwatchRingGap = 1.0f;
-constexpr float kSwatchRingWidth = 2.0f;
+// The line that marks where a dragged swatch lands: two hairlines, a mark (not an outline) that
+// must read between swatches of any color.
+constexpr float kSwatchDropLineWidth = 2.0f;
 // The check mark of the chosen swatch takes this share of the swatch side.
 constexpr float kSwatchCheckShare = 0.6f;
 // A held swatch shrinks by this many hairlines on each side.
@@ -493,23 +495,25 @@ bool RunSwatchPalette(const char* label, ImVec4* color, SwatchList list, ColorHi
                 {
                     internal::DrawColorSwatch(drawList, rect, c, radius, true);
                 }
-                // A hairline edge, so a swatch of the surface color still shows its shape.
-                StrokeRect(drawList, rect.Min, rect.Max, ToU32(t.colors.separator), radius, hairline);
+                // The one controlBorder hairline of a tile, so a swatch of the surface color still
+                // shows its shape; controlBorderHover under the pointer.
+                internal::OutlineLook edge;
+                edge.hoverAmount = hovered == i && !readOnly ? 1.0f : 0.0f;
+                edge.disabled = item.disabled;
+                internal::DrawOutline(drawList, rect, radius, internal::ControlOutlineColor(edge));
                 if (i == chosenNow && !dragged)
                 {
-                    const float out = hairline * (kSwatchRingGap + kSwatchRingWidth);
+                    // Chosen: the accent hairline one gap outside the swatch and the check mark on it.
+                    const float out = hairline * (kSwatchRingGap + 1.0f);
                     ImRect ring = rect;
                     ring.Expand(out);
-                    StrokeRect(drawList, ring.Min, ring.Max, ToU32(internal::ControlLabelColor(item.disabled)),
-                               radius + out, hairline * kSwatchRingWidth);
+                    internal::OutlineLook chosenEdge;
+                    chosenEdge.selected = true;
+                    chosenEdge.disabled = item.disabled;
+                    internal::DrawOutline(drawList, ring, radius + out, internal::ControlOutlineColor(chosenEdge));
                     const float icon = std::round(layout.side * kSwatchCheckShare);
                     internal::DrawControlIcon(drawList, Icon("check"), std::round(rect.GetCenter().x - icon * 0.5f),
                                               rect.GetCenter().y, icon, ToU32(ReadableOn(internal::ColorOnChecker(c))));
-                }
-                else if (hovered == i && !readOnly)
-                {
-                    StrokeRect(drawList, rect.Min, rect.Max, ToU32(internal::ControlLabelColor(false)), radius,
-                               hairline);
                 }
             }
             if (i == state.focus && item.focusVisible)
@@ -523,7 +527,7 @@ bool RunSwatchPalette(const char* label, ImVec4* color, SwatchList list, ColorHi
                 const ImRect target = layout.Rect(layout.history + dropAt);
                 const float x = dropAt > state.dragFrom ? target.Max.x + layout.gap * 0.5f : target.Min.x - layout.gap * 0.5f;
                 drawList->AddLine(ImVec2(std::round(x), target.Min.y), ImVec2(std::round(x), target.Max.y),
-                                  ToU32(t.colors.focusRing), hairline * kSwatchRingWidth);
+                                  ToU32(t.colors.focusRing), hairline * kSwatchDropLineWidth);
             }
             const ImVec2 half(layout.side * 0.5f, layout.side * 0.5f);
             const ImRect ghost(g.IO.MousePos.x - half.x, g.IO.MousePos.y - half.y, g.IO.MousePos.x + half.x,

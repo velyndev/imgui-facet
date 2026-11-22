@@ -232,7 +232,7 @@ bool ColorWell(const char* label, ImVec4* color, const ColorWellOptions& options
                      radius);
         else
             internal::DrawColorSwatch(drawList, swatch, options.alpha ? edited : WithAlpha(edited, 1.0f), radius, true);
-        StrokeRect(drawList, swatch.Min, swatch.Max, ToU32(t.colors.separator), radius, HairlineThickness());
+        internal::DrawOutline(drawList, swatch, radius, t.colors.separator);
         if (options.showHex)
         {
             char hex[16];

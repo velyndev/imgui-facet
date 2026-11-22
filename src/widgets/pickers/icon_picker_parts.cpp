@@ -210,6 +210,9 @@ PickerGridResult PickerGrid(ImGuiID id, const PickerGridDesc& desc)
                                                : index == desc.chosen;
                 ListRowDesc rowDesc;
                 rowDesc.selected = chosen;
+                // Tiles of a grid: a chosen one shows the selected tile look (accentSubtle and the
+                // accent hairline), and the focus ring sits inside the tile.
+                rowDesc.tile = true;
                 rowDesc.disabled = info.disabled;
                 rowDesc.tabStop = desc.multi ? !info.disabled : index == tabStop;
                 rowDesc.part = index == tabStop ? 0 : ++part;

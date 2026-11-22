@@ -319,9 +319,6 @@ bool ColorPicker(const char* label, ImVec4* color, const ColorPickerOptions& opt
             const ImVec2 ringCenter(std::round(ringAt.x), std::round(ringAt.y));
             const ImVec2 triAt = TrianglePoint(wheel, std::clamp(hsv.s, 0.0, 1.0), std::clamp(hsv.v, 0.0, 1.0));
             const ImVec2 triCenter(std::round(triAt.x), std::round(triAt.y));
-            const auto growth = [](const internal::ItemState& item) {
-                return std::min(1.0f, item.pressAmount + item.hoverAmount * 0.35f);
-            };
             if (mixed)
             {
                 internal::DrawFocusRing(drawList, ImRect(ringCenter.x - r, ringCenter.y - r, ringCenter.x + r, ringCenter.y + r),
@@ -332,10 +329,12 @@ bool ColorPicker(const char* label, ImVec4* color, const ColorPickerOptions& opt
             else
             {
                 internal::DrawColorHandle(drawList, ringCenter, r, internal::ColorHueColor(hsv.h),
-                                          readOnly ? 0.0f : growth(ring), ring.focusAmount, disabled);
+                                          readOnly ? 0.0f : ring.hoverAmount, readOnly ? 0.0f : ring.pressAmount,
+                                          ring.focusAmount, disabled);
                 internal::DrawColorHandle(drawList, triCenter, r,
                                           internal::ColorFromHsv({hsv.h, std::clamp(hsv.s, 0.0, 1.0), std::clamp(hsv.v, 0.0, 1.0)}, 1.0f),
-                                          readOnly ? 0.0f : growth(triangle), triangle.focusAmount, disabled);
+                                          readOnly ? 0.0f : triangle.hoverAmount, readOnly ? 0.0f : triangle.pressAmount,
+                                          triangle.focusAmount, disabled);
             }
         }
     }
@@ -413,16 +412,15 @@ bool ColorPicker(const char* label, ImVec4* color, const ColorPickerOptions& opt
                 internal::DrawColorSwatch(drawList, now, shownNow, radius, false, ImDrawFlags_RoundLeft);
                 internal::DrawColorSwatch(drawList, before, shownBefore, radius, false, ImDrawFlags_RoundRight);
             }
-            StrokeRect(drawList, strip.Min, strip.Max, ToU32(t.colors.separator), radius, HairlineThickness());
-            // The original half shows that it can be pressed: a hairline in the label color on
-            // hover and a slight inset while held.
+            internal::DrawOutline(drawList, strip, radius, t.colors.separator);
+            // The original half shows that it can be pressed: the controlBorderHover hairline under
+            // the pointer, at the one outline width.
             if (!readOnly && !compare.disabled && (compare.hoverAmount > 0.0f || compare.pressAmount > 0.0f))
             {
-                ImRect edge = before;
-                edge.Expand(-HairlineThickness() * compare.pressAmount);
-                StrokeRect(drawList, edge.Min, edge.Max,
-                           ToU32(WithAlpha(t.colors.label, t.colors.label.w * std::max(compare.hoverAmount, compare.pressAmount))),
-                           radius, HairlineThickness(), ImDrawFlags_RoundRight);
+                const ImVec4 hover = t.colors.controlBorderHover;
+                internal::DrawOutline(drawList, before, radius,
+                                      WithAlpha(hover, hover.w * std::max(compare.hoverAmount, compare.pressAmount)),
+                                      ImDrawFlags_RoundRight);
             }
             internal::DrawFocusRing(drawList, before, radius, compare.focusAmount, ImDrawFlags_RoundRight);
         }

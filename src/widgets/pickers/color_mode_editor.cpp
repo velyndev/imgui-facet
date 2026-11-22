@@ -229,7 +229,7 @@ bool ColorModeEditor(const char* label, AnimatedColor* animated, const ColorMode
                      ToU32(WithAlpha(internal::ColorOnChecker(now), internal::kColorDisabledOpacity)), radius);
         else
             internal::DrawColorSwatch(drawList, preview, now, radius, false);
-        StrokeRect(drawList, preview.Min, preview.Max, ToU32(t.colors.separator), radius, HairlineThickness());
+        internal::DrawOutline(drawList, preview, radius, t.colors.separator);
     }
     advance();
     ImGui::PopID();

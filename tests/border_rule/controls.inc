@@ -8,9 +8,3 @@
 
 FACET_BORDER_EXCEPTION("src/widgets/sliders/arc_range_slider.cpp", "m.track",
                        "the track of a full circle arc range: sliderTrackHeight, a slider track, not an outline")
-
-FACET_BORDER_PENDING("src/widgets/pickers/angle_picker.cpp")
-FACET_BORDER_PENDING("src/widgets/pickers/color_model.cpp")
-FACET_BORDER_PENDING("src/widgets/pickers/icon_picker.cpp")
-FACET_BORDER_PENDING("src/widgets/pickers/swatch_palette.cpp")
-FACET_BORDER_PENDING("src/widgets/pickers/thumbnail_picker.cpp")

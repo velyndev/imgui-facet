@@ -10,8 +10,10 @@
 
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
+#include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/state_storage.h"
 
@@ -23,8 +25,9 @@ namespace
 // How much a held handle grows, as a share of its radius: the same growth as a slider knob, so a
 // grab reads the same on every track.
 constexpr float kColorHandlePressGrowth = 0.15f;
-// The inner ring of a handle is this many hairlines wide; the outer ring is one hairline.
-constexpr float kColorHandleInnerHairlines = 2.0f;
+// The white rim of a handle around the picked color, as a share of its radius: wide enough to read
+// as the knob of the sliders, narrow enough to leave most of the handle to the color.
+constexpr float kColorHandleRimShare = 0.3f;
 // Stripes of the mixed swatch: their spacing in hairlines, and their width.
 constexpr float kColorMixedStripeGap = 4.0f;
 constexpr float kColorMixedStripeWidth = 1.5f;
@@ -473,37 +476,30 @@ ImVec4 ColorOnChecker(const ImVec4& color)
     return out;
 }
 
-ColorHandleRings ColorHandleRingColors(const ImVec4& under)
+void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float hoverAmount,
+                     float pressAmount, float focusAmount, bool disabled)
 {
-    ImVec4 opaque = under;
-    opaque.w = 1.0f;
-    const ImVec4 inner = ReadableOn(opaque);
-    ColorHandleRings rings;
-    rings.inner = ToU32(inner);
-    rings.outer = ToU32(ReadableOn(inner));
-    return rings;
-}
-
-void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float pressAmount,
-                     float focusAmount, bool disabled)
-{
+    const Colors& c = T().colors;
     const float hairline = HairlineThickness();
     const float r = std::max(hairline * 4.0f, std::round(radius * (1.0f + kColorHandlePressGrowth * pressAmount)));
-    ColorHandleRings rings = ColorHandleRingColors(fill);
+    const ImRect knob(center.x - r, center.y - r, center.x + r, center.y + r);
+    // The solid knob of the sliders: the knob token with the level 1 shadow and the one
+    // controlBorder hairline (controlBorderHover under the pointer). Its white rim reads on any
+    // color under it in both themes; the picked color fills the middle.
+    if (!disabled)
+        DrawElevation(drawList, knob.Min, knob.Max, r, 1);
+    FillRect(drawList, knob.Min, knob.Max, ToU32(WithAlpha(c.knob, c.knob.w * (disabled ? kDisabledPictureOpacity : 1.0f))), r);
+    const float rim = std::max(hairline * 2.0f, std::round(r * kColorHandleRimShare));
+    const float inner = std::max(hairline, r - rim);
     ImVec4 shown = fill;
-    shown.w = 1.0f;
-    if (disabled)
-    {
-        rings.inner = rings.outer = ToU32(T().colors.labelTertiary);
-        shown.w = kColorDisabledOpacity;
-    }
-    drawList->AddCircleFilled(center, r, ToU32(shown));
-    // Strokes lie inside their radius (Dear ImGui 1.93), so the outer hairline is the edge and the
-    // inner ring lies just inside it.
-    drawList->AddCircle(center, r, rings.outer, 0, hairline);
-    drawList->AddCircle(center, r - hairline, rings.inner, 0, hairline * kColorHandleInnerHairlines);
-    DrawFocusRing(drawList, ImRect(center.x - r, center.y - r, center.x + r, center.y + r), r, focusAmount, 0,
-                  RingShape::Round);
+    shown.w = disabled ? kColorDisabledOpacity : 1.0f;
+    FillRect(drawList, ImVec2(center.x - inner, center.y - inner), ImVec2(center.x + inner, center.y + inner), ToU32(shown),
+             inner);
+    OutlineLook outline;
+    outline.hoverAmount = disabled ? 0.0f : hoverAmount;
+    outline.disabled = disabled;
+    DrawOutline(drawList, knob, r, ControlOutlineColor(outline));
+    DrawFocusRing(drawList, knob, r, focusAmount, 0, RingShape::Round);
 }
 
 void DrawColorSwatch(ImDrawList* drawList, const ImRect& rect, const ImVec4& color, float radius, bool split,

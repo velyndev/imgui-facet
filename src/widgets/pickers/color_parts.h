@@ -12,8 +12,8 @@
 // square runs the two-axis input of color_plane.h, a bar the value drag core
 // (internal/value_drag.h) with the keys of a Slider. Gradients are drawn in gamma-encoded sRGB, the
 // space HSV is defined in, so the color under the centre of a handle is the color the handle
-// stands for. Handles are filled with that color and carry the two rings of
-// ColorHandleRingColors, so they read on any color in both themes.
+// stands for. Handles are the solid knobs of the sliders with that color inside their rim
+// (DrawColorHandle), so they read on any color in both themes.
 
 #include <imgui.h>
 #include <imgui_internal.h>

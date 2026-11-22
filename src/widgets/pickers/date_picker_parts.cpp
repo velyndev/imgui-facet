@@ -756,10 +756,16 @@ CalendarPanelResult CalendarPanel(ImGuiID panelId, const CalendarPanelDesc& desc
                         FillRect(drawList, ImVec2(rect.Min.x + inset, rect.Min.y + inset),
                                  ImVec2(rect.Max.x - inset, rect.Max.y - inset),
                                  ToU32(disabled ? c.fill[0] : c.accent), radius);
+                    // Today: the accent hairline at the one outline width (the selected day shows by
+                    // its fill instead).
                     if (date == today && !picked)
-                        StrokeRect(drawList, ImVec2(rect.Min.x + inset, rect.Min.y + inset),
-                                   ImVec2(rect.Max.x - inset, rect.Max.y - inset), ToU32(ControlBoundaryColor(c)), radius,
-                                   HairlineThickness());
+                    {
+                        OutlineLook todayEdge;
+                        todayEdge.selected = true;
+                        todayEdge.disabled = disabled;
+                        DrawOutline(drawList, ImRect(rect.Min.x + inset, rect.Min.y + inset, rect.Max.x - inset, rect.Max.y - inset),
+                                    radius, ControlOutlineColor(todayEdge));
+                    }
                     char number[8];
                     std::snprintf(number, sizeof(number), "%d", day);
                     const ImVec4 ink = disabled ? c.labelTertiary

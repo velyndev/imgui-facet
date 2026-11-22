@@ -90,21 +90,13 @@ bool ColorParseText(const char* text, ImVec4* out, bool* hasAlpha);
 // theme when it is translucent, clamped to 0 to 1, opaque.
 ImVec4 ColorOnChecker(const ImVec4& color);
 
-// The two rings of a handle that must read on any color under it: the inner ring in white or
-// black, whichever reads better on `under`, the outer hairline in the other one. Computed from
-// the color, so they are the same in both themes.
-struct ColorHandleRings
-{
-    ImU32 inner = 0;
-    ImU32 outer = 0;
-};
-ColorHandleRings ColorHandleRingColors(const ImVec4& under);
-
-// A round handle centered on `center` with `radius` pixels: filled with `fill` (opaque), the two
-// rings of ColorHandleRingColors(fill) (labelTertiary for both when disabled), grown a little while
-// held (pressAmount), and the round focus ring at focusAmount.
-void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float pressAmount,
-                     float focusAmount, bool disabled);
+// A round handle centered on `center` with `radius` pixels: the solid knob of the sliders (the knob
+// token, the level 1 shadow and one controlBorder hairline that turns controlBorderHover by
+// hoverAmount) with `fill` (opaque) inside its rim, grown a little while held (pressAmount), and
+// the round focus ring at focusAmount. Disabled: the disabled opacities, a separator hairline and
+// no shadow.
+void DrawColorHandle(ImDrawList* drawList, ImVec2 center, float radius, const ImVec4& fill, float hoverAmount,
+                     float pressAmount, float focusAmount, bool disabled);
 
 // Fills `rect` with the swatch of `color`: the checkerboard of the theme under a translucent color
 // (the left half shows the color opaque when `split`, so both the hue and the alpha read), then the

@@ -773,3 +773,51 @@ TEST_CASE("ColorModeEditor makes room in its period field for the unit of String
     CHECK(shortUnit > 0.0f);
     CHECK(longUnit > shortUnit);
 }
+
+TEST_CASE("Color handles are solid knobs: the knob color with the picked color inside, hover changes only the outline color")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    struct Restore
+    {
+        facet::Theme theme;
+        ~Restore() { facet::SetTheme(theme, false); }
+    } restore{saved};
+    facet::Theme theme = facet::Theme::Dark();
+    // A knob color nothing else on the square uses, so its vertices can be counted.
+    theme.colors.knob = facet::Rgb(0x00FF7F);
+    facet::SetTheme(theme, false);
+    ImVec4 color(0.2f, 0.4f, 0.8f, 1.0f);
+    std::vector<ImDrawVert> drawn;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        (void)facet::SatValSquare("Square", &color, {.width = 160.0f});
+        session.Track("square");
+        drawn.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+    });
+    session.Frames(2);
+    const ImRect rect = session.ItemRect("square");
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    const auto count = [&](ImU32 color32) {
+        int n = 0;
+        for (const ImDrawVert& v : drawn)
+            n += v.col == color32 ? 1 : 0;
+        return n;
+    };
+    session.MouseMove(ImVec2(rect.Max.x + 200.0f, rect.Max.y + 100.0f));
+    session.Seconds(settle);
+    const std::vector<ImDrawVert> rest = drawn;
+    CHECK(count(facet::ToU32(facet::T().colors.knob)) > 0);
+    CHECK(count(facet::ToU32(facet::T().colors.controlBorder)) > 0);
+    // Hover anywhere on the square: the handle keeps its size, its outline turns controlBorderHover.
+    session.MouseMove(ImVec2(rect.Min.x + 10.0f, rect.Min.y + 10.0f));
+    session.Seconds(settle);
+    REQUIRE(drawn.size() == rest.size());
+    bool samePlaces = true;
+    for (std::size_t i = 0; i < rest.size(); ++i)
+        samePlaces = samePlaces && std::fabs(drawn[i].pos.x - rest[i].pos.x) < 0.01f && std::fabs(drawn[i].pos.y - rest[i].pos.y) < 0.01f;
+    CHECK(samePlaces);
+    CHECK(count(facet::ToU32(facet::T().colors.controlBorderHover)) > 0);
+}

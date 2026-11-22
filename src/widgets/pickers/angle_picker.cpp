@@ -44,8 +44,6 @@ constexpr float kAngleDialHeights = 2.0f;
 constexpr float kAngleFieldMinHeights = 1.5f;
 // The tick marks at the quarter turns reach this share of the radius in from the rim.
 constexpr float kAngleTickShare = 0.18f;
-// The hover darkens the dial outline halfway from the boundary color toward label (as the Knob).
-constexpr float kAngleHoverShare = 0.5f;
 constexpr double kDegreesPerRadian = 180.0 / std::numbers::pi;
 
 struct AnglePickerState
@@ -188,12 +186,21 @@ bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& op
     const bool disabled = item.disabled;
     if (item.visible)
     {
+        // The face: a control surface like the Knob's, the neutral fill and one controlBorder
+        // hairline, both stronger under the pointer; destructive with an error.
         const float radius = diameter * 0.5f;
-        const ImVec4 outline = disabled ? c.labelTertiary
-                                        : (options.error != nullptr ? c.destructive
-                                                                    : Mix(ControlBoundaryColor(c), c.label, item.hoverAmount * kAngleHoverShare));
-        drawList->AddCircleFilled(center, radius, ToU32(disabled ? c.fill[3] : c.bg));
-        drawList->AddCircle(center, std::max(1.0f, radius - HairlineThickness() * 0.5f), ToU32(outline), 0, HairlineThickness() * 1.5f);
+        internal::ItemState faceState = item;
+        if (readOnly)
+        {
+            faceState.hoverAmount = 0.0f;
+            faceState.pressAmount = 0.0f;
+        }
+        FillRect(drawList, dial.Min, dial.Max, ToU32(internal::NeutralFill(faceState)), radius);
+        internal::OutlineLook outline;
+        outline.hoverAmount = faceState.hoverAmount;
+        outline.disabled = disabled;
+        outline.error = options.error != nullptr;
+        internal::DrawOutline(drawList, dial, radius, internal::ControlOutlineColor(outline));
         const ImU32 tick = ToU32(disabled ? c.labelQuaternary : c.labelTertiary);
         for (int q = 0; q < 4; ++q)
         {
@@ -206,7 +213,8 @@ bool AnglePicker(const char* label, float* radians, const AnglePickerOptions& op
         }
         if (!mixed)
         {
-            const ImVec4 ink = disabled ? c.labelTertiary : (readOnly ? c.labelSecondary : c.accent);
+            // The needle carries the value: the accent mark (3:1 on the face over every surface).
+            const ImVec4 ink = disabled ? c.labelTertiary : (readOnly ? c.labelSecondary : c.focusRing);
             const float a = static_cast<float>(edited / kDegreesPerRadian);
             const ImVec2 dir(std::cos(a), -std::sin(a));
             const float dot = std::max(1.5f, Px(t.charts.markerSize) * 0.5f);

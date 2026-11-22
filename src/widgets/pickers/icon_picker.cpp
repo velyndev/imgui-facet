@@ -174,21 +174,13 @@ void IconGridDraw(void* user, const internal::PickerGridTile& tile)
     using namespace internal;
     const IconGridContext& c = *static_cast<const IconGridContext*>(user);
     const int item = c.state->tiles[tile.index];
-    const Theme& t = T();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     if (tile.item.visible)
     {
         const float side = std::round(tile.rect.GetWidth() * kIconGlyphShare);
         const ImVec2 at(std::round(tile.rect.GetCenter().x - side * 0.5f), std::round(tile.rect.GetCenter().y - side * 0.5f));
+        // The chosen icon shows by the selected tile look the grid draws (icon_picker_parts.cpp).
         DrawIcon(drawList, c.source->IconAt(item), at, side, ToU32(ControlLabelColor(tile.disabled)));
-        if (tile.chosen)
-        {
-            // The chosen icon: a ring in the accent text color inside the tile.
-            const float inset = PxSnapped(t.metrics.segmentInset);
-            StrokeRect(drawList, ImVec2(tile.rect.Min.x + inset, tile.rect.Min.y + inset),
-                       ImVec2(tile.rect.Max.x - inset, tile.rect.Max.y - inset), ToU32(t.colors.accentText),
-                       Px(t.radii.control), HairlineThickness() * 2.0f);
-        }
     }
     // The name of the icon on hover and keyboard focus.
     if (BeginPopupTooltip(tile.item.id, tile.rect, tile.item.hovered, tile.item.focusVisible))
