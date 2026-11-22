@@ -601,7 +601,7 @@ bool BeginDataTable(const char* id, std::span<const DataTableColumn> columns, in
         frame.listFocused = true;
     }
     BeginListRows({.rowCount = rowCount, .rowHeight = rowHeight, .columns = 1, .keepAlive = frame.tabStop});
-    frame.group.Begin(frame.listFocused, &frame.forced);
+    frame.group.Begin(&frame.forced);
     frame.rowsOpen = true;
     PushScope(kTableScope);
     return true;

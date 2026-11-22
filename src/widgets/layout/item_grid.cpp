@@ -207,7 +207,7 @@ bool BeginItemGrid(const char* id, int itemCount, ImGuiSelectionBasicStorage* se
     if (selection != nullptr)
         internal::BeginListSelection(selection, count, {.boxSelect = options.boxSelect, .grid = true});
     internal::BeginListRows({.rowCount = count, .rowHeight = e.pitch, .columns = e.columns, .keepAlive = e.tabStop});
-    e.group.Begin(focused, &e.forced);
+    e.group.Begin(&e.forced);
     internal::PushScope("BeginItemGrid");
     return true;
 }

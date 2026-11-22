@@ -175,7 +175,7 @@ PickerGridResult PickerGrid(ImGuiID id, const PickerGridDesc& desc)
     BeginListRows({.rowCount = rowCount, .rowHeight = rowHeight, .columns = 1,
                    .keepAlive = desc.multi ? -1 : PickerGridRowOf(desc.rows, tabStop)});
     ListRowGroup group;
-    group.Begin(state.focused, desc.forced);
+    group.Begin(desc.forced);
     bool anyFocused = false;
     int part = 1;
     RowRange range;

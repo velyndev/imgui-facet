@@ -24,6 +24,7 @@
 #include "facet/core/scale.h"
 #include "facet/core/text.h"
 #include "facet/core/theme.h"
+#include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/list_internal.h"
 #include "internal/loading.h"
@@ -90,7 +91,6 @@ struct RowEnv
 {
     ImGuiWindow* window = nullptr;
     bool multi = false;         // a multi-select scope of this list is open
-    bool listFocused = false;
     SelectionPill* pill = nullptr;  // the chosen row targets the pill instead of a fill
     const ForcedItemRequest* forced = nullptr;
     ItemState* ring = nullptr;      // the focused row, for the ring drawn at the end
@@ -154,26 +154,18 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
 
     if (selected && env.pill != nullptr)
         env.pill->Target(rect);
+    // Rows are inset one hairline top and bottom, so adjacent fills stay apart.
+    const ImRect fill = ListRowFillRect(rect);
     if (item.visible)
     {
-        const Colors& c = theme.colors;
-        ImDrawList* drawList = window->DrawList;
-        const float radius = Px(theme.radii.control);
-        ImRect fill = rect;
-        const float gap = HairlineThickness();
-        fill.Min.y += gap;
-        fill.Max.y -= gap;
-        if (selected && env.pill == nullptr)
-            FillRect(drawList, fill.Min, fill.Max, ToU32(env.listFocused ? c.accentSubtle : c.fill[1]), radius);
         const bool quiet = IsScrollAreaScrolling(window);
-        float feedback = item.disabled ? 0.0f : std::max(quiet ? 0.0f : item.hoverAmount, item.pressAmount);
-        if (highlighted && !item.disabled)
-            feedback = 1.0f;
-        if (!selected && feedback > 0.0f)
-        {
-            const ImVec4 tint = Mix(c.fill[2], c.fill[1], item.pressAmount);
-            FillRect(drawList, fill.Min, fill.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-        }
+        ListRowLook look;
+        look.hoverAmount = quiet ? 0.0f : item.hoverAmount;
+        look.pressAmount = item.pressAmount;
+        look.highlighted = highlighted;
+        look.selected = selected && env.pill == nullptr;
+        look.disabled = item.disabled;
+        DrawListRowFill(window->DrawList, fill, Px(theme.radii.control), look);
     }
     if (env.ring != nullptr && !placement.ownRing &&
         (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
@@ -775,11 +767,37 @@ int ListTypeahead::Find(int count, int from, ListEntryFn entry, void* user) cons
     return ListTypeaheadFind(text, count, from, entry, user);
 }
 
-void ListRowGroup::Begin(bool focused, const ForcedItemRequest* forcedRequest)
+ImRect ListRowFillRect(const ImRect& row)
+{
+    const float gap = HairlineThickness();
+    return ImRect(row.Min.x, row.Min.y + gap, row.Max.x, std::max(row.Min.y + gap, row.Max.y - gap));
+}
+
+void DrawListRowFill(ImDrawList* drawList, const ImRect& rect, float radius, const ListRowLook& look)
+{
+    if (drawList == nullptr)
+        return;
+    const Colors& c = T().colors;
+    if (look.selected)
+    {
+        FillRect(drawList, rect.Min, rect.Max, ToU32(c.accentSubtle), radius);
+        if (look.tile)
+            DrawOutline(drawList, rect, radius, ControlOutlineColor({.selected = true, .disabled = look.disabled}));
+        return;
+    }
+    if (look.disabled)
+        return;
+    const float feedback = look.highlighted ? 1.0f : std::max(look.hoverAmount, look.pressAmount);
+    if (feedback <= 0.0f)
+        return;
+    const ImVec4 tint = look.pressAmount > 0.0f ? Mix(c.fill[2], c.fill[1], std::min(look.pressAmount, 1.0f)) : c.fill[2];
+    FillRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(tint, tint.w * std::min(feedback, 1.0f))), radius);
+}
+
+void ListRowGroup::Begin(const ForcedItemRequest* forcedRequest)
 {
     window = ImGui::GetCurrentContext() != nullptr ? GImGui->CurrentWindow : nullptr;
     forced = forcedRequest;
-    listFocused = focused;
     hasRing = false;
     ring = {};
 }
@@ -795,7 +813,6 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
     RowEnv env;
     env.window = window;
     env.multi = desc.selection != ImGuiSelectionUserData_Invalid;
-    env.listFocused = listFocused;
     env.forced = forced != nullptr ? forced : &kNoForce;
     env.ring = &ring;
     env.hasRing = &hasRing;
@@ -1110,7 +1127,6 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
     RowEnv env;
     env.window = frame.window;
     env.multi = frame.multi || frame.choiceScope;
-    env.listFocused = frame.listFocused;
     env.pill = frame.pillOpen ? &frame.pill : nullptr;
     env.forced = &frame.forced;
     env.ring = &frame.ring;
@@ -1333,7 +1349,6 @@ ListTreeNodeState ListTreeNode(const char* label, const ListTreeNodeOptions& opt
     RowEnv env;
     env.window = window;
     env.multi = frame.multi;
-    env.listFocused = frame.listFocused;
     env.forced = &frame.forced;
     env.ring = &frame.ring;
     env.hasRing = &frame.hasRing;

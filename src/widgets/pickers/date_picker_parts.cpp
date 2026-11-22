@@ -663,7 +663,7 @@ CalendarPanelResult CalendarPanel(ImGuiID panelId, const CalendarPanelDesc& desc
     state.firstWeekday = desc.firstWeekday;
     const ImGuiID focusScope = ImGui::GetCurrentFocusScope();
     ListRowGroup group;
-    group.Begin(true, desc.forced);
+    group.Begin(desc.forced);
     bool cellFocused = false;
     const bool mouseOver = live && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                            ImGui::IsMousePosValid(&g.IO.MousePos);

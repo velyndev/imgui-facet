@@ -1173,7 +1173,7 @@ struct TableUi
             fi::BeginListSelection(&selection, kRows);
             fi::BeginListRows({.rowCount = kRows, .rowHeight = kRowHeight, .keepAlive = focusIndex});
             fi::ListRowGroup group;
-            group.Begin(focused);
+            group.Begin();
             facet::RowRange rows;
             char name[16];
             while (fi::NextListRows(&rows))
@@ -1245,4 +1245,60 @@ TEST_CASE("Row block: a table runs its rows through the list look, Home and End 
     session.Type("o");
     session.Frames(2);
     CHECK(ui.focusIndex == 17);
+}
+
+TEST_CASE("Row look: hover and current rows take fill[2], a selection accentSubtle, a selected tile its outline")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    facet::SetTheme(facet::Theme::Light(), false);
+    const facet::Colors& c = facet::T().colors;
+    struct Case
+    {
+        fi::ListRowLook look;
+        std::vector<ImU32> colors;
+    };
+    Case cases[6];
+    cases[0].look.hoverAmount = 1.0f;
+    cases[1].look.highlighted = true;
+    cases[2].look.selected = true;
+    cases[3].look.selected = true;
+    cases[3].look.tile = true;
+    cases[4].look.hoverAmount = 1.0f;
+    cases[4].look.disabled = true;
+    cases[5].look.selected = true;
+    cases[5].look.hoverAmount = 1.0f;
+    session.SetUi([&] {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        for (int i = 0; i < 6; ++i)
+        {
+            const int from = drawList->VtxBuffer.Size;
+            const ImRect row(ImVec2(20.0f, 20.0f + 40.0f * i), ImVec2(220.0f, 52.0f + 40.0f * i));
+            fi::DrawListRowFill(drawList, fi::ListRowFillRect(row), 8.0f, cases[i].look);
+            cases[i].colors.clear();
+            for (int v = from; v < drawList->VtxBuffer.Size; ++v)
+                if ((drawList->VtxBuffer[v].col >> IM_COL32_A_SHIFT) != 0)
+                    cases[i].colors.push_back(drawList->VtxBuffer[v].col);
+        }
+    });
+    session.Frame();
+    const auto only = [](const std::vector<ImU32>& colors, ImU32 color) {
+        return !colors.empty() && std::all_of(colors.begin(), colors.end(), [&](ImU32 c2) { return c2 == color; });
+    };
+    const auto has = [](const std::vector<ImU32>& colors, ImU32 color) {
+        return std::find(colors.begin(), colors.end(), color) != colors.end();
+    };
+    CHECK(only(cases[0].colors, facet::ToU32(c.fill[2])));
+    CHECK(only(cases[1].colors, facet::ToU32(c.fill[2])));
+    CHECK(only(cases[2].colors, facet::ToU32(c.accentSubtle)));
+    CHECK(has(cases[3].colors, facet::ToU32(c.accentSubtle)));
+    CHECK(has(cases[3].colors, facet::ToU32(c.focusRing)));
+    CHECK(cases[4].colors.empty());
+    // A selected row shows its selection, not the hover fill on top of it.
+    CHECK(only(cases[5].colors, facet::ToU32(c.accentSubtle)));
+    // The fill keeps one hairline free at the top and the bottom of the row.
+    const ImRect fill = fi::ListRowFillRect(ImRect(ImVec2(0.0f, 0.0f), ImVec2(100.0f, 32.0f)));
+    CHECK(fill.Min.y == doctest::Approx(facet::HairlineThickness()));
+    CHECK(fill.Max.y == doctest::Approx(32.0f - facet::HairlineThickness()));
+    CHECK(fill.Min.x == 0.0f);
 }

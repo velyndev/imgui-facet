@@ -231,13 +231,12 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const float radius = Px(t.radii.element);
-        const float feedback =
-            row.disabled ? 0.0f : std::max({row.hoverAmount, row.pressAmount, submenuShown ? 1.0f : 0.0f});
-        if (feedback > 0.0f)
-        {
-            const ImVec4 fill = Mix(c.fill[2], c.fill[1], row.pressAmount);
-            FillRect(drawList, row.rect.Min, row.rect.Max, ToU32(WithAlpha(fill, fill.w * feedback)), radius);
-        }
+        ListRowLook look;
+        look.hoverAmount = row.hoverAmount;
+        look.pressAmount = row.pressAmount;
+        look.highlighted = submenuShown;
+        look.disabled = row.disabled;
+        DrawListRowFill(drawList, row.rect, radius, look);
         const bool destructive = desc.destructive && !row.disabled;
         const ImU32 text = ToU32(row.disabled ? c.labelTertiary : (destructive ? c.destructive : c.label));
         const ImU32 secondary = ToU32(row.disabled ? c.labelTertiary : c.labelSecondary);

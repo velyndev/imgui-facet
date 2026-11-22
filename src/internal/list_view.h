@@ -43,10 +43,9 @@
 //     focus (and a plain selection, as an arrow key would) to the next entry whose label starts
 //     with it, case-insensitive in ASCII; the same letter typed again cycles through the entries
 //     that start with it. A pause of list.typeaheadTimeout starts a new text.
-//   - Look: hover (fill[2]), the selection (accentSubtle while the view has focus, fill[1] when
-//     it does not), or the sliding selection pill for a single choice (`pill`); the focus ring on
-//     the focused row, drawn after every row so neighbours never cover it; no hover while the
-//     area scrolls. The caller draws the label, and draws it with PushPillLabelStyle so the
+//   - Look: the row look below (hover fill[2], the selection accentSubtle), or the sliding
+//     selection pill for a single choice (`pill`); the focus ring on the focused row, drawn after
+//     every row so neighbours never cover it; no hover while the area scrolls. The caller draws the label, and draws it with PushPillLabelStyle so the
 //     selected row also differs by weight, not by color alone, and in labelTertiary when the row
 //     is disabled.
 //   - States: while `state` is Loading or Error, or with no rows, the area keeps its size, shows
@@ -179,11 +178,12 @@ int ListTypeaheadFind(const char* typed, int count, int from, ListEntryFn entry,
 // themselves: DataTable rows in a Dear ImGui table, ItemGrid tiles, LogView lines. Such a
 // container opens BeginListRows and BeginListSelection (list_core.h) itself and runs every row
 // through one ListRowGroup, so its rows look and behave as a list view's: the hover and selection
-// fills, no hover while the area scrolls, the focus ring drawn over every row, Home and End to the
-// first and last enabled entry with Shift ranges (ListJumpToEnd), and typeahead (ListTypeahead).
+// fills (the row look below), no hover while the area scrolls, the focus ring drawn over every
+// row, Home and End to the first and last enabled entry with Shift ranges (ListJumpToEnd), and
+// typeahead (ListTypeahead).
 //
 //     ListRowGroup group;
-//     group.Begin(focused);                      // the list holds the keyboard focus
+//     group.Begin();
 //     RowRange rows;
 //     while (NextListRows(&rows))
 //         for (int i = rows.first; i < rows.last; ++i)
@@ -236,10 +236,9 @@ struct ListRowDesc
 class ListRowGroup
 {
 public:
-    // `listFocused`: the list holds the keyboard focus (selected rows are accentSubtle, else
-    // fill[1]). `forced`: a capture's forced state (TakeForcedItemState), applied to the row whose
-    // part matches; null for none.
-    void Begin(bool listFocused, const ForcedItemRequest* forced = nullptr);
+    // `forced`: a capture's forced state (TakeForcedItemState), applied to the row whose part
+    // matches; null for none.
+    void Begin(const ForcedItemRequest* forced = nullptr);
     // Places row `id` at `rect` (screen pixels, the whole row), runs its item behaviour and the
     // selection hooks, and draws its fill. The cursor is left at row.content on the row's line.
     ListRowState Row(ImGuiID id, const ImRect& rect, const ListRowDesc& desc);
@@ -249,10 +248,38 @@ public:
 private:
     ImGuiWindow* window = nullptr;
     const ForcedItemRequest* forced = nullptr;
-    bool listFocused = false;
     bool hasRing = false;
     ItemState ring;
 };
+
+// ---- Row look -------------------------------------------------------------------------------------
+//
+// The states of a row, a cell or a tile, one look for every list, menu, table and grid (the rows
+// rule of DESIGN.md): the row under the pointer and the current row of a driven list or a menu show
+// fill[2], a press blends toward fill[1]; a selected row shows accentSubtle (plus the check mark
+// where the widget has one); a selected tile or card shows accentSubtle and the accent outline at
+// the one border width. No state draws a thicker stroke, and no state draws the focus ring: the ring
+// belongs to the keyboard focus alone and sits inside the row (DrawFocusRingInside, focus.h). The
+// list view, the tree, the row block and the menu rows draw their rows through these two helpers;
+// widgets that place their own rows, cells or tiles call them too.
+
+struct ListRowLook
+{
+    float hoverAmount = 0.0f;  // 0 to 1: the pointer is over the row (item.hoverAmount)
+    float pressAmount = 0.0f;  // 0 to 1: held down (item.pressAmount)
+    bool highlighted = false;  // the current row of a driven list or a menu (an open submenu's row): fill[2]
+    bool selected = false;     // accentSubtle instead of the hover fill
+    bool disabled = false;     // no hover or press fill; a selection still shows
+    bool tile = false;         // a tile or a card: a selected one adds the accent outline
+};
+
+// The rectangle a list row's fill covers: the row inset one hairline at the top and the bottom, so
+// the fills of adjacent selected rows stay apart. Screen pixels.
+ImRect ListRowFillRect(const ImRect& row);
+
+// Draws the fill of `look` into `rect` (screen pixels, usually ListRowFillRect of the row) with
+// corners of `radius` pixels, and for a selected tile its accent outline (DrawOutline, control.h).
+void DrawListRowFill(ImDrawList* drawList, const ImRect& rect, float radius, const ListRowLook& look);
 
 struct ListJumpDesc
 {
