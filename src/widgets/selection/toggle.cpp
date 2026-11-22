@@ -180,13 +180,17 @@ bool Toggle(const char* label, bool* value, const ToggleOptions& options)
         outlineLook.disabled = item.disabled;
         if (item.disabled)
         {
-            trackColor = c.fill[3];
+            // Disabled: the on track keeps its accent mark at the disabled picture opacity, so on
+            // and off still differ by color and not by the knob position alone.
+            const ImVec4 dimOn = WithAlpha(c.focusRing, c.focusRing.w * internal::kDisabledPictureOpacity);
+            trackColor = Mix(c.fill[3], dimOn, onT);
         }
         else if (item.readOnly)
         {
-            // Read-only: labelSecondary instead of the accent, so it does not look like a choice.
+            // Read-only: labelTertiary instead of the accent, so it does not look like a choice; a
+            // mid grey that keeps the white knob clearly separate from the on track in both themes.
             outlineLook.hoverAmount = 0.0f;
-            trackColor = Mix(c.fill[0], c.labelSecondary, onT);
+            trackColor = Mix(c.fill[0], c.labelTertiary, onT);
         }
         else
         {

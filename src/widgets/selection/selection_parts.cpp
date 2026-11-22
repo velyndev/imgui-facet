@@ -52,13 +52,19 @@ MarkColors MarkLook(float onAmount, const ItemState& item)
         look.glyph = WithAlpha(c.labelTertiary, c.labelTertiary.w * onAmount);
         return look;
     }
-    const ImVec4 clear = WithAlpha(c.fill[1], 0.0f);
-    const ImVec4 offFill = item.readOnly ? clear : StateFill(clear, c.fill[1], c.fill[0], item);
-    const ImVec4 offOutline = ControlBoundaryColor(c);
-    // Read-only marks are labelSecondary, so a value that cannot change does not claim the accent.
-    const ImVec4 onFill = item.readOnly ? c.labelSecondary : StateFill(c.accent, c.accentHover, c.accentPressed, item);
-    const ImVec4 onOutline = item.readOnly ? c.labelSecondary : c.focusRing;
-    const ImVec4 glyph = item.readOnly ? c.bg : c.onAccent;
+    // Off: a quiet box, the neutral control fill and the one controlBorder hairline (stronger under
+    // the pointer). Read-only shows no fill, like a read-only field.
+    const ImVec4 clear = WithAlpha(c.fill[2], 0.0f);
+    const ImVec4 offFill = item.readOnly ? clear : NeutralFill(item);
+    OutlineLook outline;
+    outline.hoverAmount = item.readOnly ? 0.0f : item.hoverAmount;
+    const ImVec4 offOutline = ControlOutlineColor(outline);
+    // On: the accent fill with the accent mark as its edge, the glyph in onAccent. Read-only keeps
+    // the quiet box and draws the glyph in label, so a value that cannot change does not claim the
+    // accent and no light grey fill appears in the dark theme.
+    const ImVec4 onFill = item.readOnly ? clear : StateFill(c.accent, c.accentHover, c.accentPressed, item);
+    const ImVec4 onOutline = item.readOnly ? offOutline : c.focusRing;
+    const ImVec4 glyph = item.readOnly ? c.label : c.onAccent;
     look.fill = onAmount <= 0.0f ? offFill : (onAmount >= 1.0f ? onFill : Mix(offFill, onFill, onAmount));
     look.outline = onAmount <= 0.0f ? offOutline : (onAmount >= 1.0f ? onOutline : Mix(offOutline, onOutline, onAmount));
     look.glyph = WithAlpha(glyph, glyph.w * onAmount);
@@ -143,7 +149,7 @@ void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMar
     const MarkColors look = MarkLook(onAmount, item);
     const float radius = SelectionCheckboxRadius(box);
     FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);
-    StrokeRect(drawList, box.Min, box.Max, ToU32(look.outline), radius, HairlineThickness());
+    DrawOutline(drawList, box, radius, look.outline);
     if (shown != SelectionMark::Off && look.glyph.w > 0.0f)
     {
         // The glyphs are drawn at the box size: their artwork keeps a margin to the box edge.
@@ -157,8 +163,8 @@ void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount,
     const MarkColors look = MarkLook(onAmount, item);
     const ImVec2 center = box.GetCenter();
     const float radius = box.GetWidth() * 0.5f;
-    drawList->AddCircleFilled(center, radius, ToU32(look.fill));
-    drawList->AddCircle(center, radius, ToU32(look.outline), 0, HairlineThickness());
+    FillRect(drawList, box.Min, box.Max, ToU32(look.fill), radius);
+    DrawOutline(drawList, box, radius, look.outline);
     if (look.glyph.w > 0.0f)
     {
         // The dot grows in with the fill, so the change reads as one motion.

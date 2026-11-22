@@ -162,8 +162,10 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
             const float onAmount = internal::SelectionMarkAmount(cardId, on);
             if (!item.visible)
                 continue;
-            // The card: bgSecondary with the 3:1 boundary; selected, the selection tint and a
-            // focusRing hairline (labelSecondary while read-only); hover and press tint it further.
+            // The card: bgSecondary with the one controlBorder hairline (controlBorderHover under the
+            // pointer); selected, the selected tile look of the rows rule: the accentSubtle tint and
+            // the accent hairline at the same width. Read-only selected keeps the quiet hairline and
+            // takes fill[0]; hover and press tint the card further.
             const float radius = Px(t.radii.card);
             const bool off = item.disabled;
             FillRect(drawList, rect.Min, rect.Max, ToU32(off ? c.fill[3] : c.bgSecondary), radius);
@@ -178,10 +180,12 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
                 const ImVec4 tint = Mix(c.fill[2], c.fill[1], item.pressAmount);
                 FillRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
             }
-            const ImVec4 boundary = off ? c.separator : ControlBoundaryColor(c);
-            const ImVec4 selectedEdge = item.readOnly ? c.labelSecondary : c.focusRing;
-            StrokeRect(drawList, rect.Min, rect.Max, ToU32(off ? boundary : Mix(boundary, selectedEdge, onAmount)), radius,
-                       HairlineThickness());
+            internal::OutlineLook edge;
+            edge.hoverAmount = off || item.readOnly ? 0.0f : item.hoverAmount;
+            edge.disabled = off;
+            const ImVec4 boundary = internal::ControlOutlineColor(edge);
+            const bool accentEdge = !off && !item.readOnly;
+            internal::DrawOutline(drawList, rect, radius, accentEdge ? Mix(boundary, c.focusRing, onAmount) : boundary);
 
             float y = rect.Min.y + layout.padding;
             const float innerLeft = rect.Min.x + layout.padding;
@@ -244,7 +248,9 @@ bool OptionCardGroupImpl(const char* label, int* index, std::span<bool> selected
                                   ToU32(internal::ControlSecondaryColor(off)), card.description, nullptr,
                                   std::max(1.0f, innerRight - innerLeft));
             }
-            internal::DrawFocusRing(drawList, rect, radius, item.focusAmount);
+            // Inside the card, as for every tile of a grid: never cut by a neighbour, never one ring
+            // around another with the accent hairline of a selected card.
+            internal::DrawFocusRingInside(drawList, rect, radius, item.focusAmount);
             internal::CutTextTooltip(item, title, ImGui::FindRenderedTextEnd(title), truncated);
         }
         rowTop += rowHeight + layout.gap;

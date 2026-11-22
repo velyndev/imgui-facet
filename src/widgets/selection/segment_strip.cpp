@@ -221,8 +221,11 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
     const float innerRadius = std::max(0.0f, m.radius - inset);
     FillRect(drawList, track.Min, track.Max,
              ToU32(groupDisabled ? c.fill[3] : (readOnly ? WithAlpha(c.fill[2], 0.0f) : c.fill[2])), m.radius);
-    StrokeRect(drawList, track.Min, track.Max, ToU32(groupDisabled ? c.separator : ControlBoundaryColor(c)), m.radius,
-               HairlineThickness());
+    // A quiet container: the neutral fill and one controlBorder hairline; the segments inside have
+    // no outline of their own, the selected one shows by its fill.
+    OutlineLook containerEdge;
+    containerEdge.disabled = groupDisabled;
+    DrawOutline(drawList, track, m.radius, ControlOutlineColor(containerEdge));
     DrawFrontLabel(drawList, front, ImVec2(origin.x, CenteredTextY(origin.y, m.height)), m.size, groupDisabled);
 
     const bool mixedShown = SelectionMixedShown(widgetId, desc.mixed || (next.itemFlags & ImGuiItemFlags_MixedValue) != 0, false);
@@ -299,7 +302,8 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
             truncated = DrawSegmentContent(drawList, rect, item, showIcon, showLabel, iconSize, m,
                                            ToU32(ControlLabelColor(entry.disabled)));
             PopTextStyle();
-            DrawFocusRing(drawList, inner, innerRadius, entry.focusAmount);
+            // Inside the segment: a ring outside it would cross the container's edge.
+            DrawFocusRingInside(drawList, inner, innerRadius, entry.focusAmount);
         }
         CutTextTooltip(entry, item.label, ImGui::FindRenderedTextEnd(item.label), truncated);
     }
@@ -339,7 +343,7 @@ bool SegmentStrip(const char* label, const SelectionItems& items, int* index, st
             }
             DrawControlIcon(drawList, Icon("more-horizontal"), std::round(rect.GetCenter().x - iconSize * 0.5f),
                             rect.GetCenter().y, iconSize, ToU32(ControlLabelColor(more.disabled)));
-            DrawFocusRing(drawList, inner, innerRadius, more.focusAmount);
+            DrawFocusRingInside(drawList, inner, innerRadius, more.focusAmount);
         }
         if (BeginPopupTooltip(moreId, rect, more.hovered, more.focusVisible))
         {

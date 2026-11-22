@@ -1497,3 +1497,216 @@ TEST_CASE("The toggle is a capsule with a solid round knob in every size and sta
         }
     }
 }
+
+// --- The quiet look: one outline width, rings from the keyboard only -------------------------------
+
+namespace
+{
+
+// The vertices drawn into the window draw list since `from`.
+std::vector<ImDrawVert> VerticesSince(int from)
+{
+    const ImDrawList* drawList = ImGui::GetWindowDrawList();
+    return std::vector<ImDrawVert>(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+}
+
+bool SameGeometry(const std::vector<ImDrawVert>& a, const std::vector<ImDrawVert>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (std::fabs(a[i].pos.x - b[i].pos.x) > 0.01f || std::fabs(a[i].pos.y - b[i].pos.y) > 0.01f)
+            return false;
+    return true;
+}
+
+bool SameColors(const std::vector<ImDrawVert>& a, const std::vector<ImDrawVert>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (a[i].col != b[i].col)
+            return false;
+    return true;
+}
+
+// Vertices in the ring color (any alpha above 0) further than a pixel and a half outside `rect`: the
+// focus ring outside a control (it reaches a hairline plus its width out), never the anti-aliased
+// fringe of the control's own accent hairline, which lies inside.
+int RingVerticesOutside(const std::vector<ImDrawVert>& vertices, const ImRect& rect)
+{
+    const ImU32 ring = facet::ToU32(facet::T().colors.focusRing) & ~IM_COL32_A_MASK;
+    constexpr float kMargin = 1.5f;
+    int count = 0;
+    for (const ImDrawVert& v : vertices)
+    {
+        if ((v.col & ~IM_COL32_A_MASK) != ring || (v.col & IM_COL32_A_MASK) == 0)
+            continue;
+        const bool outside = v.pos.x < rect.Min.x - kMargin || v.pos.x > rect.Max.x + kMargin ||
+                             v.pos.y < rect.Min.y - kMargin || v.pos.y > rect.Max.y + kMargin;
+        count += outside ? 1 : 0;
+    }
+    return count;
+}
+
+int RingColorVertices(const std::vector<ImDrawVert>& vertices)
+{
+    const ImU32 ring = facet::ToU32(facet::T().colors.focusRing) & ~IM_COL32_A_MASK;
+    int count = 0;
+    for (const ImDrawVert& v : vertices)
+        count += ((v.col & ~IM_COL32_A_MASK) == ring && (v.col & IM_COL32_A_MASK) != 0) ? 1 : 0;
+    return count;
+}
+
+} // namespace
+
+TEST_CASE("A disabled on toggle keeps a dim accent track and a read-only on toggle a mid grey one")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
+        const facet::Colors& c = facet::T().colors;
+        const ImU32 dimOn = facet::ToU32(facet::WithAlpha(c.focusRing, c.focusRing.w * facet::internal::kDisabledPictureOpacity));
+        const ImU32 readOnlyOn = facet::ToU32(c.labelTertiary);
+        int disabledOn = 0;
+        int disabledOff = 0;
+        int readOnly = 0;
+        session.SetUi([&] {
+            bool on = true;
+            bool off = false;
+            ImGui::BeginDisabled();
+            int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+            facet::Toggle("On##d", &on);
+            disabledOn = CountColor(from, dimOn);
+            from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+            facet::Toggle("Off##d", &off);
+            disabledOff = CountColor(from, dimOn);
+            ImGui::EndDisabled();
+            from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+            facet::Toggle("Read-only##r", &on, {.readOnly = true});
+            readOnly = CountColor(from, readOnlyOn);
+        });
+        session.Frames(4);
+        CHECK(disabledOn > 0);
+        CHECK(disabledOff == 0);
+        CHECK(readOnly > 0);
+    }
+}
+
+TEST_CASE("A checkbox under the pointer changes the outline color, never its geometry, and a click draws no ring")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Dark(), false);
+    bool value = false;
+    std::vector<ImDrawVert> drawn;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::Checkbox("Option", &value);
+        session.Track("box");
+        drawn = VerticesSince(from);
+    });
+    session.Frames(2);
+    const ImRect item = session.ItemRect("box");
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    session.MouseMove(ImVec2(item.Max.x + 200.0f, item.Max.y + 100.0f));
+    session.Seconds(settle);
+    const std::vector<ImDrawVert> rest = drawn;
+    // The unchecked box is quiet: the neutral fill and the controlBorder hairline.
+    const ImU32 quietEdge = facet::ToU32(facet::T().colors.controlBorder);
+    CHECK(std::count_if(rest.begin(), rest.end(), [&](const ImDrawVert& v) { return v.col == quietEdge; }) > 0);
+    const float side = std::max(1.0f, facet::PxSnapped(facet::T().metrics.checkboxSize));
+    const ImVec2 boxCenter(item.Min.x + side * 0.5f, item.GetCenter().y);
+    session.MouseMove(boxCenter);
+    session.Seconds(settle);
+    CHECK(SameGeometry(rest, drawn));
+    CHECK_FALSE(SameColors(rest, drawn));
+    // A click checks it: the accent fill and hairline, and no ring around the box.
+    session.Click(boxCenter);
+    session.Seconds(settle);
+    REQUIRE(value);
+    const ImRect box(item.Min.x, std::round(item.GetCenter().y - side * 0.5f), item.Min.x + side,
+                     std::round(item.GetCenter().y - side * 0.5f) + side);
+    CHECK(RingVerticesOutside(drawn, box) == 0);
+    TabFrom(session, 2);
+    session.Seconds(settle);
+    CHECK(RingVerticesOutside(drawn, box) > 0);
+}
+
+TEST_CASE("A segmented control shows no ring after a click and a ring inside the segment after Tab")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Dark(), false);
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    int index = 0;
+    std::vector<ImDrawVert> drawn;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        facet::SegmentedControl("##seg", &index, kItems);
+        session.Track("seg");
+        drawn = VerticesSince(from);
+    });
+    session.Frames(2);
+    const ImRect strip = session.ItemRect("seg");
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    // Hover the last segment, then click it.
+    const ImVec2 last(strip.Max.x - strip.GetWidth() / 6.0f, strip.GetCenter().y);
+    session.MouseMove(last);
+    session.Seconds(settle);
+    CHECK(RingColorVertices(drawn) == 0);
+    session.Click(last);
+    session.Seconds(1.0f);
+    CHECK(index == 2);
+    CHECK(RingColorVertices(drawn) == 0);
+    // After Tab the ring shows, inside the strip.
+    TabFrom(session, 2);
+    session.Seconds(settle);
+    CHECK(RingColorVertices(drawn) > 0);
+    CHECK(RingVerticesOutside(drawn, strip) == 0);
+}
+
+TEST_CASE("A chip keeps one outline width when hovered or selected and shows no ring after a click")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    facet::SetTheme(facet::Theme::Dark(), false);
+    bool selected = false;
+    std::vector<ImDrawVert> drawn;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        if (facet::Chip("Filter", {.selected = selected}))
+            selected = !selected;
+        session.Track("chip");
+        drawn = VerticesSince(from);
+    });
+    session.Frames(2);
+    const ImRect chip = session.ItemRect("chip");
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    session.MouseMove(ImVec2(chip.Max.x + 200.0f, chip.Max.y + 100.0f));
+    session.Seconds(settle);
+    const std::vector<ImDrawVert> rest = drawn;
+    session.MouseMove(chip.GetCenter());
+    session.Seconds(settle);
+    CHECK(SameGeometry(rest, drawn));
+    session.Click(chip.GetCenter());
+    session.Seconds(settle);
+    REQUIRE(selected);
+    CHECK(RingVerticesOutside(drawn, chip) == 0);
+    TabFrom(session, 2);
+    session.Seconds(settle);
+    CHECK(RingVerticesOutside(drawn, chip) > 0);
+}

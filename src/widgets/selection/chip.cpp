@@ -161,8 +161,10 @@ SelectionChipResult SelectionChip(const char* label, ImGuiID id, float width, co
         ImDrawList* drawList = window->DrawList;
         const ImRect& r = body.rect;
         const float radius = m.height * 0.5f;
-        // Unselected: the neutral fill with the 3:1 boundary hairline, like a secondary button.
-        // Selected: the selection tint (accentSubtle) with a focusRing hairline and a semibold label.
+        // A capsule. Unselected: the neutral fill with the one controlBorder hairline (stronger under
+        // the pointer), like a secondary button. Selected: the selection tint (accentSubtle) with the
+        // accent hairline at the same width and a semibold label. Read-only selected keeps the quiet
+        // hairline and shows the selection by fill[0] and the semibold label.
         ImVec4 fill;
         ImVec4 outline;
         if (body.disabled)
@@ -182,7 +184,10 @@ SelectionChipResult SelectionChip(const char* label, ImGuiID id, float width, co
                 fill = StateFill(clear, c.fill[2], c.fill[1], look);  // the group's pill shows through
             else
                 fill = NeutralFill(look);
-            outline = Mix(ControlBoundaryColor(c), body.readOnly ? c.labelSecondary : c.focusRing, selectedAmount);
+            OutlineLook rest;
+            rest.hoverAmount = body.readOnly ? 0.0f : look.hoverAmount;
+            const ImVec4 quiet = ControlOutlineColor(rest);
+            outline = body.readOnly ? quiet : Mix(quiet, c.focusRing, selectedAmount);
         }
         FillRect(drawList, r.Min, r.Max, ToU32(fill), radius);
         if (!body.disabled && desc.selectedFill && selectedAmount > 0.0f)
@@ -190,7 +195,7 @@ SelectionChipResult SelectionChip(const char* label, ImGuiID id, float width, co
             const ImVec4 tint = body.readOnly ? c.fill[0] : c.accentSubtle;
             FillRect(drawList, r.Min, r.Max, ToU32(WithAlpha(tint, tint.w * selectedAmount)), radius);
         }
-        StrokeRect(drawList, r.Min, r.Max, ToU32(outline), radius, HairlineThickness());
+        DrawOutline(drawList, r, radius, outline);
 
         float x = r.Min.x + m.paddingX;
         const float centerY = r.GetCenter().y;

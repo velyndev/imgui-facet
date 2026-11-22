@@ -29,13 +29,17 @@ after it; returns true on the frame it wrote `*value`.
 - **Input.** A click on the label or the switch, or Space or Enter while it has keyboard focus,
   flips the value. A press on the switch that moves further than the drag threshold drags the knob,
   and letting go sets the side the knob is on (also when the pointer left the toggle).
-- **Look.** Off: the neutral fill with the 3:1 boundary hairline and a labelSecondary knob. On: the
-  accent track with an onAccent knob and a focusRing hairline. The knob springs between the ends
-  (the quick spring) and the colors follow over `motion.durationFast`; with reduced motion both
-  jump. The focus ring goes around the track after keyboard input.
-- **States.** Disabled (`ImGui::BeginDisabled`): fill[3], labelTertiary knob and label, the
-  not-allowed cursor, no Tab stop. `readOnly` (or a null `value`): labelSecondary instead of the
-  accent, focusable, never written, and the arrow cursor. `loading`: a spinner in the knob and no
+- **Look.** A capsule track with circular ends and a round solid knob in the `knob` token (white in
+  both themes) with one controlBorder hairline and the level 1 shadow, in every size and state.
+  Off: fill[0] with the controlBorder hairline (controlBorderHover under the pointer). On: the
+  accent mark (focusRing, 3:1 against an off track) without an outline. The knob springs between
+  the ends (the quick spring) and the colors follow over `motion.durationFast`; with reduced motion
+  both jump. The focus ring goes around the track after keyboard input only, never after a click.
+- **States.** Disabled (`ImGui::BeginDisabled`): an off track in fill[3], an on track in the accent
+  mark at the disabled picture opacity (so on and off still differ by color), the knob at that
+  opacity, a labelTertiary label, the not-allowed cursor, no Tab stop. `readOnly` (or a null
+  `value`): an on track in labelTertiary instead of the accent, focusable, never written, and the
+  arrow cursor. `loading`: a spinner in the knob and no
   input, but it stays a Tab stop. `mixed`: the knob in the middle of a neutral track until the
   first edit, which writes on; after that the toggle shows its value until `mixed` is switched off
   and on again. `error` replaces `helpText` under the toggle, in destructive with the error icon.
@@ -63,15 +67,16 @@ hit area. Returns true on the frame it wrote the value.
   A mouse press that then crosses other checkboxes of the same window with the button held gives
   each of them the first box's new value, the first box included (one write per box that changes),
   and the release does not flip the first box back.
-- **Look.** Unchecked: no fill at rest (fill[1] on hover, fill[0] while pressed) and the 3:1
-  boundary hairline. Checked: the accent with an onAccent check and a focusRing hairline. Mixed:
+- **Look.** Unchecked: a quiet box, the neutral control fill (fill[2] at rest, fill[1] on hover,
+  fill[0] while pressed) and one controlBorder hairline (controlBorderHover on hover). Checked: the
+  accent with an onAccent check and the accent mark as its hairline, at the same width. Mixed:
   the same fill with a minus, so it differs from both other states by its shape and not only by
   its color. The corners are radii.element, at most a quarter of the box, so a box never looks like
   a radio mark. The fill fades over `motion.durationFast` (at once with reduced motion). The focus
   ring goes around the box after keyboard input.
 - **States.** Disabled: fill[3] with a labelTertiary glyph, no Tab stop. `readOnly` (or a null
-  value pointer): checked and mixed boxes are labelSecondary instead of the accent, focusable,
-  never written. `error` replaces `helpText` under the box.
+  value pointer): an unfilled quiet box with the glyph in label instead of the accent fill,
+  focusable, never written. `error` replaces `helpText` under the box.
 - **Sizes and width.** `size` sets the item height and the label text; the box keeps its token
   size. The default width is the box, spacing.sm and the label; `ImGui::SetNextItemWidth` and
   `PushItemWidth` apply as rule 6 says, and a narrower width cuts the label with an ellipsis and
@@ -127,9 +132,10 @@ above the group. Returns true on the frame it wrote `*index`; -1 means none is s
   is selected. The four arrow keys move the focus and the selection to the previous or next
   enabled option and wrap at the ends; Home and End go to the first and last enabled option.
   Options with `disabled` are drawn disabled and skipped. Escape does not undo a choice.
-- **Look.** Unselected: the boundary hairline circle, fill[1] on hover. Selected: an accent disc
-  with an onAccent dot and a focusRing hairline; the dot grows in over `motion.durationFast`. The
-  focus ring is round, around the mark.
+- **Look.** Unselected: a quiet circle in the checkbox colors (the neutral fill and one
+  controlBorder hairline, both stronger on hover). Selected: an accent disc with an onAccent dot and
+  the accent mark as its hairline; the dot grows in over `motion.durationFast`. The focus ring is
+  round, around the mark, after keyboard input only.
 - **Layout.** `Orientation::Vertical` (the default) puts one option under the other, each one
   control height tall plus its detail line. `Horizontal` places them side by side, spacing.xl
   apart, and starts a new row when the next option does not fit. Default width: the available
@@ -137,7 +143,8 @@ above the group. Returns true on the frame it wrote `*index`; -1 means none is s
   a label or detail that does not fit is cut with an ellipsis and shown in full on hover and
   keyboard focus.
 - **States.** `ImGui::BeginDisabled` disables every option. `readOnly` (or a null `index`): the
-  selection shows in labelSecondary, the arrows still move the focus, nothing is written.
+  selection shows as a label dot in an unfilled quiet circle, the arrows still move the focus,
+  nothing is written.
   `error` replaces `helpText` under the group.
 
 Status: ready.
@@ -160,13 +167,15 @@ segment selected.
   selected segment, else the first enabled one); Left and Right move the focus and the selection
   and stop at the ends, Home and End go to the first and last enabled segment. Items with
   `disabled` are drawn disabled and skipped.
-- **Look.** The track is fill[2] with the 3:1 boundary hairline. The pill is accentSubtle,
+- **Look.** A quiet container: the track is fill[2] with one controlBorder hairline, and the
+  segments have no outline of their own. The pill is accentSubtle,
   metrics.segmentInset inside the track with concentric corners, and the selected label is
   semibold, so the choice does not depend on the tint alone. Hover and press tint a segment inside
   the same inset; hairline dividers stand between segments where the pill is not. The pill springs
   to a new segment with the standard spring (its leading edge a little faster, so it stretches on
   the way), comes to rest on whole pixels, follows a change of width or scale with the same
-  spring, and moves at once with reduced motion. The focus ring goes around the focused segment.
+  spring, and moves at once with reduced motion. After keyboard input the focus ring sits inside
+  the focused segment, so it never crosses the container's edge.
 - **Width.** `width` 0 fits the segments (each its content plus the control padding, measured in
   semibold so the bold label of the selected one fits), at most the available width; `kFill`, a
   set width, `ImGui::SetNextItemWidth` or a row shorter than the content divide the track into
@@ -197,9 +206,11 @@ Space or Enter while focused); a chip used as a filter flips its own `selected` 
   `ChipRemovePressed()`, called right after the chip, is true on that frame; the caller removes the
   chip from its data. The button is not a Tab stop of its own, so a row of chips has one stop per
   chip.
-- **Look.** Unselected: the neutral fill with the 3:1 boundary hairline, like a secondary button.
-  `selected`: the selection tint (accentSubtle) with a focusRing hairline and a semibold label,
-  faded in over `motion.durationFast`. The focus ring follows the pill shape.
+- **Look.** A capsule with circular ends. Unselected: the neutral fill with one controlBorder
+  hairline (controlBorderHover on hover), like a secondary button. `selected`: the selection tint
+  (accentSubtle) with the accent hairline at the same width and a semibold label, faded in over
+  `motion.durationFast`; read-only selected chips keep the quiet hairline on fill[0]. The focus
+  ring follows the capsule, after keyboard input only.
 - **States.** Disabled: fill[3] (fill[1] while selected), labelTertiary, no Tab stop, nothing
   reported. The dot keeps its data color unless disabled.
 - **Width.** Its content (measured with the semibold label, so selecting never cuts it);
@@ -318,14 +329,16 @@ bool OptionCardGroup(const char* label, std::span<bool> selected, std::span<cons
 Large selectable cards in a grid, for choices that need a picture or a description, with the
 visible label part above them. Returns true when the index or a flag was written.
 
-- **Card.** bgSecondary with radii.card corners and the 3:1 boundary hairline. Inside (spacing.md
+- **Card.** bgSecondary with radii.card corners and one controlBorder hairline (controlBorderHover
+  on hover). Inside (spacing.md
   padding): `image` across the top (the thumbnailSize token tall, filling the width, cropped to
   fit), then the title line in Headline with `icon` in front of it when there is no image, `badge`
   as a small pill and the mark at the end of the line, then `description` wrapped in Footnote
   labelSecondary. A title that does not fit is cut with an ellipsis and shown in full on hover and
   keyboard focus. The cards of one row share the height of the tallest.
-- **Selected.** The selection tint (accentSubtle) with a focusRing hairline, and the mark: a radio
-  mark for one choice, a checkbox mark for several, so the two forms read differently.
+- **Selected.** The selected tile look: the selection tint (accentSubtle) with the accent hairline
+  at the one border width, and the mark: a radio mark for one choice, a checkbox mark for several,
+  so the two forms read differently. After keyboard input the focus ring sits inside the card.
 - **One choice** (`int*`): one Tab stop (the chosen card, else the first enabled one). Left and
   Right move along the reading order, Up and Down by a row; disabled cards are skipped and the
   movement stops at the edges. A click, Space or Enter chooses the card. -1 means none.
@@ -336,7 +349,8 @@ visible label part above them. Returns true when the index or a flag was written
   takes the available width.
 - **States.** Disabled cards (`OptionCard::disabled`, or `ImGui::BeginDisabled` for all): fill[3],
   labelTertiary, no Tab stop. `readOnly` (or a null `index`): shown and focusable, never written;
-  the selection shows in labelSecondary. `error` replaces `helpText` under the grid.
+  a selected card takes fill[0] with the quiet hairline and a read-only mark. `error` replaces
+  `helpText` under the grid.
 
 Status: ready.
 

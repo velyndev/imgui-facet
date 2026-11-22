@@ -163,16 +163,17 @@ ImRect SelectionMarkRect(float x, float centerY);
 // box never reads as the circle of a radio mark. The focus ring takes it too.
 float SelectionCheckboxRadius(const ImRect& box);
 
-// Draws a checkbox: a box with SelectionCheckboxRadius corners. Off is the hover fill of a neutral control
-// with the 3:1 boundary hairline; On and Mixed fill it with the accent (labelSecondary while
-// read-only) and draw the check or minus glyph in onAccent, so the mixed state differs from both
-// others by its shape. `onAmount` (0 to 1) fades between Off and the mark; `shown` is the glyph
-// faded in or out.
+// Draws a checkbox: a box with SelectionCheckboxRadius corners. Off is a quiet box, the neutral
+// control fill with the one controlBorder hairline (controlBorderHover under the pointer); On and
+// Mixed fill it with the accent, edged by the accent mark, and draw the check or minus glyph in
+// onAccent, so the mixed state differs from both others by its shape. Read-only keeps an unfilled
+// quiet box and draws the glyph in label. `onAmount` (0 to 1) fades between Off and the mark;
+// `shown` is the glyph faded in or out.
 void DrawSelectionCheckbox(ImDrawList* drawList, const ImRect& box, SelectionMark shown, float onAmount,
                            const ItemState& item);
 
-// Draws a radio mark: a circle with the boundary hairline; selected, an accent disc (labelSecondary
-// while read-only) with an onAccent dot in the middle.
+// Draws a radio mark: a circle in the checkbox colors; selected, an accent disc with an onAccent dot
+// in the middle (read-only: the quiet circle with a label dot).
 void DrawSelectionRadio(ImDrawList* drawList, const ImRect& box, float onAmount, const ItemState& item);
 
 // The animated amount of a mark under `id`: 1 while on, 0 while off, over motion.durationFast.
