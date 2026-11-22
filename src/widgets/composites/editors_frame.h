@@ -111,7 +111,8 @@ struct PreviewCanvasFrame
     ImGuiWindow* window = nullptr;
     ImRect frame;                // the whole widget, screen pixels
     ImRect screen;               // the letterboxed reference screen, screen pixels
-    ImVec2 reference;            // the reference size, reference pixels
+    ImRect outerClip;            // the clip rect the caller had around the canvas, screen pixels
+    ImVec2 reference;          // the reference size, reference pixels
     float scale = 1.0f;          // screen pixels per reference pixel
     float safeArea = 0.0f;       // inset per side as a share of the reference size
     bool centerGuides = true;

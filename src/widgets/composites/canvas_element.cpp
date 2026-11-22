@@ -3,10 +3,11 @@
 //
 // The box is one item and Tab stop: a press selects it and starts a move, the arrows move it by one
 // reference pixel, Shift by ten; with `resizable`, Ctrl with the arrows moves its right or bottom edge
-// (Shift: ten). Escape during a move or resize puts it back: the caller's state as it was, exactly. While selected, a resizable element shows
-// eight handles (corners and edge middles, composites.canvasHandleSize, each grown to the minimum hit
+// (Shift: ten). Escape during a move or resize puts it back: the caller's state as it was, exactly.
+// While selected, a resizable element shows eight handles (corners and edge middles, composites.canvasHandleSize, each grown to the minimum hit
 // target) that resize it like the edges and corners of the BoxRangePad, and `anchorPicker` shows a
-// 3 x 3 anchor control beside it; choosing a cell keeps the element where it is and changes its anchor
+// 3 x 3 anchor control beside it (CanvasAnchorControlSpot: inside the canvas where it hides no element,
+// else beside the canvas); choosing a cell keeps the element where it is and changes its anchor
 // and offset. With `snap`, a moved box or edge comes to the canvas edges and center, the safe area and
 // the edges and centers of the other elements of the canvas (as they were in the last frame) when it
 // is within composites.canvasSnapDistance; Alt held moves freely. The guide it snapped to and the
@@ -137,6 +138,45 @@ const char* CanvasAnchorName(int cell)
     const char* names[kCanvasCells] = {s.anchorTopLeft, s.anchorTop,        s.anchorTopRight, s.anchorLeft,      s.anchorCenter,
                                        s.anchorRight,   s.anchorBottomLeft, s.anchorBottom,   s.anchorBottomRight};
     return names[std::clamp(cell, 0, kCanvasCells - 1)];
+}
+
+// The top-left corner of the anchor control (`side` square) for the element `self` drawn at `box`, so
+// that it hides neither that element nor another element of the canvas (as they were in the last
+// frame): beside the element inside the canvas (right, else left), else under or above it; where no
+// such spot is free, beside the canvas inside the caller's clip rect (right, else left); else clamped
+// into the canvas.
+ImVec2 CanvasAnchorControlSpot(const internal::PreviewCanvasFrame& canvas, ImGuiID self, const ImRect& box, float side, float gap)
+{
+    const ImRect& frame = canvas.frame;
+    const ImRect& outer = canvas.outerClip;
+    const auto spotFree = [&](float x, float y) {
+        if (x < frame.Min.x || x + side > frame.Max.x || y < frame.Min.y || y + side > frame.Max.y)
+            return false;
+        const ImRect spot(ImVec2(x, y), ImVec2(x + side, y + side));
+        for (int i = 0; i < canvas.otherCount; ++i)
+        {
+            if (canvas.otherIds[i] == self)
+                continue;
+            const ImRect& r = canvas.others[i];
+            const ImRect other(ImVec2(canvas.screen.Min.x + r.Min.x * canvas.scale, canvas.screen.Min.y + r.Min.y * canvas.scale),
+                               ImVec2(canvas.screen.Min.x + r.Max.x * canvas.scale, canvas.screen.Min.y + r.Max.y * canvas.scale));
+            if (spot.Overlaps(other))
+                return false;
+        }
+        return true;
+    };
+    const float inY = std::clamp(box.Min.y, frame.Min.y, std::max(frame.Min.y, frame.Max.y - side));
+    const float inX = std::clamp(box.Min.x, frame.Min.x, std::max(frame.Min.x, frame.Max.x - side));
+    const ImVec2 inside[4] = {{box.Max.x + gap, inY}, {box.Min.x - gap - side, inY}, {inX, box.Max.y + gap}, {inX, box.Min.y - gap - side}};
+    for (const ImVec2& p : inside)
+        if (spotFree(p.x, p.y))
+            return p;
+    const float outY = std::clamp(inY, outer.Min.y, std::max(outer.Min.y, outer.Max.y - side));
+    const ImVec2 outside[2] = {{frame.Max.x + gap, outY}, {frame.Min.x - gap - side, outY}};
+    for (const ImVec2& p : outside)
+        if (p.x >= outer.Min.x && p.x + side <= outer.Max.x)
+            return p;
+    return ImVec2(inX, inY);
 }
 
 } // namespace
@@ -355,20 +395,11 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
         const float cell = std::round(Px(t.metrics.minHitTarget));
         const float gap = std::round(Px(t.spacing.xs));
         const float side = cell * 3.0f;
-        // Beside the element where the canvas has room (right, else left), else under or above it, so
-        // it covers as little of the element as the canvas allows.
-        const ImRect& area = canvas->frame;
-        float x = box.Max.x + gap;
-        float y = box.Min.y;
-        if (x + side > area.Max.x)
-            x = box.Min.x - gap - side;
-        if (x < area.Min.x)
-        {
-            x = box.Min.x;
-            y = box.Max.y + gap + side <= area.Max.y ? box.Max.y + gap : box.Min.y - gap - side;
-        }
-        x = std::clamp(x, area.Min.x, std::max(area.Min.x, area.Max.x - side));
-        y = std::clamp(y, area.Min.y, std::max(area.Min.y, area.Max.y - side));
+        const ImVec2 spot = CanvasAnchorControlSpot(*canvas, id, box, side, gap);
+        const float x = spot.x;
+        const float y = spot.y;
+        // A spot outside the canvas lies outside its clip rect: the control is clipped to the caller's.
+        ImGui::PushClipRect(canvas->outerClip.Min, canvas->outerClip.Max, false);
         ImDrawList* drawList = window->DrawList;
         FillRect(drawList, ImVec2(x, y), ImVec2(x + side, y + side), ToU32(c.bgElevated), Px(t.radii.element));
         StrokeRect(drawList, ImVec2(x, y), ImVec2(x + side, y + side), ToU32(ControlBoundaryColor(c)), Px(t.radii.element),
@@ -401,6 +432,7 @@ bool CanvasElement(const char* label, CanvasElementState* element, const CanvasE
             internal::DrawItemFocusRing(cellItem, Px(t.radii.element));
             internal::CutTextTooltip(cellItem, CanvasAnchorName(k), nullptr, true);
         }
+        ImGui::PopClipRect();
     }
     else
     {

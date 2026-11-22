@@ -706,7 +706,8 @@ pixel, Shift by ten; with `resizable`, Ctrl with the arrows moves its right or b
 ten). Escape during a move or a resize puts it back. While selected, a resizable element shows
 eight handles (corners and edge middles, `composites.canvasHandleSize`, each grown to the minimum
 hit target) that resize it, and `anchorPicker` shows a 3 by 3 anchor control beside it (right,
-else left, else under or above it): each cell is a Tab stop named by `Strings::anchorTopLeft` to
+else left, else under or above it, where it covers no other element of the canvas; where no such
+place is free, beside the canvas, right or else left, inside the caller's clip rect): each cell is a Tab stop named by `Strings::anchorTopLeft` to
 `anchorBottomRight` on hover and focus, and choosing one changes the anchor and the offset while
 the element stays where it is. With `snap`, a moved box or edge comes to the canvas edges and
 center, the safe area and the edges and centers of the other elements of the canvas (as they were

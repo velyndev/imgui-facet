@@ -188,6 +188,7 @@ void BeginPreviewCanvas(const char* id, ImVec2 referenceSize, const PreviewCanva
     f.window = window;
     f.frame = frame;
     f.screen = screen;
+    f.outerClip = window->ClipRect;
     f.reference = referenceSize;
     f.scale = scale;
     f.safeArea = std::clamp(options.safeArea, 0.0f, 0.5f);

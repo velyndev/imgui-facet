@@ -92,6 +92,7 @@ struct EditorsUi
     bool canvasOversized = false;
     int canvasWrites = 0;
     ImGuiID elementId = 0;
+    ImGuiID cornerId = 0;
     facet::LayerItem layers[5] = {{"Layer 1", {}, 0, true, false, 1},
                                   {"Group 1", {}, 0, true, false, 2},
                                   {"Layer 2", {}, 1, true, false, 3},
@@ -336,7 +337,12 @@ void CanvasSection(facet::demo::PageCtx& ctx)
     if (CanvasElement("Element 1", &ui.element, {.resizable = ui.canvasResizable, .snap = ui.canvasSnap}))
         ++ui.canvasWrites;
     ctx.Probe("composites.canvas.e1");
+    ui.cornerId = ImGui::GetID("Element 2 (read-only)");
     CanvasElement("Element 2 (read-only)", &ui.corner, {.readOnly = true});
+    EndPreviewCanvas();
+    ctx.Probe("composites.canvas");
+    // The parts are probed after the canvas, against the page's clip rect: the anchor control can sit
+    // beside the canvas.
     {
         const char* parts[] = {"composites.canvas.e1.h5", "composites.canvas.e1.center"};
         const int indices[] = {5, 9 + static_cast<int>(CanvasAnchor::Center)};
@@ -348,8 +354,6 @@ void CanvasSection(facet::demo::PageCtx& ctx)
                 demo::ProbeRect(ctx, parts[k], itemId, rect.Min, rect.Max);
         }
     }
-    EndPreviewCanvas();
-    ctx.Probe("composites.canvas");
     if (capture && ctx.captureState == kCanvasSelected)
         ctx.RevealInCapture(0.6f);
     LabeledRow("");
@@ -783,6 +787,13 @@ FACET_DEMO_SELFTEST("composites-editors")
     test.Expect("the anchor control sets the center anchor and keeps the place", [] {
         const float minX = ui.element.offset.x + 960.0f - ui.element.extent.x * 0.5f;
         return ui.element.anchor == facet::CanvasAnchor::Center && std::fabs(minX - ui.savedPosition) < 0.01f;
+    });
+    test.Expect("the anchor control hides neither element", [] {
+        ImRect control = facet::internal::CanvasElementPartRect(ui.elementId, 9);
+        for (int k = 10; k < 18; ++k)
+            control.Add(facet::internal::CanvasElementPartRect(ui.elementId, k));
+        return control.GetWidth() > 0.0f && !control.Overlaps(facet::internal::CanvasElementPartRect(ui.elementId, 0)) &&
+               !control.Overlaps(facet::internal::CanvasElementPartRect(ui.cornerId, 0));
     });
     test.Do([] { ui.savedPosition = ui.element.offset.x; });
     // The lower left part of the element: the anchor control sits beside its top right.

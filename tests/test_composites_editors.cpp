@@ -1200,6 +1200,65 @@ TEST_CASE("Canvas element: a handle resizes it and the anchor control keeps its 
     CHECK(ui.Part(0).Min.y == doctest::Approx(before.Min.y).epsilon(0.001));
 }
 
+namespace
+{
+
+// The anchor control of the canvas element `id` as drawn in the last frame: its nine cells.
+ImRect CanvasAnchorControlRect(ImGuiID id)
+{
+    ImRect control = facet::internal::CanvasElementPartRect(id, 9);
+    for (int k = 10; k < 18; ++k)
+        control.Add(facet::internal::CanvasElementPartRect(id, k));
+    return control;
+}
+
+ImRect CanvasElementScreenRect(ImGuiID id)
+{
+    return facet::internal::CanvasElementPartRect(id, 0);
+}
+
+} // namespace
+
+TEST_CASE("Canvas element: the anchor control hides no other element and moves beside the canvas")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    CanvasUi ui;
+    // The element fills the left edge from top to bottom; the other fills the rest of the canvas right
+    // of it, so no spot beside, under or above the element inside the canvas is free.
+    ui.element = {facet::CanvasAnchor::TopLeft, {0.0f, 0.0f}, {200.0f, 500.0f}};
+    ui.other = {facet::CanvasAnchor::TopLeft, {250.0f, 0.0f}, {750.0f, 500.0f}};
+    ImGuiID otherId = 0;
+    session.SetUi([&] {
+        ui.Draw(session);
+        ImGui::PushID("canvas");  // the canvas scopes its elements' ids
+        otherId = ImGui::GetID("Other");
+        ImGui::PopID();
+    });
+    session.Frames(2);
+    session.Click(ui.Part(0).GetCenter());
+    session.Frames(2);
+    const ImRect canvas = session.ItemRect("canvas");
+    const ImRect control = CanvasAnchorControlRect(ui.id);
+    REQUIRE(control.GetWidth() > 0.0f);
+    CHECK(control.Min.x >= canvas.Max.x);  // beside the canvas, on its right
+    CHECK_FALSE(control.Overlaps(CanvasElementScreenRect(ui.id)));
+    CHECK_FALSE(control.Overlaps(CanvasElementScreenRect(otherId)));
+    // Its cells still take clicks outside the canvas clip rect.
+    session.Click(ui.Part(9 + static_cast<int>(facet::CanvasAnchor::BottomRight)).GetCenter());
+    session.Frames(1);
+    CHECK(ui.element.anchor == facet::CanvasAnchor::BottomRight);
+
+    // With room right of the element and clear of the other element, it stays inside the canvas.
+    ui.element = {facet::CanvasAnchor::TopLeft, {0.0f, 0.0f}, {200.0f, 100.0f}};
+    ui.other = {facet::CanvasAnchor::TopLeft, {900.0f, 400.0f}, {100.0f, 100.0f}};
+    session.Frames(2);
+    const ImRect inside = CanvasAnchorControlRect(ui.id);
+    CHECK(inside.Min.x >= CanvasElementScreenRect(ui.id).Max.x);
+    CHECK(inside.Max.x <= canvas.Max.x);
+    CHECK_FALSE(inside.Overlaps(CanvasElementScreenRect(otherId)));
+}
+
 TEST_CASE("Canvas element: one larger than the canvas moves, Escape puts a drag back, read-only writes nothing")
 {
     facet::test::Session session;

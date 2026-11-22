@@ -814,6 +814,8 @@ Composites, editors and canvas:
 - **Canvas screen** keeps the window background with a hairline in the control boundary color,
   so the area elements are dragged in has a 3:1 edge; its grid stays in separator so it does not
   compete with the elements.
+- **Canvas anchor control** sits beside the selected element only where it hides no other
+  element, else beside the canvas: a picker that covers the layout it edits hides what it places.
 
 ## Effects
 
