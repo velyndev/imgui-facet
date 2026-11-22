@@ -54,7 +54,10 @@
 //     index is the request's part (part -1: the first row).
 //   - Driven lists (ListViewDesc::highlight): the keyboard focus stays on the driving item (a text
 //     field typing a filter, a dropdown button), and the view keeps an active row instead, drawn
-//     with the hover fill and the focus ring and scrolled into view when it moves. With keyOwner
+//     with the hover fill and scrolled into view when it moves. It shows the focus ring only while
+//     the keyboard modality is on and the keys (or the driving item) put it there: a list opened by
+//     Enter or moved by an arrow shows it, a list opened by a click or a row the pointer moved to
+//     does not. With keyOwner
 //     it reads Up and Down (from no row: the first or the last), Page Up and Down (a page of
 //     visible rows), Home and End, and Enter, Keypad Enter or Tab (activate the active row) owned
 //     by keyOwner, skipping disabled entries; Escape is the owner's (it closes the level). The
@@ -219,7 +222,9 @@ struct ListRowDesc
     bool selected = false;     // shown selected (inside a scope, a request of this frame may change it)
     bool disabled = false;     // shown, not focusable, skipped by the arrows
     bool tabStop = false;      // the row Tab lands on (one per list)
-    bool highlighted = false;  // the active row of a driven list: the hover fill and the focus ring
+    // The active row of a driven list: the hover fill, and the focus ring only while the keyboard
+    // modality is on (the pointer moving the row never shows the ring).
+    bool highlighted = false;
     float indent = 0.0f;       // pixels before row.content (a tree depth)
     int part = -1;             // the part of the group's forced state this row answers to (captures)
     // A row over space the container laid out itself (a table row spanning its cells): the row is
@@ -249,6 +254,7 @@ private:
     ImGuiWindow* window = nullptr;
     const ForcedItemRequest* forced = nullptr;
     bool hasRing = false;
+    bool ringFromHighlight = false;
     ItemState ring;
 };
 

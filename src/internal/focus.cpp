@@ -9,7 +9,6 @@
 
 #include "facet/core/color.h"
 #include "facet/core/draw.h"
-#include "facet/core/effects.h"
 #include "facet/core/scale.h"
 #include "facet/core/theme.h"
 #include "internal/multi_handle.h"
@@ -33,9 +32,6 @@ constexpr ImGuiKey kModalityKeys[] = {
     ImGuiKey_PageUp,   ImGuiKey_PageDown,  ImGuiKey_Home,       ImGuiKey_End,     ImGuiKey_Space,
     ImGuiKey_Enter,    ImGuiKey_KeypadEnter, ImGuiKey_Escape,
 };
-
-// Share of the ring color in its halo.
-constexpr float kHaloAlpha = 0.35f;
 
 void UpdateModality()
 {
@@ -121,9 +117,14 @@ ImVec4 FocusRingColor()
     return T().colors.focusRing;
 }
 
+float FocusRingWidth()
+{
+    return std::max(1.0f, PxSnapped(T().metrics.focusRingWidth));
+}
+
 float FocusRingOutset()
 {
-    return HairlineThickness() + PxSnapped(T().metrics.focusRingWidth);
+    return HairlineThickness() + FocusRingWidth();
 }
 
 ImRect FocusRingRect(const ImRect& rect)
@@ -139,14 +140,11 @@ void DrawFocusRing(ImDrawList* drawList, const ImRect& rect, float radius, float
     amount = std::clamp(amount, 0.0f, 1.0f);
     if (drawList == nullptr || amount <= 0.0f)
         return;
-    const Theme& theme = T();
-    const float width = PxSnapped(theme.metrics.focusRingWidth);
+    const float width = FocusRingWidth();
     const float offset = FocusRingOutset();
     const ImRect ring = FocusRingRect(rect);
     const float ringRadius = std::max(0.0f, radius) + offset;
     const ImVec4 color = FocusRingColor();
-    DrawGlow(drawList, ring.Min, ring.Max, ringRadius, ToU32(WithAlpha(color, color.w * kHaloAlpha * amount)),
-             Px(theme.spacing.xs));
     const ImU32 stroke = ToU32(WithAlpha(color, color.w * amount));
     if (shape == RingShape::Round)
         StrokeRoundRect(drawList, ring.Min, ring.Max, stroke, ringRadius, width, corners);
@@ -159,6 +157,23 @@ void DrawItemFocusRing(const ItemState& item, float radius, ImDrawFlags corners,
     if (!item.visible || item.focusAmount <= 0.0f || ImGui::GetCurrentContext() == nullptr)
         return;
     DrawFocusRing(ImGui::GetWindowDrawList(), item.rect, radius, item.focusAmount, corners, shape);
+}
+
+void DrawFocusRingInside(ImDrawList* drawList, const ImRect& rect, float radius, float amount, ImDrawFlags corners)
+{
+    amount = std::clamp(amount, 0.0f, 1.0f);
+    if (drawList == nullptr || amount <= 0.0f || rect.GetWidth() <= 0.0f || rect.GetHeight() <= 0.0f)
+        return;
+    const ImVec4 color = FocusRingColor();
+    StrokeRect(drawList, rect.Min, rect.Max, ToU32(WithAlpha(color, color.w * amount)), std::max(0.0f, radius),
+               FocusRingWidth(), corners);
+}
+
+void DrawItemFocusRingInside(const ItemState& item, float radius, ImDrawFlags corners)
+{
+    if (!item.visible || item.focusAmount <= 0.0f || ImGui::GetCurrentContext() == nullptr)
+        return;
+    DrawFocusRingInside(ImGui::GetWindowDrawList(), item.rect, radius, item.focusAmount, corners);
 }
 
 Subsystem FocusSubsystem()

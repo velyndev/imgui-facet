@@ -41,6 +41,7 @@ const BorderRuleException kExceptions[] = {
     FACET_BORDER_EXCEPTION("src/core/draw.cpp", "thickness", "StrokeRoundRect forwards its own parameter")
     FACET_BORDER_EXCEPTION("src/core/squircle.cpp", "thickness", "StrokeContinuousRect forwards its own parameter")
     FACET_BORDER_EXCEPTION("src/internal/focus.cpp", "width", "the focus ring: metrics.focusRingWidth, not an outline")
+    FACET_BORDER_EXCEPTION("src/internal/focus.cpp", "FocusRingWidth()", "the focus ring inside rows and tiles")
     FACET_BORDER_EXCEPTION("src/image/icon_atlas.cpp", "thickness", "the crossed box glyph of a missing icon, a hairline")
 #include "border_rule/controls.inc"
 #include "border_rule/surfaces.inc"

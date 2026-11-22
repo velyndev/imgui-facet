@@ -93,8 +93,11 @@ struct RowEnv
     bool multi = false;         // a multi-select scope of this list is open
     SelectionPill* pill = nullptr;  // the chosen row targets the pill instead of a fill
     const ForcedItemRequest* forced = nullptr;
-    ItemState* ring = nullptr;      // the focused row, for the ring drawn at the end
+    ItemState* ring = nullptr;      // the focused row, for the ring drawn at the end; its rect is the row's fill
     bool* hasRing = nullptr;
+    // Set with the ring: true when the ring belongs to the current row of a driven list rather than
+    // to the keyboard focus, so the owner shows it only while the keys put that row there.
+    bool* ringFromHighlight = nullptr;
 };
 
 // How a row is placed beyond its rectangle (ListRowDesc::inPlace, allowOverlap, ownRing).
@@ -170,11 +173,16 @@ ListRowState RunRow(const RowEnv& env, ImGuiID id, const ImRect& rect, ImGuiSele
     if (env.ring != nullptr && !placement.ownRing &&
         (item.focusAmount > 0.0f || (highlighted && item.visible && !item.disabled)))
     {
-        // The active row of a driven list shows the ring the keyboard focus would.
+        // The current row of a driven list may show the ring the keyboard focus would, when the keys
+        // put it there; the owner decides with ringFromHighlight. The ring sits inside the fill.
         *env.ring = item;
+        env.ring->rect = fill;
+        const bool fromHighlight = highlighted && item.focusAmount <= 0.0f;
         if (highlighted)
             env.ring->focusAmount = 1.0f;
         *env.hasRing = true;
+        if (env.ringFromHighlight != nullptr)
+            *env.ringFromHighlight = fromHighlight;
     }
 
     if (placement.inPlace)
@@ -287,6 +295,12 @@ struct ViewState
     ImGuiID focusedId = 0;
     int revealRow = -1;
     ListRangeAnchor anchor;    // the Shift range start at the end of the last frame
+    // A driven list's current row: whether the keys (or the driving item) put it where it is, as
+    // opposed to the pointer; the row at the end of the last frame; and the last frame the view
+    // was shown, so a list opened anew starts from the modality of its opening.
+    bool highlightByKeys = false;
+    int lastHighlight = -1;
+    int shownFrame = -1;
 };
 
 struct ViewFrame
@@ -311,6 +325,7 @@ struct ViewFrame
     bool pillOpen = false;
     ItemState ring;
     bool hasRing = false;
+    bool ringFromHighlight = false;
     bool changed = false;
     int activated = -1;
     bool driven = false;  // desc.highlight is set
@@ -343,6 +358,7 @@ void ResetFrame(ViewFrame& frame)
     frame.pillOpen = false;
     frame.ring = {};
     frame.hasRing = false;
+    frame.ringFromHighlight = false;
     frame.changed = false;
     frame.activated = -1;
     frame.driven = false;
@@ -498,6 +514,7 @@ void DriveHighlight(ViewFrame& frame)
     if (target != active && target >= 0)
     {
         active = target;
+        frame.state->highlightByKeys = true;
         ScrollAreaRevealRect(frame.window, RowRect(frame, target), ScrollAlign::Nearest, !jump);
     }
     const bool activate = ImGui::IsKeyPressed(ImGuiKey_Enter, ImGuiInputFlags_None, owner) ||
@@ -799,6 +816,7 @@ void ListRowGroup::Begin(const ForcedItemRequest* forcedRequest)
     window = ImGui::GetCurrentContext() != nullptr ? GImGui->CurrentWindow : nullptr;
     forced = forcedRequest;
     hasRing = false;
+    ringFromHighlight = false;
     ring = {};
 }
 
@@ -816,6 +834,7 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
     env.forced = forced != nullptr ? forced : &kNoForce;
     env.ring = &ring;
     env.hasRing = &hasRing;
+    env.ringFromHighlight = &ringFromHighlight;
     RowPlacement placement;
     placement.inPlace = desc.inPlace;
     placement.allowOverlap = desc.allowOverlap;
@@ -826,10 +845,14 @@ ListRowState ListRowGroup::Row(ImGuiID id, const ImRect& rect, const ListRowDesc
 
 void ListRowGroup::End()
 {
-    if (window != nullptr && hasRing && GImGui->CurrentWindow == window)
-        DrawItemFocusRing(ring, Px(T().radii.control));
+    // A highlighted row (ListRowDesc::highlighted) shows the ring only while the keyboard modality
+    // is on; the container moves that row with the keys, the pointer moves only its fill.
+    const bool ringShown = !ringFromHighlight || KeyboardModality();
+    if (window != nullptr && hasRing && ringShown && GImGui->CurrentWindow == window)
+        DrawItemFocusRingInside(ring, Px(T().radii.control));
     window = nullptr;
     hasRing = false;
+    ringFromHighlight = false;
 }
 
 int ListJumpToEnd(const ListJumpDesc& desc, bool end, bool* changed)
@@ -1006,6 +1029,15 @@ bool BeginListView(ImGuiID id, const ListViewDesc& desc)
         frame.driven = true;
         if (*desc.highlight < -1 || *desc.highlight >= desc.rowCount)
             *desc.highlight = -1;
+        // Who put the current row there: a list opened anew starts from the modality of its
+        // opening (Enter or Alt+Down show the ring at once, a click does not); a row the driving
+        // item moved since the last frame (typeahead, a filter) counts as moved by the keys.
+        const int frameCount = ImGui::GetFrameCount();
+        if (state.shownFrame != frameCount - 1)
+            state.highlightByKeys = KeyboardModality();
+        else if (*desc.highlight != state.lastHighlight)
+            state.highlightByKeys = true;
+        state.shownFrame = frameCount;
         if (desc.keyOwner != 0)
             DriveHighlight(frame);
     }
@@ -1131,6 +1163,7 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
     env.forced = &frame.forced;
     env.ring = &frame.ring;
     env.hasRing = &frame.hasRing;
+    env.ringFromHighlight = &frame.ringFromHighlight;
     const bool highlighted = frame.driven && *desc.highlight == index;
     ListRowState row =
         RunRow(env, id, RowRect(frame, index), index, selected, disabled, tabStop, index, 0.0f, highlighted);
@@ -1144,7 +1177,10 @@ ListRowState ListViewRow(int index, const ListRowOptions& options)
         // The pointer moving over a row makes it the active one; a click activates it.
         const ImGuiIO& io = ImGui::GetIO();
         if (row.item.hovered && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f))
+        {
             *desc.highlight = index;
+            frame.state->highlightByKeys = false;
+        }
         if (row.item.pressed && !row.item.keyboardPressed)
             ActivateHighlight(frame, index);
         // A click already activates a row of a driven list, so a double click is two activations
@@ -1185,8 +1221,13 @@ ListViewResult EndListView()
         frame.pill.End(ToU32(T().colors.accentSubtle), radius);
         frame.pillOpen = false;
     }
-    if (frame.hasRing)
-        DrawItemFocusRing(frame.ring, radius);
+    // The current row of a driven list shows the ring only while the keys put it there: a row the
+    // pointer moved to shows its fill, never the ring.
+    const bool ringShown = !frame.ringFromHighlight || (frame.state->highlightByKeys && KeyboardModality());
+    if (frame.hasRing && ringShown)
+        DrawItemFocusRingInside(frame.ring, radius);
+    if (frame.driven)
+        frame.state->lastHighlight = *frame.desc.highlight;
     EndScrollAreaCore();
     const ListViewResult result{frame.changed, frame.activated};
     --views.depth;
@@ -1537,7 +1578,7 @@ ListTreeResult EndListTree()
     }
     const float radius = Px(T().radii.control);
     if (frame.hasRing)
-        DrawItemFocusRing(frame.ring, radius);
+        DrawItemFocusRingInside(frame.ring, radius);
     // The content ends below the last row (the loading rows are not items), or below the room of
     // the empty state.
     frame.window->DC.CursorPos = ImVec2(frame.left, TreeRowRect(frame, std::max(frame.position, 1)).Min.y);

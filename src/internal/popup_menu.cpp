@@ -267,9 +267,7 @@ MenuRowResult MenuRow(ImGuiID level, const char* label, const MenuRowDesc& desc)
         }
         if (desc.shortcut != nullptr)
             drawList->AddText(ImVec2(right - shortcutWidth, textY), secondary, desc.shortcut);
-        ImRect ring = row.rect;
-        ring.Expand(-FocusRingOutset());
-        DrawFocusRing(drawList, ring, std::max(0.0f, radius - FocusRingOutset()), row.focusAmount);
+        DrawFocusRingInside(drawList, row.rect, radius, row.focusAmount);
     }
     PopTextStyle();
     return result;
