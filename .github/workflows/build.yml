@@ -1,0 +1,44 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    # Windows Server 2025 with Visual Studio 2026 (generator "Visual Studio 18 2026", toolset
+    # v145), the generator and toolset of the msvc-x64 preset. The label names the image
+    # explicitly, so a later move of windows-latest does not change the compiler.
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Facet loads Segoe UI from the system at run time; the tests that draw text need it.
+      - name: List the system fonts Facet loads
+        shell: pwsh
+        run: |
+          foreach ($name in 'SegUIVar.ttf', 'segoeui.ttf', 'seguisb.ttf', 'segoeuib.ttf') {
+            $path = Join-Path $env:WINDIR "Fonts\$name"
+            if (Test-Path $path) { "found: $name" } else { "missing: $name" }
+          }
+          if (-not (Test-Path (Join-Path $env:WINDIR 'Fonts\segoeui.ttf'))) {
+            '::warning::segoeui.ttf is missing: Facet falls back to the default font and text tests may fail'
+          }
+
+      # The tests and the consumer example create WARP devices, so no GPU is needed. The
+      # test that needs the D3D11 debug layer prints "skipped" with the reason when the layer
+      # is not installed; the verbose test output keeps that line in the log.
+      - name: Configure
+        run: cmake --preset msvc-x64 -DFACET_BUILD_CONSUMER_TEST=ON -DFACET_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset msvc-x64-release --parallel
+
+      - name: Test
+        run: ctest --preset msvc-x64-release --verbose
