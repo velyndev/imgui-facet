@@ -116,23 +116,28 @@ SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, flo
     f.widget = ImRect(origin, ImVec2(origin.x + width, origin.y + height));
     f.label = MeasureFrontLabel(label, m.control.size, width);
     f.label.width = std::round(f.label.width);
+    // Narrower than the label column plus the narrowest row control, the label takes only its text
+    // width (control.h). The labelled sliders that start at one x share the widest of those widths
+    // (row_layout.h), so their tracks still start at one x; never more than the label's share of
+    // this slider, so the control keeps its room.
+    const float minControl = std::max(m.knob * 2.0f, Px(T().layout.minRowControl));
+    if (f.label.text != nullptr && width < RowFrontLabelColumn() + std::round(Px(T().layout.minRowControl)))
+    {
+        const float shared = RowLeadingColumn(origin.x, f.label.width);
+        f.label.width = std::max(f.label.width, std::min(shared, std::floor(width * kFrontLabelMaxShare)));
+    }
     f.labelPos = ImVec2(origin.x, CenteredTextY(origin.y, height));
     float controlMin = origin.x + f.label.width;
     float controlMax = origin.x + width;
     float column = valueWidth > 0.0f ? std::ceil(valueWidth) + m.valueGap : 0.0f;
     // The sliders of one column share their value column (row_layout.h), so their tracks end at
-    // one x and keep one length whatever values they show.
-    // A shared column that would leave the track shorter than the narrowest row control gives
-    // way to the slider's own column first.
+    // one x and keep one length whatever values they show. Where the shared column would leave the
+    // track shorter than the narrowest row control, the value column is dropped. The sliders of
+    // one column share their label column too, so they all decide alike: every track of the column
+    // keeps one start and one end.
     if (column > 0.0f)
-    {
-        const float shared = RowTrailingColumn(controlMax, column, columnKind);
-        if (controlMax - controlMin - shared >= std::max(m.knob * 2.0f, Px(T().layout.minRowControl)))
-            column = shared;
-    }
-    // The value column gives way first, so the track keeps the length of the narrowest control a
-    // labelled row keeps beside its label.
-    if (controlMax - controlMin - column < std::max(m.knob * 2.0f, Px(T().layout.minRowControl)))
+        column = RowTrailingColumn(controlMax, column, columnKind);
+    if (controlMax - controlMin - column < minControl)
         column = 0.0f;
     f.value = ImRect(controlMax - column + (column > 0.0f ? m.valueGap : 0.0f), origin.y, controlMax, origin.y + height);
     controlMax -= column;

@@ -82,11 +82,12 @@ inline constexpr int kSliderColumnRange = 1;
 inline constexpr int kSliderColumnField = 2;  // the number field of SliderWithInput
 
 // Lays out a slider at `origin` (pixels). Horizontal: `width` pixels wide and one control height
-// high, the label in front in the label column (control.h), then the control, then a value column
-// of at least `valueWidth` pixels, shared with the sliders of `columnKind` that end at the same x
-// (0 for none; the shared width gives way to the own one, and the own one is dropped, when the
-// control would get shorter than layout.minRowControl). Vertical: one control height wide and
-// `length` pixels high, no label and no value column.
+// high, the label in front in the label column (control.h; below the label column plus
+// layout.minRowControl the widest text width of the labelled sliders that start at the same x),
+// then the control, then a value column of at least `valueWidth` pixels, shared with the sliders of
+// `columnKind` that end at the same x (0 for none; dropped when the control would get shorter than
+// layout.minRowControl, which the sliders of one column decide alike). Vertical: one control
+// height wide and `length` pixels high, no label and no value column.
 SliderFrame LayoutSliderFrame(ImVec2 origin, const char* label, float width, float valueWidth, const SliderMetrics& m,
                               Orientation orientation, float length, int columnKind = kSliderColumnSingle);
 

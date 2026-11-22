@@ -12,6 +12,7 @@
 
 #include <facet/facet.h>
 
+#include "internal/row_layout.h"
 #include "support/session.h"
 #include "widgets/sliders/pad_core.h"
 #include "widgets/sliders/range_core.h"
@@ -2047,5 +2048,45 @@ TEST_CASE("Sliders stacked in a column start and end their tracks at one x whate
         CHECK(level > 0.0f);
         CHECK(level < 1.0f);
         CHECK(gain == doctest::Approx(level).epsilon(0.001));
+    }
+}
+
+TEST_CASE("A narrow column of sliders keeps one track start and end, with or without its value column")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    // Narrower than the label column plus layout.minRowControl, so each label takes its text width.
+    const float narrow = facet::internal::RowFrontLabelColumn() + facet::Px(facet::T().layout.minRowControl) - 6.0f;
+    const char* const labels[] = {"Level", "Frequency", "Gain"};
+    for (const float valueWidth : {6.0f, 60.0f})
+    {
+        CAPTURE(valueWidth);
+        facet::internal::SliderFrame frames[3];
+        session.SetUi([&] {
+            const facet::internal::SliderMetrics m = facet::internal::GetSliderMetrics(facet::ControlSize::Regular);
+            for (int i = 0; i < 3; ++i)
+            {
+                // Each slider asks for a value column of its own width; the middle one the widest.
+                const float own = valueWidth * (i == 1 ? 1.5f : 1.0f);
+                frames[i] = facet::internal::LayoutSliderFrame(ImGui::GetCursorScreenPos(), labels[i], narrow, own, m,
+                                                               facet::Orientation::Horizontal, 0.0f);
+                ImGui::Dummy(frames[i].widget.GetSize());
+            }
+        });
+        session.Frames(3);
+        for (int i = 1; i < 3; ++i)
+        {
+            CAPTURE(i);
+            CHECK(frames[i].track.Min.x == frames[0].track.Min.x);
+            CHECK(frames[i].track.Max.x == frames[0].track.Max.x);
+            CHECK(frames[i].value.GetWidth() == frames[0].value.GetWidth());
+        }
+        // The short values fit beside the tracks, the long ones leave every slider of the column.
+        if (valueWidth < 10.0f)
+            CHECK(frames[0].value.GetWidth() > 0.0f);
+        else
+            CHECK(frames[0].value.GetWidth() == 0.0f);
+        // The label in front still ends where the longest one needs it.
+        CHECK(frames[0].control.Min.x - frames[0].widget.Min.x >= frames[1].label.shown.width);
     }
 }

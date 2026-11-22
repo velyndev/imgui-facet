@@ -340,8 +340,10 @@ Control anatomy (`src/internal/control.h`), the parts every widget family shares
   because it sits inline among other controls where a column would only open a gap.
 - **Trailing columns** (a slider's value, the number field beside a slider) are shared by the
   controls of one window that end at one x and show the same kind of value, at the widest of them,
-  so the tracks of a column end at one x too and keep one length; a shared column that would leave
-  a track shorter than layout.minRowControl gives way to the slider's own.
+  so the tracks of a column end at one x too and keep one length. A shared column that would leave
+  a track shorter than layout.minRowControl is dropped by every slider of the column alike, and in
+  a narrow column the sliders share the widest label text width as well, because a column whose
+  tracks start and end at different x reads as broken.
 - **Labels above** a group or a tall control use the control text style and stand spacing.xs above
   it, the same gap as the message line below, so label, control and message read as one block.
 - **One message line** for every control: Footnote, spacing.xs under it, help text in

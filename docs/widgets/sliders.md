@@ -14,7 +14,10 @@ settings row (`layout.labelColumn`; a longer label ends in an ellipsis and shows
 keyboard focus), and sliders of one window that end at one x share their value column (single
 values, ranges and the number field of SliderWithInput each among their own kind), so their tracks
 start and end at one x whatever their labels and values say. A slider narrower than the label
-column plus `layout.minRowControl` gives its label only the text width, at most half the widget.
+column plus `layout.minRowControl` gives its label only the text width, at most half the widget;
+the labelled sliders that start at one x then share the widest of those widths, so a narrow column
+of sliders still starts its tracks at one x. Where the shared value column would leave a track
+shorter than `layout.minRowControl`, every slider of that column drops its value text alike.
 
 ## The multi-handle model
 
@@ -54,7 +57,8 @@ bool Slider(const char* label, int* value, int min, int max, const SliderOptions
 A track with an accent fill and a round knob, the visible label in front and the formatted value at
 the end, inside the widget width (the available width by default). The value column is as wide as
 the widest of the two range ends and the values shown so far, so it does not jitter; it gives way
-when the track would get shorter than the `layout.minRowControl` token, and the label is cut at
+when the track would get shorter than the `layout.minRowControl` token (for every slider of its
+column at once), and the label is cut at
 half the width with its full text on hover and keyboard focus. A track shorter than its knob gets
 a smaller knob, so nothing leaves the row. Ticks closer than three tick sizes are thinned. The knob follows the control size (Small, Regular, Large) and sits on whole
 pixels.

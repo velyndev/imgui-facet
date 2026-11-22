@@ -457,8 +457,16 @@ RowTrailingRecord* RowTrailingRecords()
     return records;
 }
 
-// The shared column behind RowTrailingColumn (row_layout.h).
-float RowSharedColumn(float edge, float width, int kind)
+// Which end of the control a shared column sits at; part of the key, so a leading and a trailing
+// column never share a record.
+enum class RowSharedColumnSide
+{
+    Leading,
+    Trailing,
+};
+
+// The shared column behind RowLeadingColumn and RowTrailingColumn (row_layout.h).
+float RowSharedColumn(float edge, float width, int kind, RowSharedColumnSide side)
 {
     const ImGuiContext* g = ImGui::GetCurrentContext();
     if (g == nullptr || g->CurrentWindow == nullptr)
@@ -474,7 +482,8 @@ float RowSharedColumn(float edge, float width, int kind)
         ImGuiID column;
         int edge;
         int kind;
-    } const keyData{window->ID, RowColumnKey(), static_cast<int>(std::lround(contentEdge)), kind};
+        int side;
+    } const keyData{window->ID, RowColumnKey(), static_cast<int>(std::lround(contentEdge)), kind, static_cast<int>(side)};
     // The records are shared by every Dear ImGui context of the process: the context is part of
     // the key, so two contexts with windows of one name never share a column.
     const ImGuiContext* context = g;
@@ -515,9 +524,14 @@ float RowSharedColumn(float edge, float width, int kind)
 
 } // namespace
 
+float RowLeadingColumn(float left, float width, int kind)
+{
+    return RowSharedColumn(left, width, kind, RowSharedColumnSide::Leading);
+}
+
 float RowTrailingColumn(float right, float width, int kind)
 {
-    return RowSharedColumn(right, width, kind);
+    return RowSharedColumn(right, width, kind, RowSharedColumnSide::Trailing);
 }
 
 void ClearRowTrailingColumns()

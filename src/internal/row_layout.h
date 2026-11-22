@@ -129,7 +129,14 @@ inline constexpr int kRowTrailingColumns = 32;
 // The edge counts relative to the window's content, so a window that moves keeps its columns;
 // each Dear ImGui context has columns of its own. Nothing is allocated.
 float RowTrailingColumn(float right, float width, int kind = 0);
-// Forgets every shared trailing column (facet::Shutdown through the widgets_common subsystem).
+// A column at the start of a control (a visible label in front that takes only its text width,
+// below the label column plus layout.minRowControl), shared like RowTrailingColumn by the controls
+// of one window and column key that start at `left` (screen pixels) and ask with the same `kind`,
+// so their controls start at one x in a narrow column too. Leading and trailing columns never
+// share a record.
+float RowLeadingColumn(float left, float width, int kind = 0);
+// Forgets every shared leading and trailing column (facet::Shutdown through the widgets_common
+// subsystem).
 void ClearRowTrailingColumns();
 
 // The y at which text in the current font sits on `baseline` (screen pixels).
