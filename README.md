@@ -130,8 +130,9 @@ type, motion, drawing, effects), Media (icons, images), Blocks (one page per sha
 block) and Widgets (one or more pages per widget family). The title bar holds the theme editor
 and, as far as the width allows, the theme mode and the UI scale. The editor changes radii,
 spacing, type sizes, control heights, line widths, motion, blur, shadows and the accent of the live
-theme, turns on the increased contrast variant, and copies the edits as C++ code. `--overlay`, or a switch in the editor, floats the gallery as a
-shell over a generated backdrop; F9 shows and hides it.
+theme, turns on the increased contrast variant (the Tokens page has the same switch next to the
+border tokens), and copies the edits as C++ code. `--overlay`, or a switch in the editor, floats
+the gallery as a shell over a generated backdrop; F9 shows and hides it.
 
 Besides its window it has a capture mode, which renders pages offscreen into PNG files, and a
 selftest mode, which operates the pages with scripted mouse and keyboard input and checks the

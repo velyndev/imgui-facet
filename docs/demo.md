@@ -19,8 +19,9 @@ group in the navigation:
     item and value is a labelled placeholder, and nothing changes outside the page. The two cards
     sit side by side in a wide window and one above the other in a narrow one.
 - Foundations
-  - Tokens: every color token with its live contrast ratios, the accent presets, spacing,
-    radii, control heights and the elevation levels.
+  - Tokens: every color token with its live contrast ratios, the border tokens and the knob face
+    marked quiet or increased contrast with an "Increased contrast" switch, the accent presets,
+    spacing, radii, control heights and the elevation levels.
   - Type: the text styles and weights, truncation, wrapping and match highlighting.
   - Motion: smoothing, a spring and a tween side by side with replay, reduce motion and
     slow-down switches, and their curves sampled at 240 and 30 frames per second.
@@ -123,7 +124,8 @@ The editor opens from the title bar as a pane beside the page (it floats over th
 Compact width) and changes the live theme; every change animates as a theme switch does. It holds:
 
 - the theme mode, the accent (the presets and a custom color), the UI scale and the increased
-  contrast switch (`facet::SetIncreasedContrast`), which lifts every outline and divider to 3:1;
+  contrast switch (`facet::SetIncreasedContrast`), which lifts every outline and divider to 3:1
+  (the Tokens page has the same switch next to the border tokens);
 - corner radii, spacing, type sizes and control heights, each as a factor over the preset's
   values, and under "Each token" every token of the group on its own (a token set on its own
   ignores the factor; its row's reset button returns it to the factor);

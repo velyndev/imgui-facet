@@ -351,7 +351,7 @@ keyboard focus. One item and one Tab stop under the label's id.
   scrolls the window, also over the pad.
 - **Options:** `step` snaps each axis to `min + n * step` (0 continuous); `grid` draws separator
   hairlines at every step when there are at most 32 per axis, and at the quarters otherwise;
-  `crosshair` (on by default) draws labelTertiary guide lines through the point and the two
+  `crosshair` (on by default) draws controlBorder guide lines through the point and the two
   values in Footnote at the edges of the frame, moved to the other side when the point comes
   near, and left out when the pad is too small for both; `format`, `formatter` and
   `formatterUser` format both readouts; `yDown` puts `min.y` at the top.
