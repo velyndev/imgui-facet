@@ -434,7 +434,26 @@ bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, std::span
 bool ConsoleView(const char* id, char* buffer, std::size_t bufferSize, int entryCount, LogGetter getter, void* user, const ConsoleViewOptions& options = {});
 ```
 
-Log view with a command field, history and Tab completion. Status: planned.
+A `LogView` over the caller's entries (`timestamps`, `state`, `emptyText` and `errorText` go to it)
+and a `TextField` for the command under it, with `placeholder` as its placeholder. The default width
+fills the available width and the default height the available height; the log takes what the field
+leaves. The log is virtualized by `LogView`, so a log of ten thousand lines costs a frame what a
+short one does (a unit test counts the getter calls).
+
+Typing writes the command per keystroke. Enter with text submits: the function returns true on that
+frame, the text stays for the caller to run, add to its history and clear, and the field gets the
+keyboard back in the next frame. Enter on an empty field submits nothing. Up and Down walk
+`history` (oldest first): the first Up keeps the text typed so far and shows the newest entry; Up at
+the oldest entry and Down at the typed text stay; Down past the newest entry gives the typed text
+back. Tab completes the word before the caret from `commands`, ranked with the fuzzy matcher: with
+no candidate a line above the field says `Strings::noResults` and the text stays; with one, the word
+becomes it and a space follows; with several the word grows to the prefix they share and the line
+lists them, and a Tab that cannot grow the word puts them in one per press. Typing hides the line.
+Tab completes only while the field holds text, so on an empty field it moves the focus on; while it
+holds text, Escape (which restores the text from activation) or Shift+Tab leave the field. Escape
+gives the text back as in every text field. `readOnly` keeps the log usable and the field
+read-only; `ImGui::BeginDisabled` disables both. Keeps the history position and the completion
+under the id. Status: ready.
 
 ### Usage of the search and app controls
 

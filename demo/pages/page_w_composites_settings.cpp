@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <iterator>
@@ -36,8 +37,9 @@ using facet::demo::Note;
 using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
 
-// Height of the console view, in multiples of the xxxl spacing token.
-constexpr float kViewSpans = 4.0f;
+// Heights of the console views, in design units.
+constexpr float kConsoleHeight = 200.0f;
+constexpr float kConsoleReadOnlyHeight = 110.0f;
 // Range of the example UI scale controls (1 is 100 percent).
 constexpr float kScaleMin = 0.75f;
 constexpr float kScaleMax = 2.0f;
@@ -46,9 +48,9 @@ constexpr float kThemeWidth = 260.0f;
 constexpr float kThemeNarrowWidth = 96.0f;
 constexpr float kScaleWidth = 320.0f;
 
-// Placeholder data: names like "Preset 1", nothing real.
-const facet::LogEntry kConsoleLines[] = {{"Output line 1"}, {"Output line 2", facet::LogLevel::Warning}};
-const char* const kCommands[] = {"command-1", "command-2"};
+// The log of the read-only console: placeholder lines.
+const facet::LogEntry kConsoleReadOnly[] = {{"Placeholder line 1"}, {"Placeholder line 2", facet::LogLevel::Warning}};
+
 // The page's presets: placeholder names, at most kMaxPresets, so creating one never allocates.
 constexpr int kMaxPresets = 8;
 struct DemoPreset
@@ -69,6 +71,7 @@ enum CaptureState
     kSettingsHits,  // a settings search query with one hit far down, revealed and highlighted
     kPresetMenu,    // the preset list's menu open
     kBindsFocus,    // the second row's capture field of the key bind list focused
+    kConsoleFocus,  // the console's command field focused
 };
 
 // Rows of the page's key bind list, and its width in design units.
@@ -81,9 +84,29 @@ constexpr int kSettingsCaptureFrames = 30;
 // Height of the scrolling area of example settings rows, in design units.
 constexpr float kSettingsAreaHeight = 150.0f;
 
+// The console's log and history: fixed rings, so a command never allocates.
+constexpr int kConsoleLines = 64;
+constexpr int kConsoleLineText = 96;
+constexpr int kConsoleHistory = 16;
+constexpr int kGeneratedLines = 10000;
+
+struct ConsoleLine
+{
+    char text[kConsoleLineText] = "";
+    facet::LogLevel level = facet::LogLevel::Info;
+};
+
 struct SettingsUi
 {
+    // ConsoleView
     std::string command;
+    ConsoleLine consoleLines[kConsoleLines];
+    int consoleStart = 0;
+    int consoleCount = 0;
+    char history[kConsoleHistory][64] = {};
+    int historyCount = 0;
+    int consoleState = 0;  // DataState
+    bool consoleGenerated = false;
 
     // SearchFilterBar
     std::string query;
@@ -754,13 +777,131 @@ void KeybindListSection(facet::demo::PageCtx& ctx)
                        {.groups = false, .width = DemoWidth(kBindsWidth), .readOnly = true});
 }
 
+void ConsolePrint(facet::LogLevel level, const char* fmt, ...) IM_FMTARGS(2);
+void ConsolePrint(facet::LogLevel level, const char* fmt, ...)
+{
+    // A full ring drops its oldest line.
+    int index = 0;
+    if (ui.consoleCount < kConsoleLines)
+    {
+        index = (ui.consoleStart + ui.consoleCount) % kConsoleLines;
+        ++ui.consoleCount;
+    }
+    else
+    {
+        index = ui.consoleStart;
+        ui.consoleStart = (ui.consoleStart + 1) % kConsoleLines;
+    }
+    va_list args;
+    va_start(args, fmt);
+    std::vsnprintf(ui.consoleLines[index].text, kConsoleLineText, fmt, args);
+    va_end(args);
+    ui.consoleLines[index].level = level;
+}
+
+bool ConsoleLineGetter(void*, int index, facet::LogEntry* out)
+{
+    const ConsoleLine& line = ui.consoleLines[(ui.consoleStart + index) % kConsoleLines];
+    out->text = line.text;
+    out->level = line.level;
+    return true;
+}
+
+bool GeneratedLineGetter(void* user, int index, facet::LogEntry* out)
+{
+    char* text = static_cast<char*>(user);
+    std::snprintf(text, kConsoleLineText, "Generated placeholder line %d", index + 1);
+    out->text = text;
+    out->level = index % 50 == 49 ? facet::LogLevel::Warning : facet::LogLevel::Info;
+    return true;
+}
+
+const char* const kConsoleCommands[] = {"clear", "echo", "help", "lines"};
+
+// Runs a command of the page's small interpreter, which only prints into the page's log.
+void ConsoleRun(const std::string& command)
+{
+    ConsolePrint(facet::LogLevel::Debug, "> %s", command.c_str());
+    const std::size_t space = command.find(' ');
+    const std::string name = command.substr(0, space);
+    if (name == "clear")
+        ui.consoleCount = ui.consoleStart = 0;
+    else if (name == "echo")
+        ConsolePrint(facet::LogLevel::Info, "%s", space == std::string::npos ? "" : command.c_str() + space + 1);
+    else if (name == "help")
+        ConsolePrint(facet::LogLevel::Info, "Commands: clear, echo <text>, help, lines");
+    else if (name == "lines")
+        ConsolePrint(facet::LogLevel::Info, "%d lines in the log", ui.consoleCount);
+    else
+        ConsolePrint(facet::LogLevel::Error, "Unknown command: %s", name.c_str());
+    // The history keeps the newest commands, oldest first.
+    if (ui.historyCount == kConsoleHistory)
+    {
+        for (int i = 1; i < kConsoleHistory; ++i)
+            std::memcpy(ui.history[i - 1], ui.history[i], sizeof(ui.history[i]));
+        --ui.historyCount;
+    }
+    std::snprintf(ui.history[ui.historyCount++], sizeof(ui.history[0]), "%s", command.c_str());
+}
+
+void ConsoleSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("ConsoleView");
+    Paragraph("A log with a command field. Enter runs a command of this page's small interpreter (help lists "
+              "them), Up and Down walk the history, Tab completes a command name. The generated log has ten "
+              "thousand placeholder lines; only the visible ones are read each frame.");
+    static const char* const kStates[] = {"Ready", "Loading", "Error"};
+    LabeledRow("Data state");
+    facet::SegmentedControl("##console state", &ui.consoleState, kStates);
+    LabeledRow("Generated log");
+    facet::Toggle("##generated", &ui.consoleGenerated);
+    ctx.Probe("comp.console.generated");
+    const char* history[kConsoleHistory];
+    for (int i = 0; i < ui.historyCount; ++i)
+        history[i] = ui.history[i];
+    const facet::ConsoleViewOptions options{
+        .history = std::span<const char* const>(history, static_cast<std::size_t>(ui.historyCount)),
+        .commands = kConsoleCommands,
+        .placeholder = "Placeholder command, try help",
+        .state = static_cast<facet::DataState>(ui.consoleState),
+        .width = DemoWidth(kBindsWidth),
+        .height = kConsoleHeight,
+    };
+    LabeledRow("Console");
+    if (ctx.capture && ctx.captureState == kConsoleFocus)
+        ctx.ForceNextItemState(ForcedItemState::Focused, 1);
+    static char generatedText[kConsoleLineText];
+    const bool submitted = ui.consoleGenerated
+                               ? facet::ConsoleView("##console", &ui.command, kGeneratedLines, &GeneratedLineGetter,
+                                                    generatedText, options)
+                               : facet::ConsoleView("##console", &ui.command, ui.consoleCount, &ConsoleLineGetter, nullptr,
+                                                    options);
+    ctx.Probe("comp.console");
+    if (ctx.probes != nullptr)
+    {
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const float line = facet::ControlHeight(facet::ControlSize::Inherit);
+        facet::demo::ProbeRect(ctx, "comp.console.field", 0, ImVec2(min.x, max.y - line), ImVec2(min.x + facet::Px(120.0f), max.y));
+    }
+    if (ctx.capture && ctx.captureState == kConsoleFocus)
+        ctx.RevealInCapture(0.5f);
+    if (submitted)
+    {
+        ConsoleRun(ui.command);
+        ui.command.clear();
+    }
+    LabeledRow("Read-only");
+    std::string readOnlyCommand = "help";
+    facet::ConsoleView("##console read-only", &readOnlyCommand, std::span<const facet::LogEntry>(kConsoleReadOnly),
+                       {.width = DemoWidth(kBindsWidth), .height = kConsoleReadOnlyHeight, .readOnly = true});
+}
+
 } // namespace
 
 FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
-                "accent popover", "search focused", "settings hits", "preset menu", "binds focused")
+                "accent popover", "search focused", "settings hits", "preset menu", "binds focused", "console focused")
 {
-    const facet::Theme& theme = facet::T();
-    const float viewHeight = theme.spacing.xxxl * kViewSpans;
 
     facet::demo::PageHeader("Search and app controls",
                             "Search filter bars, settings search, key bind and preset lists, theme mode, accent and "
@@ -791,9 +932,7 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
         facet::EndOnboarding();
     }
 
-    SectionHeader("Console");
-    LabeledRow("Console view");
-    facet::ConsoleView("console", &ui.command, kConsoleLines, {.commands = kCommands, .height = viewHeight});
+    ConsoleSection(ctx);
 }
 
 FACET_DEMO_SELFTEST("composites-settings")
@@ -994,4 +1133,30 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.ExpectNear("Ctrl+= zooms the example scale in", [] { return ui.uiScale; }, 1.25, 0.001);
     test.KeyPress(ImGuiKey_0 | ImGuiMod_Ctrl);
     test.ExpectNear("Ctrl+0 resets it", [] { return ui.uiScale; }, 1.0, 0.001);
+
+    // ConsoleView: run commands, complete with Tab, walk the history.
+    test.Click("comp.console.field");
+    test.Type("echo hi");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Enter runs echo into the log and the page clears the field", [] {
+        return ui.consoleCount == 2 && std::strcmp(ui.consoleLines[1].text, "hi") == 0 && ui.command.empty();
+    });
+    test.Type("he");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectText("Tab completes the one candidate", [] { return ui.command; }, "help ");
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("the field kept the keyboard: help ran", [] { return ui.consoleCount == 4 && ui.historyCount == 2; });
+    test.Type("zz");
+    test.KeyPress(ImGuiKey_Tab);
+    test.ExpectText("Tab without a candidate leaves the text", [] { return ui.command; }, "zz");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectText("Up shows the newest command", [] { return ui.command; }, "help ");
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.KeyPress(ImGuiKey_UpArrow);
+    test.ExpectText("Up stops at the oldest command", [] { return ui.command; }, "echo hi");
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.KeyPress(ImGuiKey_DownArrow);
+    test.ExpectText("Down past the newest gives the typed text back", [] { return ui.command; }, "zz");
+    test.Click("comp.console.generated");
+    test.Expect("the toggle shows the generated log", [] { return ui.consoleGenerated; });
 }

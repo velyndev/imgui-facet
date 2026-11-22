@@ -61,27 +61,6 @@ static_assert(OptionsFollowConventions<facet::UiScaleControlOptions>());
 void SettingsCalls()
 {
     using namespace facet;
-    static const LogEntry lines[] = {{"Line 1"}};
-    static const char* const commands[] = {"command"};
-    const LogGetter getter = [](void*, int index, LogEntry* out) {
-        *out = lines[index];
-        return true;
-    };
-    std::string command = "text";
-    char buffer[16] = "text";
-    Check("ConsoleView", Expect::Item, "console", [&] {
-        CHECK_FALSE(ConsoleView("console", &command, lines, {.commands = commands, .height = 80.0f}));
-    });
-    Check("ConsoleView, getter", Expect::Item, "console 2",
-          [&] { CHECK_FALSE(ConsoleView("console 2", &command, 1, getter, nullptr, {.height = 80.0f})); });
-    Check("ConsoleView, buffer", Expect::Item, "console 3",
-          [&] { CHECK_FALSE(ConsoleView("console 3", buffer, sizeof(buffer), lines, {.height = 80.0f})); });
-    Check("ConsoleView, buffer and getter", Expect::Item, "console 4", [&] {
-        CHECK_FALSE(ConsoleView("console 4", buffer, sizeof(buffer), 1, getter, nullptr, {.height = 80.0f}));
-    });
-    CHECK(command == "text");
-    CHECK(std::strcmp(buffer, "text") == 0);
-
     // The settings search is ready; it submits no item of its own and keeps every stack.
     Check("SettingsSearch", Expect::NoItem, nullptr, [] {
         BeginSettingsSearch("settings", {.filter = "query"});

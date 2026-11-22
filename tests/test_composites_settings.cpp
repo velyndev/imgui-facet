@@ -1021,3 +1021,226 @@ TEST_CASE("KeybindList filters rows, shows no results, and read-only never liste
     CHECK(items[0].bind.primary == ImGuiKey_A);
 }
 
+// ---- ConsoleView ---------------------------------------------------------------------------
+
+namespace
+{
+
+const facet::LogEntry kConsoleLog[] = {{"Line 1"}, {"Line 2", facet::LogLevel::Warning}};
+
+// A console of a fixed height with a stock button before it; records submits.
+struct ConsoleHarness
+{
+    std::string command;
+    std::span<const char* const> history;
+    std::span<const char* const> commands;
+    int submits = 0;
+    std::string submitted;
+    bool readOnly = false;
+
+    void Run(facet::test::Session& session)
+    {
+        ImGui::Button("before");
+        session.Track("before");
+        if (facet::ConsoleView("console", &command, kConsoleLog,
+                               {.history = history, .commands = commands, .height = 200.0f, .readOnly = readOnly}))
+        {
+            ++submits;
+            submitted = command;
+        }
+        session.Track("console");
+        ImGui::Button("after");
+        session.Track("after");
+    }
+
+    static ImVec2 Field(facet::test::Session& session)
+    {
+        const ImRect rect = session.ItemRect("console");
+        return ImVec2(rect.Min.x + facet::Px(40.0f), rect.Max.y - facet::ControlHeight(facet::ControlSize::Inherit) * 0.5f);
+    }
+};
+
+} // namespace
+
+TEST_CASE("ConsoleView writes the command per keystroke, and Enter submits it and keeps the keyboard")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ConsoleHarness h;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(ConsoleHarness::Field(session));
+    session.Type("he");
+    CHECK(h.command == "he");
+    session.Type("lp");
+    CHECK(h.command == "help");
+    CHECK(h.submits == 0);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(h.submits == 1);
+    CHECK(h.submitted == "help");
+    CHECK(h.command == "help");  // the caller clears it
+    h.command.clear();
+    session.Frames(3);
+    // The field has the keyboard again: typing goes on.
+    session.Type("next");
+    CHECK(h.command == "next");
+    // Enter on an empty field submits nothing.
+    h.command.clear();
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(h.submits == 1);
+}
+
+TEST_CASE("ConsoleView walks the history with Up and Down and stops at both ends")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kHistory[] = {"first", "second", "third"};
+    ConsoleHarness h;
+    h.history = kHistory;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(ConsoleHarness::Field(session));
+    session.Type("draft");
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(h.command == "third");
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.KeyPress(ImGuiKey_UpArrow);
+    CHECK(h.command == "first");
+    session.KeyPress(ImGuiKey_UpArrow);  // the oldest end
+    CHECK(h.command == "first");
+    session.KeyPress(ImGuiKey_DownArrow);
+    CHECK(h.command == "second");
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_DownArrow);  // past the newest: the typed text again
+    CHECK(h.command == "draft");
+    session.KeyPress(ImGuiKey_DownArrow);  // the newest end
+    CHECK(h.command == "draft");
+}
+
+TEST_CASE("ConsoleView completes with Tab: none, one, and several candidates")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kCommands[] = {"clear", "close", "color", "help"};
+    ConsoleHarness h;
+    h.commands = kCommands;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(ConsoleHarness::Field(session));
+    const float plain = session.ItemRect("console").GetHeight();
+    // No candidate: the text stays.
+    session.Type("zz");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(h.command == "zz");
+    CHECK(session.ItemRect("console").GetHeight() == doctest::Approx(plain));
+    // One candidate: it goes in with a space.
+    session.KeyPress(ImGuiKey_Backspace);
+    session.KeyPress(ImGuiKey_Backspace);
+    session.Type("he");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(h.command == "help ");
+    // Several: the shared prefix, then one candidate per Tab.
+    h.command.clear();
+    session.Frames(2);
+    session.Type("cl");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(h.command == "cl");
+    session.KeyPress(ImGuiKey_Tab);
+    const std::string first = h.command;
+    CHECK((first == "clear" || first == "close"));
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(h.command != first);
+    CHECK((h.command == "clear" || h.command == "close"));
+    CHECK(h.submits == 0);
+}
+
+TEST_CASE("ConsoleView shares a prefix of several candidates and Tab on an empty field moves on")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kCommands[] = {"reload-config", "reload-assets"};
+    ConsoleHarness h;
+    h.commands = kCommands;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(ConsoleHarness::Field(session));
+    session.Type("rel");
+    session.KeyPress(ImGuiKey_Tab);
+    CHECK(h.command == "reload-");
+    h.command.clear();
+    session.Frames(2);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Click(ConsoleHarness::Field(session));
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frames(2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("after"));
+}
+
+TEST_CASE("ConsoleView reads only the visible lines of ten thousand, as of a hundred")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    struct Log
+    {
+        int calls = 0;
+    } log;
+    const facet::LogGetter getter = [](void* user, int index, facet::LogEntry* out) {
+        ++static_cast<Log*>(user)->calls;
+        out->text = index % 2 == 0 ? std::string_view("Even line") : std::string_view("Odd line");
+        return true;
+    };
+    std::string command;
+    int count = 100;
+    session.SetUi([&] { facet::ConsoleView("console", &command, count, getter, &log, {.height = 200.0f}); });
+    session.Frames(3);
+    log.calls = 0;
+    session.Frame();
+    const int hundred = log.calls;
+    count = 10000;
+    session.Frames(3);
+    log.calls = 0;
+    session.Frame();
+    CHECK(hundred > 0);
+    CHECK(log.calls <= hundred + 2);
+}
+
+TEST_CASE("ConsoleView with a caller buffer and a log getter submits like the string form")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    char buffer[32] = "";
+    int submits = 0;
+    const facet::LogGetter getter = [](void*, int, facet::LogEntry* out) {
+        out->text = "Line";
+        return true;
+    };
+    session.SetUi([&] {
+        if (facet::ConsoleView("console", buffer, sizeof(buffer), 3, getter, nullptr, {.height = 200.0f}))
+            ++submits;
+        session.Track("console");
+    });
+    session.Frame();
+    const ImRect rect = session.ItemRect("console");
+    session.Click(ImVec2(rect.Min.x + facet::Px(40.0f), rect.Max.y - facet::ControlHeight(facet::ControlSize::Inherit) * 0.5f));
+    session.Type("run");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(submits == 1);
+    CHECK(std::string(buffer) == "run");
+}
+
+TEST_CASE("ConsoleView read-only takes no typing and submits nothing")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ConsoleHarness h;
+    h.command = "fixed";
+    h.readOnly = true;
+    session.SetUi([&] { h.Run(session); });
+    session.Frame();
+    session.Click(ConsoleHarness::Field(session));
+    session.Type("x");
+    session.KeyPress(ImGuiKey_Enter);
+    CHECK(h.command == "fixed");
+    CHECK(h.submits == 0);
+}
