@@ -81,7 +81,6 @@ Subsystem WidgetsDatePickersSubsystem(); // src/widgets/pickers/date_pickers_fra
 Subsystem WidgetsNavigationSubsystem();  // src/widgets/navigation/navigation_frame.cpp
 Subsystem WidgetsLayoutSubsystem();      // src/widgets/layout/layout_frame.cpp
 Subsystem WidgetsOverlaysSubsystem();    // src/widgets/overlays/overlays_frame.cpp
-Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp: the placeholder frames (structure_stub.h)
 Subsystem WidgetsDataTableSubsystem();   // src/widgets/display/data_table_frame.cpp: DataTable
 Subsystem WidgetsChartsSubsystem();      // src/widgets/charts/charts_frame.cpp
 Subsystem WidgetsMediaSubsystem();       // src/widgets/media/media_frame.cpp
