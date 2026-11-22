@@ -60,7 +60,6 @@ DisplayCalloutResult DisplayCallout(const DisplayCalloutSpec& spec)
     const char* label = spec.label != nullptr ? spec.label : "";
     const NextItemData next = TakeNextItemData();
     const Theme& t = T();
-    const Colors& c = t.colors;
     const ImGuiID id = window->GetID(label);
     const bool open = spec.open == nullptr || *spec.open;
     // The open amount is kept every frame, also while collapsed, so a reopened banner grows back.
@@ -116,9 +115,9 @@ DisplayCalloutResult DisplayCallout(const DisplayCalloutSpec& spec)
     {
         ImGui::PushClipRect(bounds.Min, bounds.Max, true);
         FillRect(drawList, bounds.Min, bounds.Max, ToU32(tone.wash), radius);
+        // An inline alert sits among fields: the separator hairline of a surface edge.
         if (spec.outline)
-            StrokeRect(drawList, bounds.Min, bounds.Max, ToU32(disabled ? c.separator : c.separatorOpaque), radius,
-                       HairlineThickness());
+            DrawSurfaceOutline(drawList, bounds, radius);
         // The icon on the capitals of the first line, in the tone: the cue besides the wash.
         PushTextStyle(hasTitle ? TextStyle::Headline : TextStyle::Body);
         const float capsCenter = DisplayCapsCenter(top);

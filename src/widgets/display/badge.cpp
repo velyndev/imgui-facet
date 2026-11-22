@@ -1,5 +1,5 @@
-// Badge (facet/widgets/display.h): a small label in a box with the element radius, on the text
-// baseline of the line it sits in. A subtle tone wash with label text by default, or a solid tone
+// Badge (facet/widgets/display.h): a small label in a capsule (circular ends, the shape of every
+// badge, chip and pill), on the text baseline of the line it sits in. A subtle tone wash with label text by default, or a solid tone
 // fill. Not interactive: one item that is not a Tab stop.
 
 #include "facet/widgets/display.h"
@@ -52,7 +52,7 @@ void Badge(const char* text, const BadgeOptions& options)
     ImDrawList* drawList = window->DrawList;
     const ImU32 fill = ToU32(options.solid ? tone.solid : tone.wash);
     const ImU32 content = ToU32(options.solid ? tone.onSolid : internal::ControlLabelColor(disabled));
-    FillRect(drawList, box.rect.Min, box.rect.Max, fill, Px(t.radii.element));
+    FillRect(drawList, box.rect.Min, box.rect.Max, fill, box.rect.GetHeight() * 0.5f);
     const float textTop = internal::DisplayTextTop(box.baseline);
     float x = box.rect.Min.x + padding;
     if (hasIcon)

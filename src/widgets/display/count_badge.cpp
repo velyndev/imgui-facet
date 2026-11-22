@@ -52,7 +52,8 @@ void CountBadge(int count, const CountBadgeOptions& options)
     const bool disabled = (GImGui->LastItemData.ItemFlags & ImGuiItemFlags_Disabled) != 0;
     const internal::DisplayToneColors tone = internal::DisplayToneLook(options.tone, disabled);
     ImDrawList* drawList = window->DrawList;
-    // A counter is a pill: its round ends tell it apart from a badge, which names a status.
+    // A counter is a solid capsule, a circle for one digit, with the number centered: its solid fill
+    // and its round shape tell it apart from a badge, which names a status on a wash.
     FillRoundRect(drawList, box.rect.Min, box.rect.Max, ToU32(tone.solid), box.rect.GetHeight() * 0.5f);
     drawList->AddText(ImVec2(std::round(box.rect.GetCenter().x - textWidth * 0.5f), internal::DisplayTextTop(box.baseline)),
                       ToU32(tone.onSolid), text);

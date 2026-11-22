@@ -79,7 +79,7 @@ InlineAlertAction InlineAlert(const char* label, bool* open, const char* message
 ```
 
 The callout box of Banner for a place inside the content: the same wash, icon, Headline title,
-wrapped message and close button, with a hairline around it and its one action as a small Secondary
+wrapped message and close button, with a `separator` hairline around it and its one action as a small Secondary
 button under the message. The action and the close button are Tab stops; Escape on either one
 dismisses it, which writes `*open = false`, returns `Dismissed` and collapses it like a banner.
 Status: ready.
@@ -178,7 +178,7 @@ keeps no state. Status: ready.
 void Badge(const char* text, const BadgeOptions& options = {});
 ```
 
-A small label in a box with the element radius, for a real status or category: by default the
+A small label in a capsule (circular ends, the shape of every pill), for a real status or category: by default the
 tone's wash with the text in `label`, with `solid` the tone's fill with its readable text color
 (`onAccent`, `onSuccess`, `onWarning`, `onDestructive`). An optional leading icon takes the tone's
 glyph color. The text is Footnote, centered in the badge, and the badge sits on the baseline of the
@@ -191,7 +191,7 @@ below). Not interactive. Status: ready.
 void CountBadge(int count, const CountBadgeOptions& options = {});
 ```
 
-A counter in a solid pill of the tone (Accent by default): a circle for one digit, wider for more,
+A counter in a solid capsule of the tone (Accent by default): a circle for one digit, wider for more,
 "99+" above `maxCount`. Negative counts draw as 0; a count of 0 submits an empty item unless
 `showZero`. It sits on the text baseline like a badge. Not interactive. Status: ready.
 
@@ -213,7 +213,7 @@ interactive. Status: ready.
 void StatusPill(const char* label, const StatusPillOptions& options = {});
 ```
 
-A pill in the tone's wash with the visible label part in `label` and an optional leading icon, or a
+A capsule in the tone's wash with the visible label part in `label` and an optional leading icon, or a
 pulsing live dot, in the tone's glyph color, in three sizes (Caption, Footnote or Body text). A tone
 change crossfades the wash and the glyph over `motion.durationFast` under the id (at once with
 reduced motion). It sits on the text baseline like a badge. Not interactive. Status: ready.
@@ -226,7 +226,8 @@ void KeyCap(ImGuiKeyChord chord, const KeyCapOptions& options = {});
 
 A chord as key caps: one cap per modifier (Ctrl, Shift, Alt, Win, in that order) and one for the key,
 named by `KeyNameText`; a modifier key alone folds into the modifiers. A cap is the faint control
-fill with a 3:1 boundary hairline and the key name in `label`. `ImGuiKey_None` draws
+fill with the quiet `controlBorder` hairline (3:1 in the increased contrast variant) and the key
+name in `label`. `ImGuiKey_None` draws
 `Strings::unbound` in `labelSecondary`. With `live` the caps show the held look (a stronger fill and
 a `focusRing` outline) while the chord is down. Small, Regular and Large sizes; the caps sit on the
 text baseline like a badge. Not interactive. Status: ready.

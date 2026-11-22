@@ -616,6 +616,59 @@ TEST_CASE("A badge draws its tone as a wash with label text, or solid with the t
     CHECK(onSolid > 0);
 }
 
+TEST_CASE("A badge, a status pill and a count badge are capsules with circular ends")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DisplayGuard guard;
+    const facet::Colors& c = facet::T().colors;
+    // For each mark: the vertices of its fill and its rectangle. A capsule's leftmost and rightmost
+    // points lie only on the middle line; a rounded rectangle has a straight vertical edge there.
+    struct Mark
+    {
+        std::vector<ImVec2> points;
+        ImRect rect;
+    } marks[3];
+    const auto collect = [&](Mark& mark, int from, ImU32 color) {
+        mark.points.clear();
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+            if (drawList->VtxBuffer[i].col == color)
+                mark.points.push_back(drawList->VtxBuffer[i].pos);
+        mark.rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    };
+    session.SetUi([&] {
+        int from = VertexCount();
+        facet::Badge("Synced", {.tone = facet::Tone::Success});
+        collect(marks[0], from, facet::ToU32(c.successSubtle));
+        from = VertexCount();
+        facet::StatusPill("Online", {.tone = facet::Tone::Success});
+        collect(marks[1], from, facet::ToU32(c.successSubtle));
+        from = VertexCount();
+        facet::CountBadge(128, {.tone = facet::Tone::Destructive});
+        collect(marks[2], from, facet::ToU32(c.destructive));
+    });
+    session.Frames(30);  // the status pill's wash settles on its tone
+    for (const Mark& mark : marks)
+    {
+        REQUIRE_FALSE(mark.points.empty());
+        float minX = FLT_MAX;
+        float maxX = -FLT_MAX;
+        for (const ImVec2& p : mark.points)
+        {
+            minX = std::fmin(minX, p.x);
+            maxX = std::fmax(maxX, p.x);
+        }
+        // The element radius would put the ends of the straight edge a quarter of the height from the
+        // middle; an arc reaches its extreme within a segment of the middle.
+        const float middle = mark.rect.GetCenter().y;
+        const float tolerance = mark.rect.GetHeight() * 0.2f;
+        for (const ImVec2& p : mark.points)
+            if (p.x <= minX + 0.25f || p.x >= maxX - 0.25f)
+                CHECK(std::fabs(p.y - middle) <= tolerance);
+    }
+}
+
 // ==== CountBadge ====
 
 TEST_CASE("A count badge caps large counts, hides zero unless asked and is never narrower than tall")
