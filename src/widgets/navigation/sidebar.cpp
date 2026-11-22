@@ -59,6 +59,7 @@ constexpr int kSidebarWidthSub = 1;
 struct SidebarState
 {
     NavigationRoving roving;
+    ImGuiID revealId = 0;  // the item an arrow key moved the focus to, scrolled into view when drawn
 };
 
 struct SidebarSectionState
@@ -237,7 +238,19 @@ bool SidebarItem(const char* label, Icon icon, const SidebarItemOptions& options
     {
         state->roving.Add(id, !row.disabled, options.selected);
         if (row.focused && row.forced == ForcedItemState::None)
-            (void)state->roving.Step(id, true);
+        {
+            const ImGuiID moved = state->roving.Step(id, true);
+            if (moved != 0)
+                state->revealId = moved;
+        }
+        // The item that took the focus comes later in this frame (Down) or in the next one (Up);
+        // either way it is scrolled into view when it is laid out, so a held key never walks
+        // past the visible rows.
+        if (state->revealId == id)
+        {
+            ScrollAreaRevealRect(window, row.rect, ScrollAlign::Nearest, false);
+            state->revealId = 0;
+        }
     }
     const float radius = Px(t.radii.control);
     if (options.selected && entry != nullptr)

@@ -410,19 +410,6 @@ void DrawNavigation(GalleryState& state, PageCtx& ctx, float height)
             std::snprintf(probe, sizeof(probe), "nav.%s", page.id.c_str());
             ctx.Probe(probe);
             ++shown;
-            // A row the arrow keys moved the focus to is scrolled into view; the sidebar moves
-            // the focus without scrolling.
-            if (ImGui::IsItemFocused() && state.navFocusedPage != i)
-            {
-                const float top = ImGui::GetItemRectMin().y;
-                const float bottom = ImGui::GetItemRectMax().y;
-                const float viewTop = ImGui::GetWindowPos().y;
-                const float viewBottom = viewTop + ImGui::GetWindowHeight();
-                if (top >= viewTop - 0.5f && bottom <= viewBottom + 0.5f)
-                    state.navFocusedPage = i;
-                else
-                    ImGui::ScrollToItem(ImGuiScrollFlags_KeepVisibleEdgeY);
-            }
             if (!rail)
             {
                 // The selected title is semibold, as the sidebar draws it.

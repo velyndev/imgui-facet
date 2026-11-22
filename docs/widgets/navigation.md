@@ -50,7 +50,8 @@ A navigation column on the `bgSecondary` surface with the card radius.
   operated there. Sections push their label on the id stack, so items in two sections may share a
   label.
 - **Keys.** The sidebar is one Tab stop (the focused item, else the selected one, else the first);
-  Up and Down move the focus, Home and End go to the ends.
+  Up and Down move the focus, Home and End go to the ends. The item that takes the focus is scrolled
+  into view, so a held key never walks past the visible rows.
 - **Disabled.** `ImGui::BeginDisabled` around an item gives its disabled look; it is skipped by the
   arrows and not a Tab stop.
 

@@ -48,7 +48,6 @@ struct GalleryState
     std::string navFilter;
     bool navExpanded = false;
     bool navRail = false;  // the navigation was drawn as the icon rail in the last frame
-    int navFocusedPage = -1;  // the row last scrolled into view for the keyboard focus
 
     // The theme editor pane, and the edits it holds: `edits` is what its controls show, applied
     // at once except while a slider that moves the layout (spacing, type, control heights) is

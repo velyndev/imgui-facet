@@ -484,6 +484,43 @@ TEST_CASE("Sidebar items are one Tab stop, Up and Down move the focus and Enter 
     CHECK(ImGui::GetFocusID() == session.ItemId("after"));
 }
 
+TEST_CASE("A sidebar scrolls the item the arrow keys move the focus to into view")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ImRect view;
+    session.SetUi([&] {
+        if (facet::BeginSidebar("nav", {.mode = facet::SidebarMode::Expanded, .height = 120.0f}))
+        {
+            view = ImGui::GetCurrentWindow()->InnerClipRect;
+            for (int i = 0; i < 12; ++i)
+            {
+                char label[16];
+                std::snprintf(label, sizeof(label), "Page %d", i + 1);
+                facet::SidebarItem(label, facet::Icon("list"), {.selected = i == 0});
+                session.Track(label);
+            }
+            facet::EndSidebar();
+        }
+    });
+    session.Frames(2);
+    const auto inView = [&](const char* name) {
+        const ImRect rect = session.ItemRect(name);
+        return rect.Min.y >= view.Min.y - 0.5f && rect.Max.y <= view.Max.y + 0.5f;
+    };
+    REQUIRE_FALSE(inView("Page 12"));
+    session.Click(session.ItemCenter("Page 1"));
+    for (int i = 0; i < 11; ++i)
+        session.KeyPress(ImGuiKey_DownArrow);
+    session.Frames(2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 12"));
+    CHECK(inView("Page 12"));
+    session.KeyPress(ImGuiKey_Home);
+    session.Frames(2);
+    CHECK(ImGui::GetFocusID() == session.ItemId("Page 1"));
+    CHECK(inView("Page 1"));
+}
+
 TEST_CASE("An Auto sidebar is a rail in a narrow width and names its items in tooltips")
 {
     facet::test::Session session;
