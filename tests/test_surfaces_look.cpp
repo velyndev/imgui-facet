@@ -159,6 +159,40 @@ TEST_CASE("Lists look: a reorderable row shows no ring after a click and an insi
     CHECK(ring.Max.x <= list.Max.x + 0.5f);
 }
 
+TEST_CASE("Overlays look: the pointer over command palette rows draws fills, never the ring")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    static const char* const kCommands[] = {"First", "Second", "Third", "Fourth", "Fifth"};
+    bool open = true;
+    int picked = -1;
+    session.SetUi([&] { (void)facet::CommandPalette("Commands", &open, &picked, kCommands); });
+    session.Frames(6);
+    REQUIRE(open);
+    // What the open palette draws in the ring color before the pointer moves (its search field
+    // may show the accent outline of a focused field); hovering rows must add nothing to it.
+    const int baseline = ColorCount(RingColor(), false);
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    bool hoverFill = false;
+    for (float y = display.y * 0.1f; y < display.y * 0.9f; y += 8.0f)
+    {
+        session.MouseMove(ImVec2(display.x * 0.5f, y));
+        session.Frames(2);
+        CAPTURE(y);
+        CHECK(ColorCount(RingColor(), false) == baseline);
+        hoverFill = hoverFill || ColorCount(facet::ToU32(facet::T().colors.fill[2]), true) > 0;
+    }
+    CHECK(hoverFill);
+    CHECK(picked == -1);
+    // The keys move the current row (up from the last row the pointer rested on): now the ring
+    // shows on it.
+    session.KeyPress(ImGuiKey_UpArrow);
+    session.Frames(2);
+    CHECK(ColorCount(RingColor(), false) > baseline);
+}
+
 TEST_CASE("Navigation look: a sidebar item shows no ring after a click and an inside ring after a key")
 {
     SurfacesLookGuard guard;
