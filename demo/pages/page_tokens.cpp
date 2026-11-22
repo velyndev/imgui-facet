@@ -469,51 +469,8 @@ FACET_DEMO_SELFTEST("tokens")
         return !facet::HasCustomAccent() && facet::ToU32(facet::T().colors.accent) == facet::ToU32(preset.colors.accent);
     });
 
-    // Theme and scale lists in the title strip. The script is built before it runs, so every
-    // step is the same in both themes: the entries are chosen by their own probes first.
-    test.Click("gallery.minimize");  // does nothing offscreen; puts the focus in the strip
-    // The window buttons are Tab stops in order (they do nothing offscreen).
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("gallery.minimize");
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("gallery.maximize");
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("gallery.close");
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("gallery.minimize");
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("gallery.scale");
-    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
-    test.ExpectFocused("gallery.theme");
-    test.KeyPress(ImGuiKey_Space);
-    test.Click("gallery.theme.0");
-    test.Expect("choosing Light in the theme list shows the light theme",
-                [] { return facet::GetThemeMode() == facet::ThemeMode::Light && !facet::T().dark; });
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("gallery.theme");
-    test.KeyPress(ImGuiKey_Space);
-    test.ExpectFocused("gallery.theme.0");
-    test.KeyPress(ImGuiKey_DownArrow);
-    test.ExpectFocused("gallery.theme.1");
-    test.KeyPress(ImGuiKey_Enter);
-    test.Expect("Space, Down and Enter choose Dark",
-                [] { return facet::GetThemeMode() == facet::ThemeMode::Dark && facet::T().dark; });
-    test.KeyPress(ImGuiKey_Space);
-    test.ExpectFocused("gallery.theme.1");
-    test.KeyPress(ImGuiKey_Escape);
-    test.Expect("Escape closes the list without a change", [] { return facet::T().dark; });
-
-    test.KeyPress(ImGuiKey_Tab);
-    test.ExpectFocused("gallery.scale");
-    test.KeyPress(ImGuiKey_Space);
-    test.KeyPress(ImGuiKey_DownArrow);
-    test.KeyPress(ImGuiKey_Enter);
-    test.Expect("Down and Enter in the UI scale list select 125%", [] { return facet::UiScale() == 1.25f; });
-    test.KeyPress(ImGuiKey_Space);
-    test.KeyPress(ImGuiKey_UpArrow);
-    test.KeyPress(ImGuiKey_Enter);
-    test.Expect("Up and Enter in the UI scale list return to 100%", [] { return facet::UiScale() == 1.0f; });
+    // The window buttons and the theme control of the title bar are covered by the app script
+    // app:title-bar (demo/app_selftests.cpp).
     // Navigation: a click opens a page (its controls can be clicked), the arrow keys and
     // Space open the one above.
     test.Click("nav.type");
@@ -529,9 +486,9 @@ FACET_DEMO_SELFTEST("tokens")
     });
     test.Click("tokens.accent.0");
     test.Wait(30);
-    test.Expect("in the dark theme the first swatch gives the dark theme's own accent", [] {
-        return facet::T().dark && !facet::HasCustomAccent() &&
-               facet::ToU32(facet::T().colors.accent) == facet::ToU32(facet::Theme::Dark().colors.accent);
+    test.Expect("after the page is opened again the first swatch gives the theme's own accent", [] {
+        const facet::Theme preset = facet::T().dark ? facet::Theme::Dark() : facet::Theme::Light();
+        return !facet::HasCustomAccent() && facet::ToU32(facet::T().colors.accent) == facet::ToU32(preset.colors.accent);
     });
 
     // The mouse wheel scrolls the page under the mouse.
@@ -552,8 +509,9 @@ FACET_DEMO_SELFTEST("tokens")
     test.ExpectVisible("nav.composites-editors");
     test.KeyPress(ImGuiKey_Enter);
     test.ExpectPage("composites-editors");
-    // Back up: Up walks to the first page, which is scrolled into view under its heading.
+    // Back up: Up walks to the first page, the showcase, which is scrolled into view under its
+    // heading.
     test.HoldKey(ImGuiKey_UpArrow, 3.0f);
-    test.ExpectFocused("nav.tokens");
-    test.ExpectVisible("nav.tokens");
+    test.ExpectFocused("nav.showcase");
+    test.ExpectVisible("nav.showcase");
 }
