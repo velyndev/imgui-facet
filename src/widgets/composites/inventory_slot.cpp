@@ -53,6 +53,7 @@ InventoryResult InventorySlot(const char* label, const InventoryItem& item, cons
     {
         internal::InventoryTileLook look;
         look.disabled = state.disabled;
+        look.hoverAmount = state.hoverAmount;
         look.lifted = lifted;
         look.placeholderIcon = options.placeholderIcon;
         internal::InventoryDrawTile(drawList, state.rect, item, look);
@@ -70,8 +71,9 @@ InventoryResult InventorySlot(const char* label, const InventoryItem& item, cons
     target.owner = slotId;
     target.accept = !blocked;
     const internal::InventoryDropOutcome drop = internal::InventoryDropTarget(target);
+    // Inside the slot, as on the tiles of a grid: keyboard focus only.
     if (state.visible)
-        internal::DrawItemFocusRing(state, radius);
+        internal::DrawItemFocusRingInside(state, radius);
 
     // The visible part of the label names the slot while it is empty.
     internal::InventoryTileTooltip(slotId, state.rect, state.hovered, state.focusVisible, item, label);

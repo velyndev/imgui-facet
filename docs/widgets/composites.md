@@ -47,15 +47,19 @@ keep the slot size and shrink only when the set columns do not fit. The grid is 
 rows, at most `height` units (at least one row) or, while `height` is 0, the visible height of the
 window it is in; further rows scroll inside it.
 
-Each tile shows the item's image with the loading and failed states of the media family (or its
-icon), the count, a lock chip, the cooldown as a pie in `scrim`, the category bar (`tint`,
+Each tile is `fill[2]` with one `controlBorder` hairline (`controlBorderHover` under the pointer), so
+an empty slot reads by its fill like any control. It shows the item's image with the loading and
+failed states of the media family (or its icon), the count in a capsule, the lock in a circle (both
+on `bgElevated` with a `separator` hairline), the cooldown as a pie in `scrim`, the category bar (`tint`,
 `composites.inventoryTintHeight`) and the title in Caption, cut with an ellipsis and left out where
 the tile is too small for it. Hover and keyboard focus show the full name and, for a locked item,
 `Strings::locked`; an empty slot names itself `Strings::emptySlot`.
 
 Selection goes through the list core: a click selects, Ctrl+click and Shift+click extend, the
-arrows move in two dimensions, Escape clears. Selected tiles show the selection fill and an accent
-ring inside the edge, so the selection does not rest on color alone. `*selected` is the focused
+arrows move in two dimensions, Escape clears. Selected tiles show the selection fill
+(`accentSubtle`) and the accent outline at the same hairline width as the rest outline, so the
+selection does not rest on the fill color alone and no state thickens a stroke. A click never draws
+the focus ring; after keyboard input it sits inside the focused tile. `*selected` is the focused
 selected slot, else the first selected one, and is written when it changes; a value the caller
 writes replaces the selection. Box selection is off, because a drag from a slot moves its item.
 The grid is one Tab stop. Enter or a double click returns `Activated`.
@@ -88,8 +92,8 @@ bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTil
 
 One tile outside a grid, a square of `slotSize` (a width set with `ImGui::SetNextItemWidth` keeps it
 square), drawn as a grid tile. A click, Space or Enter activates it; hover and press show a wash
-over it, the focus ring follows keyboard input, the item label is the tooltip. `selected` draws the
-accent ring. With `dragSource` it is an inventory drag source (pointer, or Ctrl+Space for a keyboard
+over it, the focus ring follows keyboard input (inside the tile, as on a grid tile), the item label
+is the tooltip. `selected` draws the selected tile look of the grid. With `dragSource` it is an inventory drag source (pointer, or Ctrl+Space for a keyboard
 drag, since Space activates it); it is not a drop target. Status: ready.
 
 ### InventorySlot
@@ -102,7 +106,8 @@ A single slot that takes inventory drops by the grid's rules (`to` is -1) and gi
 by a drag (Space picks it up for a keyboard drag). While a drag it takes hovers it, it shows the
 accent target highlight. Empty, it draws `placeholderIcon` faintly and its visible label is the
 tooltip. Enter or a double click returns `Activated` (`source` is the slot); a single click does
-nothing. A keyboard drop leaves the focus on the slot. Disabled and a pushed
+nothing. It has the grid tile's look, and its focus ring shows inside it after keyboard input only.
+A keyboard drop leaves the focus on the slot. Disabled and a pushed
 `ImGuiItemFlags_ReadOnly` take no drop and start no drag. Status: ready.
 
 ### InventoryDetailCard
@@ -129,7 +134,8 @@ A card surface with the cover as an `ImageView` (`mediaCoverAspect` of the width
 and failed states), the title in Headline cut to one line, the description in Footnote
 `labelSecondary`, wrapped, and the badges in a flow. Narrower than `mediaCardHorizontalBelow` the
 cover is a square beside the text. One Tab stop over the whole card: a click, Space or Enter
-activates it; hover and press show a wash, `selected` an accent ring, a cut title shows in full on
+activates it; hover and press show a wash, `selected` the selected card look (`accentSubtle` over
+the card and the accent outline at the hairline width), a cut title shows in full on
 hover and keyboard focus. Width: `metrics.cardWidth`, at most the available width. Status: ready.
 
 ### UserChip

@@ -27,14 +27,13 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/list_view.h"
 
 namespace facet
 {
 namespace
 {
 
-// The accent ring of a selected card is this many hairlines thick, as the selected avatar ring.
-constexpr float kMediaCardSelectedRingHairlines = 2.0f;
 // The cover of a narrow card takes at most this share of its inner width, so the text keeps the rest.
 constexpr float kMediaCardCoverMaxShare = 0.5f;
 
@@ -129,13 +128,11 @@ bool MediaCard(const char* label, ImageHandle cover, const MediaCardOptions& opt
         const ImVec4 wash = internal::StateFill(WithAlpha(c.fill[2], 0.0f), c.fill[2], c.fill[1], item);
         if (!item.disabled && wash.w > 0.0f)
             FillRect(drawList, frame.Min, frame.Max, ToU32(wash), radius);
+        // The selected card look of the row rule: accentSubtle over the card and the accent outline
+        // at the one border width.
         if (options.selected)
-        {
-            const float ring = std::max(1.0f, std::round(HairlineThickness() * kMediaCardSelectedRingHairlines));
-            const float half = ring * 0.5f;
-            StrokeRect(drawList, ImVec2(frame.Min.x + half, frame.Min.y + half), ImVec2(frame.Max.x - half, frame.Max.y - half),
-                       ToU32(item.disabled ? c.labelTertiary : c.accent), std::max(0.0f, radius - half), ring);
-        }
+            internal::DrawListRowFill(drawList, frame, radius,
+                                      {.selected = true, .disabled = item.disabled, .tile = true});
         internal::DrawItemFocusRing(item, radius);
     }
     ImGui::EndGroup();

@@ -7,6 +7,7 @@
 // tests/test_api_composites_cards.cpp. The inventory tests run one bag model: a grid of slots and
 // one equipment slot, to which every returned InventoryResult is applied as an application would.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -146,6 +147,48 @@ InventoryItem Item(const char* label, int count = 1, std::uint32_t key = 0, int 
 [[maybe_unused]] std::string LabelOf(const InventoryItem& item)
 {
     return item.label != nullptr ? std::string(item.label) : std::string();
+}
+
+// The light theme with a ring color nothing else draws: the focus ring and the accent outline of a
+// selected tile (both colors.focusRing) are then the only vertices in it.
+void SetInventoryProbeTheme()
+{
+    facet::Theme theme = facet::Theme::Light();
+    theme.colors.focusRing = facet::Rgb(0xFF00FF);
+    facet::SetTheme(theme, false);
+}
+
+struct InventoryThemeGuard
+{
+    ~InventoryThemeGuard() { facet::SetTheme(facet::Theme::Light(), false); }
+};
+
+// The vertices in the RGB of `color` (alpha above 0) drawn this frame inside `tile` (grown by half a
+// pixel), relative to its top left corner and sorted, so two strokes of the same geometry in two
+// tiles compare equal.
+std::vector<ImVec2> InventoryStrokeVertices(ImU32 color, const ImRect& tile)
+{
+    std::vector<ImVec2> found;
+    ImRect grown = tile;
+    grown.Expand(0.5f);
+    for (const ImDrawList* list : ImGui::GetDrawData()->CmdLists)
+        for (const ImDrawVert& v : list->VtxBuffer)
+            if ((v.col & ~IM_COL32_A_MASK) == (color & ~IM_COL32_A_MASK) && (v.col & IM_COL32_A_MASK) != 0 &&
+                grown.Contains(v.pos))
+                found.emplace_back(v.pos.x - tile.Min.x, v.pos.y - tile.Min.y);
+    std::sort(found.begin(), found.end(), [](const ImVec2& a, const ImVec2& b) { return a.x != b.x ? a.x < b.x : a.y < b.y; });
+    return found;
+}
+
+// Whether two sorted vertex sets are the same within a hundredth of a pixel.
+bool InventorySameStroke(const std::vector<ImVec2>& a, const std::vector<ImVec2>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (std::fabs(a[i].x - b[i].x) > 0.01f || std::fabs(a[i].y - b[i].y) > 0.01f)
+            return false;
+    return true;
 }
 
 } // namespace
@@ -361,6 +404,74 @@ TEST_CASE("Inventory grid: the arrow keys move the selection in two dimensions, 
     session.Frames(2);
     CHECK(bag.last.action == InventoryAction::Activated);
     CHECK(bag.last.to == 1);
+}
+
+TEST_CASE("Inventory grid: a clicked slot is selected by fill and a hairline accent outline, never a ring")
+{
+    InventoryThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetInventoryProbeTheme();
+    Bag bag = SixSlots();
+    session.SetUi([&] { bag.Ui(session); });
+    session.Frames(2);
+    const auto tileRect = [&](int index) {
+        const ImVec2 center = Bag::Tile(session, index, 3);
+        const float half = facet::Px(32.0f);
+        return ImRect(center.x - half, center.y - half, center.x + half, center.y + half);
+    };
+    const ImU32 accent = facet::ToU32(facet::T().colors.focusRing);
+    const ImU32 boundary = facet::ToU32(facet::T().colors.controlBorder);
+    // An empty slot clicked: selected, with the accent outline in the geometry of the quiet outline
+    // of the other empty slot, so the state changed the color and not the width.
+    session.Click(Bag::Tile(session, 4, 3));
+    session.MouseMove(ImVec2(2.0f, 2.0f));
+    session.Frames(3);
+    REQUIRE(bag.selected == 4);
+    CHECK_FALSE(fi::KeyboardModality());
+    const std::vector<ImVec2> selectedOutline = InventoryStrokeVertices(accent, tileRect(4));
+    const std::vector<ImVec2> restOutline = InventoryStrokeVertices(boundary, tileRect(2));
+    REQUIRE_FALSE(selectedOutline.empty());
+    CHECK(InventorySameStroke(selectedOutline, restOutline));
+    CHECK(InventoryStrokeVertices(accent, tileRect(2)).empty());
+    // An arrow key moves the selection and turns the keyboard modality on: now the ring shows inside
+    // the focused tile, as geometry beyond its outline (after the ring of the slot it left faded out).
+    session.KeyPress(ImGuiKey_LeftArrow);
+    session.Frames(12);
+    REQUIRE(bag.selected == 3);
+    CHECK(fi::KeyboardModality());
+    CHECK(InventoryStrokeVertices(accent, tileRect(3)).size() > selectedOutline.size());
+}
+
+TEST_CASE("Inventory slot: a click draws no ring, Tab draws it inside the slot")
+{
+    InventoryThemeGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetInventoryProbeTheme();
+    const InventoryItem empty;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        (void)facet::InventorySlot("Slot", empty);
+        session.Track("slot");
+    });
+    session.Frames(2);
+    const ImU32 accent = facet::ToU32(facet::T().colors.focusRing);
+    session.Click(session.ItemCenter("slot"));
+    session.Frames(3);
+    const ImRect slot = session.ItemRect("slot");
+    CHECK(InventoryStrokeVertices(accent, slot).empty());
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Frames(3);
+    REQUIRE(ImGui::GetFocusID() == session.ItemId("slot"));
+    // Every ring vertex lies inside the slot: the ring never reaches past it.
+    const std::vector<ImVec2> inside = InventoryStrokeVertices(accent, slot);
+    const std::vector<ImVec2> anywhere = InventoryStrokeVertices(accent, ImRect(-1.0e4f, -1.0e4f, 1.0e4f, 1.0e4f));
+    CHECK_FALSE(inside.empty());
+    CHECK(inside.size() == anywhere.size());
 }
 
 TEST_CASE("Inventory grid: Alt+arrow moves the focused item to an empty slot, swaps, and refuses a locked slot")

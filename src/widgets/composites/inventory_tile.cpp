@@ -58,6 +58,7 @@ bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTil
         internal::InventoryTileLook look;
         look.disabled = state.disabled;
         look.selected = options.selected;
+        look.hoverAmount = state.hoverAmount;
         look.lifted = lifted;
         internal::InventoryDrawTile(drawList, state.rect, item, look);
         // Hover and press as a wash over the tile, as over an activatable image.
@@ -65,7 +66,9 @@ bool InventoryTile(const char* id, const InventoryItem& item, const InventoryTil
         const float radius = internal::InventoryTileRadius();
         if (!state.disabled && wash.w > 0.0f)
             FillRect(drawList, state.rect.Min, state.rect.Max, ToU32(wash), radius);
-        internal::DrawItemFocusRing(state, radius);
+        // Inside the tile, as on the tiles of a grid: keyboard focus only (focusAmount stays 0
+        // without the keyboard modality).
+        internal::DrawItemFocusRingInside(state, radius);
     }
     internal::InventoryTileTooltip(itemId, state.rect, state.hovered, state.focusVisible, item, nullptr);
     return state.pressed && !state.disabled && !lifted;

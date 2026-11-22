@@ -240,8 +240,7 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
                 tileId = last.ID;
                 rect = last.Rect;
                 hovered = ImGui::IsItemHovered();
-                focused = ImGui::IsItemFocused();
-                tileDisabled = tileDisabled || (last.ItemFlags & ImGuiItemFlags_Disabled) != 0;
+                focused = ImGui::IsItemFocused();                tileDisabled = tileDisabled || (last.ItemFlags & ImGuiItemFlags_Disabled) != 0;
                 if (focused)
                     focusedTile = i;
                 if (state.focusPending == i && !focused && !tileDisabled)
@@ -280,6 +279,8 @@ InventoryResult InventoryGrid(const char* id, int* selected, std::span<const Inv
                 InventoryTileLook look;
                 look.disabled = tileDisabled;
                 look.selected = selected != nullptr && state.selection.Contains(static_cast<ImGuiID>(i));
+                // ItemGridTile drew the row fill under the tile: accentSubtle for a selected tile.
+                look.selectionFilled = true;
                 look.lifted = lifted;
                 InventoryDrawTile(drawList, rect, item, look);
             }

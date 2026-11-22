@@ -38,10 +38,19 @@ namespace facet::internal
 
 // ---- The tile ---------------------------------------------------------------------------------
 
+// The tile follows the row rule of DESIGN.md: fill[2] with the controlBorder hairline at rest
+// (controlBorderHover by hoverAmount), a selected tile accentSubtle with the accent outline at the
+// one border width, a disabled one fill[3] with a separator hairline. No state changes the width of
+// the outline, and the tile never draws the focus ring: its widget draws it inside the tile
+// (DrawFocusRingInside, focus.h) while the keyboard modality is on.
 struct InventoryTileLook
 {
     bool disabled = false;      // the disabled colors, the picture faded
-    bool selected = false;      // the accent ring inside the edge
+    bool selected = false;      // accentSubtle and the accent outline
+    // The selection fill is already under the tile (the row block of an item grid draws it), so a
+    // selected tile draws only its outline over it instead of a second accentSubtle layer.
+    bool selectionFilled = false;
+    float hoverAmount = 0.0f;   // 0 to 1: the outline blends toward controlBorderHover
     bool lifted = false;        // the item is being dragged: its place shows it faded
     Icon placeholderIcon;       // drawn faintly while the slot is empty; none for none
 };

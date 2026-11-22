@@ -22,8 +22,6 @@ namespace facet::internal
 namespace
 {
 
-// The accent ring of a selected tile is this many hairlines thick, as the selected avatar ring.
-constexpr float kInventorySelectedRingHairlines = 2.0f;
 // The cooldown sweep is drawn as two convex halves, each an arc of at most half a turn.
 constexpr int kInventorySweepSegments = 24;
 
@@ -42,14 +40,16 @@ InventoryDragRecord& DragRecord()
     return record;
 }
 
-// A small chip on the tile (the count, the lock): bgElevated with a hairline, so it reads over any
-// picture in both themes.
-void DrawTileChip(ImDrawList* drawList, ImVec2 min, ImVec2 size, float radius)
+// A small chip on the tile (the count, the lock): bgElevated with the separator hairline, so it
+// reads over any picture in both themes. A capsule (a circle when it is square), the shape of every
+// badge.
+void DrawTileChip(ImDrawList* drawList, ImVec2 min, ImVec2 size)
 {
     const Colors& c = T().colors;
     const ImVec2 max(min.x + size.x, min.y + size.y);
+    const float radius = 0.5f * std::min(size.x, size.y);
     FillRect(drawList, min, max, ToU32(c.bgElevated), radius);
-    StrokeRect(drawList, min, max, ToU32(c.separator), radius, HairlineThickness());
+    DrawSurfaceOutline(drawList, ImRect(min, max), radius);
 }
 
 // The remaining part of a cooldown as a scrim pie over the middle of ox, clockwise from the top,
@@ -97,10 +97,16 @@ InventoryTileDrawn InventoryDrawTile(ImDrawList* drawList, const ImRect& rect, c
     const ImVec2 min(std::round(rect.Min.x), std::round(rect.Min.y));
     const ImVec2 max(std::round(rect.Max.x), std::round(rect.Max.y));
 
-    // The slot: a faint surface and a boundary that reaches 3:1, so an empty slot is seen too.
-    FillRect(drawList, min, max, ToU32(look.disabled ? c.fill[3] : c.fill[2]), radius);
-    StrokeRect(drawList, min, max, ToU32(look.disabled ? c.separator : ControlBoundaryColor(c)), radius,
-               HairlineThickness());
+    // The slot: its fill and one quiet hairline, so an empty slot reads by its fill like any control;
+    // a selected slot takes accentSubtle (unless the grid's row fill already holds it) and the accent
+    // outline at the same width.
+    const ImRect box(min, max);
+    if (!look.selected)
+        FillRect(drawList, min, max, ToU32(look.disabled ? c.fill[3] : c.fill[2]), radius);
+    else if (!look.selectionFilled)
+        FillRect(drawList, min, max, ToU32(c.accentSubtle), radius);
+    DrawOutline(drawList, box, radius,
+                ControlOutlineColor({.hoverAmount = look.hoverAmount, .selected = look.selected, .disabled = look.disabled}));
 
     const float pad = PxSnapped(t.spacing.xs);
     const ImRect inner(min.x + pad, min.y + pad, max.x - pad, max.y - pad);
@@ -149,12 +155,13 @@ InventoryTileDrawn InventoryDrawTile(ImDrawList* drawList, const ImRect& rect, c
 
         const float chipPad = PxSnapped(t.spacing.xs);
         const float chipHeight = lineHeight;
-        const float chipRadius = Px(t.radii.element);
         if (item.locked)
         {
             const float side = std::floor(caption.IconSize());
-            const ImVec2 size(side + chipPad, chipHeight);
-            DrawTileChip(drawList, inner.Min, size, chipRadius);
+            // A circle around the lock glyph.
+            const float diameter = std::max(chipHeight, side + chipPad);
+            const ImVec2 size(diameter, diameter);
+            DrawTileChip(drawList, inner.Min, size);
             DrawIcon(drawList, Icon("lock"),
                      ImVec2(std::round(inner.Min.x + (size.x - side) * 0.5f), std::round(inner.Min.y + (size.y - side) * 0.5f)),
                      side, ToU32(ControlSecondaryColor(look.disabled)));
@@ -164,10 +171,12 @@ InventoryTileDrawn InventoryDrawTile(ImDrawList* drawList, const ImRect& rect, c
             char text[16];
             std::snprintf(text, sizeof(text), "%d", item.count);
             const FittedText shown = FitText(text, nullptr, std::max(0.0f, inner.GetWidth() - chipPad * 2.0f));
-            const ImVec2 size(std::ceil(shown.width) + chipPad * 2.0f, chipHeight);
+            // A capsule, never narrower than a circle, so one digit sits in a round badge.
+            const ImVec2 size(std::max(chipHeight, std::ceil(shown.width) + chipPad * 2.0f), chipHeight);
             const ImVec2 at(inner.Max.x - size.x, inner.Min.y);
-            DrawTileChip(drawList, at, size, chipRadius);
-            drawList->AddText(ImVec2(at.x + chipPad, at.y), ToU32(ControlLabelColor(look.disabled)), shown.text);
+            DrawTileChip(drawList, at, size);
+            const float textX = std::round(at.x + (size.x - shown.width) * 0.5f);
+            drawList->AddText(ImVec2(textX, at.y), ToU32(ControlLabelColor(look.disabled)), shown.text);
         }
         if (title)
         {
@@ -188,13 +197,6 @@ InventoryTileDrawn InventoryDrawTile(ImDrawList* drawList, const ImRect& rect, c
         }
     }
 
-    if (look.selected)
-    {
-        const float ring = std::max(1.0f, std::round(HairlineThickness() * kInventorySelectedRingHairlines));
-        const float half = ring * 0.5f;
-        StrokeRect(drawList, ImVec2(min.x + half, min.y + half), ImVec2(max.x - half, max.y - half),
-                   ToU32(look.disabled ? c.labelTertiary : c.accent), std::max(0.0f, radius - half), ring);
-    }
     return drawn;
 }
 
