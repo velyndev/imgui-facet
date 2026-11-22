@@ -1,8 +1,7 @@
 // Demo page: Search and app controls. Each widget of the search, preset and app control composites
 // (facet/widgets/composites.h) has a section with its variants and states, capture states for its
-// important looks and selftest steps that operate it by mouse and keyboard. The family note stays
-// the planned one until the other composite pages are ready too. The theme controls run with apply off, so
-// they never fight the theme and scale selectors of the gallery: each shows what it chose next to
+// important looks and selftest steps that operate it by mouse and keyboard. The theme controls run
+// with apply off, so they never fight the theme and scale selectors of the gallery: each shows what it chose next to
 // it (the accent in a preview button under PushAccent). The inventory and cards and the editors
 // have pages of their own (page_w_composites_cards.cpp and page_w_composites_editors.cpp).
 
@@ -954,7 +953,7 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
     facet::demo::PageHeader("Search and app controls",
                             "Search filter bars, settings search, key bind and preset lists, theme mode, accent and "
                             "UI scale controls, onboarding and console views.");
-    facet::demo::PlannedFamilyNote("composites");
+    facet::demo::ReadyFamilyNote("composites");
 
     ThemeModeSection(ctx);
     AccentSection(ctx);

@@ -1,8 +1,7 @@
 // Demo page: Editors and canvas. One section per editor, property grid, canvas and layer composite of
 // facet/widgets/composites.h, each with its variants and states, capture states and selftest steps.
-// A widget that is still planned draws the placeholder of its declared size. The inventory and cards
-// and the search and app controls have pages of their own (page_w_composites_cards.cpp and
-// page_w_composites_settings.cpp).
+// The inventory and cards and the search and app controls have pages of their own
+// (page_w_composites_cards.cpp and page_w_composites_settings.cpp).
 //
 // The values on this page are placeholders: property names and numbers that only show the widgets
 // working, nothing real.
@@ -593,7 +592,7 @@ FACET_DEMO_PAGE("composites-editors", "Editors and canvas", "Widgets", 144, "def
     facet::demo::PageHeader("Editors and canvas",
                             "Editors for curves, easing and gradients, property grids, preview canvases with their "
                             "elements, and layer lists.");
-    facet::demo::PlannedFamilyNote("composites");
+    facet::demo::ReadyFamilyNote("composites");
 
     CurveSection(ctx);
     BezierSection(ctx);

@@ -700,7 +700,7 @@ FACET_DEMO_PAGE("composites-cards", "Inventory and cards", "Widgets", 140, "defa
     facet::demo::PageHeader("Inventory and cards",
                             "Inventory grids, item tiles, slots and detail cards, media cards, user chips, profile "
                             "switchers and the drag and drop calls. Every item and profile here is a placeholder.");
-    facet::demo::PlannedFamilyNote("composites");
+    facet::demo::ReadyFamilyNote("composites");
     InventorySection(ctx);
     TilesSection(ctx);
     DetailSection(ctx);

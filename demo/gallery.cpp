@@ -705,15 +705,6 @@ void Note(const char* fmt, ...)
     va_end(args);
 }
 
-void PlannedFamilyNote(const char* family)
-{
-    Note("Widgets whose entry in docs/widgets/%s.md says \"Status: ready.\" work as documented. Every other widget on "
-         "this page is a placeholder of its declared size: it shows its name and the word planned (a narrow box only "
-         "its label, or its name when it has none, with the whole text on hover), cannot be operated and returns "
-         "nothing. Declared in facet/widgets/%s.h; the declarations and usage examples are in docs/widgets/%s.md.",
-         family, family, family);
-}
-
 void ReadyFamilyNote(const char* family)
 {
     Note("Every widget of this family works as its entry in docs/widgets/%s.md describes. Declared in "
