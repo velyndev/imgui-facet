@@ -392,8 +392,8 @@ The visible label part in front, then a `SwatchPalette` with one swatch per pres
 height square) and, with `customColor`, a `ColorWell` for any other color. With a non-null
 `themeDefault` the first swatch shows the current theme's own accent and stands for "each theme's
 own accent" (its tooltip is `Strings::themeDefaultAccent`); the others show their preset color and
-name it on hover and on keyboard focus (the palette's `names`). The chosen swatch shows the palette's selection ring and check mark; while a
-custom color is the accent the well has the same ring instead, also when that color happens to equal
+name it on hover and on keyboard focus (the palette's `names`). The chosen swatch shows the palette's chosen mark (the accent hairline one gap outside
+it) and check mark; while a custom color is the accent the well has the same accent hairline instead, also when that color happens to equal
 the first swatch. The palette is one Tab stop: Left, Right, Home and End move between swatches,
 Enter or Space chooses; a click chooses. The well opens its color picker in a popover (click, Enter,
 Space or Alt+Down); dragging there writes the accent live, and Escape in the popover restores the

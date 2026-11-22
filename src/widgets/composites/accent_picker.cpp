@@ -37,10 +37,9 @@ namespace
 
 // Presets the picker shows at most; it keeps no state, so the swatch colors live on the stack.
 constexpr int kAccentPickerMaxSwatches = 32;
-// The selection ring around the well while a custom color is the accent: the same gap and width
-// (in hairlines) as the palette's ring around its chosen swatch, so the two read as one mark.
+// The accent outline around the well while a custom color is the accent sits this many hairlines
+// outside it, the gap of the palette's outline around its chosen swatch, so the two read as one mark.
 constexpr float kAccentPickerRingGap = 1.0f;
-constexpr float kAccentPickerRingWidth = 2.0f;
 
 // The accent a theme preset shows when no SetAccent overrides it.
 ImVec4 AccentPickerThemeDefault(bool dark)
@@ -184,12 +183,13 @@ bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const A
         ItemTooltip("%s", s.customColor);
         if (customChosen && !defaultChosen && ImGui::IsRectVisible(wellRect.Min, wellRect.Max))
         {
-            const float hairline = HairlineThickness();
-            const float out = hairline * (kAccentPickerRingGap + kAccentPickerRingWidth);
+            const float out = HairlineThickness() * (kAccentPickerRingGap + 1.0f);
             ImRect ring = wellRect;
             ring.Expand(out);
-            StrokeRect(window->DrawList, ring.Min, ring.Max, ToU32(internal::ControlLabelColor(disabled)), m.radius + out,
-                       hairline * kAccentPickerRingWidth);
+            internal::OutlineLook chosenEdge;
+            chosenEdge.selected = true;
+            chosenEdge.disabled = disabled;
+            internal::DrawOutline(window->DrawList, ring, m.radius + out, internal::ControlOutlineColor(chosenEdge));
         }
     }
     ImGui::PopID();

@@ -478,6 +478,6 @@ These widgets of the later tier are not declared yet.
 
 These options of declared widgets are planned too:
 
-- **ColorWell selected**: an option that draws the selection ring around the well, so a well
-  that stands for a chosen value matches the chosen swatch. Today `AccentPicker` draws that ring
-  itself.
+- **ColorWell selected**: an option that draws the chosen mark (the accent hairline one gap
+  outside) around the well, so a well that stands for a chosen value matches the chosen swatch.
+  Today `AccentPicker` draws that mark itself.

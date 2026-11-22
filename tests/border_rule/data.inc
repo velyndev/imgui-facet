@@ -7,8 +7,6 @@
 // src/internal/control.h. FACET_BORDER_EXCEPTION("path", "width argument", "reason") allows a stroke
 // that is not an outline (a glyph, a ring that marks focus) with its reason.
 
-FACET_BORDER_EXCEPTION("src/widgets/composites/accent_picker.cpp", "hairline * kAccentPickerRingWidth",
-                       "the chosen-color ring around the custom well: the selection mark of SwatchPalette's chosen swatch, outside the color it marks, not an outline")
 FACET_BORDER_EXCEPTION("src/widgets/charts/chart_parts.cpp", "stroke",
                        "the hollow marker and legend swatch of a hidden series: a glyph at a share of charts.lineWidth, not an outline")
 FACET_BORDER_EXCEPTION("src/widgets/media/image_viewer.cpp", "ring",

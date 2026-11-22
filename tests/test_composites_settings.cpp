@@ -6,6 +6,7 @@
 // pattern. The API checks are in tests/test_api_composites_settings.cpp. A test that changes the
 // theme mode, the accent or the UI scale restores them before it ends.
 
+#include <cfloat>
 #include <cmath>
 #include <string>
 
@@ -210,6 +211,37 @@ TEST_CASE("AccentPicker moves with the arrow keys and chooses with Enter")
     session.KeyPress(ImGuiKey_Home);
     session.KeyPress(ImGuiKey_Space);
     CHECK(themeDefault);
+}
+
+TEST_CASE("AccentPicker marks a custom accent with one accent hairline around the well")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeRestore restore;
+    bool themeDefault = false;
+    ImVec4 accent(0.9f, 0.5f, 0.1f, 1.0f);
+    session.SetUi([&] {
+        facet::AccentPicker("##accent", &themeDefault, &accent, {.apply = false});
+        session.Track("accent");
+    });
+    session.Frames(2);
+    // The tallest accent drawing is the chosen mark around the well, at the end of the row (the theme
+    // default swatch may show the accent too, at the swatch height): an outline one
+    // hairline wide, one hairline of gap outside the well, so the mark is two hairlines taller than
+    // the well on each side (plus the antialiased fringe), never more.
+    const ImU32 ring = facet::ToU32(facet::T().colors.focusRing) & ~IM_COL32_A_MASK;
+    const ImRect item = session.ItemRect("accent");
+    const float hairline = facet::HairlineThickness();
+    const float side = std::round(facet::ControlHeight(facet::ControlSize::Inherit));
+    ImRect mark(ImVec2(FLT_MAX, FLT_MAX), ImVec2(-FLT_MAX, -FLT_MAX));
+    for (const ImDrawList* list : ImGui::GetDrawData()->CmdLists)
+        for (const ImDrawVert& v : list->VtxBuffer)
+            if ((v.col & ~IM_COL32_A_MASK) == ring && (v.col & IM_COL32_A_MASK) != 0)
+                mark.Add(v.pos);
+    REQUIRE(mark.Min.x < mark.Max.x);
+    CHECK(mark.Max.x > item.GetCenter().x);
+    CHECK(mark.GetHeight() >= side + hairline * 4.0f - 0.5f);
+    CHECK(mark.GetHeight() <= side + hairline * 4.0f + 1.5f);
 }
 
 TEST_CASE("AccentPicker without a theme default treats the first preset as a color")
