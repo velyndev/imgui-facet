@@ -85,7 +85,10 @@ Subsystem WidgetsStructureSubsystem();   // src/widgets/structure_frame.cpp: the
 Subsystem WidgetsDataTableSubsystem();   // src/widgets/display/data_table_frame.cpp: DataTable
 Subsystem WidgetsChartsSubsystem();      // src/widgets/charts/charts_frame.cpp
 Subsystem WidgetsMediaSubsystem();       // src/widgets/media/media_frame.cpp
-Subsystem WidgetsCompositesSubsystem();  // src/widgets/composites/composites_frame.cpp
+// The composites, one entry per package that builds them (docs/writing-a-widget.md):
+Subsystem WidgetsCardsSubsystem();       // src/widgets/composites/cards_frame.cpp: inventory, cards, people, drag and drop
+Subsystem WidgetsSettingsSubsystem();    // src/widgets/composites/settings_frame.cpp: search, presets, app controls
+Subsystem WidgetsEditorsSubsystem();     // src/widgets/composites/editors_frame.cpp: editors, property grid, canvas, layers
 Subsystem ScopesSubsystem();             // src/internal/scope_stack.cpp
 
 // The ordered table (src/core/subsystems.cpp). Built on first use, valid for the whole run.

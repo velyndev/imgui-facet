@@ -36,7 +36,9 @@
 //                      order; each fills its own accessor in a file of its own. The overlays'
 //                      EndFrame runs after every page has drawn (the toast stack).
 //   widgets structure  forgets the placeholder frames of structure_stub.h left open
-//   DataTable, charts, media, composites, in that order, each with an entry of its own
+//   DataTable, charts, media, in that order, each with an entry of its own
+//   composites         one entry per package that builds them: inventory and cards (with the
+//                      public drag and drop calls), search and app controls, editors and canvas
 //
 // Last:
 //   scopes             EndFrame reports Begin / End pairs still open, after every module
@@ -51,7 +53,7 @@ namespace facet::internal
 
 std::span<const Subsystem> Subsystems()
 {
-    static const std::array<Subsystem, 35> table = {
+    static const std::array<Subsystem, 37> table = {
         ThemeSubsystem(),
         ScaleSubsystem(),
         StateStorageSubsystem(),
@@ -85,7 +87,9 @@ std::span<const Subsystem> Subsystems()
         WidgetsDataTableSubsystem(),
         WidgetsChartsSubsystem(),
         WidgetsMediaSubsystem(),
-        WidgetsCompositesSubsystem(),
+        WidgetsCardsSubsystem(),
+        WidgetsSettingsSubsystem(),
+        WidgetsEditorsSubsystem(),
         ScopesSubsystem(),
     };
     return table;
