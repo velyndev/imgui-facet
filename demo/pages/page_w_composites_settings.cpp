@@ -912,8 +912,9 @@ void OnboardingSection(facet::demo::PageCtx& ctx)
 {
     SectionHeader("Onboarding");
     Paragraph("A short sequence of steps in a dialog over a scrim, with progress dots and the step number. Next "
-              "has the keyboard on each step, so Enter steps through; Back, Skip, Finish, Escape and a click on "
-              "the scrim behave as their names say. The step content below is a placeholder.");
+              "has the keyboard on each step, so Enter steps through; Back goes back; Skip, Finish, Escape and a "
+              "click on the scrim close it, and with Skippable off only Finish does. The step content below is a "
+              "placeholder.");
     LabeledRow("Skippable");
     facet::Toggle("##skippable", &ui.onboardingSkippable);
     LabeledRow("Show");
@@ -1063,6 +1064,24 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.KeyPress(ImGuiKey_Enter);
     test.WaitSeconds(0.4f);
     test.Expect("Enter on Finish closes it on the last step", [] { return !ui.onboarding && ui.onboardingStep == 2; });
+    // Not skippable: Escape and the scrim leave it open, only Finish closes it.
+    test.Do([] { ui.onboardingSkippable = false; });
+    test.Click("comp.onboarding.show");
+    test.WaitSeconds(0.4f);
+    test.KeyPress(ImGuiKey_Escape);
+    test.WaitSeconds(0.4f);
+    test.Expect("without Skippable Escape keeps it open", [] { return ui.onboarding; });
+    test.MouseMove(T::Display(0.02f, 0.98f));
+    test.MouseDown();
+    test.MouseUp();
+    test.WaitSeconds(0.4f);
+    test.Expect("without Skippable a click on the scrim keeps it open", [] { return ui.onboarding; });
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Enter);
+    test.KeyPress(ImGuiKey_Enter);
+    test.WaitSeconds(0.4f);
+    test.Expect("without Skippable Finish still closes it", [] { return !ui.onboarding && ui.onboardingStep == 2; });
+    test.Do([] { ui.onboardingSkippable = true; });
 
     // SearchFilterBar: typing, Escape, a chip by mouse and by keyboard.
     test.Click("comp.filter.field");

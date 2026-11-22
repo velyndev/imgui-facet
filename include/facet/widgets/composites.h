@@ -703,15 +703,16 @@ LayerListResult LayerList(const char* id, int* selected, std::span<LayerItem> la
 
 struct OnboardingOptions
 {
-    bool skippable = true;                 // a skip button (Strings::skip) that closes the panel
+    bool skippable = true;                 // a skip button (Strings::skip), Escape and a scrim click close it
     float width = 0.0f;                    // units; 0 for the dialog width default
 };
 
 // A centered panel over a scrim with paged steps, progress dots and back, next and finish
 // buttons (Strings back, next, finish). The caller writes *open = true to show it and draws
 // the content of step *step between Begin and End; the buttons write *step, and finish, skip
-// and Escape write *open = false. The visible label part is the panel title. Returns false
-// while closed; call EndOnboarding only after true. stepCount < 1 counts as 1.
+// and Escape write *open = false (without skippable only finish does). The visible label part
+// is the panel title. Returns false while closed; call EndOnboarding only after true.
+// stepCount < 1 counts as 1.
 [[nodiscard]] bool BeginOnboarding(const char* label, bool* open, int* step, int stepCount,
                                    const OnboardingOptions& options = {});
 void EndOnboarding();

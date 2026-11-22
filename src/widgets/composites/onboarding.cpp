@@ -1,7 +1,8 @@
 // BeginOnboarding and EndOnboarding: a Modal (overlays.h) with the caller's step content and a
 // footer of progress dots, the step text and the Skip, Back and Next or Finish Buttons. The modal
-// gives the scrim, the open and close motion, the focus trap and Escape; the buttons are the
-// finished widgets. This file adds the footer layout, the dots and the step logic.
+// gives the scrim, the open and close motion, the focus trap and Escape (and a scrim click; both
+// only while skippable, so a tour that cannot be skipped ends only through Finish); the buttons
+// are the finished widgets. This file adds the footer layout, the dots and the step logic.
 //
 // Footer: the dots (metrics.pageDotSize, the current one in the accent and the others in the
 // separatorOpaque token) and Strings::stepOf beside them, so the step is never told by color
@@ -86,6 +87,9 @@ bool BeginOnboarding(const char* label, bool* open, int* step, int stepCount, co
         *step = std::clamp(*step, 0, count - 1);
     ModalOptions modal;
     modal.closeButton = false;
+    // A tour that cannot be skipped ends only through Finish: Escape and the scrim would skip it
+    // too, with the same *open = false the caller could not tell from a finished tour.
+    modal.dismissible = options.skippable;
     modal.width = options.width;
     if (!BeginModal(label, open, modal))
         return false;

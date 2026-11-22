@@ -434,8 +434,9 @@ the second step on) and `Strings::next`, or `Strings::finish` on the last step (
 too narrow for both puts the buttons on a line of their own. Next or Finish takes the keyboard
 focus when a step opens, so Enter steps through; Tab and Shift+Tab move between the buttons inside
 the panel. Back and Next write `*step`; Finish, Skip, Escape and a click on the scrim write
-`*open = false` and leave `*step` as it is. `*step` is clamped to the steps, and `stepCount` below 1
-counts as 1. The width is `overlay.modalWidth` unless `width` is set. A null `step` shows the first
+`*open = false` and leave `*step` as it is. With `skippable` false there is no Skip button and
+Escape and the scrim do nothing, so the tour ends only through Finish. `*step` is clamped to the
+steps, and `stepCount` below 1 counts as 1. The width is `overlay.modalWidth` unless `width` is set. A null `step` shows the first
 step and the buttons write nothing to it. Status: ready.
 
 ### ConsoleView

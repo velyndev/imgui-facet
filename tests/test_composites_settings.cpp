@@ -1379,6 +1379,34 @@ TEST_CASE("Onboarding skip closes it, and a panel that cannot be skipped has no 
     CHECK(h.step == 1);
 }
 
+TEST_CASE("Onboarding that cannot be skipped ignores Escape and a scrim click and closes only through Finish")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OnboardingHarness h;
+    h.skippable = false;
+    h.open = true;
+    session.SetUi([&] { h.Run(); });
+    session.Seconds(0.5f);
+    session.KeyPress(ImGuiKey_Escape);
+    session.Seconds(0.5f);
+    CHECK(h.open);
+    CHECK(h.shown);
+    // The scrim: a click in the corner of the display, outside the panel.
+    session.Click(ImVec2(2.0f, ImGui::GetIO().DisplaySize.y - 2.0f));
+    session.Seconds(0.5f);
+    CHECK(h.open);
+    // Enter through the steps; Finish closes it.
+    for (int i = 0; i < 3; ++i)
+    {
+        session.KeyPress(ImGuiKey_Enter);
+        session.Frames(2);
+    }
+    session.Seconds(0.5f);
+    CHECK_FALSE(h.open);
+    CHECK(h.step == 2);
+}
+
 TEST_CASE("Onboarding counts fewer than one step as one and clamps the step")
 {
     facet::test::Session session;
