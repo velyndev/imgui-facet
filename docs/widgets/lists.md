@@ -129,7 +129,9 @@ in labelSecondary), the chevron, the message line, the width rule and the three 
 - **Rows:** ComboItem draws the row as the rows of Dropdown: a check mark slot showing `selected`,
   `icon`, the label (semibold while selected, cut with an ellipsis and a tooltip) and `detail` at the
   end. Rows wrapped in `ImGui::BeginDisabled` are shown in labelTertiary and refused. Other widgets
-  may be submitted between the rows.
+  may be submitted between the rows. The row look is the Dropdown's: fill[2] under the pointer, the
+  accentSubtle fill on the selected row, and the focus ring inside the row after keyboard input
+  only.
 - **Height:** as tall as the rows submitted while the list was last open, at most `maxVisibleRows`
   rows (`list.popupRows` by default); more rows scroll. The first opening uses the maximum.
 - **Calls out of place:** ComboItem outside BeginCombo / EndCombo is reported and returns false; an

@@ -103,6 +103,36 @@ TEST_CASE("Lists look: the chosen value of an open dropdown shows the selected r
     CHECK(index == 1);
 }
 
+TEST_CASE("Lists look: a combo marks its chosen row by fill and draws no ring for the pointer")
+{
+    SurfacesLookGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    SetSurfacesProbeTheme();
+    static const char* const kItems[] = {"First", "Second", "Third", "Fourth"};
+    int index = 1;
+    session.SetUi([&] {
+        if (facet::BeginCombo("##combo", kItems[index]))
+        {
+            for (int i = 0; i < 4; ++i)
+                if (facet::ComboItem(kItems[i], i == index))
+                    index = i;
+            facet::EndCombo();
+        }
+        session.Track("field");
+    });
+    session.Frames(2);
+    const ImRect field = session.ItemRect("field");
+    session.Click(field.GetCenter());
+    session.Frames(4);
+    const float row = facet::internal::ListRowHeight(facet::ControlSize::Regular);
+    session.MouseMove(ImVec2(field.GetCenter().x, field.Max.y + row * 3.6f));
+    session.Frames(3);
+    CHECK(ColorCount(facet::ToU32(facet::T().colors.accentSubtle), true) > 0);
+    const float listTop = field.Max.y + facet::internal::FocusRingOutset() + 1.0f;
+    CHECK(ColorBounds(RingColor()).Max.y <= listTop);
+}
+
 TEST_CASE("Lists look: a reorderable row shows no ring after a click and an inside ring after a key")
 {
     SurfacesLookGuard guard;

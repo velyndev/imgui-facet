@@ -21,6 +21,7 @@
 #include "internal/control.h"
 #include "internal/focus.h"
 #include "internal/item.h"
+#include "internal/list_view.h"
 #include "internal/popup_host.h"
 #include "internal/scope_stack.h"
 #include "internal/scroll.h"
@@ -196,7 +197,6 @@ bool ComboItem(const char* label, bool selected, const ComboItemOptions& options
     ++frame.rowCount;
     ImGuiWindow* window = GImGui->CurrentWindow;
     const Theme& theme = T();
-    const Colors& c = theme.colors;
     const float rowHeight = ListRowHeight(frame.size);
     const float width = std::max(1.0f, window->WorkRect.Max.x - window->DC.CursorPos.x);
 
@@ -220,16 +220,15 @@ bool ComboItem(const char* label, bool selected, const ComboItemOptions& options
     {
         ImDrawList* drawList = window->DrawList;
         const float radius = Px(theme.radii.control);
-        ImRect fill = item.rect;
-        fill.Min.y += HairlineThickness();
-        fill.Max.y -= HairlineThickness();
-        const float feedback = item.disabled || IsScrollAreaScrolling(window) ? 0.0f
-                                                                              : std::max(item.hoverAmount, item.pressAmount);
-        if (feedback > 0.0f)
-        {
-            const ImVec4 tint = Mix(c.fill[2], c.fill[1], item.pressAmount);
-            FillRect(drawList, fill.Min, fill.Max, ToU32(WithAlpha(tint, tint.w * feedback)), radius);
-        }
+        // The shared row look: the hover fill, and the selected fill on the chosen row with its check
+        // mark, as in the list of a Dropdown.
+        const ImRect fill = ListRowFillRect(item.rect);
+        ListRowLook rowLook;
+        rowLook.hoverAmount = IsScrollAreaScrolling(window) ? 0.0f : item.hoverAmount;
+        rowLook.pressAmount = item.pressAmount;
+        rowLook.selected = selected;
+        rowLook.disabled = item.disabled;
+        DrawListRowFill(drawList, fill, radius, rowLook);
         const float pad = Px(theme.spacing.sm);
         const ImRect content(item.rect.Min.x + pad, item.rect.Min.y, std::max(item.rect.Min.x + pad, item.rect.Max.x - pad),
                              item.rect.Max.y);
@@ -241,7 +240,8 @@ bool ComboItem(const char* label, bool selected, const ComboItemOptions& options
         look.checkSlot = true;
         look.selected = selected;
         truncated = DrawListsRowContent(content, item, entry, look, frame.size);
-        DrawItemFocusRing(item, radius);
+        // Inside the row, after keyboard input only (item.focusAmount).
+        DrawFocusRingInside(drawList, fill, radius, item.visible ? item.focusAmount : 0.0f);
     }
     CutTextTooltip(item, label, ImGui::FindRenderedTextEnd(label), truncated);
     if (!item.pressed)
