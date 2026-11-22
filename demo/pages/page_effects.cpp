@@ -9,10 +9,12 @@
 #include <iterator>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
 #include "page_helpers.h"
+#include "internal/focus.h"
 #include "pages/pages.h"
 
 namespace
@@ -286,20 +288,16 @@ void DrawGlowSection()
     const ImVec2 area = ImGui::GetItemRectMin();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // Focus ring halo around a control-shaped sample. The ring has the full token width and
-    // sits just outside the control; the halo glows outside the ring.
+    // The focus ring beside the glow for comparison: the library's ring (focus.h), one stroke one
+    // hairline outside a control-shaped sample, and no glow, because keyboard focus is marked by
+    // the stroke alone.
     const ImVec2 focusMin(area.x + room, area.y + room);
     const ImVec2 focusMax(focusMin.x + width, focusMin.y + height);
     const float controlRadius = facet::Px(theme.radii.control);
-    const float ringWidth = facet::Px(theme.metrics.focusRingWidth);
-    const ImVec2 ringMin(focusMin.x - ringWidth, focusMin.y - ringWidth);
-    const ImVec2 ringMax(focusMax.x + ringWidth, focusMax.y + ringWidth);
-    const float ringRadius = controlRadius + ringWidth;
     facet::FillRect(drawList, focusMin, focusMax, facet::ToU32(c.fill[1]), controlRadius);
-    facet::DrawGlow(drawList, ringMin, ringMax, ringRadius, facet::ToU32(c.focusRing), facet::Px(theme.spacing.sm));
-    facet::StrokeRect(drawList, ringMin, ringMax, facet::ToU32(c.focusRing), ringRadius, ringWidth);
+    facet::internal::DrawFocusRing(drawList, ImRect(focusMin, focusMax), controlRadius);
     drawList->AddText(ImVec2(focusMin.x, focusMax.y + room * 0.5f), facet::ToU32(c.labelSecondary),
-                      "Focus ring halo");
+                      "Focus ring, no glow");
 
     // The opt-in accent glow around an accent shape. The shape has no text and the caption
     // names it a sample, so it does not read as a button that can be pressed.

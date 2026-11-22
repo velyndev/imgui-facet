@@ -14,6 +14,7 @@
 #include <facet/facet.h>
 
 #include "page_helpers.h"
+#include "internal/control.h"
 #include "internal/keys.h"
 #include "internal/row_layout.h"
 #include "pages/pages.h"
@@ -171,17 +172,15 @@ void DrawCaptureField(const facet::Theme& theme, const facet::demo::PageCtx& ctx
     }
     facet::ItemCursor();
 
-    // The frame: a stock-style field, its outline in the focus ring color while listening.
+    // The frame: a stock-style field with the one outline of the border rule, in the accent while
+    // listening, as a focused field shows it.
     const bool listening = page.capture.Listening();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float radius = facet::Px(theme.radii.control);
     facet::FillRect(drawList, bb.Min, bb.Max, facet::ToU32(hovered ? c.fill[0] : c.fill[1]), radius);
-    if (listening)
-        facet::StrokeRect(drawList, bb.Min, bb.Max, facet::ToU32(c.focusRing), radius,
-                          facet::Px(theme.metrics.focusRingWidth) * 0.5f);
-    else
-        facet::StrokeRect(drawList, bb.Min, bb.Max, facet::ToU32(facet::ControlBoundaryColor(c)), radius,
-                          facet::HairlineThickness());
+    facet::internal::DrawOutline(drawList, bb, radius,
+                                 facet::internal::ControlOutlineColor({.hoverAmount = hovered ? 1.0f : 0.0f,
+                                                                       .focused = listening}));
     ImGui::RenderNavCursor(bb, id);
 
     std::string label;

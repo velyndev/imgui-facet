@@ -298,14 +298,15 @@ void DrawTrack(ImDrawList* drawList, const ImRect& track, facet::Orientation ori
     const float start = vertical ? track.Max.y : track.Min.x;
     const float end = vertical ? track.Min.y : track.Max.x;
     const ImRect whole = lineRect(start - (vertical ? -half : half), end + (vertical ? -half : half));
-    // The unfilled line in the 3:1 boundary color, so the ends of the range stay visible.
-    facet::FillRect(drawList, whole.Min, whole.Max, Color(disabled ? c.fill[3] : facet::ControlBoundaryColor(c)), half);
+    // The unfilled line in fill[0], the filled part in the accent mark (focusRing, 3:1 against it
+    // and the surface), as the slider widgets draw their tracks.
+    facet::FillRect(drawList, whole.Min, whole.Max, Color(disabled ? c.fill[3] : c.fill[0]), half);
     const float a = facet::internal::FractionToTrack(track, orientation, fillFrom);
     const float b = facet::internal::FractionToTrack(track, orientation, fillTo);
     if (a != b)
     {
         const ImRect fill = lineRect(a, b);
-        const ImVec4& color = disabled ? c.labelTertiary : (look == TrackLook::ReadOnly ? c.labelSecondary : c.accent);
+        const ImVec4& color = disabled ? c.labelTertiary : (look == TrackLook::ReadOnly ? c.labelSecondary : c.focusRing);
         facet::FillRect(drawList, fill.Min, fill.Max, Color(color), half);
     }
     // Ticks for a short list of steps and for snap stops, so a slider shows where it can stop.
@@ -333,16 +334,20 @@ void DrawTrack(ImDrawList* drawList, const ImRect& track, facet::Orientation ori
     }
 }
 
-// A knob: the background color with a 3:1 outline, a little larger while held.
+// A knob as the slider widgets draw it: a solid disc in the knob token with the controlBorder
+// hairline (controlBorderHover under the pointer) and the level 1 shadow, a little larger while held.
 void DrawKnob(ImDrawList* drawList, const ImRect& rect, const facet::internal::ItemState& item, bool disabled)
 {
     const facet::Colors& c = facet::T().colors;
     const ImVec2 center = rect.GetCenter();
     const float radius = rect.GetWidth() * 0.5f * (1.0f + kKnobPressGrowth * item.pressAmount);
-    const ImVec4 boundary = facet::ControlBoundaryColor(c);
-    const ImVec4 outline = disabled ? c.labelTertiary : facet::Mix(boundary, c.label, item.hoverAmount * 0.5f);
-    drawList->AddCircleFilled(center, radius, Color(c.bg));
-    drawList->AddCircle(center, radius, Color(outline), 0, facet::HairlineThickness() * 1.5f);
+    const ImRect disc(center.x - radius, center.y - radius, center.x + radius, center.y + radius);
+    const float alpha = disabled ? facet::internal::kDisabledPictureOpacity : 1.0f;
+    if (!disabled)
+        facet::DrawElevation(drawList, disc.Min, disc.Max, radius, 1);
+    facet::FillRect(drawList, disc.Min, disc.Max, Color(facet::WithAlpha(c.knob, c.knob.w * alpha)), radius);
+    facet::internal::DrawOutline(drawList, disc, radius,
+                                 facet::internal::ControlOutlineColor({.hoverAmount = item.hoverAmount, .disabled = disabled}));
     // Round, like the knob, so the ring keeps an even gap all around it.
     facet::internal::DrawFocusRing(drawList, rect, rect.GetWidth() * 0.5f, item.focusAmount, 0,
                                    facet::internal::RingShape::Round);
@@ -377,9 +382,10 @@ bool ProtoButton(PageCtx& ctx, const char* label, const char* probe, bool repeat
         const float radius = facet::Px(t.radii.control);
         if (!selected)
             facet::FillRect(drawList, item.rect.Min, item.rect.Max, Color(ControlFill(item)), radius);
-        facet::StrokeRect(drawList, item.rect.Min, item.rect.Max,
-                          Color(item.disabled ? c.separator : facet::ControlBoundaryColor(c)), radius,
-                          facet::HairlineThickness());
+        facet::internal::DrawOutline(drawList, item.rect, radius,
+                                     facet::internal::ControlOutlineColor({.hoverAmount = item.hoverAmount,
+                                                                           .selected = selected,
+                                                                           .disabled = item.disabled}));
         drawList->AddText(ImVec2(item.rect.Min.x + padding, facet::CenteredTextY(item.rect.Min.y, height)),
                           Color(item.disabled ? c.labelTertiary : c.label), label, end);
         facet::internal::DrawItemFocusRing(item, radius);
@@ -419,18 +425,26 @@ bool ProtoToggle(PageCtx& ctx, const char* label, bool* value, const char* probe
         const ImVec2 min(item.rect.Max.x - track.x, item.rect.Min.y + (height - track.y) * 0.5f);
         const ImVec2 max(item.rect.Max.x, min.y + track.y);
         const float radius = track.y * 0.5f;
-        const ImVec4 off = item.disabled ? c.fill[3] : ControlFill(item);
-        const ImVec4 trackColor = item.disabled ? c.fill[3] : facet::Mix(off, c.accent, knobT);
+        // The toggle look: a capsule track, fill[0] with the controlBorder hairline when off, the
+        // accent mark (focusRing) without an outline when on, and the solid knob.
+        const ImVec4 trackColor = item.disabled ? c.fill[3] : facet::Mix(c.fill[0], c.focusRing, knobT);
         facet::FillRect(drawList, min, max, Color(trackColor), radius);
-        if (knobT < 1.0f)
-            facet::StrokeRect(drawList, min, max,
-                              Color(facet::WithAlpha(facet::ControlBoundaryColor(c), 1.0f - knobT)), radius,
-                              facet::HairlineThickness());
+        const ImVec4 outline =
+            facet::internal::ControlOutlineColor({.hoverAmount = item.hoverAmount, .disabled = item.disabled});
+        facet::internal::DrawOutline(drawList, ImRect(min, max), radius,
+                                     facet::WithAlpha(outline, outline.w * (1.0f - knobT)));
         const float inset = facet::Px(t.metrics.toggleKnobInset);
         const float knob = track.y - inset * 2.0f;
         const float x = min.x + inset + knob * 0.5f + knobT * (track.x - inset * 2.0f - knob);
-        const ImVec4 knobColor = item.disabled ? c.labelTertiary : facet::Mix(c.labelSecondary, c.onAccent, knobT);
-        drawList->AddCircleFilled(ImVec2(x, (min.y + max.y) * 0.5f), knob * 0.5f, Color(knobColor));
+        const float knobY = (min.y + max.y) * 0.5f;
+        const ImRect knobRect(x - knob * 0.5f, knobY - knob * 0.5f, x + knob * 0.5f, knobY + knob * 0.5f);
+        const float knobAlpha = item.disabled ? facet::internal::kDisabledPictureOpacity : 1.0f;
+        if (!item.disabled)
+            facet::DrawElevation(drawList, knobRect.Min, knobRect.Max, knob * 0.5f, 1);
+        facet::FillRect(drawList, knobRect.Min, knobRect.Max, Color(facet::WithAlpha(c.knob, c.knob.w * knobAlpha)),
+                        knob * 0.5f);
+        facet::internal::DrawOutline(drawList, knobRect, knob * 0.5f,
+                                     facet::internal::ControlOutlineColor({.disabled = item.disabled}));
         facet::internal::DrawFocusRing(drawList, ImRect(min, max), radius, item.focusAmount);
     }
     facet::PopTextStyle();
@@ -540,18 +554,8 @@ bool ProtoRange(PageCtx& ctx, const char* id, double* values, int count, const P
                                : (slider.readOnly || result.track.readOnly) ? TrackLook::ReadOnly
                                                                             : TrackLook::Normal;
         DrawTrack(drawList, track, slider.orientation, first, last, look, m);
-        // The span thickens while a press would grab it and while it is dragged, so it shows
-        // that it moves as one piece.
-        const float spanAmount = std::max(result.span.hoverAmount, result.span.pressAmount);
-        if (count > 1 && look == TrackLook::Normal && spanAmount > 0.0f)
-        {
-            const float half = facet::PxSnapped(t.metrics.sliderTrackHeight) * 0.5f + facet::Px(t.spacing.xs) * 0.5f * spanAmount;
-            const float a = facet::internal::FractionToTrack(track, slider.orientation, first);
-            const float b = facet::internal::FractionToTrack(track, slider.orientation, last);
-            const ImRect span = vertical ? ImRect(track.Min.x - half, std::min(a, b), track.Min.x + half, std::max(a, b))
-                                         : ImRect(std::min(a, b), track.Min.y - half, std::max(a, b), track.Min.y + half);
-            facet::FillRect(drawList, span.Min, span.Max, Color(t.colors.accent), half);
-        }
+        // The span between the handles keeps its look under the pointer and while dragged: it is
+        // not a control with a look of its own, so only the handles show hover.
         // The handle a press would take, or the one in use, is drawn on top.
         int top = result.activeHandle >= 0 ? result.activeHandle : result.focusedHandle;
         int order[facet::internal::kMaxHandles];
@@ -599,8 +603,7 @@ bool ProtoSegmented(PageCtx& ctx, const char* id, int* index, std::span<const ch
     ImGui::ItemSize(rect.GetSize());
     ImDrawList* drawList = window->DrawList;
     facet::FillRect(drawList, rect.Min, rect.Max, Color(c.fill[3]), radius);
-    facet::StrokeRect(drawList, rect.Min, rect.Max, Color(facet::ControlBoundaryColor(c)), radius,
-                      facet::HairlineThickness());
+    facet::internal::DrawOutline(drawList, rect, radius, facet::internal::ControlOutlineColor({}));
 
     const facet::internal::ForcedItemRequest forced = facet::internal::TakeForcedItemState();
     facet::internal::SelectionPill pill;

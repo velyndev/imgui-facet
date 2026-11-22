@@ -7,7 +7,5 @@
 // src/internal/control.h. FACET_BORDER_EXCEPTION("path", "width argument", "reason") allows a stroke
 // that is not an outline (a glyph, a ring that marks focus) with its reason.
 
-FACET_BORDER_PENDING("demo/overlay_backdrop.cpp")
-FACET_BORDER_PENDING("demo/page_helpers.cpp")
-FACET_BORDER_PENDING("demo/pages/page_b_keys.cpp")
-FACET_BORDER_PENDING("demo/pages/page_effects.cpp")
+FACET_BORDER_EXCEPTION("demo/overlay_backdrop.cpp", "facet::Px(t.metrics.hairline) * 2.0f",
+                       "a ring inside the moving discs of the picture that stands in for a host's frame behind the overlay menu, not an outline of the interface")
