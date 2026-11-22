@@ -131,9 +131,9 @@ void FieldValidation(const char* message, const FieldValidationOptions& options)
     if (options.outline && underItem && options.tone != Tone::Neutral &&
         ImGui::IsRectVisible(last.Rect.Min, last.Rect.Max))
     {
-        // Closed shapes stroke inside their rect, so the outline never covers a neighbour.
-        StrokeRect(window->DrawList, last.Rect.Min, last.Rect.Max, ToU32(look.color), Px(T().radii.control),
-                   HairlineThickness());
+        // The one outline of the border rule in the tone's color, inside the item's rect, so it
+        // never covers a neighbour and never changes the field's outline width.
+        internal::DrawOutline(window->DrawList, last.Rect, Px(T().radii.control), look.color);
     }
     if (options.tone == Tone::Destructive)
         internal::ReportFieldError(underItem ? last.ID : 0, underItem ? last.Rect : box, message);

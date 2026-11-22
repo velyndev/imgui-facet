@@ -17,6 +17,14 @@ Typed text is written per keystroke; typed numbers on Enter, Tab or focus loss; 
 list choices at once. Escape restores the value from activation. `facet::IsItemEditCommitted()`
 after the call reports one finished edit.
 
+Every field frame has one look (the field frame of `src/internal/control.h`): the neutral fill
+with one controlBorder hairline at rest, controlBorderHover under the pointer, the accent hairline
+while the field has the keyboard (from a click or from Tab) and the destructive hairline with an
+error, always at the same width; read-only fields drop the fill, disabled ones take fill[3] and a
+separator hairline. Steppers, clear, reveal and other buttons inside a field show a fill under the
+pointer, no outline. The focus ring goes around a field only after keyboard input, never after a
+click.
+
 ## Widgets
 
 ### TextField

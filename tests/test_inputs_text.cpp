@@ -2106,3 +2106,80 @@ TEST_CASE("A forced focused state draws the TagInput focus ring around the field
     CHECK(ringMinX <= frame.Min.x + 1.0f);
     CHECK(ringMaxX >= frame.Max.x - 1.0f);
 }
+
+TEST_CASE("A text field keeps one outline width at rest, hovered and focused, and a click draws no ring")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    struct Restore
+    {
+        facet::Theme theme;
+        ~Restore() { facet::SetTheme(theme, false); }
+    } restore{saved};
+    facet::SetTheme(facet::Theme::Dark(), false);
+    std::string text = "Placeholder";
+    std::vector<ImDrawVert> drawn;
+    session.SetUi([&] {
+        ImGui::Button("before");
+        session.Track("before");
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        facet::TextField("##field", &text);
+        session.Track("field");
+        drawn.assign(drawList->VtxBuffer.Data + from, drawList->VtxBuffer.Data + drawList->VtxBuffer.Size);
+    });
+    session.Frames(2);
+    const ImRect frame = session.ItemRect("field");
+    const float settle = facet::T().motion.durationFast + 0.1f;
+    const facet::Colors& c = facet::T().colors;
+    const auto count = [&](ImU32 color) {
+        return static_cast<int>(std::count_if(drawn.begin(), drawn.end(), [&](const ImDrawVert& v) { return v.col == color; }));
+    };
+    // The outline's vertices: the hairline in whichever border color the state picks, never wider.
+    const auto outlineBounds = [&](ImU32 color) {
+        ImRect bounds(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+        for (const ImDrawVert& v : drawn)
+            if (v.col == color)
+                bounds.Add(v.pos);
+        return bounds;
+    };
+    session.MouseMove(ImVec2(frame.Max.x + 200.0f, frame.Max.y + 100.0f));
+    session.Seconds(settle);
+    REQUIRE(count(facet::ToU32(c.controlBorder)) > 0);
+    const ImRect rest = outlineBounds(facet::ToU32(c.controlBorder));
+    session.MouseMove(frame.GetCenter());
+    session.Seconds(settle);
+    REQUIRE(count(facet::ToU32(c.controlBorderHover)) > 0);
+    const ImRect hovered = outlineBounds(facet::ToU32(c.controlBorderHover));
+    CHECK(hovered.Min.x == doctest::Approx(rest.Min.x));
+    CHECK(hovered.Max.x == doctest::Approx(rest.Max.x));
+    CHECK(hovered.Min.y == doctest::Approx(rest.Min.y));
+    CHECK(hovered.Max.y == doctest::Approx(rest.Max.y));
+    // A click focuses the field: the accent hairline in the same place, and no ring outside it.
+    session.Click(frame.GetCenter());
+    session.Seconds(settle);
+    const ImU32 accent = facet::ToU32(c.focusRing);
+    REQUIRE(count(accent) > 0);
+    const ImRect focused = outlineBounds(accent);
+    CHECK(focused.Min.x == doctest::Approx(rest.Min.x));
+    CHECK(focused.Max.x == doctest::Approx(rest.Max.x));
+    CHECK(focused.Min.y == doctest::Approx(rest.Min.y));
+    CHECK(focused.Max.y == doctest::Approx(rest.Max.y));
+    const auto ringOutside = [&] {
+        int outside = 0;
+        for (const ImDrawVert& v : drawn)
+            if ((v.col & ~IM_COL32_A_MASK) == (accent & ~IM_COL32_A_MASK) && (v.col & IM_COL32_A_MASK) != 0 &&
+                (v.pos.x < frame.Min.x - 1.5f || v.pos.x > frame.Max.x + 1.5f || v.pos.y < frame.Min.y - 1.5f ||
+                 v.pos.y > frame.Max.y + 1.5f))
+                ++outside;
+        return outside;
+    };
+    CHECK(ringOutside() == 0);
+    // Tab from the button: the ring shows around the frame.
+    session.Click(session.ItemCenter("before"));
+    session.KeyPress(ImGuiKey_Tab);
+    session.KeyPress(ImGuiKey_Tab);
+    session.Seconds(settle);
+    CHECK(ringOutside() > 0);
+}
