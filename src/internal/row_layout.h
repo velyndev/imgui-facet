@@ -126,7 +126,8 @@ inline constexpr int kRowTrailingColumns = 32;
 // (RowColumnKey) whose right edge is `right` (screen pixels) and that ask with the same `kind` (a
 // module's own numbering, so a wide kind of column never widens another). Returns the widest
 // `width` (pixels) any of them asked for in this frame or the previous one, at least `width`.
-// Nothing is allocated.
+// The edge counts relative to the window's content, so a window that moves keeps its columns;
+// each Dear ImGui context has columns of its own. Nothing is allocated.
 float RowTrailingColumn(float right, float width, int kind = 0);
 // Forgets every shared trailing column (facet::Shutdown through the widgets_common subsystem).
 void ClearRowTrailingColumns();

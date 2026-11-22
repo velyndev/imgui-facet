@@ -448,3 +448,36 @@ TEST_CASE("Controls of one column share their trailing column from the frame bef
     session.Frame();
     CHECK(narrow == doctest::Approx(20.0f));
 }
+
+TEST_CASE("A window that moves keeps the trailing columns of its controls")
+{
+    LayoutGuard guard;
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    float x = 40.0f;
+    float narrow = 0.0f;
+    float wide = 0.0f;
+    session.SetUi([&] {
+        ImGui::SetNextWindowPos(ImVec2(x, 40.0f));
+        ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+        if (ImGui::Begin("Moving columns", nullptr, ImGuiWindowFlags_NoSavedSettings))
+        {
+            const float right = ImGui::GetCursorScreenPos().x + 300.0f;
+            narrow = facet::internal::RowTrailingColumn(right, 20.0f);
+            wide = facet::internal::RowTrailingColumn(right, 50.0f);
+        }
+        ImGui::End();
+    });
+    session.Frame();
+    session.Frame();
+    CHECK(narrow == doctest::Approx(50.0f));
+    // The window moves by a different amount every frame, as while it is dragged: the narrow
+    // control keeps the wide column from the frame before.
+    for (int i = 1; i <= 3; ++i)
+    {
+        x += 17.0f * static_cast<float>(i);
+        session.Frame();
+        CHECK(narrow == doctest::Approx(50.0f));
+        CHECK(wide == doctest::Approx(50.0f));
+    }
+}

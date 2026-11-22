@@ -457,22 +457,28 @@ RowTrailingRecord* RowTrailingRecords()
     return records;
 }
 
-} // namespace
-
-float RowTrailingColumn(float right, float width, int kind)
+// The shared column behind RowTrailingColumn (row_layout.h).
+float RowSharedColumn(float edge, float width, int kind)
 {
     const ImGuiContext* g = ImGui::GetCurrentContext();
     if (g == nullptr || g->CurrentWindow == nullptr)
         return width;
+    const ImGuiWindow* window = g->CurrentWindow;
     const int frame = g->FrameCount;
+    // The edge in the window's content coordinates, so a window that moves (a floating shell being
+    // dragged) keeps its columns instead of starting new ones every frame.
+    const float contentEdge = edge - window->Pos.x + window->Scroll.x;
     struct
     {
         ImGuiID window;
         ImGuiID column;
-        int right;
+        int edge;
         int kind;
-    } const keyData{g->CurrentWindow->ID, RowColumnKey(), static_cast<int>(std::lround(right)), kind};
-    ImGuiID key = ImHashData(&keyData, sizeof(keyData));
+    } const keyData{window->ID, RowColumnKey(), static_cast<int>(std::lround(contentEdge)), kind};
+    // The records are shared by every Dear ImGui context of the process: the context is part of
+    // the key, so two contexts with windows of one name never share a column.
+    const ImGuiContext* context = g;
+    ImGuiID key = ImHashData(&keyData, sizeof(keyData), ImHashData(&context, sizeof(context)));
     if (key == 0)
         key = 1;
     RowTrailingRecord* records = RowTrailingRecords();
@@ -505,6 +511,13 @@ float RowTrailingColumn(float right, float width, int kind)
     }
     found->current = std::max(found->current, width);
     return std::max(found->previous, found->current);
+}
+
+} // namespace
+
+float RowTrailingColumn(float right, float width, int kind)
+{
+    return RowSharedColumn(right, width, kind);
 }
 
 void ClearRowTrailingColumns()
