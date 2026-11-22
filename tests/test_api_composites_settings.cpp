@@ -118,23 +118,6 @@ void SettingsCalls()
     });
     CHECK(active == 1);
 
-    ThemeMode mode = ThemeMode::Dark;
-    Check("ThemeModeControl", Expect::Item, "Theme", [&] { CHECK_FALSE(ThemeModeControl("Theme", &mode)); });
-    CHECK(mode == ThemeMode::Dark);
-    ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
-    const Snapshot accentBefore(accent);
-    bool themeDefault = false;
-    Check("AccentPicker", Expect::Item, "Accent",
-          [&] { CHECK_FALSE(AccentPicker("Accent", &themeDefault, &accent)); });
-    Check("AccentPicker, no theme default", Expect::Item, "Accent 2",
-          [&] { CHECK_FALSE(AccentPicker("Accent 2", nullptr, &accent)); });
-    CHECK(accentBefore.Unchanged());
-    CHECK_FALSE(themeDefault);
-    float scale = 1.25f;
-    Check("UiScaleControl", Expect::Item, "Scale",
-          [&] { CHECK_FALSE(UiScaleControl("Scale", &scale, 0.75f, 2.0f, {.wheelZoom = true})); });
-    CHECK(scale == 1.25f);
-
     // A shown onboarding panel draws its placeholder and reports closed; a hidden one draws nothing.
     bool open = true;
     int step = 1;
@@ -183,30 +166,6 @@ TEST_CASE("The onboarding stub follows kFill and widths relative to the availabl
             CHECK(ImGui::GetItemRectSize().x == doctest::Approx(expected));
             ++checked;
         }
-    });
-    session.Frame();
-    CHECK(checked == 2);
-}
-
-TEST_CASE("Content-sized theme control stubs are wide enough to name the widget and say planned")
-{
-    facet::test::Session session;
-    REQUIRE(session.Ready());
-    int checked = 0;
-    session.SetUi([&] {
-        using namespace facet;
-        const auto wide = [&](const char* widget, auto&& call) {
-            INFO("widget: " << std::string(widget));
-            call();
-            char text[64];
-            ImFormatString(text, sizeof(text), "%s: planned", widget);
-            CHECK(ImGui::GetItemRectSize().x >= MeasureText(TextStyle::Footnote, text).x);
-            ++checked;
-        };
-        ThemeMode mode = ThemeMode::Light;
-        ImVec4 accent(0.1f, 0.2f, 0.3f, 1.0f);
-        wide("ThemeModeControl", [&] { ThemeModeControl("##theme", &mode); });
-        wide("AccentPicker", [&] { AccentPicker("##accent", nullptr, &accent, {.customColor = false}); });
     });
     session.Frame();
     CHECK(checked == 2);

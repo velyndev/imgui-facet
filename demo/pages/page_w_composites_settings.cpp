@@ -1,36 +1,58 @@
-// Demo page: Search and app controls. Calls every search, preset and app control composite of
-// facet/widgets/composites.h once with neutral arguments. A planned widget draws the placeholder of
-// its declared size; when it is implemented, its call here grows into a section with its variants
-// and states, capture states and selftest steps. The theme controls are called with apply off, so
-// they never fight the theme selector of the gallery. The inventory and cards and the editors have
-// pages of their own (page_w_composites_cards.cpp and page_w_composites_editors.cpp).
+// Demo page: Search and app controls. Each ready widget of the search, preset and app control
+// composites (facet/widgets/composites.h) has a section with its variants and states, capture
+// states for its important looks and selftest steps that operate it by mouse and keyboard; the
+// widgets that are still planned draw their placeholder. The theme controls run with apply off, so
+// they never fight the theme and scale selectors of the gallery: each shows what it chose next to
+// it (the accent in a preview button under PushAccent). The inventory and cards and the editors
+// have pages of their own (page_w_composites_cards.cpp and page_w_composites_editors.cpp).
 
+#include <cmath>
+#include <cstdio>
 #include <string>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <facet/facet.h>
 
 #include "gallery.h"
+#include "internal/popup_host.h"
 #include "pages/pages.h"
 #include "selftest.h"
 
 namespace
 {
 
+using facet::demo::DemoWidth;
+using facet::demo::ForcedItemState;
 using facet::demo::LabeledRow;
+using facet::demo::MixedHeightRow;
+using facet::demo::Note;
+using facet::demo::Paragraph;
 using facet::demo::SectionHeader;
 
 // Height of the console view, in multiples of the xxxl spacing token.
 constexpr float kViewSpans = 4.0f;
-// Range of the example UI scale control (1 is 100 percent).
+// Range of the example UI scale controls (1 is 100 percent).
 constexpr float kScaleMin = 0.75f;
 constexpr float kScaleMax = 2.0f;
+// Widths of the example controls, in design units (DemoWidth keeps them inside the row).
+constexpr float kThemeWidth = 260.0f;
+constexpr float kThemeNarrowWidth = 96.0f;
+constexpr float kScaleWidth = 320.0f;
 
 // Placeholder data: names like "Preset 1", nothing real.
 const facet::LogEntry kConsoleLines[] = {{"Output line 1"}, {"Output line 2", facet::LogLevel::Warning}};
 const char* const kCommands[] = {"command-1", "command-2"};
 const facet::PresetItem kPresets[] = {{"Preset 1", false, true}, {"Preset 2", true}, {"Preset 3"}};
+
+// The capture states, in the order of the FACET_DEMO_PAGE line below.
+enum CaptureState
+{
+    kDefault,
+    kAppFocus,    // the theme mode control focused, the accent swatches hovered
+    kAccentOpen,  // the accent picker's custom color well with its popover open
+};
 
 struct SettingsUi
 {
@@ -43,19 +65,234 @@ struct SettingsUi
         {"Action 2", "Group 1", {ImGuiMod_Ctrl | ImGuiKey_2}, {ImGuiMod_Ctrl | ImGuiKey_2}},
     };
     int preset = 0;
+
+    // ThemeModeControl
     facet::ThemeMode themeMode = facet::ThemeMode::System;
+    facet::ThemeMode themeSizes[3] = {facet::ThemeMode::Light, facet::ThemeMode::Dark, facet::ThemeMode::System};
+    facet::ThemeMode themeNarrow = facet::ThemeMode::Dark;
+    int themeWrites = 0;
+
+    // AccentPicker
+    // The well starts on the first preset, so it never shows a color nobody chose.
     bool themeAccent = true;
-    ImVec4 accent = {0.0f, 0.0f, 0.0f, 1.0f};
+    ImVec4 accent = facet::AccentPresets()[0].color;
+    ImVec4 accentPlain = facet::AccentPresets()[1].color;
+    int accentWrites = 0;
+    int previewPresses = 0;
+
+    // UiScaleControl
     float uiScale = 1.0f;
+    float uiScaleSmall = 1.25f;
+    bool wheelZoom = false;
+    int scaleWrites = 0;
+
     bool onboarding = false;
     int onboardingStep = 0;
 };
 
 SettingsUi ui;
 
+// Records "<probe>.<i>" for the `count` segments of the SegmentedControl-based widget `label` just
+// submitted: equal segments over the item rect (the widgets are given a width), with the ids the
+// segmented control gives its segments (the index hashed with the widget id).
+void ProbeSegments(facet::demo::PageCtx& ctx, const char* label, const char* probe, int count)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImGuiID widget = ImGui::GetID(label);
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const float w = (max.x - min.x) / static_cast<float>(count);
+    char name[64];
+    for (int i = 0; i < count; ++i)
+    {
+        std::snprintf(name, sizeof(name), "%s.%d", probe, i);
+        facet::demo::ProbeRect(ctx, name, ImHashData(&i, sizeof(i), widget),
+                               ImVec2(min.x + w * static_cast<float>(i), min.y),
+                               ImVec2(min.x + w * static_cast<float>(i + 1), max.y));
+    }
+}
+
+// Records "<probe>.<i>" for the first `count` swatches of the AccentPicker just submitted, which
+// has no visible label: swatches one control height square, xs apart, from the left edge.
+void ProbeSwatches(facet::demo::PageCtx& ctx, const char* probe, int count, facet::ControlSize size)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const float side = std::round(facet::ControlHeight(size));
+    const float gap = std::round(facet::Px(facet::T().spacing.xs));
+    char name[64];
+    for (int i = 0; i < count; ++i)
+    {
+        std::snprintf(name, sizeof(name), "%s.%d", probe, i);
+        const float x = min.x + static_cast<float>(i) * (side + gap);
+        facet::demo::ProbeRect(ctx, name, 0, ImVec2(x, min.y), ImVec2(x + side, min.y + side));
+    }
+}
+
+// Records "<probe>.out" and "<probe>.in" for the two buttons at the end of the UiScaleControl just
+// submitted, with the ids the control gives them ("###zoomOut" and "###zoomIn" under its id).
+void ProbeZoomButtons(facet::demo::PageCtx& ctx, const char* label, const char* probe, facet::ControlSize size)
+{
+    if (ctx.probes == nullptr)
+        return;
+    const ImGuiID widget = ImGui::GetID(label);
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const float side = std::round(facet::ControlHeight(size));
+    const float gap = std::round(facet::Px(facet::T().spacing.xs));
+    char name[64];
+    std::snprintf(name, sizeof(name), "%s.in", probe);
+    facet::demo::ProbeRect(ctx, name, ImHashStr("###zoomIn", 0, widget), ImVec2(max.x - side, min.y),
+                           ImVec2(max.x, min.y + side));
+    std::snprintf(name, sizeof(name), "%s.out", probe);
+    facet::demo::ProbeRect(ctx, name, ImHashStr("###zoomOut", 0, widget), ImVec2(max.x - 2.0f * side - gap, min.y),
+                           ImVec2(max.x - side - gap, min.y + side));
+}
+
+const char* ThemeModeName(facet::ThemeMode mode)
+{
+    const facet::Strings& s = facet::GetStrings();
+    switch (mode)
+    {
+    case facet::ThemeMode::Light: return s.themeLight;
+    case facet::ThemeMode::Dark: return s.themeDark;
+    case facet::ThemeMode::System: return s.themeSystem;
+    }
+    return "";
+}
+
+void ThemeModeSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("ThemeModeControl");
+    Paragraph("Light, Dark and System as a segmented control. With apply on it calls SetThemeMode once per "
+              "change and the core animates the switch; here apply is off and the choice shows beside it.");
+    const auto count = [](bool written) {
+        if (written)
+            ++ui.themeWrites;
+    };
+    LabeledRow("Theme");
+    if (ctx.capture && ctx.captureState == kAppFocus)
+        ctx.ForceNextItemState(ForcedItemState::Focused);
+    count(facet::ThemeModeControl("##theme", &ui.themeMode, {.apply = false, .width = DemoWidth(kThemeWidth)}));
+    ctx.Probe("comp.theme");
+    ProbeSegments(ctx, "##theme", "comp.theme", 3);
+    ImGui::SameLine();
+    facet::demo::NoteBeside("Chosen: %s, %d changes", ThemeModeName(ui.themeMode), ui.themeWrites);
+
+    const float large = facet::ControlHeight(facet::ControlSize::Large);
+    LabeledRow("Sizes", large);
+    {
+        MixedHeightRow row(large);
+        const facet::ControlSize sizes[3] = {facet::ControlSize::Small, facet::ControlSize::Regular, facet::ControlSize::Large};
+        for (int i = 0; i < 3; ++i)
+        {
+            ImGui::PushID(i);
+            row.Item(facet::ControlHeight(sizes[i]));
+            count(facet::ThemeModeControl("##size", &ui.themeSizes[i], {.apply = false, .size = sizes[i]}));
+            ImGui::PopID();
+        }
+    }
+    LabeledRow("Narrow, icons");
+    count(facet::ThemeModeControl("##narrow", &ui.themeNarrow, {.apply = false, .width = DemoWidth(kThemeNarrowWidth)}));
+    ctx.Probe("comp.theme.narrow");
+    LabeledRow("Read-only");
+    facet::ThemeMode readOnly = facet::ThemeMode::Dark;
+    facet::ThemeModeControl("##readonly", &readOnly, {.apply = false, .width = DemoWidth(kThemeWidth), .readOnly = true});
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    facet::ThemeMode disabled = facet::ThemeMode::Light;
+    facet::ThemeModeControl("##disabled", &disabled, {.apply = false, .width = DemoWidth(kThemeWidth)});
+    ImGui::EndDisabled();
+}
+
+void AccentSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("AccentPicker");
+    Paragraph("The accent presets as swatches plus a well for any color. The first swatch is each theme's own "
+              "accent, a value of its own. With apply on it calls ClearAccent or SetAccent; here the preview "
+              "button shows the choice under PushAccent.");
+    const int presetCount = static_cast<int>(facet::AccentPresets().size());
+    LabeledRow("Accent");
+    if (ctx.capture && ctx.captureState == kAppFocus)
+        ctx.ForceNextItemState(ForcedItemState::Hovered, 2);
+    if (ctx.capture && ctx.captureState == kAccentOpen)
+        ctx.ForceNextItemState(ForcedItemState::Open, presetCount);
+    if (facet::AccentPicker("##accent", &ui.themeAccent, &ui.accent, {.apply = false}))
+        ++ui.accentWrites;
+    ctx.Probe("comp.accent");
+    ProbeSwatches(ctx, "comp.accent", presetCount, facet::ControlSize::Inherit);
+    if (ctx.capture && ctx.captureState == kAccentOpen)
+    {
+        ctx.RevealInCapture(0.2f);
+        // The well is "##custom" under the picker's id, its popover "##popover" under the well's.
+        const ImGuiID well = ImHashStr("##custom", 0, ImGui::GetID("##accent"));
+        if (ctx.captureFramesLeft == 0 && !facet::internal::IsPopupLevelOpen(ImHashStr("##popover", 0, well)))
+            ctx.captureError = "the custom color popover did not open";
+    }
+
+    LabeledRow("Preview");
+    if (!ui.themeAccent)
+        facet::PushAccent(ui.accent);
+    if (facet::Button("Preview button", {.variant = facet::ButtonVariant::Primary}))
+        ++ui.previewPresses;
+    ctx.Probe("comp.accent.preview");
+    if (!ui.themeAccent)
+        facet::PopAccent();
+    ImGui::SameLine();
+    facet::demo::NoteBeside(ui.themeAccent ? "Theme default, %d changes" : "Custom accent, %d changes", ui.accentWrites);
+
+    LabeledRow("No theme default");
+    facet::AccentPicker("##plain", nullptr, &ui.accentPlain, {.customColor = false, .apply = false});
+    ctx.Probe("comp.accent.plain");
+    LabeledRow("Small");
+    bool smallDefault = ui.themeAccent;
+    ImVec4 smallAccent = ui.accent;
+    facet::AccentPicker("##small", &smallDefault, &smallAccent, {.apply = false, .size = facet::ControlSize::Small, .readOnly = true});
+    Note("Small and read-only: it mirrors the first picker.");
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    bool disabledDefault = true;
+    ImVec4 disabledAccent = ui.accent;
+    facet::AccentPicker("##disabled", &disabledDefault, &disabledAccent, {.apply = false});
+    ImGui::EndDisabled();
+}
+
+void UiScaleSection(facet::demo::PageCtx& ctx)
+{
+    SectionHeader("UiScaleControl");
+    Paragraph("The user UI scale in steps, shown as percent, with zoom out and zoom in buttons. With apply on a "
+              "drag applies once on release and every other change at once; here apply is off.");
+    LabeledRow("UI scale");
+    if (facet::UiScaleControl("##scale", &ui.uiScale, kScaleMin, kScaleMax,
+                              {.wheelZoom = ui.wheelZoom, .apply = false, .width = DemoWidth(kScaleWidth)}))
+        ++ui.scaleWrites;
+    ctx.Probe("comp.scale");
+    ProbeZoomButtons(ctx, "##scale", "comp.scale", facet::ControlSize::Inherit);
+    LabeledRow("Ctrl+wheel");
+    facet::Toggle("##wheel", &ui.wheelZoom);
+    ctx.Probe("comp.scale.wheel");
+    ImGui::SameLine();
+    facet::demo::NoteBeside("Ctrl+wheel anywhere changes the scale above, %d changes", ui.scaleWrites);
+    LabeledRow("Small, step 0.05");
+    facet::UiScaleControl("##fine", &ui.uiScaleSmall, kScaleMin, kScaleMax,
+                          {.step = 0.05f, .apply = false, .size = facet::ControlSize::Small, .width = DemoWidth(kScaleWidth)});
+    LabeledRow("Read-only");
+    float readOnly = 1.5f;
+    facet::UiScaleControl("##readonly", &readOnly, kScaleMin, kScaleMax,
+                          {.apply = false, .width = DemoWidth(kScaleWidth), .readOnly = true});
+    LabeledRow("Disabled");
+    ImGui::BeginDisabled();
+    float disabled = 1.0f;
+    facet::UiScaleControl("##disabled", &disabled, kScaleMin, kScaleMax, {.apply = false, .width = DemoWidth(kScaleWidth)});
+    ImGui::EndDisabled();
+}
+
 } // namespace
 
-FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142)
+FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142, "default", "app controls focused",
+                "accent popover")
 {
     const facet::Theme& theme = facet::T();
     const float viewHeight = theme.spacing.xxxl * kViewSpans;
@@ -64,6 +301,10 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
                             "Search filter bars, settings search, key bind and preset lists, theme mode, accent and "
                             "UI scale controls, onboarding and console views.");
     facet::demo::PlannedFamilyNote("composites");
+
+    ThemeModeSection(ctx);
+    AccentSection(ctx);
+    UiScaleSection(ctx);
 
     SectionHeader("Search and settings");
     LabeledRow("Search filter bar");
@@ -80,14 +321,6 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
     facet::KeybindList("binds", ui.binds);
     LabeledRow("Preset list");
     facet::PresetList("presets", &ui.preset, kPresets, {.importExport = true});
-
-    SectionHeader("App controls");
-    LabeledRow("Theme mode control");
-    facet::ThemeModeControl("Theme##composites", &ui.themeMode, {.apply = false});
-    LabeledRow("Accent picker");
-    facet::AccentPicker("Accent##composites", &ui.themeAccent, &ui.accent, {.apply = false});
-    LabeledRow("UI scale control");
-    facet::UiScaleControl("UI scale##composites", &ui.uiScale, kScaleMin, kScaleMax, {.apply = false});
 
     SectionHeader("Onboarding");
     LabeledRow("Onboarding");
@@ -109,10 +342,62 @@ FACET_DEMO_PAGE("composites-settings", "Search and app controls", "Widgets", 142
 
 FACET_DEMO_SELFTEST("composites-settings")
 {
+    using T = facet::demo::Target;
     test.Do([] { ui = SettingsUi{}; });
-    // The search filter bar placeholder writes nothing.
-    test.Click("composites.search");
-    test.Expect("a click on the search filter bar placeholder leaves the query empty", [] { return ui.query.empty(); });
+
+    // ThemeModeControl: a click on the middle segment, then the arrow keys.
+    test.Click("comp.theme.1");
+    test.Expect("a click on Dark writes Dark", [] { return ui.themeMode == facet::ThemeMode::Dark; });
+    test.Expect("the click wrote once", [] { return ui.themeWrites == 1; });
+    test.ExpectFocused("comp.theme.1");
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.Expect("Right moves to System", [] { return ui.themeMode == facet::ThemeMode::System; });
+    test.ExpectFocused("comp.theme.2");
+    test.KeyPress(ImGuiKey_Home);
+    test.Expect("Home moves to Light", [] { return ui.themeMode == facet::ThemeMode::Light; });
+    test.Expect("three changes so far", [] { return ui.themeWrites == 3; });
+
+    // AccentPicker: a preset by mouse, then the theme default by keyboard.
+    test.Click("comp.accent.3");
+    test.Expect("a click on the fourth swatch writes its color", [] {
+        return !ui.themeAccent && facet::ToU32(ui.accent) == facet::ToU32(facet::AccentPresets()[3].color);
+    });
+    test.KeyPress(ImGuiKey_Home);
+    test.KeyPress(ImGuiKey_Enter);
+    test.Expect("Home and Enter choose the theme default", [] { return ui.themeAccent; });
+    test.Expect("the custom color stays when the theme default is chosen",
+                [] { return facet::ToU32(ui.accent) == facet::ToU32(facet::AccentPresets()[3].color); });
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_RightArrow);
+    test.KeyPress(ImGuiKey_Space);
+    test.Expect("Right twice and Space choose the third swatch", [] {
+        return !ui.themeAccent && facet::ToU32(ui.accent) == facet::ToU32(facet::AccentPresets()[2].color);
+    });
+    test.Expect("three accent changes", [] { return ui.accentWrites == 3; });
+    test.Click("comp.accent.preview");
+    test.Expect("the preview button works under the chosen accent", [] { return ui.previewPresses == 1; });
+
+    // UiScaleControl: the buttons by mouse, the slider by keyboard, then Ctrl+wheel.
+    test.Click("comp.scale.in");
+    test.ExpectNear("zoom in steps to 125 %", [] { return ui.uiScale; }, 1.25, 0.001);
+    test.Click("comp.scale.out");
+    test.Click("comp.scale.out");
+    test.ExpectNear("zoom out twice steps to 75 %", [] { return ui.uiScale; }, 0.75, 0.001);
+    test.Click("comp.scale.out");
+    test.ExpectNear("the minimum holds", [] { return ui.uiScale; }, 0.75, 0.001);
+    test.ExpectFocused("comp.scale.out");
+    test.KeyPress(ImGuiKey_Tab | ImGuiMod_Shift);
+    test.ExpectFocused("comp.scale");
+    test.KeyPress(ImGuiKey_End);
+    test.ExpectNear("End on the slider goes to 200 %", [] { return ui.uiScale; }, 2.0, 0.001);
+    test.KeyPress(ImGuiKey_LeftArrow);
+    test.ExpectNear("Left steps back to 175 %", [] { return ui.uiScale; }, 1.75, 0.001);
+    test.Click("comp.scale.wheel");
+    test.Expect("the toggle turns Ctrl+wheel on", [] { return ui.wheelZoom; });
+    test.KeyDown(ImGuiMod_Ctrl);
+    test.Wheel(T::Item("comp.accent.preview"), -1.0f);
+    test.KeyUp(ImGuiMod_Ctrl);
+    test.ExpectNear("Ctrl+wheel down steps to 150 %", [] { return ui.uiScale; }, 1.5, 0.001);
 
     // The stock button that shows the onboarding placeholder, by mouse and by keyboard.
     test.Click("composites.onboarding");
@@ -126,4 +411,8 @@ FACET_DEMO_SELFTEST("composites-settings")
     test.Expect("Space on the focused button hides it again", [] { return !ui.onboarding; });
     test.ExpectFocused("composites.onboarding");
     test.Do([] { ui.onboarding = false; });
+
+    // The search filter bar placeholder writes nothing.
+    test.Click("composites.search");
+    test.Expect("a click on the search filter bar placeholder leaves the query empty", [] { return ui.query.empty(); });
 }

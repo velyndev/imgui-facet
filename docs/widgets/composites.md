@@ -273,7 +273,17 @@ Preset manager with create, save, rename, duplicate, delete, import and export. 
 bool ThemeModeControl(const char* label, ThemeMode* mode, const ThemeModeControlOptions& options = {});
 ```
 
-Light, Dark and System segments that can apply the mode. Status: planned.
+A `SegmentedControl` with the segments `Strings::themeLight`, `themeDark` and `themeSystem` (sun,
+moon and monitor icons; at a narrow width the segments show only the icons and the names become
+tooltips). The visible label part is drawn in front, inside the width; the default width fits the
+segments, a set width gives equal segments. One Tab stop; Left, Right, Home and End move the choice
+and write at once, as a click does. A click on the chosen segment writes nothing. With `apply` (the
+default) the control calls `SetThemeMode` once on the frame it writes `*mode`, and the core blends
+to the new colors over `motion.durationStandard` (at once while motion is reduced); every Facet
+widget and open popup reads the blended theme each frame, so nothing keeps the old colors. Without
+`apply` the caller applies the mode itself. `readOnly`, a null `mode` and `ImGui::BeginDisabled`
+show the mode and write nothing; sizes Small, Regular and Large as for the segmented control.
+Status: ready.
 
 ### AccentPicker
 
@@ -281,7 +291,25 @@ Light, Dark and System segments that can apply the mode. Status: planned.
 bool AccentPicker(const char* label, bool* themeDefault, ImVec4* accent, const AccentPickerOptions& options = {});
 ```
 
-Accent swatches with a theme default and a custom color that can apply the accent. Status: planned.
+The visible label part in front, then a `SwatchPalette` with one swatch per preset (each one control
+height square) and, with `customColor`, a `ColorWell` for any other color. With a non-null
+`themeDefault` the first swatch shows the current theme's own accent and stands for "each theme's
+own accent" (its tooltip is `Strings::themeDefaultAccent`); the others show their preset color and
+name it on hover. The chosen swatch shows the palette's selection ring and check mark; while a
+custom color is the accent the well has the same ring instead, also when that color happens to equal
+the first swatch. The palette is one Tab stop: Left, Right, Home and End move between swatches,
+Enter or Space chooses; a click chooses. The well opens its color picker in a popover (click, Enter,
+Space or Alt+Down); dragging there writes the accent live, and Escape in the popover restores the
+color it opened with. Writes: choosing the theme default writes `*themeDefault = true` and leaves
+`*accent`; any other choice writes `*accent` (its alpha kept) and `*themeDefault = false`. With
+`apply` it then calls `ClearAccent` and `SetThemeMode(GetThemeMode())` for the theme default, or
+`SetAccent` for a color, once per written value; `Theme::ApplyAccent` derives the hover, pressed,
+on-accent and focus ring colors of every color the same way, preset or custom, so every offered
+preset keeps 4.5:1 for text on the accent and 3:1 for the focus ring in both themes (a unit test
+checks each preset). The default width fits the label, the swatches and the well; a narrower width
+(`ImGui::SetNextItemWidth`) wraps the swatches into rows. At most 32 presets are shown. The preset
+names show on hover only, not on keyboard focus (the palette does not report which swatch has the
+focus). Status: ready.
 
 ### UiScaleControl
 
@@ -289,7 +317,19 @@ Accent swatches with a theme default and a custom color that can apply the accen
 bool UiScaleControl(const char* label, float* scale, float min, float max, const UiScaleControlOptions& options = {});
 ```
 
-Stepped UI scale with optional Ctrl zoom keys. Status: planned.
+A `SliderStepped` with a stop every `step` from `min` to `max` (`max` is the last stop when the range
+is not a whole number of steps; more than 63 steps use a continuous `Slider` that snaps to `step`),
+the value shown through `Strings::percent`, then a zoom out and a zoom in `IconButton`
+(`Strings::zoomOut`, `Strings::zoomIn`). The label is the slider's, in front inside the width; the
+default width fills the available width. The slider takes the usual slider keys (Left and Right one
+stop, Home and End); each button moves one stop and stops at the ends. `zoomInShortcut`,
+`zoomOutShortcut` and `zoomResetShortcut` (registered shortcuts, see `core/input.h`) step or reset
+to 1 wherever the focus is, and with `wheelZoom` each whole notch of Ctrl+wheel steps once. With
+`apply` the control calls `SetUiScale`: a slider drag applies once, when the slider is released,
+because applying a scale moves the track under the pointer; keys, buttons, shortcuts and the wheel
+apply on the frame they write. `*scale` is written while dragging, as for every slider. `readOnly`
+(which also turns the shortcuts and the wheel off), a null `scale`, `min == max` and
+`ImGui::BeginDisabled` show the value and write nothing. Status: ready.
 
 ### Onboarding
 
