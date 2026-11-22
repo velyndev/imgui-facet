@@ -7,14 +7,19 @@ control size stack, the edit session queries and the built-in strings). Every de
 follows [the API conventions](api-conventions.md).
 
 **Status: every declared widget is implemented.** Every family header declares its widgets with
-documentation comments, and every widget of all fourteen families is ready: no declared widget is
+documentation comments, and every widget of the fourteen families is ready: no declared widget is
 a placeholder. The status of each widget is the last line of its entry on its family page under
-`docs/widgets/` ("Status: ready."). Widgets that are planned but not declared yet are listed at
-the end of their family page. Besides the widgets, `ApplyReorderMove`, `PassesFilter`, the
-built-in strings and the edit session queries in `common.h` work. The demo gallery has one page per family under Widgets, and two for the inputs (text inputs and value
-inputs), the pickers (color pickers and the other pickers) and the display family (the display
-widgets and the data table), and three for the composites (inventory and cards, search and app
-controls, editors and canvas). How a widget is built is described in
+`docs/widgets/` ("Status: ready."). Additions that are planned but not declared yet are listed in
+the section "Planned, not declared yet" at the end of the family pages that have one (buttons,
+selection, sliders, inputs, pickers, display, charts, media and composites). Besides the widgets,
+`ApplyReorderMove`, `PassesFilter`, the built-in strings and the edit session queries in
+`common.h` work.
+
+The demo gallery has one page per family under Widgets, and two for the inputs (text inputs and
+value inputs), the pickers (color pickers and the other pickers) and the display family (the
+display widgets and the data table), and three for the composites (inventory and cards, search and
+app controls, editors and canvas). [Getting started](getting-started.md) shows how an application
+sets Facet up and calls its first widgets; how a widget is built is described in
 [writing a widget](writing-a-widget.md).
 
 | Family | Header | Documentation | What it holds |

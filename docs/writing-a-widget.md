@@ -104,18 +104,17 @@ second one.
 | Labelled rows | `internal/row_layout.h` |
 | Fuzzy matching, key chords, charts | `internal/fuzzy.h`, `internal/keys.h`, `internal/chart_core.h` |
 
-The theme is fixed for widget work: every token a widget of this stage needs exists in
-`include/facet/core/theme.h`, with its reason in `DESIGN.md`. A widget never uses a color or pixel
-literal; a factor that has no token (the share of a spinner stroke) is a named constant with a
-comment. In the same way, built-in text comes from a `Strings` member (`widgets/common.h`), and the
-members the widgets of a stage name exist before the stage starts. A member with a number or a
-name in it is a template filled with `FormatTokens` (`internal/text_util.h`); a `TextToken` carries
-a number, or a text such as a preset name, which is copied as it is.
+Every color, length and duration a widget uses is a token in `include/facet/core/theme.h`, with
+its reason in `DESIGN.md`. A widget never uses a color or pixel literal; a factor that has no token
+(the share of a spinner stroke) is a named constant with a comment. In the same way, built-in text
+comes from a `Strings` member (`widgets/common.h`). A member with a number or a name in it is a
+template filled with `FormatTokens` (`internal/text_util.h`); a `TextToken` carries a number, or a
+text such as a preset name, which is copied as it is.
 
-A part that a helper above does not cover yet, or a token or string that is missing, is asked
-for, not added: shared headers (`src/internal/`, `include/facet/core/`, `widgets/common.h`) change
-only additively, through the engineer who merges the stage, so two widgets never grow two versions
-of one part.
+A part that a helper above does not cover yet, or a token or string that is missing, is added to
+the shared headers first (`src/internal/`, `include/facet/core/`, `widgets/common.h`), as a change
+of its own with its reason in `DESIGN.md`. These headers change only additively, so two widgets
+never grow two versions of one part.
 
 ## States and keys
 
@@ -225,13 +224,11 @@ block, a short description of what it draws and does (variants, sizes, keys, sta
 as its last sentence its status, `Status: ready.` A widget is declared in its family header only
 once it is built; what is planned and not declared yet is listed at the end of its family page.
 
-Three files describe every family at once: the lists of what is ready in the status section of
-`README.md` and in `docs/widgets.md`, and the one-line reason for every new visual choice in
-`DESIGN.md`. Working alone, update them with the widget. When several groups are built at the same
-time, none of them edits these files: each lists its lines (the widgets that became ready, each
-new look with its reason) in its report, and the engineer who merges the work writes them once.
-The same holds for a page shared by several groups (`docs/widgets/inputs.md`, `pickers.md`,
-`display.md`, `composites.md`): each group edits only its own entries and its own usage section.
+Three files describe every family at once: the family table with its status in `README.md` and in
+`docs/widgets.md`, and the one-line reason for every new visual choice in `DESIGN.md`. Update them
+in the same change as the widget. A page shared by several groups (`docs/widgets/inputs.md`,
+`pickers.md`, `display.md`, `composites.md`) keeps one section of entries and one usage section
+per group.
 
 ## Composites
 
