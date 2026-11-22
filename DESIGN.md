@@ -31,9 +31,57 @@ navigation and the block prototypes.
 **Dose caps.** Effects are allowed only where they carry meaning:
 
 - Backdrop blur: only on the floating menu shell and on popovers.
-- Shadows: only on floating layers (popovers, menus, dialogs, the shell).
-- Glow: only as the focus ring, plus one opt-in accent glow per screen.
+- Shadows: only on floating layers (popovers, menus, dialogs, the shell) and the level 1 shadow
+  under slider and toggle knobs, which lifts the one part of a control the pointer grabs.
+- Glow: only one opt-in accent glow per screen; the focus ring is a plain stroke.
 - Accent: only on the selection, the primary action and keyboard focus.
+
+## Quiet layers
+
+A control is shaped by its fill and one faint hairline, never by a light outline. Depth in the
+dark theme comes from near-black greys stepping up from black. Color and weight are spent on state
+(the selection, the primary action, keyboard focus), not on edges. The rules, each with its reason:
+
+- **One border rule.** Every outline is one hairline (`metrics.hairline`, at least one physical
+  pixel) in a border token: `controlBorder` for the edge of a control or a tile, `separator` for
+  dividing lines and the edge of a surface. A state changes the color or the fill, never the
+  width: hover takes `controlBorderHover`, a focused field and a selected tile the accent outline
+  (`focusRing`, the accent at 3:1), an error `destructive`. Reason: one stroke weight everywhere
+  reads as one product, and a weight that changes with state reads as a layout jump.
+  `src/internal/control.h` holds the helpers (`ControlOutlineColor`, `DrawOutline`,
+  `DrawSurfaceOutline`) and `tests/test_border_rule.cpp` scans the sources for any other width.
+- **Strokes that are not outlines** (chart lines, glyphs, check marks, slider tracks, the arcs of
+  knobs and gauges, the focus ring) keep their own weights, each from a named token. Reason: they
+  carry data or state, not an edge.
+- **The focus ring** is two units wide, one hairline outside the control, without a halo, and it
+  shows only while the keyboard modality is on. Inside lists, menus, tables and grids of tiles it
+  sits inside the row, cell or tile. Reason: a keyboard user needs one clear mark, a pointer user
+  needs none, and a ring inside a row is never cut by the list edge nor pushes the layout.
+- **Rows, cells and tiles.** The row under the pointer and the current row show `fill[2]`; a
+  selected row shows `accentSubtle` (plus its check mark); a selected tile or card adds the accent
+  outline at the one border width. No state draws a thicker stroke. Reason: rows are scanned in
+  quantity, so their state must read from a fill, not from a frame around each of them.
+- **Capsules.** A radius of half the shorter side or more gives a capsule with circular ends, in
+  the shared fill and stroke helpers, whatever the corner settings say. Reason: the continuous
+  corner flattens a pill's ends into a rounded rectangle, which reads as a mistake on a switch.
+- **Knobs and tracks.** Slider and toggle knobs are solid discs in `knob` (white in both themes)
+  with the `controlBorder` hairline and the level 1 shadow; the unfilled track is `fill[0]` and
+  the filled part the accent mark (`focusRing`), 3:1 against both. Reason: a solid knob reads as
+  the thing to grab; a hollow ring with a light outline reads as a frame.
+- **Hover only on controls.** A part the pointer can drag that is not a control with a look of its
+  own (the span between range handles) shows no hover change; only the handles do. Reason: motion
+  signals a state change of a control, and a span that swells under the pointer signals nothing.
+- **The dark ramp.** bg `#000000`, bgSecondary `#111113`, bgTertiary `#19191C`, elevated
+  `#18181B` / `#1E1E21` / `#26262A`; fills and edges are white at low opacity. Reason: steps of
+  near-black separate layers without any light grey edge, and a floating surface shows its height
+  through its lighter grey and its separator hairline, because a shadow cannot darken black.
+- **Quiet outlines, increased contrast on request.** In the standard presets a control's outline
+  stays below 3:1 on purpose; text keeps 4.5:1 and the focus ring and the marks that carry a state
+  keep 3:1. `SetIncreasedContrast(true)` (or the Windows high contrast setting, while the
+  application follows it with `SetFollowSystemContrast`) resolves `controlBorder`,
+  `controlBorderHover` and `separator` to colors that reach 3:1 on every surface. Reason: a 3:1
+  outline on every control is the light grey frame this look removes, and the users who need it
+  get it from one switch.
 
 Reduced motion follows the Windows "Animation effects" setting. Interactive items show the hand
 cursor, disabled ones the not-allowed cursor.
@@ -43,12 +91,12 @@ cursor, disabled ones the not-allowed cursor.
 | Token group | Values | Reason |
 |---|---|---|
 | Spacing | 4 px grid: 4, 8, 12, 16, 20, 24, 32 | One rhythm for every gap and padding |
-| Radii | element 6, control 8, card 12, popover 14, window 16; pill only for toggles and chips | Radius signals the layer; not everything is a pill |
-| Corners | Continuous path from radius 10 up, circular arcs below | Large surfaces get a smooth corner join; small ones cannot show the difference |
+| Radii | element 6, control 8, card 12, popover 14, window 16; a capsule (half the shorter side) for toggle tracks, chips, badges, status pills, scroll thumbs and thin tracks | Radius signals the layer; not everything is a capsule |
+| Corners | Continuous path from radius 10 up, circular arcs below and for every capsule | Large surfaces get a smooth corner join; small ones cannot show the difference; a capsule needs true half circles |
 | Control heights | small 22, regular 28, large 36 | Pointer-density sizes for desktop tools and menus |
 | Toggle, checkbox, slider | toggle 38 x 22 with a 2 inset, checkbox 16, slider track 4 and knob 18 | Sized against the 28 control height so rows line up |
-| Focus ring | 3 wide, in the focusRing color (see Colors) | Visible on every surface without hiding the control |
-| Hairline | 1, at least one physical pixel | Separators stay crisp at every scale |
+| Focus ring | 2 wide, one hairline outside the control (inside rows, cells and tiles), in the focusRing color, no halo | Visible on every surface without hiding the control or competing with the content |
+| Hairline | 1, at least one physical pixel; the width of every outline and divider | One stroke weight; outlines and separators stay crisp at every scale |
 | Minimum hit target | 24 | Small visuals stay easy to click |
 | Type | caption 11, footnote 12, callout 12, body 13, headline 13 semibold, title3 15 semibold, title2 17 semibold, title1 22 bold, large title 26 bold | Compact desktop scale with weight carrying the hierarchy |
 | Motion springs | quick (0.25 s, damping 1), standard (0.35 s, 0.85), gentle (0.5 s, 1) | The standard spring overshoots slightly, which reads as a physical selection highlight |
@@ -99,15 +147,17 @@ cursor, disabled ones the not-allowed cursor.
 
 | Token | Light | Dark | Reason |
 |---|---|---|---|
-| Surfaces bg, bgSecondary, bgTertiary, bgElevated | #FFFFFF, #F2F2F7, #E5E5EA, #FFFFFF | #000000, #1C1C1E, #2C2C2E, #3A3A3C | White and black bases with grey steps for grouping and depth |
-| bgElevatedLevels 1 / 2 / 3 | #FFFFFF for all three | #2C2C2E, #3A3A3C, #444446 | A black shadow cannot darken black, so in dark a higher layer is a lighter surface; level 2 is bgElevated |
-| label, labelSecondary, labelTertiary, labelQuaternary | black at 100 / 60 / 30 / 16 % | white at 100 / 60 / 30 / 16 % | One text color in four strengths keeps every surface consistent |
-| fill[0] to fill[3] | #787880 at 20 / 16 / 12 / 8 % | #787880 at 36 / 32 / 24 / 18 % | Translucent control fills work on every surface |
-| separator | #3C3C43 at 29 % | #545458 at 60 % | A translucent hairline reads the same on every surface |
-| separatorOpaque | #C6C6C8 | #38383A | Where a translucent line would double up (crossing table borders) |
+| Surfaces bg, bgSecondary, bgTertiary, bgElevated | #FFFFFF, #F2F2F7, #E5E5EA, #FFFFFF | #000000, #111113, #19191C, #1E1E21 | White and black bases; in dark, near-black greys step up from black, so layers separate without a light edge |
+| bgElevatedLevels 1 / 2 / 3 | #FFFFFF for all three | #18181B, #1E1E21, #26262A | A black shadow cannot darken black, so in dark a higher layer is a lighter surface; level 2 is bgElevated |
+| label, labelSecondary, labelTertiary, labelQuaternary | black at 100 / 60 / 30 / 16 % | white at 100 / 60 / 32 / 18 % | One text color in four strengths keeps every surface consistent |
+| fill[0] to fill[3] | #787880 at 20 / 16 / 12 / 8 % | white at 14 / 10 / 7 / 4 % | Translucent control fills work on every surface; in dark, white at low opacity keeps the greys neutral on the near-black ramp |
+| separator | black at 10 % | white at 8 % | A translucent hairline reads the same on every surface, quieter than a control's edge |
+| separatorOpaque | #E5E5E7 | #242426 | Where a translucent line would double up (crossing table borders) |
+| controlBorder, controlBorderHover | black at 14 / 22 % | white at 14 / 22 % | The one faint hairline that completes a control's fill (`ControlBoundaryColor` returns it, and "boundary" below means it); hover strengthens the color, never the width; 3:1 only in the increased contrast variant |
+| knob | #FFFFFF | #FFFFFF | A solid knob reads as the part to grab in both themes; its hairline and shadow set it off a light track |
 | Accent | #0066CC | #1F6FEB | One blue, dark enough in each theme for white text on it |
 | accentSubtle | the accent at 14 % | the accent at 24 % | A selection background that tints without competing with the text on it |
-| focusRing | the accent hue, lightness moved to 3:1 on every surface | the same | The ring sits on whatever surface holds the control, so it needs the non-text contrast on all of them; an accent that already has it is kept as it is |
+| focusRing | the accent hue, lightness moved to 3:1 on every surface and against fill[0] over each | the same | The ring sits on whatever surface holds the control, so it needs the non-text contrast on all of them; the same color marks a filled track, an on switch and a selected tile next to fill[0]; an accent that already has it is kept as it is |
 | Chart palette (chart[0] to chart[7]) | eight hues from the accent hue, chroma 0.14, lightness from 0.56, moved to 3:1 | the same from lightness 0.72 | Neighbouring series differ by at least 90 degrees of hue, and every series stays visible on every surface for any accent |
 | scrollThumb, scrollThumbHover | black at 45 / 60 % | white at 45 / 62 % | The scroll position reads at 3:1 on every surface, and the thumb gets stronger where the pointer is |
 | Accent presets | blue, purple, pink, red, orange, yellow, green, graphite | the same | A short list of distinct hues; any of them derives readable states |
@@ -117,16 +167,16 @@ cursor, disabled ones the not-allowed cursor.
 | destructiveSubtle, successSubtle, warningSubtle | the status color at 14 % | the status color at 14 % | Enough to tint the surface; the dark accentSubtle strength (24 %) would take labelSecondary below 4.5:1 on the bright dark warning, so the washes keep 14 % in both themes; the tone glyph keeps 3:1 on them |
 | accentTextVisited | accentText with its hue turned 60 degrees, lightness moved to 4.5:1 | the same | A visited link stays a link (same chroma and strength) but differs in hue from an unvisited one |
 | Code tints keyword, string, number | #7A1FA2, #1A6B2B, #9A4A00 | #D7A8FF, #7EE08F, #FFB86B | Three hues far apart that reach 4.5:1 on every surface; comments use labelSecondary, so code never needs a color that is hard to read |
-| checker[0], checker[1] | #FFFFFF, #D1D1D6 | #48484A, #2C2C2E | Two greys of the theme's own surfaces, about 1.5:1 apart: alpha shows on them, and they never compete with the color drawn over them |
+| checker[0], checker[1] | #FFFFFF, #D1D1D6 | #2A2A2D, #19191C | Two greys of the theme's own surfaces, 1.2:1 to 1.5:1 apart: alpha shows on them, and they never compete with the color drawn over them |
 | shadow | black | black | A neutral shadow; its strength comes from the elevation opacity |
 | Elevation opacity | 0.10 / 0.12 / 0.18 | 0.36 / 0.44 / 0.56 | Dark surfaces need more strength for a shadow to show over bgSecondary and bgTertiary |
-| glassTint | #FFFFFF | #1C1C1E | The panel tint matches the theme's base surfaces, so glass reads as a surface |
-| Scrim | black at 20 % | black at 48 % | Dims the content behind a modal layer without hiding it |
+| glassTint | #FFFFFF | #111113 | The panel tint matches the theme's base surfaces, so glass reads as a surface |
+| Scrim | black at 20 % | black at 55 % | Dims the content behind a modal layer without hiding it; dark needs more because the content under it is already dark |
 
 Contrast rules, checked by the unit tests:
 
 - label and labelSecondary reach 4.5:1 on every surface, the elevation surfaces included, and
-  on every fill over a surface; they are the only label tokens for text that must be read,
+  on every fill over every surface; they are the only label tokens for text that must be read,
   placeholders included.
 - labelTertiary is below 4.5:1 and is used only for disabled text and decorative glyphs.
 - The accent is set at runtime. `Theme::ApplyAccent` derives the other accent colors in OKLCH:
@@ -135,8 +185,13 @@ Contrast rules, checked by the unit tests:
   the lightness until it reaches 4.5:1 on every surface, for links and accent text; focusRing
   and the chart palette do the same for 3:1, measured as drawn (8 bits per channel). The tests
   check this for 24 hues at five lightness levels in both themes.
-- Outlines of controls reach 3:1 (non-text contrast) on the content surfaces; the scrollbar
-  thumbs reach 3:1 on every surface.
+- The focus ring and the marks that carry a state (a check mark on its fill, the filled part of a
+  track, an on switch against an off one, the scroll thumb, the accent outline of a selected tile)
+  reach 3:1.
+- The outline of a control at rest is quiet on purpose: in the standard presets controlBorder
+  stays between 1.25:1 and 1.8:1 over every surface (the tests lock both ends), and a divider
+  stays below it. In the increased contrast variant controlBorder, controlBorderHover and
+  separator reach 3:1 on every surface, in both themes and for every accent preset.
 
 ## Core
 
@@ -162,8 +217,8 @@ Contrast rules, checked by the unit tests:
   size is drawn for large text). Where it is missing or its instances cannot be selected, the
   static Segoe UI files are used. Nothing is bundled.
 - **Stock Dear ImGui widgets** follow the theme through `facet::ApplyImGuiStyle`: frame padding
-  makes a stock control exactly one control height, frames get a hairline outline of 3:1, and
-  the scrollbar is a pill.
+  makes a stock control exactly one control height, frames get the controlBorder hairline (3:1 in
+  the increased contrast variant), and the scrollbar is a capsule.
 - **Loading states.** A skeleton is a fill[2] block with a fill[3] band sweeping left to right;
   every skeleton on screen sweeps in step from one shared clock, so one screen has one loading
   language.
@@ -176,9 +231,13 @@ The building blocks in `src/internal/` that widgets are made of. The choices beh
   any neighbour whose visible rectangle is under the pointer; Dear ImGui still reports the
   visible rectangle.
 - **Focus ring.** One hairline of surface between control and ring, concentric corners in the
-  control's own corner shape (circular arcs around knobs), focusRing width, a soft halo,
-  faded over durationFast; shown only after keyboard or gamepad input, because a mouse user
-  already knows where they clicked.
+  control's own corner shape (circular arcs around knobs), focusRing width, no halo, faded over
+  durationFast; shown only after keyboard or gamepad input, because a mouse user already knows
+  where they clicked. Rows, cells and tiles draw it inside their bounds (`DrawFocusRingInside`).
+- **No ring from the pointer.** The current row of an open dropdown, a completion list or the
+  command palette follows the pointer, and such a row shows its fill only; it shows the ring when
+  the keys put it there while the keyboard modality is on (a list opened with Enter, an arrow
+  press), because a ring that follows the mouse tells the pointer user what they already see.
 - **Ring color.** focusRing, which reaches 3:1 on every surface for any accent (see Colors), so
   the ring is visible with every accent preset and every custom accent.
 - **Selection pill motion.** The leading edge uses the standard spring at 0.7 of its response,
@@ -215,7 +274,8 @@ Popup host:
 
 - **Surfaces by kind.** Menus, lists and popovers take the popover radius and elevation 2,
   dialogs the window radius and elevation 3, tooltips the control radius and elevation 1; the
-  height of the layer sets its shadow.
+  height of the layer sets its shadow and its surface, and every floating layer has the separator
+  hairline, which with the lighter grey shows height over black, where a shadow cannot.
 - **Padding by kind.** spacing.xs for menus and lists, so rows run almost edge to edge;
   spacing.xl for dialogs; spacing.sm by spacing.xs for tooltips.
 - **Open and close motion.** A level enters with ease-out over popupOpen and leaves with ease-in
@@ -234,7 +294,8 @@ Popup host:
 - **Scrim.** The host draws the modal scrim from colors.scrim and fades it with the dialog;
   Dear ImGui's own dim is not used, so the dim and the dialog arrive together.
 - **Rows in menus** draw the focus ring inside the row, because the menu padding is narrower
-  than the ring.
+  than the ring, and take the shared row look (`DrawListRowFill`), so a menu row and a list row
+  under the pointer look the same.
 - **Menu row pitch.** Menu rows take the list row height and meet without a gap, the same as the
   rows of an open list, so the pointer moving down a menu is always on a row and the highlight
   never blinks off between two rows.
@@ -260,14 +321,14 @@ Scroll core:
 
 List core:
 
-- **Rows.** Hover fill[2]; the selection accentSubtle while the list has keyboard focus and
-  fill[1] otherwise, so it stays visible but quieter when focus is elsewhere; selected labels
-  semibold; rows inset one hairline top and bottom with radii.control, so adjacent selected
-  rows stay separate.
-- **Row focus ring** is drawn after all rows, so neighbours never cover it.
+- **Rows.** The row look of `list_view.h` (`ListRowLook`, `DrawListRowFill`): hover fill[2], the
+  selection accentSubtle whether or not the list has the focus, so a selection never changes its
+  look when the focus moves on; selected labels semibold; rows inset one hairline top and bottom
+  (`ListRowFillRect`) with radii.control, so adjacent selected rows stay separate.
+- **Row focus ring** is drawn after all rows, inside the row's fill, so neighbours never cover it
+  and the list edge never cuts it.
 - **Active row of a driven list** (the open list of a field that keeps the keyboard) takes the
-  hover fill and the focus ring, because it is where Enter goes, the same promise the ring makes
-  for a focused row.
+  hover fill, because it is where Enter goes; it takes the ring only when the keys moved it there.
 - **Trees.** chevron-right and chevron-down in labelSecondary, one list.indent per level, and
   separator hairlines as indent guides.
 - **Data states.** The spinner and Strings::loading in labelSecondary; the error glyph in
@@ -283,8 +344,8 @@ Drag and drop core:
   because they are information, not part of the faded item.
 - **Insertion line.** The focusRing color at focusRingWidth with round ends, the one mark that
   reaches 3:1 on every surface.
-- **Drop target.** An accentSubtle fill with a focusRing outline at focusRingWidth and no halo,
-  so it is not mistaken for the focus ring.
+- **Drop target.** An accentSubtle fill with the accent outline at the one border width, the look
+  of a selected tile, so it is not mistaken for the focus ring.
 - **Refusal.** No highlight and the not-allowed cursor, so refusal does not rest on color.
 - **Gap.** Rows move apart along the standard spring, keyed by item, to show where the item
   lands; the landing place gets a fill[2] wash; under reduced motion the rows jump.
@@ -293,13 +354,14 @@ Drag and drop core:
 
 Text field core:
 
-- **Fill.** fill[2] at rest and fill[1] on hover, like the other control fills, with the 3:1
-  boundary hairline against the surface.
-- **Read-only.** No fill, boundary only, because it reads as text that can be selected but not
-  typed.
+- **Fill.** fill[2] at rest and fill[1] on hover, like the other control fills, with the
+  controlBorder hairline, controlBorderHover under the pointer.
+- **Read-only.** No fill, the controlBorder hairline only, because it reads as text that can be
+  selected but not typed.
 - **Disabled.** fill[3], a separator hairline and labelTertiary text.
-- **Active field.** A focusRing-colored hairline even after a mouse click, because typing goes
-  where that outline is; the keyboard focus ring is added only after keyboard input.
+- **Active field.** The accent outline (focusRing color) at the hairline width even after a mouse
+  click, because typing goes where that outline is; the keyboard focus ring is added only after
+  keyboard input.
 - **Error.** A destructive hairline in place of the boundary, which keeps its color when
   disabled.
 - **Caret.** The label color, the strongest contrast on every surface, field.caretWidth wide and
@@ -366,9 +428,11 @@ these parts itself:
 | State or part | Helper | Rule |
 |---|---|---|
 | Hover and press | `ItemBehavior` (item.h) and `StateFill` | The fill blends toward the hover and the pressed fill over durationFast |
-| Keyboard focus | `DrawItemFocusRing` and `DrawFocusRing` (focus.h) | focusRing color and width, one hairline of surface between control and ring, shown after keyboard input only |
+| Keyboard focus | `DrawItemFocusRing` and `DrawFocusRing`; `DrawFocusRingInside` for rows, cells and tiles (focus.h) | focusRing color, two units wide, one hairline of surface between control and ring (inside a row, at its edge), shown after keyboard input only |
+| Outlines | `ControlOutlineColor`, `DrawOutline`, `DrawSurfaceOutline` (control.h) | One hairline: controlBorder (hover controlBorderHover, focused or selected the accent, error destructive), separator for surfaces |
+| Rows, cells and tiles | `ListRowLook`, `ListRowFillRect`, `DrawListRowFill` (list_view.h) | Hover and current row fill[2], selected accentSubtle, a selected tile also the accent outline |
 | Disabled | `ControlLabelColor`, `NeutralFill`, `kDisabledPictureOpacity` (control.h) | fill[3], a separator hairline, labelTertiary content, pictures and colors at 35 % |
-| Read-only | `FieldFrameLook::readOnly` and each family's read-only marks | No fill, the boundary hairline; selections in labelSecondary instead of the accent |
+| Read-only | `FieldFrameLook::readOnly` and each family's read-only marks | No fill, the controlBorder hairline; selections in labelSecondary instead of the accent |
 | Help and error line | `DrawControlMessage` (control.h) | Footnote spacing.xs under the control; an error in destructive with the error icon |
 | Labels in front and above | `MeasureFrontLabel`, `MeasureAboveLabel` (control.h) | The label column of a settings row in front, spacing.xs above |
 | Popup surfaces | The popup host by level kind (popup_host.h) | Radius, elevation and padding by kind, open and close motion from the motion tokens |
@@ -383,13 +447,13 @@ destructive close button of the title bar, or the drag cursors of fields that dr
 The Blocks pages operate the blocks through prototype controls in `demo/`. They are not the
 finished widgets; their look was the starting point for the widget families:
 
-- **Fills** step fill[2], fill[1], fill[0] for rest, hover and press with a 3:1 boundary
-  hairline, so the states differ in more than one subtle shade and the edge stays visible.
-- **Tracks.** The unfilled slider track is in the 3:1 boundary color so the range ends stay
-  visible.
-- **Knobs** are bg with a 3:1 outline and grow 15 % while held, which confirms the grab.
-- **Span.** A range's filled span thickens by spacing.xs while a press would grab it or it is
-  dragged, so the user sees that the whole span moves.
+- **Fills** step fill[2], fill[1], fill[0] for rest, hover and press with the controlBorder
+  hairline, so the states differ in more than one subtle shade.
+- **Tracks.** The unfilled slider track is fill[0] and the filled part the accent mark, which
+  reaches 3:1 against it, so the value reads without an outline.
+- **Knobs** follow the knob rule of Quiet layers and grow 15 % while held, which confirms the grab.
+- **Span.** A range's filled span keeps its thickness and color under the pointer and while it is
+  dragged; the handles show that the range is held.
 - **Marks.** Step ticks (including an off-grid max) and snap stops are labelSecondary dots.
 - **Read-only** fills in labelSecondary, so a value that cannot change does not look like an
   accent selection.
@@ -398,7 +462,7 @@ finished widgets; their look was the starting point for the widget families:
 
 Button:
 
-- **Secondary** is the neutral fill with the 3:1 boundary hairline, like a text field, so a row of
+- **Secondary** is the neutral fill with the controlBorder hairline, like a text field, so a row of
   neutral controls reads as one set.
 - **Primary** is the accent fill with onAccent text and a focusRing hairline; focusRing equals the
   accent where the accent already reaches 3:1, and keeps a light accent's edge visible otherwise.
@@ -427,21 +491,23 @@ ProgressBar:
 
 Buttons and selection:
 
-- **Toggle.** Off is the neutral fill with the 3:1 boundary and a labelSecondary knob, on is the
-  accent with an onAccent knob and a focusRing edge, so on and off differ in fill, edge and knob
-  position, not only in hue. The knob moves with the quick spring, because it is a small state change.
-- **Checkbox and radio marks.** Unchecked has no fill and the 3:1 boundary; checked is the accent
-  with a focusRing edge. Mixed is a minus instead of a check, so the three states differ by shape.
+- **Toggle.** A capsule track: off is fill[0] with the controlBorder hairline, on is the accent
+  mark (focusRing, 3:1 against an off track) without an outline; the knob is a solid disc in the
+  knob token with the controlBorder hairline and the level 1 shadow in every size and state, so on
+  and off differ in fill, edge and knob position, not only in hue. The knob moves with the quick
+  spring, because it is a small state change.
+- **Checkbox and radio marks.** Unchecked has no fill and the controlBorder hairline; checked is
+  the accent. Mixed is a minus instead of a check, so the three states differ by shape.
   Box corners are at most a quarter of the side, so a box never reads as a radio circle. The radio
   dot is 3/8 of the mark and grows in with the fill, so the change reads as one motion.
 - **Read-only selections** (marks, segments, chips, cards) use labelSecondary or fill[0] instead of
   the accent, so a value that cannot change does not look like a live selection.
-- **Segmented track and toggle groups.** The track is fill[2] with the 3:1 boundary, like a
-  Secondary button. The pill is accentSubtle inset by segmentInset with concentric corners, and
+- **Segmented track and toggle groups.** The track is fill[2] with the controlBorder hairline, like
+  a Secondary button. The pill is accentSubtle inset by segmentInset with concentric corners, and
   hairline dividers stand only between unselected neighbours, so the pill reads as one piece.
 - **Latches** (a latched IconButton, selected chips and cards) take accentSubtle plus a focusRing
   hairline, so a latch shows by its edge as well as its tint.
-- **Chips** are pills (the radii rule allows pills for toggles and chips). The remove button sits
+- **Chips** are capsules (the radii rule allows capsules for toggles, chips and badges). The remove button sits
   inside the pill's end and is not a Tab stop, so a row of chips keeps one stop per chip; Delete
   and Backspace remove.
 - **CopyButton.** The confirmation check is in the success color on the neutral variants, because
@@ -474,8 +540,8 @@ Sliders:
   both ends stay marked.
 - **Stepped stops** are evenly spaced whatever their values, so a list of choices reads as equal
   steps; stop labels are Caption under the ticks.
-- **Knob.** A track arc in the boundary color, the value as an accent arc, a dot or a wiper, and a
-  bg face with a 3:1 outline like a slider knob.
+- **Knob.** A track arc in fill[0], the value as an accent arc, a dot or a wiper, and a face in
+  the knob token with the controlBorder hairline, like a slider knob.
 - **Histogram bars.** The selected stretch in the accent, the rest in fill[0], top corners rounded
   with half of radii.element, so the bars read as one chart under the range.
 - **Multi slider segments** take the series colors (the chart palette) unless the caller gives a
@@ -489,8 +555,9 @@ Sliders:
   only decorate, the values must be read.
 - **Pad grid.** Separator hairlines at every step up to 32 per axis, otherwise at the quarters,
   because more lines would read as a texture.
-- **BoxRangePad box.** An accentSubtle wash with an accent outline that thickens while the body
-  would be grabbed: it is the selected range, like a range slider's filled span. Edge knobs show
+- **BoxRangePad box.** An accentSubtle wash with the accent outline at the one border width: it is
+  the selected range, like a range slider's filled span, and like it keeps its look under the
+  pointer. Edge knobs show
   only on edges at least three knobs long, so a small box does not pile up knobs.
 - **AllocationBar** segments sit on the slider track in chart palette colors with Caption
   captions; the share is kept over the label when crowded, because the number is the data.
@@ -527,7 +594,7 @@ Text inputs:
 
 Value inputs:
 
-- **Key caps.** fill[2] with the 3:1 boundary hairline and radii.element, Footnote (Caption at
+- **Key caps.** fill[2] with the controlBorder hairline and radii.element, Footnote (Caption at
   Small), spacing.xs apart, so a cap reads as a key on a page and on a field fill; a held cap
   takes fill[0] and a focusRing outline. KeyCap, ShortcutHint and KeybindCapture share this look
   (`src/internal/key_caps.h`) and differ only in placement: on the text baseline inline, centered
@@ -735,8 +802,9 @@ Date, time and other pickers:
   picker.
 - **Angle dial.** The Knob's face with four quarter ticks in labelTertiary (decoration) and an
   accent needle with a tip dot, so the direction reads without the number.
-- **Icon and thumbnail tiles.** The chosen tile has the row selection fill and a ring two hairlines
-  wide in accentText (4.5:1 on every surface), so the choice does not depend on the fill alone.
+- **Icon and thumbnail tiles.** The chosen tile has the selected tile look of the row rule
+  (accentSubtle and the accent outline at the one border width), so the choice does not depend on
+  the fill alone.
 - **Thumbnail badges.** A lock on a bgElevated disc and a check on an accent disc, so locked and
   checked tiles differ by shape.
 - **File browser.** The list is framed like the inline lists, and the path is cut in the middle so
@@ -772,8 +840,8 @@ Media:
   past a corner.
 - **Avatar fallback.** Without a ready image an avatar shows initials in label on fill[1], or the
   user icon: a neutral fallback that invents no picture.
-- **Selected avatars and thumbnails** get an accent ring two hairlines wide inside their edge, with
-  a hairline gap, so the choice shows without the item growing or relying on color alone.
+- **Selected avatars and thumbnails** get the accent outline at the one border width inside their
+  edge, with a hairline gap, so the choice shows without the item growing or relying on color alone.
 - **Surface rings.** Overlapping avatars and an avatar's status dot are ringed in the surface color,
   so the edge between them stays visible.
 - **Image feedback.** Hover and press on images are fill[2] and fill[1] washes over the picture,
@@ -785,23 +853,23 @@ Media:
 - **Timeline layers.** Accent for the played part, labelTertiary for the buffered band,
   accentSubtle for the loop region and loop markers in the slider knob look, so each layer reads
   apart.
-- **Drop zone** outline is dashed in the boundary color (3:1); an accepted drag takes the drag and
-  drop target look and a refused type gets no highlight.
+- **Drop zone** outline is dashed in controlBorder at the hairline width; an accepted drag takes the
+  drag and drop target look and a refused type gets no highlight.
 - **Glide.** Strips and carousels hand the drag's speed to a spring (standard motion) on release,
   so they glide and snap without a jump; with reduced motion they jump.
 
 Composites, inventory and cards:
 
-- **Inventory slot surface.** fill[2] with a ControlBoundaryColor hairline, so an empty slot is
-  seen at 3:1.
+- **Inventory slot surface.** fill[2] with the controlBorder hairline, so an empty slot reads by
+  its fill like any control (3:1 in the increased contrast variant).
 - **Count and lock chips** sit on bgElevated with a separator hairline, so they read over any
   picture in both themes.
 - **Cooldown.** A pie in scrim over the picture, clockwise from the top, so it reads as a clock
   running down.
 - **A lifted item's place** is drawn at 1 minus drag.ghostOpacity, so the user sees where the item
   came from while the ghost carries it.
-- **Selected tile and selected media card.** An accent ring two hairlines thick inside the edge, so
-  the selection does not rest on the fill color alone.
+- **Selected tile and selected media card.** accentSubtle and the accent outline at the one border
+  width (the row rule), so the selection does not rest on the fill color alone.
 - **A disabled tile's picture** takes the disabled picture opacity of Control anatomy next to
   labelTertiary text.
 - **Detail card stat differences.** success when better, destructive when worse, with the sign
@@ -853,8 +921,8 @@ Composites, editors and canvas:
 - **Canvas snap guides and the selected element's outline** use focusRing, which reaches 3:1 on
   every surface; the center lines and the dashed safe area frame are labelTertiary because they
   are reference lines, not controls.
-- **Canvas screen** keeps the window background with a hairline in the control boundary color,
-  so the area elements are dragged in has a 3:1 edge; its grid stays in separator so it does not
+- **Canvas screen** keeps the window background with the controlBorder hairline, so the area
+  elements are dragged in has an edge like a control; its grid stays in separator so it does not
   compete with the elements.
 - **Canvas anchor control** sits beside the selected element only where it hides no other
   element, else beside the canvas: a picker that covers the layout it edits hides what it places.

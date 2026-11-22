@@ -91,7 +91,9 @@ second one.
 | Key caps of a chord | `KeyCapNames`, `KeyCapLook` (`internal/key_caps.h`) |
 | Checkerboard behind translucent colors and images | `FillCheckerboard` (`core/draw.h`) with `colors.checker` and `metrics.checkerCell` |
 | Help and error text under a control | `PickControlMessage`, `ControlMessageHeight`, `DrawControlMessage` (an error is also recorded for `ValidationSummary`) |
-| Focus ring | `DrawItemFocusRing`, `DrawFocusRing` (`internal/focus.h`) |
+| Focus ring | `DrawItemFocusRing`, `DrawFocusRing`; inside rows, cells and tiles `DrawFocusRingInside`, `DrawItemFocusRingInside` (`internal/focus.h`); shown only while `ItemState::focusVisible` |
+| Outlines (one hairline in a border token) | `ControlOutlineColor`, `DrawOutline`, `DrawSurfaceOutline` (`internal/control.h`); `tests/test_border_rule.cpp` fails on an outline of any other width |
+| Row, cell and tile states | `ListRowLook`, `ListRowFillRect`, `DrawListRowFill` (`internal/list_view.h`): hover fill[2], selected accentSubtle, a selected tile also the accent outline |
 | Motion | `Tween`, `Spring`, `Smooth` (`core/anim.h`) under the widget id with sub keys below `kItemAnimSubBase`; the item behaviour's `hoverAmount`, `pressAmount`, `focusAmount` |
 | State kept across frames | `GetState`, `GetPersistentState` (`internal/state_storage.h`) |
 | Selection highlight | `SelectionPill`, `PushPillLabelStyle` (`internal/selection_pill.h`) |

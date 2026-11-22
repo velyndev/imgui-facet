@@ -10,10 +10,10 @@ the reason for each are listed in `DESIGN.md`.
 
 | Group | Holds |
 |---|---|
-| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the accent and its derived states (visited links included), status colors with their solid fill states and translucent washes, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`), the scrollbar thumbs, the code view tints and the two checkerboard cells |
+| `colors` | Surfaces (with one per elevation level, read with `ElevatedSurface(level)`), translucent fills, four label strengths, separators, the control outline at rest and hovered (`controlBorder`, `controlBorderHover`), the knob face (`knob`), the accent and its derived states (visited links included), status colors with their solid fill states and translucent washes, focus ring, shadow, glass tint, scrim, the chart palette (`chart[kChartPaletteSize]`), the scrollbar thumbs, the code view tints and the two checkerboard cells |
 | `spacing` | The 4 px grid: `xs` 4 to `xxxl` 32 |
 | `radii` | `element`, `control`, `card`, `popover`, `window`, and where continuous corners start |
-| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width, hairline, minimum hit target, the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots), status and page dots, slider ticks, the segment inset, progress tracks per control size, the icon of an empty state, step markers and their connectors, and the checkerboard cell |
+| `metrics` | Control heights, toggle, checkbox and slider sizes, focus ring width (2), hairline (the width of every outline and divider), minimum hit target, the default sizes of larger controls (faders, pads, pickers, charts, panels, cards, thumbnails, slots), status and page dots, slider ticks, the segment inset, progress tracks per control size, the icon of an empty state, step markers and their connectors, and the checkerboard cell |
 | `type` | Size and weight of every `TextStyle` |
 | `motion` | Springs, durations, loading periods, the popup open and close motion, how long copied feedback stays, the live dot pulse, a global `scale` and `reduceMotion` |
 | `elevation` | Three shadow levels (their surfaces are in `colors`) |
@@ -128,8 +128,9 @@ facet::SetAccent(IM_COL32(0x24, 0x8A, 0x3D, 0xFF));
 - `accentText`: the accent hue with its lightness moved until it reaches 4.5:1 on every surface,
   for links and accent-colored text.
 - `focusRing`: the accent hue with its lightness moved until it reaches 3:1 (the non-text
-  contrast) on every surface, opaque; an accent that already reaches it is used as it is. Drop
-  indicators use it too.
+  contrast) on every surface and against `fill[0]` over each, opaque; an accent that already
+  reaches it is used as it is. The marks that carry a state use it too: the filled part of a
+  track, an on switch, the accent outline of a selected tile or a focused field, drop indicators.
 - `chart[0]` to `chart[7]`: the chart palette, eight hues stepping around the OKLCH circle from
   the accent hue, each moved in lightness until it reaches 3:1 on every surface. Charts, legends
   and other indexed data take color `i % kChartPaletteSize` for entry `i`.
@@ -164,11 +165,38 @@ of its own scope or the next theme change. A `PopAccent` without a push, a push 
 `facet::EndFrame` are reported through Dear ImGui's recoverable error path and the debugger
 output; `EndFrame` then clears the stack, so the next frame starts without a scoped accent.
 
+## Outlines and increased contrast
+
+Every outline is one hairline (`metrics.hairline`, at least one physical pixel) in a border token:
+`controlBorder` for the edge of a control or a tile, `separator` for dividing lines and the edge of
+a surface. A state changes the color, not the width: `controlBorderHover` under the pointer, the
+accent outline (`focusRing`) for a focused field or a selected tile, `destructive` for an error.
+In the presets the outline is quiet: the fill shapes a control, the hairline only completes it.
+
+```cpp
+facet::SetIncreasedContrast(true);       // every outline and divider at 3:1
+facet::SetFollowSystemContrast(true);    // or follow the Windows high contrast setting
+```
+
+While the variant is on (`facet::IncreasedContrast()`), `T()` resolves `separator`,
+`controlBorder` and `controlBorderHover` to colors that reach 3:1 on every surface of the theme:
+`separatorOpaque` mixed toward `label` until it does, the hover color a few steps further. Nothing
+else changes. It applies to the presets, to every theme given to `SetTheme`, to each step of an
+animated switch and inside `PushAccent` scopes, and `ApplyImGuiStyle` writes it into the stock
+style. `IncreasedContrastEnabled()` is the application's switch, `SystemIncreasedContrast()` the
+Windows setting (read about once per second), which counts only after
+`SetFollowSystemContrast(true)`; following it is off by default.
+
+`SetTheme` takes a theme with the standard border colors. A border color that comes back from
+`T()` unchanged while the variant is on counts as the standard color it replaced, so
+`facet::Theme t = facet::T(); t.radii.card = 10.0f; facet::SetTheme(t);` keeps the variant a switch
+that can be turned off again.
+
 ## Contrast guarantees
 
 The unit tests check, for both presets:
 
-- `label` and `labelSecondary` reach 4.5:1 on every surface and on every fill over a surface.
+- `label` and `labelSecondary` reach 4.5:1 on every surface and on every fill over every surface.
   Text that must be read uses only these two (placeholders use `labelSecondary`).
   `labelTertiary` and `labelQuaternary` stay below 4.5:1 on purpose, for disabled text and
   decoration.
@@ -182,10 +210,16 @@ The unit tests check, for both presets:
   on every surface.
 - For accents across 24 hues at five lightness levels, every accent state carries readable
   `onAccent` text, `accentText` is readable on every surface, and `focusRing` and every chart
-  palette color reach 3:1 on every surface as drawn (8 bits per channel).
-- `facet::ControlBoundaryColor()` reaches 3:1 on the content surfaces, for control outlines.
+  palette color reach 3:1 on every surface as drawn (8 bits per channel); `focusRing` also against
+  `fill[0]` over every surface and against `accentSubtle` over every surface, so a filled track,
+  an on switch and a selected tile's outline read at 3:1.
+- The control outline is quiet on purpose: `controlBorder` stays between 1.25:1 and 1.8:1 over
+  every surface, `controlBorderHover` above it and below 3:1, and `separator` below
+  `controlBorder`. `facet::ControlBoundaryColor()` returns `controlBorder`. In the increased
+  contrast variant (below) all three reach 3:1 on every surface, in both presets and for every
+  accent preset.
 - `scrollThumb` and `scrollThumbHover` reach 3:1 on every surface.
-- The two `checker` cells differ by 1.3:1 to 2:1, so alpha shows without competing with the color
+- The two `checker` cells differ by 1.2:1 to 2:1, so alpha shows without competing with the color
   over them, and both stay light in the light preset and dark in the dark one.
 
 A custom theme with other surface colors should call `theme.ApplyAccent(theme.colors.accent)`

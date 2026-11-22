@@ -474,8 +474,8 @@ the id and in its ini file.
 - **Row look:** `DataTableRow` submits one row item that spans every column, from the first column
   to the right edge of the visible table, also while the table is scrolled sideways. It draws in the
   table's background channel, under the cells: the hover fill (`fill[2]`), the selection
-  (`accentSubtle` while the rows have the focus, `fill[1]` when not) and the focus ring around the
-  whole row, or around the focused cell. A control in a cell takes the pointer before the row.
+  (`accentSubtle`) and, after keyboard input, the focus ring inside the whole row, or around the
+  focused cell. A control in a cell takes the pointer before the row.
 - **Selection** (`selection` set): click, Ctrl, Shift, Shift with the arrows, Ctrl+A, Escape and box
   select through `ImGui::BeginMultiSelect` and the storage; `singleSelect` keeps one row. The start of
   a Shift range stays on its item when the caller sorts (the selection storage keys rows through

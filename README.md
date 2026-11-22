@@ -129,8 +129,8 @@ grid built only from Facet widgets. The navigation groups the other pages: Found
 type, motion, drawing, effects), Media (icons, images), Blocks (one page per shared building
 block) and Widgets (one or more pages per widget family). The title bar holds the theme editor
 and, as far as the width allows, the theme mode and the UI scale. The editor changes radii,
-spacing, type sizes, control heights, motion, blur, shadows and the accent of the live theme and
-copies the edits as C++ code. `--overlay`, or a switch in the editor, floats the gallery as a
+spacing, type sizes, control heights, line widths, motion, blur, shadows and the accent of the live
+theme, turns on the increased contrast variant, and copies the edits as C++ code. `--overlay`, or a switch in the editor, floats the gallery as a
 shell over a generated backdrop; F9 shows and hides it.
 
 Besides its window it has a capture mode, which renders pages offscreen into PNG files, and a

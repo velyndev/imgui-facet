@@ -192,8 +192,8 @@ frame, rows, width, long-list behaviour, states and message line of ListBox. Eac
   (`boxSelect`). A click in empty space clears the selection.
 - **Keys:** one Tab stop; the arrows move the focus and select the row, Shift with the arrows,
   Home or End extends the range, Ctrl with the arrows moves the focus alone, Space toggles, Ctrl+A
-  selects every enabled row, Escape clears. Selected rows show accentSubtle while the list has the
-  focus and fill[1] otherwise, with a semibold label.
+  selects every enabled row, Escape clears. Selected rows show accentSubtle, with a semibold label,
+  whether or not the list has the focus.
 - **Disabled rows** are shown in labelTertiary, are skipped by the arrows and left out of ranges,
   select-all and box selection.
 - **Activation:** a double click or Enter on a row; `SelectableListActivatedRow()` returns that row

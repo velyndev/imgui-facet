@@ -27,7 +27,7 @@ group in the navigation:
   - Draw: corners, hairlines, gradients and alpha, arcs and loading indicators, and
     `DrawGroup`.
   - Effects: the elevation shadows, a glass panel over a busy backdrop next to its opaque
-    fallback, and the focus ring halo and accent glow.
+    fallback, the focus ring and the accent glow.
 - Media
   - Icons: the built-in icon set in a searchable grid at three sizes, with an accent tint
     and an empty state.
@@ -122,17 +122,20 @@ uses other settings.
 The editor opens from the title bar as a pane beside the page (it floats over the page in a
 Compact width) and changes the live theme; every change animates as a theme switch does. It holds:
 
-- the theme mode, the accent (the presets and a custom color) and the UI scale;
+- the theme mode, the accent (the presets and a custom color), the UI scale and the increased
+  contrast switch (`facet::SetIncreasedContrast`), which lifts every outline and divider to 3:1;
 - corner radii, spacing, type sizes and control heights, each as a factor over the preset's
   values, and under "Each token" every token of the group on its own (a token set on its own
   ignores the factor; its row's reset button returns it to the factor);
+- the line widths (the border width `metrics.hairline` and the focus ring width), as a factor
+  and a row per token;
 - the motion scale and reduce motion, the blur strength and the shadow strength;
 - overlay mode and whether its backdrop moves.
 
-Each group has a reset button, and "Reset all" returns every token, the accent and the UI scale
-to the preset (the theme mode and the window mode stay). Sliders of spacing, type and control
-heights apply when they are released, because they move the pane's own layout; the arrow keys and
-the other sliders apply at once. "Copy as C++" puts a function on the clipboard that sets exactly
+Each group has a reset button, and "Reset all" returns every token, the accent, the UI scale and
+the contrast switch to the preset (the theme mode and the window mode stay). Sliders of spacing, type, control
+heights and line widths apply when they are released, because they move the pane's own layout;
+the arrow keys and the other sliders apply at once. "Copy as C++" puts a function on the clipboard that sets exactly
 the edited tokens on a `facet::Theme` and compiles against the public headers:
 
 ```cpp
@@ -148,7 +151,7 @@ inline void ApplyThemeEdits(facet::Theme& theme)
 ```
 
 The values are absolute and were made on the preset named in the first line. A changed UI scale
-is named in a comment, because it is not a theme token.
+and the increased contrast switch are named in comments, because they are not theme tokens.
 
 ### Overlay mode
 
