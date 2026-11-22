@@ -603,3 +603,114 @@ TEST_CASE("Inventory detail card and media card follow kFill and widths relative
     session.Frame();
     CHECK(checked == 4);
 }
+
+// ---- Public drag and drop -----------------------------------------------------------------------
+
+namespace
+{
+
+struct DragUi
+{
+    int value = 7;
+    int delivered = 0;
+    int other = 0;
+    int got = 0;
+    bool dragging = false;
+
+    void Ui(facet::test::Session& session)
+    {
+        ImGui::Button("source");
+        session.Track("source");
+        if (facet::BeginDragSource("test.item", &value, sizeof(value), {.previewText = "Item"}))
+            facet::EndDragSource();
+        ImGui::Dummy(ImVec2(10.0f, 40.0f));
+        ImGui::Button("target");
+        session.Track("target");
+        if (facet::BeginDropTarget())
+        {
+            if (const ImGuiPayload* payload = facet::AcceptDrop("test.item"))
+            {
+                ++delivered;
+                got = *static_cast<const int*>(payload->Data);
+            }
+            facet::EndDropTarget();
+        }
+        ImGui::Button("elsewhere");
+        session.Track("elsewhere");
+        if (facet::BeginDropTarget())
+        {
+            if (facet::AcceptDrop("test.other") != nullptr)
+                ++other;
+            facet::EndDropTarget();
+        }
+        dragging = fi::DragDropActive("test.item", nullptr);
+    }
+};
+
+} // namespace
+
+TEST_CASE("Public drag and drop: a pointer drag delivers to a target of its type and not to another type")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DragUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Drag({session.ItemCenter("source"), session.ItemCenter("elsewhere")}, 8);
+    session.Frames(2);
+    CHECK(ui.other == 0);
+    CHECK(ui.delivered == 0);
+    session.Drag({session.ItemCenter("source"), session.ItemCenter("target")}, 8);
+    session.Frames(2);
+    CHECK(ui.delivered == 1);
+    CHECK(ui.got == 7);
+}
+
+TEST_CASE("Public drag and drop: Ctrl+Space picks the focused source up and Space drops it on the target")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    DragUi ui;
+    session.SetUi([&] { ui.Ui(session); });
+    session.Frames(2);
+    session.Click(session.ItemCenter("source"));
+    session.KeyPress(ImGuiMod_Ctrl | ImGuiKey_Space);
+    REQUIRE(ui.dragging);
+    session.KeyPress(ImGuiKey_DownArrow);
+    session.KeyPress(ImGuiKey_Space);
+    session.Frames(2);
+    CHECK(ui.delivered == 1);
+}
+
+TEST_CASE("Public drag and drop: content between BeginDragSource and EndDragSource stays out of the caller's window")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    int value = 1;
+    ImVec2 cursorBefore;
+    ImVec2 cursorAfter;
+    bool open = false;
+    session.SetUi([&] {
+        ImGui::Button("source");
+        session.Track("source");
+        cursorBefore = ImGui::GetCursorScreenPos();
+        if (facet::BeginDragSource("test.item", &value, sizeof(value)))
+        {
+            open = true;
+            facet::StyledText("Extra preview text");
+            facet::EndDragSource();
+        }
+        cursorAfter = ImGui::GetCursorScreenPos();
+    });
+    session.Frames(2);
+    const ImVec2 from = session.ItemCenter("source");
+    session.MouseMove(from);
+    session.MouseDown();
+    session.MouseMove(ImVec2(from.x + 30.0f, from.y + 60.0f));
+    session.Frames(2);
+    CHECK(open);
+    CHECK(cursorAfter.x == cursorBefore.x);
+    CHECK(cursorAfter.y == cursorBefore.y);
+    session.MouseUp();
+    session.Frames(2);
+}
