@@ -873,16 +873,8 @@ The dose caps in Direction apply. The choices behind each effect:
   and canvas), so a page stays short enough to scan and each page's note speaks for what it shows.
 - **Demo widths.** A set width on a demo control is clamped to the room left in its row, so a
   page holds at a large scale in a small window.
-- **Title strip.** The window background with a hairline below it; the title in the headline
-  style, labels in labelSecondary in front of their controls.
-- **Navigation.** bgSecondary, group names in footnote labelSecondary, rows one control height
-  tall, and the selection pill in accentSubtle that springs between rows. The groups come in a
-  fixed order (Foundations, Media, Blocks, Widgets). The list scrolls when it is taller than the
-  window; the heading of the group at the top stays pinned and the next heading pushes it out,
-  so a scrolled list still says which group its rows belong to, and a newly selected page is
-  scrolled into view. The rows run on the item behaviour, the focus ring and the selection pill
-  block; the selected title is semibold, and a cut title shows in full beside the row on
-  keyboard focus and at the pointer on hover.
+- **App shell.** The reasons for the test app's own chrome (title strip, navigation and what
+  the app adds around its pages) are in `docs/demo.md`, next to its description.
 - **Pages.** The window background with 24 / 20 padding; every page starts with a Title1
   heading and a one-paragraph summary in labelSecondary, sections with a Title3 heading.
 - **Settings rows.** A page labels each setting in one fixed label column in footnote
