@@ -110,6 +110,30 @@ TEST_CASE("Theme export names every changed token and none that is unchanged")
     CHECK(text.find("facet::Theme::Light()") != std::string::npos);
 }
 
+TEST_CASE("A group factor never pushes a token past the range of its row, and an unedited preset stays")
+{
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        const facet::Theme base = dark ? facet::Theme::Dark() : facet::Theme::Light();
+        // Unedited, no token is clamped away from its preset value.
+        CHECK(AssignedPaths(BuildThemeExport(base, ThemeEdits{}, "Preset", 1.0f)).empty());
+        ThemeEdits edits;
+        for (int g = 0; g < facet::demo::kThemeEditGroupCount; ++g)
+            edits.factor[static_cast<std::size_t>(g)] = facet::demo::ThemeEditGroupOf(static_cast<ThemeEditGroup>(g)).maxFactor;
+        const facet::Theme edited = facet::demo::ApplyThemeEdits(base, edits);
+        for (const auto& token : ThemeEditTokens())
+        {
+            CAPTURE(token.path);
+            facet::Theme copy = edited;
+            CHECK(token.ref(copy) <= token.maxValue);
+            CHECK(token.ref(copy) >= token.minValue);
+        }
+        CHECK(edited.elevation.levels[2].opacity <= 1.0f);
+        CHECK(BuildThemeExport(base, edits, "Preset", 1.0f).find("opacity = 1.1") == std::string::npos);
+    }
+}
+
 TEST_CASE("Theme edits apply factors and per-token values to the preset")
 {
     const facet::Theme base = facet::Theme::Dark();

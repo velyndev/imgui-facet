@@ -142,13 +142,16 @@ inline float ThemeTokenValue(const Theme& theme, int index)
     return ThemeEditTokens()[static_cast<std::size_t>(index)].ref(const_cast<Theme&>(theme));
 }
 
-// The value of token `index` after the edits, from the preset `base`.
+// The value of token `index` after the edits, from the preset `base`, within the range of the
+// token's row: a group factor never pushes a token past it (a shadow opacity past 1), so the live
+// theme, the row and the export show the same value.
 inline float EditedTokenValue(const Theme& base, const ThemeEdits& edits, int index)
 {
     const ThemeEditToken& token = ThemeEditTokens()[static_cast<std::size_t>(index)];
-    if (edits.overridden[static_cast<std::size_t>(index)])
-        return edits.value[static_cast<std::size_t>(index)];
-    return ThemeTokenValue(base, index) * edits.factor[static_cast<std::size_t>(token.group)];
+    const float value = edits.overridden[static_cast<std::size_t>(index)]
+                            ? edits.value[static_cast<std::size_t>(index)]
+                            : ThemeTokenValue(base, index) * edits.factor[static_cast<std::size_t>(token.group)];
+    return std::fmin(std::fmax(value, token.minValue), token.maxValue);
 }
 
 // The preset `base` with the edits applied.
