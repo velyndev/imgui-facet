@@ -1,0 +1,22 @@
+name: Widget or feature request
+description: A widget, an option or a behaviour Facet does not have yet
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to build
+      description: The screen or the control you need it for. A sketch or a screenshot of something similar helps.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What Facet should offer
+      description: The widget or option as you would like to call it. The API conventions are in docs/api-conventions.md.
+      render: cpp
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today
+      description: The widgets you combine now, and where that falls short.

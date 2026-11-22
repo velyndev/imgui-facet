@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in Facet draws or behaves wrongly
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you see, and what you expected instead. Add a screenshot when it is about the look.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: The smallest code that shows the problem, or the page of facet_demo that shows it and the steps there.
+      render: cpp
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Facet commit
+      description: The output of `git rev-parse --short HEAD` in the Facet checkout.
+    validations:
+      required: true
+  - type: dropdown
+    id: imgui
+    attributes:
+      label: Dear ImGui
+      options:
+        - Fetched by Facet (the default)
+        - My own target through FACET_IMGUI_TARGET
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows and compiler
+      description: For example "Windows 11 24H2, Visual Studio 2026 (MSVC v145), x64".
+    validations:
+      required: true
+  - type: input
+    id: display
+    attributes:
+      label: Display scale, UI scale and theme
+      description: For example "150 % display scale, UI scale 1, dark theme". Leave empty when it does not matter.
