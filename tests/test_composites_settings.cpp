@@ -1499,3 +1499,48 @@ TEST_CASE("Onboarding counts fewer than one step as one and clamps the step")
     session.Seconds(0.5f);
     CHECK_FALSE(h.open);
 }
+
+TEST_CASE("Onboarding page dots take the carousel colors: focusRing for the step, controlBorder for the rest")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    const facet::Theme saved = facet::T();
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
+        bool open = true;
+        int step = 0;
+        ImDrawList* drawList = nullptr;
+        float left = 0.0f;
+        session.SetUi([&] {
+            if (facet::BeginOnboarding("Welcome", &open, &step, 3))
+            {
+                drawList = ImGui::GetWindowDrawList();
+                left = ImGui::GetCursorScreenPos().x;
+                ImGui::TextUnformatted("Step content");
+                facet::EndOnboarding();
+            }
+        });
+        session.Seconds(0.5f);
+        REQUIRE(drawList != nullptr);
+        const facet::Colors& c = facet::T().colors;
+        // The dots start the footer at the left edge of the content; the buttons sit at its end.
+        const float band = left + facet::Px(facet::T().metrics.pageDotSize) * 12.0f;
+        int current = 0;
+        int others = 0;
+        int old = 0;
+        for (const ImDrawVert& v : drawList->VtxBuffer)
+        {
+            if (v.pos.x > band)
+                continue;
+            current += v.col == facet::ToU32(c.focusRing) ? 1 : 0;
+            others += v.col == facet::ToU32(c.controlBorder) ? 1 : 0;
+            old += v.col == facet::ToU32(c.separatorOpaque) ? 1 : 0;
+        }
+        CHECK(current > 0);
+        CHECK(others > 0);
+        CHECK(old == 0);
+    }
+    facet::SetTheme(saved, false);
+}

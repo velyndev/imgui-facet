@@ -286,7 +286,8 @@ value centered between a previous and a next arrow button. Returns true on the f
   `Strings::mixed` until the first step, which writes even when it lands on the same item. A value
   that does not fit is cut with an ellipsis and shown in full on hover and keyboard focus.
 - **Page dots.** `pageDots` adds a row under the frame with a dot (the pageDotSize token) per item,
-  the chosen one in label and the others in labelTertiary; it is left out when the dots do not fit.
+  the chosen one in the accent mark ocusRing and the others in controlBorder (separator while
+  disabled); it is left out when the dots do not fit.
 - **States.** Disabled: the field frame's disabled look, no Tab stop. `readOnly` (or a null
   `index`): shown and focusable, never written; the arrows show they cannot step. `error`
   replaces `helpText` under the frame.

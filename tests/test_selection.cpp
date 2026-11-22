@@ -1190,9 +1190,15 @@ TEST_CASE("A cycle selector shows the focus ring for a forced focused state and 
         session.Track("before");
         if (force)
             facet::internal::ForceNextItemState(facet::internal::ForcedItemState::Focused);
-        const int from = ImGui::GetWindowDrawList()->VtxBuffer.Size;
+        const ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const int from = drawList->VtxBuffer.Size;
+        const float top = ImGui::GetCursorScreenPos().y;
         facet::CycleSelector("Placeholder setting", &index, kItems, {.pageDots = true, .width = 320.0f});
-        ringVertices = CountColor(from, ring);
+        // The ring lies outside the frame, so it reaches above its top; the current page dot in
+        // the same accent mark lies under the frame and is not counted.
+        ringVertices = 0;
+        for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+            ringVertices += drawList->VtxBuffer[i].col == ring && drawList->VtxBuffer[i].pos.y < top ? 1 : 0;
     });
     session.Frames(10);
     CHECK(ringVertices > 0);
@@ -1768,5 +1774,51 @@ TEST_CASE("An error turns the one outline of the selection controls and the mode
             CHECK(quiet[kind] == 0);
             CHECK(flagged[kind] > 0);
         }
+    }
+}
+TEST_CASE("Cycle selector page dots take the carousel colors, separator while disabled")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    ThemeGuard guard;
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    for (const bool dark : {false, true})
+    {
+        CAPTURE(dark);
+        facet::SetTheme(dark ? facet::Theme::Dark() : facet::Theme::Light(), false);
+        const facet::Colors& c = facet::T().colors;
+        int counts[2][3] = {};  // [disabled][focusRing, controlBorder, separator] under the frame
+        session.SetUi([&] {
+            int index = 1;
+            facet::CycleSelector("##plain", &index, kItems);
+            const float plain = ImGui::GetItemRectSize().y;
+            for (int disabled = 0; disabled < 2; ++disabled)
+            {
+                ImGui::PushID(disabled);
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const int from = drawList->VtxBuffer.Size;
+                const float top = ImGui::GetCursorScreenPos().y;
+                ImGui::BeginDisabled(disabled == 1);
+                facet::CycleSelector("##dots", &index, kItems, {.pageDots = true});
+                ImGui::EndDisabled();
+                int* out = counts[disabled];
+                out[0] = out[1] = out[2] = 0;
+                for (int i = from; i < drawList->VtxBuffer.Size; ++i)
+                {
+                    const ImDrawVert& v = drawList->VtxBuffer[i];
+                    if (v.pos.y < top + plain)
+                        continue;
+                    out[0] += v.col == facet::ToU32(c.focusRing) ? 1 : 0;
+                    out[1] += v.col == facet::ToU32(c.controlBorder) ? 1 : 0;
+                    out[2] += v.col == facet::ToU32(c.separator) ? 1 : 0;
+                }
+                ImGui::PopID();
+            }
+        });
+        session.Frames(4);
+        CHECK(counts[0][0] > 0);
+        CHECK(counts[0][1] > 0);
+        CHECK(counts[1][0] == 0);
+        CHECK(counts[1][2] > 0);
     }
 }

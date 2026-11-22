@@ -438,7 +438,7 @@ class OnboardingScope;
 
 A `Modal` (the scrim, the open and close motion, the focus trap) with the visible label part as its
 title, the caller's content for step `*step`, and a footer: a progress dot per step
-(`metrics.pageDotSize`; the current one in the accent, the others in `separatorOpaque`) with
+(`metrics.pageDotSize`; the current one in the accent mark `focusRing`, the others in `controlBorder`) with
 `Strings::stepOf` beside them, so the step is never told by color alone, and at the end the
 buttons `Strings::skip` (Plain; while `skippable` and not on the last step), `Strings::back` (from
 the second step on) and `Strings::next`, or `Strings::finish` on the last step (Primary). A footer

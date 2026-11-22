@@ -4,8 +4,8 @@
 // only while skippable, so a tour that cannot be skipped ends only through Finish); the buttons
 // are the finished widgets. This file adds the footer layout, the dots and the step logic.
 //
-// Footer: the dots (metrics.pageDotSize, the current one in the accent and the others in the
-// separatorOpaque token) and Strings::stepOf beside them, so the step is never told by color
+// Footer: the dots (metrics.pageDotSize, the current one in the accent mark focusRing and the
+// others in controlBorder, as the carousel's) and Strings::stepOf beside them, so the step is never told by color
 // alone; then at the end Skip (Plain, while skippable and not on the last step), Back (from the
 // second step on) and Next, or Finish on the last step (Primary). Next and Finish take the
 // keyboard focus when a step opens, so Enter steps through. A footer too narrow for the dots and
@@ -155,7 +155,7 @@ void EndOnboarding()
         for (int i = 0; i < frame.count; ++i)
         {
             const ImVec2 center(origin.x + static_cast<float>(i) * (dot + gap) + dot * 0.5f, centerY);
-            const ImVec4 color = i == current ? t.colors.accent : t.colors.separatorOpaque;
+            const ImVec4 color = i == current ? t.colors.focusRing : t.colors.controlBorder;
             drawList->AddCircleFilled(center, dot * 0.5f, ToU32(color));
         }
         internal::ControlTextScope text(TextStyle::Footnote);

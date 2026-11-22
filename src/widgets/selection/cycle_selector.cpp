@@ -188,7 +188,8 @@ bool CycleSelectorImpl(const char* label, int* index, const internal::SelectionI
         drawList->AddText(ImVec2(std::round(frame.GetCenter().x - shown.width * 0.5f), CenteredTextY(frame.Min.y, m.height)),
                           valueColor, shown.text);
 
-        // Page dots: one per item, the chosen one in label, the others in labelTertiary.
+        // Page dots as the carousel's: the chosen one in the accent mark (focusRing, 3:1 on every surface),
+        // the others in the quiet controlBorder, all in separator while disabled.
         if (options.pageDots && count > 0)
         {
             const float spacing = dot * 2.0f;
@@ -199,7 +200,7 @@ bool CycleSelectorImpl(const char* label, int* index, const internal::SelectionI
                 const float y = std::round(frame.Max.y + dotsGap);
                 for (int i = 0; i < count; ++i)
                 {
-                    const ImVec4 color = i == shownIndex && !mixedShown ? internal::ControlLabelColor(body.disabled) : c.labelTertiary;
+                    const ImVec4 color = body.disabled ? c.separator : (i == shownIndex && !mixedShown ? c.focusRing : c.controlBorder);
                     drawList->AddCircleFilled(ImVec2(x + dot * 0.5f, y + dot * 0.5f), dot * 0.5f, ToU32(color));
                     x += spacing;
                 }

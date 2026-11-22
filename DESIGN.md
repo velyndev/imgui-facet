@@ -534,8 +534,8 @@ Buttons and selection:
 - **Link.** A hairline underline only under the pointer or the keyboard focus marks the link
   without underlining every link at rest; a visited link uses accentTextVisited.
 - **CycleSelector** takes the text field frame, because it shows a value. Its chevrons are
-  labelSecondary, and labelTertiary at an end that cannot step; page dots use pageDotSize, the
-  chosen one in label.
+  labelSecondary, and labelTertiary at an end that cannot step; page dots use pageDotSize and the
+  carousel's colors.
 - **Option cards** are bgSecondary with radii.card, because they are grouped content on a page. A
   radio mark stands for one choice and a checkbox mark for several, so the two forms read
   differently.
@@ -876,8 +876,9 @@ Media:
 - **Timeline layers.** The accent mark (focusRing) for the played part on a fill[0] track,
   labelTertiary for the buffered band, accentSubtle for the loop region and loop markers as solid
   knob-token faces with the level 1 shadow and the controlBorder hairline, so each layer reads apart.
-- **Carousel dots.** The current page in focusRing, the others in controlBorder, so the position
-  reads at 3:1 while the other dots stay quiet.
+- **Page dots.** The current page in focusRing, the others in controlBorder, separator while disabled,
+  in the carousel, the onboarding footer and the cycle selector alike, so the position reads at 3:1
+  while the other dots stay quiet.
 - **Drop zone** outline is dashed in controlBorder at the hairline width; an accepted drag takes the
   drag and drop target look and a refused type gets no highlight.
 - **Glide.** Strips and carousels hand the drag's speed to a spring (standard motion) on release,
@@ -923,7 +924,7 @@ Composites, search and app controls:
   hit.
 - **ConsoleView candidates.** Completion candidates and "No results" show as one Footnote
   labelSecondary line above the field, so they do not cover the log.
-- **Onboarding footer.** The current step is an accent dot plus "Step x of n", so progress is told
+- **Onboarding footer.** The current step is a focusRing dot (the page dots rule) plus "Step x of n", so progress is told
   in words as well as color.
 - **SearchFilterBar count.** The result count sits in Footnote labelSecondary between field and
   chips, close to the query it counts.
