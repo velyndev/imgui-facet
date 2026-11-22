@@ -95,3 +95,48 @@ TEST_CASE("Widgets of every group take kFill, negative widths and readOnly the s
     CHECK(readOnlyValue.x == 0.75f);
     CHECK(value.x == 0.25f);
 }
+
+TEST_CASE("Interactive widgets of every family show the hand cursor, disabled ones the not-allowed cursor")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    static const char* const kItems[] = {"One", "Two", "Three"};
+    // One widget per family, each drawn alone so the pointer rests on it.
+    int which = 0;
+    bool disabled = false;
+    bool toggle = false;
+    bool check = false;
+    float level = 0.5f;
+    int choice = 0;
+    int segment = 0;
+    ImGuiMouseCursor cursor = ImGuiMouseCursor_Arrow;
+    session.SetUi([&] {
+        if (disabled)
+            ImGui::BeginDisabled();
+        switch (which)
+        {
+        case 0: (void)facet::Button("Button"); break;
+        case 1: (void)facet::Toggle("##toggle", &toggle); break;
+        case 2: (void)facet::Checkbox("##check", &check); break;
+        case 3: (void)facet::Slider("##slider", &level, 0.0f, 1.0f, {.width = 200.0f}); break;
+        case 4: (void)facet::Dropdown("##dropdown", &choice, kItems, {.width = 200.0f}); break;
+        default: (void)facet::SegmentedControl("##segments", &segment, kItems); break;
+        }
+        session.Track("widget");
+        if (disabled)
+            ImGui::EndDisabled();
+        cursor = ImGui::GetMouseCursor();
+    });
+    for (which = 0; which < 6; ++which)
+    {
+        CAPTURE(which);
+        disabled = false;
+        session.Frame();
+        session.MouseMove(session.ItemCenter("widget"));
+        session.Frame();
+        CHECK(cursor == ImGuiMouseCursor_Hand);
+        disabled = true;
+        session.Frames(2);
+        CHECK(cursor == ImGuiMouseCursor_NotAllowed);
+    }
+}
