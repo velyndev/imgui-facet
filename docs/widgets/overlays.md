@@ -194,8 +194,10 @@ Queued notifications that `facet::EndFrame` draws in a corner of the display, af
   so nothing is allocated and the caller's strings need to live only during the call. When the queue
   is full, the oldest toast is dropped at once. `ShowToast` outside a frame returns an invalid id.
 - **Stack:** `overlay.toastMaxCount` toasts show at a time, newest nearest the corner,
-  `overlay.toastStackGap` apart and `overlay.toastMargin` from the corner, `overlay.toastWidth` wide
-  (narrower on a narrow display); the others wait and show in the order they were queued. A toast
+  `overlay.toastStackGap` apart and `overlay.toastMargin` from the corner; the others wait and show
+  in the order they were queued. A toast is as wide as its content on one line, so a short message
+  is a short toast, and at most `overlay.toastWidth` wide (less on a narrow display), where its text
+  wraps; one with a progress bar takes that width. All keep to the edge of their corner. A toast
   that leaves keeps its place while it fades, then the others move into the room on a spring, so the
   stack never jumps. A `WatermarkOverlay` strip in the half of the display the stack grows from that
   crosses the stack's column (on a narrow display) moves the stack past it, one stack gap away.

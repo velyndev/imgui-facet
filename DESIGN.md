@@ -120,7 +120,7 @@ cursor, disabled ones the not-allowed cursor.
 | Tables | header 32, columns at least 48, resize band 8 | The header sits on the regular list row rhythm; a column keeps room for a short value and its sort mark; the resize band is two grid steps, easy to grab without covering the cell |
 | Date pickers | day cell 32 | Seven days fit the 256 picker width with padding, and each day is above the minimum hit target |
 | Tooltips | 0.5 s delay, 0.4 s grace, text wraps at 280 | The first tooltip waits until the pointer rests; moving on to a neighbour shows its tooltip at once; long text stays a readable column |
-| Toasts | 5 s, 320 wide, 8 apart, 16 from the corner, 3 at once | Long enough to read two lines, few enough that the stack never covers the content it reports on |
+| Toasts | 5 s, as wide as their content up to 320, 8 apart, 16 from the corner, 3 at once | Long enough to read two lines, few enough that the stack never covers the content it reports on |
 | Dialogs and drawers | modal 440, drawer 320 wide or 280 high, command palette 560 | Wide enough for a title and two buttons in one row, narrow enough to read as a layer over the content |
 | Shell | first size 420 x 520, smallest 280 x 160, title bar 40, resize band 6 | A settings menu fits without scrolling at the first size; at the smallest the title bar and one control row remain |
 | Side columns | sidebar 220, icon rail 52, inspector 280 (at least 200) | Room for an icon and a short label; the rail keeps the icon on the minimum hit target with a margin |
@@ -756,6 +756,9 @@ Overlays:
   both dismisses it and acts.
 - **Toast.** An elevation 2 surface with the popover radius, newest nearest the corner, sliding in
   from the edge and moving on a spring: status news that never covers or jumps the page content.
+  It is as wide as its content, up to overlay.toastWidth: a two-word message in a fixed wide card
+  leaves the close button stranded far from the text, and covers more of the page than it has to
+  say.
 - **Drawer.** Flush with its edge, window radius on the inner corners only, sliding from its edge,
   so it reads as part of the window frame, not a floating card.
 - **Dialog title** in Title3 with a Plain Small close button submitted last: the title leads, and

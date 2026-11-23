@@ -1267,6 +1267,79 @@ TEST_CASE("A toast's action reports on the next frame once, and the toast leaves
     CHECK_FALSE(facet::IsToastVisible(toast));
 }
 
+TEST_CASE("A toast is as wide as its content, at most overlay.toastWidth, and keeps to the corner's edge")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion(true);
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+        {
+            facet::ShowToast("Saved", {.tone = facet::Tone::Success, .duration = -1.0f});
+            facet::ShowToast("A placeholder sentence that goes on for much longer than the widest toast holds on one line",
+                             {.duration = -1.0f});
+            facet::ShowToast("Working", {.duration = -1.0f, .progressBar = true});
+        }
+        show = false;
+    });
+    session.Frames(3);
+    const ImGuiWindow* brief = ToastWindow(0);
+    const ImGuiWindow* wordy = ToastWindow(1);
+    const ImGuiWindow* working = ToastWindow(2);
+    REQUIRE(brief != nullptr);
+    REQUIRE(wordy != nullptr);
+    REQUIRE(working != nullptr);
+    const facet::Theme& theme = facet::T();
+    const float widest = facet::Px(theme.overlay.toastWidth);
+    const float margin = facet::Px(theme.overlay.toastMargin);
+    const float padding = facet::Px(theme.spacing.md);
+    const float close = facet::ControlHeight(facet::ControlSize::Small);
+    const float oneLine = std::ceil(padding * 2.0f + close);
+
+    // A short message: its text on one line with the icon and the close button beside it.
+    const float text = facet::MeasureText(facet::TextStyle::Body, "Saved").x;
+    CHECK(brief->Size.x > padding * 2.0f + text + close);
+    CHECK(brief->Size.x < padding * 2.0f + text + close + facet::Px(48.0f));
+    CHECK(brief->Size.x < widest * 0.6f);
+    CHECK(brief->Size.y == doctest::Approx(oneLine));
+    // A long one takes the widest toast and wraps; a progress bar takes it too.
+    CHECK(wordy->Size.x == doctest::Approx(widest));
+    CHECK(wordy->Size.y > oneLine);
+    CHECK(working->Size.x == doctest::Approx(widest));
+
+    // Whatever their widths, the toasts keep to the edge of their corner.
+    const float right = ImGui::GetIO().DisplaySize.x - margin;
+    for (const ImGuiWindow* toast : {brief, wordy, working})
+        CHECK(toast->Pos.x + toast->Size.x == doctest::Approx(right));
+    facet::SetToastCorner(facet::ScreenCorner::BottomLeft);
+    session.Frames(3);
+    for (const ImGuiWindow* toast : {brief, wordy, working})
+        CHECK(toast->Pos.x == doctest::Approx(margin));
+    facet::SetToastCorner(facet::ScreenCorner::BottomRight);
+    session.Frame();
+}
+
+TEST_CASE("A toast with a short text keeps its action on the first line")
+{
+    facet::test::Session session;
+    REQUIRE(session.Ready());
+    OverlayMotionGuard motion(true);
+    bool show = true;
+    session.SetUi([&] {
+        if (show)
+            facet::ShowToast("Item deleted", {.actionLabel = "Undo", .duration = -1.0f});
+        show = false;
+    });
+    session.Frames(3);
+    const ImGuiWindow* toast = ToastWindow(0);
+    REQUIRE(toast != nullptr);
+    const float padding = facet::Px(facet::T().spacing.md);
+    const float oneLine = std::ceil(padding * 2.0f + facet::ControlHeight(facet::ControlSize::Small));
+    CHECK(toast->Size.x < facet::Px(facet::T().overlay.toastWidth));
+    CHECK(toast->Size.y == doctest::Approx(oneLine));
+}
+
 TEST_CASE("When a toast leaves, the others move into its room without a jump")
 {
     facet::test::Session session;
@@ -1709,8 +1782,11 @@ TEST_CASE("The toast stack keeps clear of a watermark strip across its column an
         session.SetUi([&] {
             markId = ImGui::GetID("mark");
             facet::WatermarkOverlay("mark", fields, {.corner = facet::ScreenCorner::BottomLeft});
+            // A text long enough for the widest toast, so the toast reaches across the strip's
+            // column on the narrow display.
             if (show)
-                toast = facet::ShowToast("Placeholder notification", {.duration = -1.0f});
+                toast = facet::ShowToast("A placeholder notification that takes the whole width of a toast",
+                                         {.duration = -1.0f});
             show = false;
         });
         session.Frames(3);
@@ -1733,6 +1809,30 @@ TEST_CASE("The toast stack keeps clear of a watermark strip across its column an
             CHECK(body.Max.y == doctest::Approx(options.displaySize.y - margin));
         }
     }
+
+    // The stack is as wide as its widest toast: a short toast that ends before the strip keeps its
+    // corner margin on the narrow display too.
+    facet::test::SessionOptions options;
+    options.displaySize = ImVec2(400.0f, 500.0f);
+    facet::test::Session session(options);
+    REQUIRE(session.Ready());
+    facet::ToastId toast;
+    bool show = true;
+    ImGuiID markId = 0;
+    session.SetUi([&] {
+        markId = ImGui::GetID("mark");
+        facet::WatermarkOverlay("mark", fields, {.corner = facet::ScreenCorner::BottomLeft});
+        if (show)
+            toast = facet::ShowToast("Saved", {.duration = -1.0f});
+        show = false;
+    });
+    session.Frames(3);
+    ImRect mark;
+    ImRect body;
+    REQUIRE(fi::OverlayWatermarkRect(markId, &mark));
+    REQUIRE(fi::OverlayToastRects(toast, &body, nullptr, nullptr));
+    REQUIRE(mark.Max.x < body.Min.x);
+    CHECK(body.Max.y == doctest::Approx(options.displaySize.y - facet::Px(facet::T().overlay.toastMargin)));
 }
 
 TEST_CASE("A movable watermark drags to another corner while an overlay menu shows")

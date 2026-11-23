@@ -7,7 +7,8 @@
 // queued; a toast that is still leaving counts, so the next one waits until it is gone.
 //
 // The stack: newest nearest the corner, overlay.toastStackGap apart, overlay.toastMargin from the
-// corner of the display's work area, overlay.toastWidth wide (narrower on a narrow display). Each
+// corner of the display's work area, each as wide as its content and at most overlay.toastWidth
+// (less on a narrow display), with its edge on the corner's side of the stack. Each
 // toast is a window of its own (one per queue slot), drawn after every page and kept in front of the
 // page windows but behind open popups. A toast that leaves keeps its place while it fades, then the
 // others move into the room on a spring, so the stack never jumps. A watermark strip in the half of
@@ -214,9 +215,10 @@ bool CornerIsBottom(ScreenCorner corner)
     return corner == ScreenCorner::BottomLeft || corner == ScreenCorner::BottomRight;
 }
 
-// Where the parts of a toast `width` pixels wide go, measured in the toast's own text styles.
+// Where the parts of a toast go, measured in the toast's own text styles.
 struct ToastLayout
 {
+    float width = 0.0f;        // of the toast
     float padding = 0.0f;
     float iconSize = 0.0f;
     float textX = 0.0f;        // from the toast's left edge
@@ -237,7 +239,10 @@ float SmallButtonWidth(const char* label)
     return std::ceil(m.paddingX * 2.0f + ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x);
 }
 
-ToastLayout MeasureToast(const ToastEntry& entry, float width)
+// A toast is as wide as its content on one line, so a short message is a short toast. Content that
+// needs more than `maxWidth` gets that width and its text wraps. A progress bar has no width of its
+// own: a toast with one takes `maxWidth`.
+ToastLayout MeasureToast(const ToastEntry& entry, float maxWidth)
 {
     const Theme& theme = T();
     ToastLayout layout;
@@ -254,9 +259,20 @@ ToastLayout MeasureToast(const ToastEntry& entry, float width)
     const bool hasAction = entry.action[0] != '\0';
     if (hasAction)
         layout.actionWidth = SmallButtonWidth(entry.action);
+    // The widest line of the texts when nothing wraps, and what stands beside it on the first line.
+    float line = MeasureText(TextStyle::Body, entry.text).x;
+    if (entry.description[0] != '\0')
+        line = std::max(line, MeasureText(TextStyle::Footnote, entry.description).x);
+    const float beside = layout.textX + closeRoom + layout.padding + (hasAction ? layout.actionWidth + gap : 0.0f);
+    // One pixel more than measured, so rounding never wraps the last word.
+    const float natural = std::ceil(beside + line) + 1.0f;
+    const bool oneLine = !entry.progressBar && natural <= maxWidth;
+    const float width = oneLine ? natural : maxWidth;
+    layout.width = width;
     float right = width - layout.padding - closeRoom;
-    // The action stays on the first line while the text keeps at least half the toast width.
-    if (hasAction && right - layout.actionWidth - gap - layout.textX >= width * 0.5f)
+    // The action stays on the first line when everything fits on it, else while the text keeps at
+    // least half the toast width.
+    if (hasAction && (oneLine || right - layout.actionWidth - gap - layout.textX >= width * 0.5f))
         right -= layout.actionWidth + gap;
     else
         layout.actionBelow = hasAction;
@@ -465,10 +481,18 @@ void LayOutAndDrawToasts()
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float margin = Px(theme.overlay.toastMargin);
     const float gapY = Px(theme.overlay.toastStackGap);
-    const float width = std::max(1.0f, std::min(Px(theme.overlay.toastWidth), viewport->WorkSize.x - margin * 2.0f));
+    const float maxWidth = std::max(1.0f, std::min(Px(theme.overlay.toastWidth), viewport->WorkSize.x - margin * 2.0f));
     const bool right = CornerIsRight(s.corner);
     const bool bottom = CornerIsBottom(s.corner);
-    const float baseX = right ? viewport->WorkPos.x + viewport->WorkSize.x - margin - width : viewport->WorkPos.x + margin;
+    // The column the stack takes: as wide as its widest toast, against the corner's edge.
+    ToastLayout layouts[kToastQueueCapacity];
+    float stackWidth = 0.0f;
+    for (int k = 0; k < count; ++k)
+    {
+        layouts[k] = MeasureToast(s.entries[order[k]], maxWidth);
+        stackWidth = std::max(stackWidth, layouts[k].width);
+    }
+    const float columnX = right ? viewport->WorkPos.x + viewport->WorkSize.x - margin - stackWidth : viewport->WorkPos.x + margin;
     float offset = 0.0f;  // from the corner edge, pixels
     // A strip in the half of the display the stack grows from, across the stack's column (a
     // watermark on a narrow display), moves the stack past it, one stack gap away.
@@ -477,7 +501,7 @@ void LayOutAndDrawToasts()
     for (int i = 0; i < s.avoidCount; ++i)
     {
         const ImRect& avoid = s.avoid[i];
-        if (avoid.Max.x <= baseX || avoid.Min.x >= baseX + width || (avoid.GetCenter().y > middleY) != bottom)
+        if (avoid.Max.x <= columnX || avoid.Min.x >= columnX + stackWidth || (avoid.GetCenter().y > middleY) != bottom)
             continue;
         offset = std::max(offset, bottom ? stackEdge - avoid.Min.y + gapY : avoid.Max.y + gapY - stackEdge);
     }
@@ -488,8 +512,11 @@ void LayOutAndDrawToasts()
     {
         const int slot = order[k];
         ToastEntry& entry = s.entries[slot];
-        const ToastLayout layout = MeasureToast(entry, width);
+        const ToastLayout& layout = layouts[k];
         entry.height = layout.height;
+        // Every toast keeps to the corner's edge, whatever its width.
+        const float width = layout.width;
+        const float baseX = right ? viewport->WorkPos.x + viewport->WorkSize.x - margin - width : viewport->WorkPos.x + margin;
         const float targetY = bottom ? viewport->WorkPos.y + viewport->WorkSize.y - margin - offset - layout.height
                                      : viewport->WorkPos.y + margin + offset;
         offset += layout.height + gapY;

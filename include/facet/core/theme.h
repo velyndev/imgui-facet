@@ -354,7 +354,7 @@ struct OverlayTokens
     float tooltipGrace = 0.4f;       // after a tooltip hides, the next one shows at once within this time
     float tooltipMaxWidth = 280.0f;  // tooltip text wraps here
     float toastDuration = 5.0f;      // a toast stays this long unless hovered
-    float toastWidth = 320.0f;
+    float toastWidth = 320.0f;       // the widest toast; one with less content is as wide as that content
     float toastStackGap = 8.0f;      // between stacked toasts
     float toastMargin = 16.0f;       // between the toast stack and the display corner
     int toastMaxCount = 3;           // toasts shown at once; later ones wait in the queue
